@@ -1,0 +1,131 @@
+# Modernisation Plan
+
+## Goal
+
+Bring Fantasy Sumo up to date without losing the useful parts of the old prototype or getting trapped in a huge dependency-upgrade swamp.
+
+The safest approach is to separate work into two streams:
+
+1. **Stabilise and document the legacy app.**
+2. **Modernise or rebuild deliberately.**
+
+## Current risk profile
+
+The current stack is old enough that a direct dependency upgrade may be more expensive than a controlled rebuild:
+
+- React 16 -> current React.
+- TypeScript 3 -> current TypeScript.
+- webpack 4 -> Vite or current webpack.
+- TSLint -> ESLint.
+- `request` -> native `fetch`, `undici`, or another maintained HTTP client.
+- `awesome-typescript-loader` -> no longer needed with Vite, or replace with modern loaders.
+- MySQL X DevAPI usage should be reassessed.
+
+## Recommended path
+
+### Phase 0: Preserve current knowledge
+
+- Add docs describing product intent, current architecture, and roadmap.
+- Record known legacy hazards.
+- Avoid feature work until setup can be reproduced.
+
+### Phase 1: Make the existing app runnable if practical
+
+- Identify a Node version that can install the current dependencies.
+- Add `.nvmrc` or `.tool-versions`.
+- Add `.env.example`.
+- Remove hard-coded DB credentials from source.
+- Document local MySQL setup.
+- Confirm whether the banzuke import endpoint still works.
+
+Exit criteria:
+
+- `npm install` works on the documented Node version.
+- `npm test` works, or known test blockers are documented.
+- App can start locally, or blockers are captured.
+
+### Phase 2: Decide upgrade vs rebuild
+
+Make a conscious decision between:
+
+#### Option A: Incremental upgrade
+
+Useful if the app runs and the codebase is still close to viable.
+
+Suggested order:
+
+1. Move secrets/config to env vars.
+2. Replace TSLint with ESLint.
+3. Upgrade TypeScript.
+4. Replace deprecated HTTP client.
+5. Upgrade test tooling.
+6. Upgrade front-end build tooling.
+7. Upgrade React.
+
+#### Option B: Controlled rebuild
+
+Likely attractive because the current app is small and unfinished.
+
+Potential target:
+
+- Vite + React + TypeScript for the client.
+- Express/Fastify/Hono or Next.js/Remix depending on desired deployment shape.
+- SQLite/Postgres/MySQL depending on hosting preference.
+- Prisma/Drizzle or simple SQL migrations.
+- Vitest/Jest for tests.
+
+Do not rebuild blindly. First preserve:
+
+- Product intent.
+- Existing banzuke/rikishi display behaviour.
+- Any useful parsing/import logic.
+- Domain naming.
+
+## Suggested modern MVP stack
+
+For the quickest useful hobby-project version:
+
+- TypeScript throughout.
+- Vite + React for the client.
+- Express or Hono API server.
+- SQLite for local-first development, moving to Postgres if deploying publicly.
+- Drizzle or Prisma for schema/migrations.
+- Vitest for domain/service tests.
+- Playwright later for core user flows.
+
+## Security and config cleanup
+
+Before any deployment:
+
+- Remove hard-coded DB credentials.
+- Add `.env.example`.
+- Add local-only defaults where safe.
+- Keep production secrets outside source control.
+- Do not expose admin import endpoints without protection.
+
+## Data-source investigation
+
+The app currently imports banzuke data from sumo.or.jp. Before relying on this:
+
+- Verify the endpoint still exists.
+- Check whether results data is available in a stable machine-readable format.
+- Consider a manual CSV/JSON import path as a fallback.
+- Keep data import adapters isolated so the data source can change.
+
+## Recommended first engineering tickets
+
+1. Add `.env.example` and move DB config to environment variables.
+2. Add local setup docs for the legacy app.
+3. Verify the current app can build and start.
+4. Add a pure scoring module with tests.
+5. Add a minimal domain model for basho, rikishi, teams, picks, and results.
+6. Create a first team selection screen using mocked/static data.
+7. Add leaderboard calculation from test data.
+
+## Avoid initially
+
+- Building complete auth before the game loop works.
+- Complex private league management.
+- Real-time updates.
+- Overly clever scoring.
+- Large dependency upgrades mixed with feature work.
