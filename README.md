@@ -35,6 +35,7 @@ Start here:
 - `AGENTS.md` - guidance for AI coding agents working on the repo.
 - `docs/PROJECT_BRIEF.md` - product intent and MVP definition.
 - `docs/ARCHITECTURE.md` - current architecture and suggested future boundaries.
+- `docs/adr/0001-rebuild-architecture.md` - accepted rebuild architecture decision.
 - `docs/MODERNISATION_PLAN.md` - safe path for updating or rebuilding the app.
 - `docs/ROADMAP.md` - staged product/engineering roadmap.
 
@@ -64,7 +65,7 @@ The legacy data layer currently contains hard-coded local database credentials. 
 
 ## Recommended next steps
 
-1. Verify whether the legacy app can still install/build/run.
-2. Add `.env.example` and remove hard-coded DB credentials.
-3. Decide whether to incrementally modernise or rebuild around the documented domain model.
+1. Scaffold the pnpm workspace described in `docs/adr/0001-rebuild-architecture.md`.
+2. Add Vite + React, Fastify, shared domain, and Drizzle + SQLite packages.
+3. Add scoring v0 in the domain package with tests.
 4. Implement the smallest playable MVP: pick a team, enter/import results, calculate scores, show leaderboard.

@@ -23,6 +23,8 @@ The current stack is old enough that a direct dependency upgrade may be more exp
 
 ## Recommended path
 
+Update: [ADR 0001](adr/0001-rebuild-architecture.md) has chosen the controlled rebuild path. The legacy app should now be treated as disposable reference rather than something to stabilise before feature work.
+
 ### Phase 0: Preserve current knowledge
 
 - Add docs describing product intent, current architecture, and roadmap.
@@ -43,6 +45,8 @@ Exit criteria:
 - `npm install` works on the documented Node version.
 - `npm test` works, or known test blockers are documented.
 - App can start locally, or blockers are captured.
+
+This phase is now optional. Do it only if a future ticket needs to recover specific legacy behaviour, such as the old banzuke import shape.
 
 ### Phase 2: Decide upgrade vs rebuild
 
@@ -66,12 +70,13 @@ Suggested order:
 
 Likely attractive because the current app is small and unfinished.
 
-Potential target:
+Accepted target:
 
 - Vite + React + TypeScript for the client.
-- Express/Fastify/Hono or Next.js/Remix depending on desired deployment shape.
-- SQLite/Postgres/MySQL depending on hosting preference.
-- Prisma/Drizzle or simple SQL migrations.
+- Fastify API server.
+- pnpm workspace with small `apps/*` and `packages/*` boundaries.
+- SQLite for the first local MVP.
+- Drizzle for schema and migrations.
 - Vitest/Jest for tests.
 
 Do not rebuild blindly. First preserve:
@@ -87,9 +92,9 @@ For the quickest useful hobby-project version:
 
 - TypeScript throughout.
 - Vite + React for the client.
-- Express or Hono API server.
+- Fastify API server.
 - SQLite for local-first development, moving to Postgres if deploying publicly.
-- Drizzle or Prisma for schema/migrations.
+- Drizzle for schema/migrations.
 - Vitest for domain/service tests.
 - Playwright later for core user flows.
 

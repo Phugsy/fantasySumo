@@ -1,5 +1,11 @@
 # Architecture Notes
 
+## Rebuild decision
+
+The accepted rebuild decision is recorded in [ADR 0001: Rebuild architecture and app foundation](adr/0001-rebuild-architecture.md).
+
+In short: the current app is disposable legacy/reference, and the next foundation should be a small pnpm workspace with a Vite + React web app, Fastify API, SQLite database, Drizzle migrations, and isolated TypeScript domain package. The notes below describe the legacy app and historical target boundaries; prefer ADR 0001 for new implementation work.
+
 ## Current architecture
 
 Fantasy Sumo currently has a simple full-stack TypeScript structure:
