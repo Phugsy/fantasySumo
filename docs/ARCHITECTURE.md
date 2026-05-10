@@ -8,91 +8,64 @@ In short: the current app is disposable legacy/reference, and the next foundatio
 
 ## Current architecture
 
-Fantasy Sumo currently has a simple full-stack TypeScript structure:
+Fantasy Sumo now uses a small pnpm workspace:
 
 ```text
-src/
-  client/
-    app/
-      index.tsx
-      components/
-        App.tsx
-        HeaderBar.tsx
-        SumoRanking.tsx
-  server/
-    app.ts
-    database.ts
+apps/
+  web/          Vite + React smoke app
+  api/          Fastify API
+packages/
+  domain/       Shared TypeScript domain boundary placeholder
 ```
 
-The app is split into:
+The active app is split into:
 
-- A React client bundled by webpack.
-- An Express server compiled by TypeScript.
-- A MySQL-backed data access layer.
+- a React client built by Vite;
+- a Fastify API compiled by TypeScript;
+- a shared framework-free domain package;
+- root pnpm scripts for dev, build, test, lint, and formatting.
 
 ## Front end
 
-The front end entry point is `src/client/app/index.tsx`.
+The front end entry point is `apps/web/src/main.tsx`.
 
 Current behaviour:
 
-- Loads Google fonts via `webfontloader`.
-- Renders the root `App` component into `#root`.
-- `App` renders:
-  - `HeaderBar`
-  - `SumoRankTable`
-- `SumoRankTable` fetches `/api/get-rankings` and displays rank, shikona, and heya.
+- Renders a basic Fantasy Sumo smoke page.
+- Shows the foundation choices: Vite + React, Fastify, and shared package boundary.
+- Has a Vitest smoke test through React Testing Library.
 
 Current limitations:
 
 - No routing.
-- No state management beyond component state.
 - No fantasy team selection flow yet.
 - No leaderboard UI yet.
-- No explicit error/loading design beyond basic text.
+- No API-backed data display yet.
 
 ## Back end
 
-The server entry point is `src/server/app.ts`.
+The API entry point is `apps/api/src/server.ts`.
 
 Current routes:
 
-- `GET /api/get-rankings`
-  - Reads rankings from MySQL.
-- `GET /api/update-rankings`
-  - Fetches banzuke data from sumo.or.jp and stores it in MySQL.
+- `GET /api/health`
+  - Returns a small JSON health payload.
 
 Current limitations:
 
 - No auth.
-- No validation.
 - No typed API contracts.
-- No error handling middleware.
-- No environment-based configuration.
 - No fantasy team, tournament, scoring, result, or leaderboard endpoints yet.
 
 ## Data layer
 
-The current data access code lives in `src/server/database.ts`.
+There is no active data layer in the foundation. The legacy MySQL code and hard-coded local credentials have been removed with the old runtime.
 
-Current behaviour:
-
-- Connects to a local MySQL X Protocol server.
-- Reads and writes to schema `sumo`, table `rankings`.
-- Imports banzuke data from an external endpoint.
-
-Current limitations:
-
-- DB credentials are hard-coded and must be removed before serious development/deployment.
-- No migrations.
-- No seed data.
-- No schema documentation.
-- No test database setup.
-- Import and persistence logic are mixed together.
+Per ADR 0001, the first MVP persistence choice remains SQLite with Drizzle migrations. Add that in the persistence ticket, not in unrelated feature work.
 
 ## Legacy stack snapshot
 
-The repository currently uses older tooling:
+The removed prototype used older tooling:
 
 - React 16.
 - TypeScript 3.
@@ -103,28 +76,35 @@ The repository currently uses older tooling:
 - `request` / `request-promise-native`.
 - `awesome-typescript-loader`.
 
-Treat modernization as its own workstream rather than mixing it with product feature work.
+Treat that code as historical reference only.
 
 ## Recommended target architecture for MVP
 
-A clean MVP can still be a simple monolith:
+A clean MVP should grow within the current workspace boundaries:
 
 ```text
-src/
-  client/
-    ... UI application
-  server/
-    app.ts
-    config/
-    routes/
-    services/
-    repositories/
-    domain/
+apps/
+  web/
+    src/
+      app/
+      features/
+      api/
+  api/
+    src/
+      routes/
+      services/
+      repositories/
+      importers/
+packages/
+  domain/
+    src/
       scoring/
       basho/
       rikishi/
-  shared/
-    types/
+  db/
+    src/
+      schema.ts
+      repositories/
 ```
 
 Recommended boundaries:

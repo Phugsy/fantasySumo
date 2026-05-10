@@ -11,7 +11,7 @@ Goal: make the project understandable and safe for future AI/human contributors.
 - [x] Add architecture notes.
 - [x] Add modernization plan.
 - [x] Decide rebuild architecture and app foundation.
-- [ ] Add local setup instructions once verified.
+- [x] Add local setup instructions once verified.
 - [ ] Add `.env.example`.
 - [ ] Document database schema or replace it with migrations.
 
@@ -19,14 +19,14 @@ Goal: make the project understandable and safe for future AI/human contributors.
 
 Goal: replace the disposable legacy prototype with a clean pnpm workspace foundation as described in `docs/adr/0001-rebuild-architecture.md`.
 
-- [ ] Add pnpm workspace configuration.
-- [ ] Create Vite + React web app.
-- [ ] Create Fastify API with a health endpoint.
-- [ ] Create shared TypeScript domain package.
+- [x] Add pnpm workspace configuration.
+- [x] Create Vite + React web app.
+- [x] Create Fastify API with a health endpoint.
+- [x] Create shared TypeScript domain package.
 - [ ] Add Drizzle + SQLite database package and migration setup.
 - [ ] Add first scoring v0 function with tests.
-- [ ] Update README setup commands for pnpm.
-- [ ] Remove legacy runtime files once the new scaffold replaces them.
+- [x] Update README setup commands for pnpm.
+- [x] Remove legacy runtime files once the new scaffold replaces them.
 
 ## Stage 3: Playable local MVP
 

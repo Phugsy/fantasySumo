@@ -4,29 +4,29 @@ Fantasy Sumo is an unfinished fantasy sports app for professional sumo.
 
 Players should be able to choose a team of rikishi at the start of a basho, then score points based on those rikishi's results during the tournament.
 
-The current codebase is a historical prototype. It has a React/TypeScript front end, an Express/TypeScript back end, and MySQL-backed banzuke/ranking import/display logic. It is not yet a complete playable fantasy game.
+The current codebase has been reset onto the clean rebuild foundation described in `docs/adr/0001-rebuild-architecture.md`. The old React 16, webpack, Express, and MySQL prototype has been removed from active runtime code.
 
 ## Current functionality
 
-At present, the app can display a table of sumo rankings from the local database.
+At present, the app has only foundation smoke functionality:
 
-Existing server endpoints:
+- A Vite + React front-end smoke page.
+- A Fastify API with `GET /api/health`.
+- A shared TypeScript domain package placeholder.
+- Vitest, ESLint, and Prettier wired through pnpm scripts.
 
-- `GET /api/get-rankings` - returns rankings from MySQL.
-- `GET /api/update-rankings` - imports banzuke data from sumo.or.jp into MySQL.
+It is not yet a playable fantasy game.
 
-## Tech stack snapshot
+## Tech Stack
 
-- React 16
-- TypeScript 3
-- styled-components 4
-- Express 4
-- MySQL X DevAPI
-- webpack 4
-- Jest 24
-- TSLint
-
-This stack is old and should be treated carefully. See `docs/MODERNISATION_PLAN.md` before attempting dependency upgrades.
+- pnpm workspace
+- TypeScript
+- Vite
+- React
+- Fastify
+- Vitest
+- ESLint
+- Prettier
 
 ## Documentation
 
@@ -41,31 +41,41 @@ Start here:
 
 ## Local setup
 
-Local setup still needs to be re-verified against the legacy dependency stack.
+Use Node 24 and pnpm. The repo declares its Node version in `.nvmrc` and its package manager in `package.json`.
 
-Historically, the app used:
-
-```bash
-npm install
-npm run build
-npm start
-```
-
-And for client development:
+Install dependencies:
 
 ```bash
-npm run start:dev
+pnpm install
 ```
 
-Before relying on this, identify a working Node version and document it in this README.
+Run both the API and web dev servers:
+
+```bash
+pnpm dev
+```
+
+Local URLs:
+
+- Web: `http://localhost:5173`
+- API health: `http://localhost:3000/api/health`
+
+Useful checks:
+
+```bash
+pnpm build
+pnpm test
+pnpm lint
+pnpm format:check
+```
 
 ## Security note
 
-The legacy data layer currently contains hard-coded local database credentials. These must be moved to environment variables before any serious development or deployment.
+No database or secrets are used by the active foundation. Keep secrets out of source control as data import and persistence are added later.
 
 ## Recommended next steps
 
-1. Scaffold the pnpm workspace described in `docs/adr/0001-rebuild-architecture.md`.
-2. Add Vite + React, Fastify, shared domain, and Drizzle + SQLite packages.
-3. Add scoring v0 in the domain package with tests.
+1. Decide the first concrete MVP slice after the foundation.
+2. Add scoring v0 in the domain package with focused tests.
+3. Add the database package and migration setup when persistence work starts.
 4. Implement the smallest playable MVP: pick a team, enter/import results, calculate scores, show leaderboard.
