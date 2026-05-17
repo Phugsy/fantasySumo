@@ -6,17 +6,16 @@ This file gives AI coding agents the context and guardrails needed to work safel
 
 Fantasy Sumo is intended to be a lightweight fantasy sports app for professional sumo tournaments (`basho`). Players pick a team of rikishi before a tournament starts, then score points based on those rikishi's results during the tournament.
 
-The original app is an unfinished barebones prototype. Treat the existing implementation as a useful historical starting point, not as a production-ready architecture.
+The original app was an unfinished barebones prototype. Treat the removed legacy implementation as a useful historical starting point, not as a production-ready architecture.
 
 ## Current known state
 
-- Front end: React 16, TypeScript, styled-components, webpack 4.
-- Back end: Express, TypeScript, Node, Winston.
-- Data: MySQL via `@mysql/xdevapi`.
-- Existing behaviour: displays current banzuke/ranking data, fetched from the server.
-- Existing server endpoints:
-  - `GET /api/get-rankings` returns rankings from the local database.
-  - `GET /api/update-rankings` pulls banzuke data from sumo.or.jp and stores it locally.
+- Package manager: pnpm workspace.
+- Front end: Vite, React, TypeScript.
+- Back end: Fastify, TypeScript, Node.
+- Shared code: `packages/domain` for framework-free domain boundaries.
+- Data: no active database layer yet. ADR 0001 chooses SQLite + Drizzle for the first MVP persistence work.
+- Existing behaviour: displays a foundation smoke page and exposes `GET /api/health`.
 
 ## Intended MVP direction
 
@@ -45,11 +44,9 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 
 ## Legacy hazards to handle carefully
 
-- The current database connection uses hard-coded local credentials. Treat this as legacy only.
-- The dependency stack is old and may not install cleanly on modern Node versions.
-- The app may need a legacy Node version to run before modernization.
-- The banzuke import uses an external endpoint from sumo.or.jp; verify whether it still works before depending on it.
-- `request` / `request-promise-native`, TSLint, React 16, TypeScript 3, webpack 4, and `awesome-typescript-loader` are legacy dependencies.
+- The removed legacy database connection used hard-coded local credentials. Do not reintroduce credentials in source.
+- The removed banzuke import used an external endpoint from sumo.or.jp; verify whether it still works before depending on it.
+- `request` / `request-promise-native`, TSLint, React 16, TypeScript 3, webpack 4, MySQL X DevAPI, and `awesome-typescript-loader` were legacy dependencies.
 
 ## Suggested workflow
 
@@ -59,7 +56,7 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 4. Read `docs/MODERNISATION_PLAN.md` before upgrading dependencies.
 5. Read `docs/ROADMAP.md` before adding features.
 6. Run tests/build before and after code changes where possible.
-7. If the legacy app cannot run, document the blocker clearly in the PR.
+7. Keep PRs focused on the next MVP slice; do not rebuild the full product in one change.
 
 ## Definition of done for future changes
 

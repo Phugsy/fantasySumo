@@ -25,6 +25,8 @@ The current stack is old enough that a direct dependency upgrade may be more exp
 
 Update: [ADR 0001](adr/0001-rebuild-architecture.md) has chosen the controlled rebuild path. The legacy app should now be treated as disposable reference rather than something to stabilise before feature work.
 
+Update: the rebuild foundation now exists as a pnpm workspace with Vite + React, Fastify, TypeScript, Vitest, ESLint, and Prettier. The old webpack, TSLint, Express, and MySQL runtime files have been removed from active code.
+
 ### Phase 0: Preserve current knowledge
 
 - Add docs describing product intent, current architecture, and roadmap.
@@ -119,13 +121,12 @@ The app currently imports banzuke data from sumo.or.jp. Before relying on this:
 
 ## Recommended first engineering tickets
 
-1. Add `.env.example` and move DB config to environment variables.
-2. Add local setup docs for the legacy app.
-3. Verify the current app can build and start.
-4. Add a pure scoring module with tests.
-5. Add a minimal domain model for basho, rikishi, teams, picks, and results.
-6. Create a first team selection screen using mocked/static data.
-7. Add leaderboard calculation from test data.
+1. Add a pure scoring module with tests.
+2. Add a minimal domain model for basho, rikishi, teams, picks, and results.
+3. Add Drizzle + SQLite when persistence work starts.
+4. Create a first team selection screen using mocked/static data.
+5. Add leaderboard calculation from test data.
+6. Add a result import or manual result entry path.
 
 ## Avoid initially
 

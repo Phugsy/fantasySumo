@@ -1,18 +1,17 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-
-# Test Coverage Reports
-coverage
-
 # Dependency directories
-node_modules
+node_modules/
+.pnpm-store/
 
-# Distribution/Build folders
-dist
+# Distribution/build output
+dist/
 
-# Optional eslint cache
-.eslintcache
+# Test coverage reports
+coverage/
 
+# OS files
+.DS_Store
 
+# Local environment files
+.env
+.env.*
+!.env.example
