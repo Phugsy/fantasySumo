@@ -15,14 +15,14 @@ apps/
   web/          Vite + React smoke app
   api/          Fastify API
 packages/
-  domain/       Shared TypeScript domain boundary placeholder
+  domain/       Shared TypeScript domain types, validation, scoring
 ```
 
 The active app is split into:
 
 - a React client built by Vite;
 - a Fastify API compiled by TypeScript;
-- a shared framework-free domain package;
+- a shared framework-free domain package with MVP types, pick validation, scoring, and leaderboard calculation;
 - root pnpm scripts for dev, build, test, lint, and formatting.
 
 ## Front end
@@ -58,6 +58,25 @@ Current limitations:
 - No auth.
 - No typed API contracts.
 - No fantasy team, tournament, scoring, result, or leaderboard endpoints yet.
+
+## Domain package
+
+The domain package entry point is `packages/domain/src/index.ts`.
+
+Current behaviour:
+
+- Exports shared TypeScript types for `Basho`, `Rikishi`, `BanzukeEntry`, `FantasyTeam`, `FantasyPick`, `BoutResult`, and `LeaderboardEntry`.
+- Scores a rikishi as one point per win.
+- Scores a team as the sum of all wins by the team's picked rikishi.
+- Calculates a leaderboard ordered by score descending.
+- Allows tied team scores and orders ties deterministically by display name, then team id.
+- Validates duplicate picks and exact team size when a team size is supplied.
+
+Current limitations:
+
+- No scoring bonuses yet.
+- No rank-band or budget validation yet.
+- No persistence or API dependency by design.
 
 ## Data layer
 

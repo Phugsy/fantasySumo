@@ -23,7 +23,7 @@ describe("GET /api/health", () => {
     expect(response.json()).toEqual({
       ok: true,
       service: "fantasy-sumo-api",
-      foundation: "foundation",
+      domain: "core-ready",
     });
   });
 });

@@ -1,5 +1,3 @@
-import { foundationLabel } from "@fantasy-sumo/domain";
-
 export function App() {
   return (
     <main className="app-shell">
@@ -21,7 +19,7 @@ export function App() {
           </div>
           <div>
             <dt>Package</dt>
-            <dd>{foundationLabel}</dd>
+            <dd>Domain core</dd>
           </div>
         </dl>
       </section>
