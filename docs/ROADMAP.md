@@ -24,7 +24,7 @@ Goal: replace the disposable legacy prototype with a clean pnpm workspace founda
 - [x] Create Fastify API with a health endpoint.
 - [x] Create shared TypeScript domain package.
 - [ ] Add Drizzle + SQLite database package and migration setup.
-- [ ] Add first scoring v0 function with tests.
+- [x] Add first scoring v0 function with tests.
 - [x] Update README setup commands for pnpm.
 - [x] Remove legacy runtime files once the new scaffold replaces them.
 
@@ -32,14 +32,14 @@ Goal: replace the disposable legacy prototype with a clean pnpm workspace founda
 
 Goal: make the core game loop work locally.
 
-- [ ] Define MVP scoring rules.
-- [ ] Add scoring module and tests.
-- [ ] Model basho/tournament data.
-- [ ] Model rikishi/banzuke entries.
-- [ ] Model fantasy teams and picks.
+- [x] Define MVP scoring rules.
+- [x] Add scoring module and tests.
+- [x] Model basho/tournament data.
+- [x] Model rikishi/banzuke entries.
+- [x] Model fantasy teams and picks.
 - [ ] Add team selection flow.
 - [ ] Add result import or manual result entry.
-- [ ] Add leaderboard calculation.
+- [x] Add leaderboard calculation.
 - [ ] Add leaderboard UI.
 
 ## Stage 4: Friendly single-league version

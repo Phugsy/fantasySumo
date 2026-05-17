@@ -11,5 +11,6 @@ describe("App", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Vite + React")).toBeInTheDocument();
     expect(screen.getByText("Fastify")).toBeInTheDocument();
+    expect(screen.getByText("Domain core")).toBeInTheDocument();
   });
 });
