@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "pnpm --filter @fantasy-sumo/domain build && concurrently -n api,web -c blue,green \"pnpm --filter @fantasy-sumo/api dev\" \"pnpm --filter @fantasy-sumo/web dev\"",
     "build": "pnpm -r --if-present build",
+    "db:migrate": "pnpm --filter @fantasy-sumo/db db:migrate",
+    "db:seed": "pnpm --filter @fantasy-sumo/db db:seed",
     "test": "pnpm --filter @fantasy-sumo/domain build && pnpm -r --if-present test",
     "lint": "eslint .",
     "format": "prettier --write .",

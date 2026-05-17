@@ -27,6 +27,8 @@ Update: [ADR 0001](adr/0001-rebuild-architecture.md) has chosen the controlled r
 
 Update: the rebuild foundation now exists as a pnpm workspace with Vite + React, Fastify, TypeScript, Vitest, ESLint, and Prettier. The old webpack, TSLint, Express, and MySQL runtime files have been removed from active code.
 
+Update: the local MVP persistence layer now uses SQLite with Drizzle schema definitions, migration SQL, repository functions, and seed data in `packages/db`.
+
 ### Phase 0: Preserve current knowledge
 
 - Add docs describing product intent, current architecture, and roadmap.
@@ -123,10 +125,9 @@ The app currently imports banzuke data from sumo.or.jp. Before relying on this:
 
 1. Add a pure scoring module with tests.
 2. Add a minimal domain model for basho, rikishi, teams, picks, and results.
-3. Add Drizzle + SQLite when persistence work starts.
-4. Create a first team selection screen using mocked/static data.
-5. Add leaderboard calculation from test data.
-6. Add a result import or manual result entry path.
+3. Create a first team selection screen using seeded data.
+4. Add API routes backed by database repositories.
+5. Add a result import or manual result entry path.
 
 ## Avoid initially
 

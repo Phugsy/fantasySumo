@@ -4,6 +4,7 @@ node_modules/
 
 # Distribution/build output
 dist/
+data/
 
 # Test coverage reports
 coverage/
