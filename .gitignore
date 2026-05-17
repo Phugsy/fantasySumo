@@ -1,8 +1,17 @@
+# Dependency directories
 node_modules/
 .pnpm-store/
+
+# Distribution/build output
 dist/
+
+# Test coverage reports
 coverage/
+
+# OS files
 .DS_Store
+
+# Local environment files
 .env
 .env.*
 !.env.example

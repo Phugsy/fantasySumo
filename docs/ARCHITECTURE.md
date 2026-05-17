@@ -46,6 +46,8 @@ Current limitations:
 
 The API entry point is `apps/api/src/server.ts`.
 
+The API package is native ESM. TypeScript source should use `.js` file extensions for local relative imports, for example `import { buildApp } from "./app.js";`. With `moduleResolution: "NodeNext"`, TypeScript resolves that to the `.ts` source during development and leaves the emitted JavaScript import valid for Node.
+
 Current routes:
 
 - `GET /api/health`
@@ -77,6 +79,36 @@ The removed prototype used older tooling:
 - `awesome-typescript-loader`.
 
 Treat that code as historical reference only.
+
+## Legacy banzuke import reference
+
+The removed prototype imported banzuke data from:
+
+```text
+http://sumo.or.jp/EnHonbashoBanzuke/index_ajax/1/1/
+```
+
+The response shape used by the old importer was `BanzukeTable`, with rows shaped roughly as:
+
+```text
+banzuke_id
+rikishi_id
+shikona
+banzuke_name
+heya_name
+```
+
+The old database write mapped those fields into a `rankings` table as:
+
+```text
+position <- banzuke_id
+rikishi_id <- rikishi_id
+shikona <- shikona
+rank <- banzuke_name
+heya <- heya_name
+```
+
+This should be treated as implementation reference only. Before reintroducing an importer, verify the endpoint still works, isolate import parsing from scoring, and avoid writing credentials or external source assumptions into active runtime code.
 
 ## Recommended target architecture for MVP
 
