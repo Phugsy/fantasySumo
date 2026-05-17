@@ -54,6 +54,10 @@ export interface RikishiScore {
   score: number;
 }
 
+export interface ScoringOptions {
+  throughDay?: BoutResult["day"];
+}
+
 export interface TeamScore {
   teamId: FantasyTeam["id"];
   displayName: FantasyTeam["displayName"];

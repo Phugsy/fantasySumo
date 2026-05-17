@@ -86,6 +86,34 @@ describe("calculateLeaderboard", () => {
     ]);
   });
 
+  it("can calculate leaderboard standings through a specific basho day", () => {
+    expect(
+      calculateLeaderboard(teams, picks, results, {
+        throughDay: 2,
+      }).map((entry) => ({
+        teamId: entry.teamId,
+        score: entry.score,
+        rank: entry.rank,
+      })),
+    ).toEqual([
+      {
+        teamId: "team-a",
+        score: 2,
+        rank: 1,
+      },
+      {
+        teamId: "team-b",
+        score: 0,
+        rank: 2,
+      },
+      {
+        teamId: "team-c",
+        score: 0,
+        rank: 3,
+      },
+    ]);
+  });
+
   it("orders tied teams deterministically by display name, then team id", () => {
     const tiedTeams: FantasyTeam[] = [
       {

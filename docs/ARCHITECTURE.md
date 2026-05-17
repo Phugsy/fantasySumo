@@ -68,6 +68,7 @@ Current behaviour:
 - Exports shared TypeScript types for `Basho`, `Rikishi`, `BanzukeEntry`, `FantasyTeam`, `FantasyPick`, `BoutResult`, and `LeaderboardEntry`.
 - Scores a rikishi as one point per win.
 - Scores a team as the sum of all wins by the team's picked rikishi.
+- Supports optional day-bounded scoring with `throughDay` so callers can calculate standings after a specific basho day without relying on an implicit "latest" result.
 - Calculates a leaderboard ordered by score descending.
 - Allows tied team scores and orders ties deterministically by display name, then team id.
 - Validates duplicate picks and exact team size when a team size is supplied.

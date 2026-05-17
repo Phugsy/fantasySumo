@@ -4,6 +4,7 @@ import type {
   FantasyPick,
   FantasyTeam,
   LeaderboardEntry,
+  ScoringOptions,
   TeamScore,
 } from "./types.js";
 
@@ -11,9 +12,10 @@ export function calculateLeaderboard(
   teams: readonly FantasyTeam[],
   picks: readonly FantasyPick[],
   boutResults: readonly BoutResult[],
+  options: ScoringOptions = {},
 ): LeaderboardEntry[] {
   const sortedScores = teams
-    .map((team) => calculateTeamScore(team, picks, boutResults))
+    .map((team) => calculateTeamScore(team, picks, boutResults, options))
     .sort(compareLeaderboardEntries);
 
   return sortedScores.map((entry, index) => ({

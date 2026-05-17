@@ -69,6 +69,18 @@ describe("calculateRikishiScore", () => {
       score: 1,
     });
   });
+
+  it("can score a rikishi through a specific basho day", () => {
+    expect(
+      calculateRikishiScore("onosato", results, {
+        throughDay: 2,
+      }),
+    ).toEqual({
+      rikishiId: "onosato",
+      wins: 0,
+      score: 0,
+    });
+  });
 });
 
 describe("calculateTeamScore", () => {
@@ -116,5 +128,24 @@ describe("calculateTeamScore", () => {
     ];
 
     expect(calculateTeamScore(team, picks, results).score).toBe(1);
+  });
+
+  it("can score a team through a specific basho day", () => {
+    const picks: FantasyPick[] = [
+      {
+        teamId: team.id,
+        rikishiId: "kotozakura",
+      },
+      {
+        teamId: team.id,
+        rikishiId: "onosato",
+      },
+    ];
+
+    expect(
+      calculateTeamScore(team, picks, results, {
+        throughDay: 2,
+      }).score,
+    ).toBe(1);
   });
 });

@@ -4,24 +4,26 @@ import type {
   FantasyTeam,
   Rikishi,
   RikishiScore,
+  ScoringOptions,
   TeamScore,
 } from "./types.js";
 
 export function countPickedRikishiWins(
   rikishiId: Rikishi["id"],
   boutResults: readonly BoutResult[],
+  options: ScoringOptions = {},
 ): number {
-  return boutResults.filter(
-    (result) =>
-      result.winnerRikishiId === rikishiId && result.winnerAbsent !== true,
+  return filterResultsForScoring(boutResults, options).filter(
+    (result) => result.winnerRikishiId === rikishiId,
   ).length;
 }
 
 export function calculateRikishiScore(
   rikishiId: Rikishi["id"],
   boutResults: readonly BoutResult[],
+  options: ScoringOptions = {},
 ): RikishiScore {
-  const wins = countPickedRikishiWins(rikishiId, boutResults);
+  const wins = countPickedRikishiWins(rikishiId, boutResults, options);
 
   return {
     rikishiId,
@@ -34,10 +36,11 @@ export function calculateTeamScore(
   team: FantasyTeam,
   picks: readonly FantasyPick[],
   boutResults: readonly BoutResult[],
+  options: ScoringOptions = {},
 ): TeamScore {
   const teamPicks = picks.filter((pick) => pick.teamId === team.id);
   const rikishiScores = teamPicks.map((pick) =>
-    calculateRikishiScore(pick.rikishiId, boutResults),
+    calculateRikishiScore(pick.rikishiId, boutResults, options),
   );
 
   return {
@@ -49,4 +52,15 @@ export function calculateTeamScore(
     ),
     rikishiScores,
   };
+}
+
+function filterResultsForScoring(
+  boutResults: readonly BoutResult[],
+  options: ScoringOptions,
+): BoutResult[] {
+  return boutResults.filter(
+    (result) =>
+      result.winnerAbsent !== true &&
+      (options.throughDay === undefined || result.day <= options.throughDay),
+  );
 }

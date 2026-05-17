@@ -74,6 +74,7 @@ Start with something simple and transparent:
 - +1 point for each win by a picked rikishi.
 - 0 points for a loss or absence.
 - Team score is the sum of all picked rikishi points.
+- Scores can be calculated from all supplied results or through a specific basho day.
 - Leaderboard entries are ordered by score descending.
 - Tied teams are allowed and are ordered deterministically by display name, then team id.
 

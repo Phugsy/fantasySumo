@@ -11,6 +11,7 @@ export type {
   PickValidationOptions,
   Rikishi,
   RikishiScore,
+  ScoringOptions,
   TeamScore,
 } from "./types.js";
 export {
