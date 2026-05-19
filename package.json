@@ -6,7 +6,7 @@
   "type": "module",
   "packageManager": "pnpm@11.0.9",
   "scripts": {
-    "dev": "pnpm --filter @fantasy-sumo/domain build && concurrently -n api,web -c blue,green \"pnpm --filter @fantasy-sumo/api dev\" \"pnpm --filter @fantasy-sumo/web dev\"",
+    "dev": "pnpm --filter @fantasy-sumo/domain build && pnpm --filter @fantasy-sumo/db build && concurrently -n api,web -c blue,green \"pnpm --filter @fantasy-sumo/api dev\" \"pnpm --filter @fantasy-sumo/web dev\"",
     "build": "pnpm -r --if-present build",
     "db:migrate": "pnpm --filter @fantasy-sumo/db db:migrate",
     "db:seed": "pnpm --filter @fantasy-sumo/db db:seed",

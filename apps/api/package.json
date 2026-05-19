@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json",
+    "dev": "pnpm --filter @fantasy-sumo/db build && tsx watch src/server.ts",
+    "build": "pnpm --filter @fantasy-sumo/db build && tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "test": "vitest run src"
+    "test": "pnpm --filter @fantasy-sumo/db build && vitest run src"
   },
   "dependencies": {
+    "@fantasy-sumo/db": "workspace:*",
     "@fantasy-sumo/domain": "workspace:*",
     "fastify": "^5.6.2"
   },

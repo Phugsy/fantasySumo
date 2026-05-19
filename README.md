@@ -8,10 +8,10 @@ The current codebase has been reset onto the clean rebuild foundation described 
 
 ## Current functionality
 
-At present, the app has only foundation smoke functionality:
+At present, the app has the first local MVP foundations:
 
 - A Vite + React front-end smoke page.
-- A Fastify API with `GET /api/health`.
+- A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.
 - A shared TypeScript domain package with MVP types, validation, scoring, and leaderboard logic.
 - A local SQLite + Drizzle database package with schema, migration, repositories, and sample seed data.
 - Vitest, ESLint, and Prettier wired through pnpm scripts.
@@ -69,6 +69,14 @@ Local URLs:
 
 - Web: `http://localhost:5173`
 - API health: `http://localhost:3000/api/health`
+
+Useful API endpoints:
+
+- `GET /api/basho/current`
+- `GET /api/basho/:bashoId/rikishi`
+- `POST /api/basho/:bashoId/teams`
+- `GET /api/basho/:bashoId/teams/:teamId`
+- `GET /api/basho/:bashoId/leaderboard`
 
 Useful checks:
 

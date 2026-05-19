@@ -18,7 +18,7 @@ import {
 } from "./schema.js";
 
 export function createRepositories(db: SqliteDatabase) {
-  return {
+  const repositories = {
     insertBasho: (entry: Basho) => db.insert(basho).values(entry).run(),
     listBashos: () => db.select().from(basho).orderBy(basho.startDate).all(),
     getBasho: (id: Basho["id"]) =>
@@ -41,6 +41,15 @@ export function createRepositories(db: SqliteDatabase) {
 
     insertFantasyTeam: (entry: FantasyTeam) =>
       db.insert(fantasyTeams).values(toFantasyTeamRow(entry)).run(),
+    getFantasyTeam: (id: FantasyTeam["id"]) => {
+      const row = db
+        .select()
+        .from(fantasyTeams)
+        .where(eq(fantasyTeams.id, id))
+        .get();
+
+      return row === undefined ? undefined : toFantasyTeam(row);
+    },
     listFantasyTeamsForBasho: (bashoId: Basho["id"]) =>
       db
         .select()
@@ -60,6 +69,10 @@ export function createRepositories(db: SqliteDatabase) {
         .orderBy(fantasyPicks.id)
         .all()
         .map(toFantasyPick),
+    listFantasyPicksForBasho: (bashoId: Basho["id"]) =>
+      repositories
+        .listFantasyTeamsForBasho(bashoId)
+        .flatMap((team) => repositories.listFantasyPicksForTeam(team.id)),
 
     insertBoutResult: (entry: BoutResult) =>
       db.insert(boutResults).values(toBoutResultRow(entry)).run(),
@@ -72,7 +85,11 @@ export function createRepositories(db: SqliteDatabase) {
         .all()
         .map(toBoutResult),
   };
+
+  return repositories;
 }
+
+export type Repositories = ReturnType<typeof createRepositories>;
 
 function toRikishiRow(entry: Rikishi) {
   return {
