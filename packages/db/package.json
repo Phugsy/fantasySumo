@@ -1,0 +1,31 @@
+{
+  "name": "@fantasy-sumo/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/scripts/migrate.ts",
+    "db:seed": "tsx src/scripts/seed.ts",
+    "test": "vitest run src"
+  },
+  "dependencies": {
+    "@fantasy-sumo/domain": "workspace:*",
+    "better-sqlite3": "^12.10.0",
+    "drizzle-orm": "^0.45.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.10.1",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.20.6",
+    "vitest": "^4.0.13"
+  }
+}

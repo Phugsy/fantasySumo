@@ -16,6 +16,7 @@ apps/
   api/          Fastify API
 packages/
   domain/       Shared TypeScript domain types, validation, scoring
+  db/           SQLite schema, migrations, repositories, seed data
 ```
 
 The active app is split into:
@@ -23,6 +24,7 @@ The active app is split into:
 - a React client built by Vite;
 - a Fastify API compiled by TypeScript;
 - a shared framework-free domain package with MVP types, pick validation, scoring, and leaderboard calculation;
+- a SQLite/Drizzle data package for local-first persistence;
 - root pnpm scripts for dev, build, test, lint, and formatting.
 
 ## Front end
@@ -81,9 +83,30 @@ Current limitations:
 
 ## Data layer
 
-There is no active data layer in the foundation. The legacy MySQL code and hard-coded local credentials have been removed with the old runtime.
+The data package entry point is `packages/db/src/index.ts`.
 
-Per ADR 0001, the first MVP persistence choice remains SQLite with Drizzle migrations. Add that in the persistence ticket, not in unrelated feature work.
+Current behaviour:
+
+- Uses SQLite through `better-sqlite3`.
+- Defines the MVP schema with Drizzle table definitions.
+- Includes Drizzle migration SQL and metadata in `packages/db/drizzle`.
+- Uses `DATABASE_URL` for the local SQLite file path, defaulting to `file:./data/fantasy-sumo.sqlite` relative to the database package scripts.
+- Provides repository functions for reading and writing basho, rikishi, banzuke entries, fantasy teams, fantasy picks, and bout results.
+- Provides sample seed data for one basho, four rikishi, two fantasy teams, picks, and bout results.
+
+Current scripts:
+
+```text
+pnpm db:migrate
+pnpm db:seed
+pnpm --filter @fantasy-sumo/db db:generate
+```
+
+Current limitations:
+
+- No API routes use the repositories yet.
+- No live banzuke/results import yet.
+- No production database configuration yet.
 
 ## Legacy stack snapshot
 
@@ -154,8 +177,10 @@ packages/
       basho/
       rikishi/
   db/
+    drizzle/
     src/
       schema.ts
+      client.ts
       repositories/
 ```
 

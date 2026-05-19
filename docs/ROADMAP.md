@@ -12,8 +12,8 @@ Goal: make the project understandable and safe for future AI/human contributors.
 - [x] Add modernization plan.
 - [x] Decide rebuild architecture and app foundation.
 - [x] Add local setup instructions once verified.
-- [ ] Add `.env.example`.
-- [ ] Document database schema or replace it with migrations.
+- [x] Add `.env.example`.
+- [x] Document database schema or replace it with migrations.
 
 ## Stage 2: Rebuild foundation
 
@@ -23,7 +23,7 @@ Goal: replace the disposable legacy prototype with a clean pnpm workspace founda
 - [x] Create Vite + React web app.
 - [x] Create Fastify API with a health endpoint.
 - [x] Create shared TypeScript domain package.
-- [ ] Add Drizzle + SQLite database package and migration setup.
+- [x] Add Drizzle + SQLite database package and migration setup.
 - [x] Add first scoring v0 function with tests.
 - [x] Update README setup commands for pnpm.
 - [x] Remove legacy runtime files once the new scaffold replaces them.

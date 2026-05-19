@@ -12,7 +12,8 @@ At present, the app has only foundation smoke functionality:
 
 - A Vite + React front-end smoke page.
 - A Fastify API with `GET /api/health`.
-- A shared TypeScript domain package placeholder.
+- A shared TypeScript domain package with MVP types, validation, scoring, and leaderboard logic.
+- A local SQLite + Drizzle database package with schema, migration, repositories, and sample seed data.
 - Vitest, ESLint, and Prettier wired through pnpm scripts.
 
 It is not yet a playable fantasy game.
@@ -24,6 +25,8 @@ It is not yet a playable fantasy game.
 - Vite
 - React
 - Fastify
+- SQLite
+- Drizzle
 - Vitest
 - ESLint
 - Prettier
@@ -49,6 +52,13 @@ Install dependencies:
 pnpm install
 ```
 
+Create a local database and seed sample MVP data:
+
+```bash
+pnpm db:migrate
+pnpm db:seed
+```
+
 Run both the API and web dev servers:
 
 ```bash
@@ -69,13 +79,18 @@ pnpm lint
 pnpm format:check
 ```
 
+By default, the database package writes local SQLite data to `packages/db/data/fantasy-sumo.sqlite` when run through the pnpm scripts. Override this with `DATABASE_URL` using a `file:` SQLite URL, for example:
+
+```bash
+DATABASE_URL=file:./data/dev.sqlite pnpm db:seed
+```
+
 ## Security note
 
-No database or secrets are used by the active foundation. Keep secrets out of source control as data import and persistence are added later.
+The local database uses a file path only and does not require credentials. Keep future secrets out of source control.
 
 ## Recommended next steps
 
-1. Decide the first concrete MVP slice after the foundation.
-2. Add scoring v0 in the domain package with focused tests.
-3. Add the database package and migration setup when persistence work starts.
-4. Implement the smallest playable MVP: pick a team, enter/import results, calculate scores, show leaderboard.
+1. Wire API routes to the database repositories.
+2. Build the first team selection flow against seeded data.
+3. Implement the smallest playable MVP: pick a team, enter/import results, calculate scores, show leaderboard.
