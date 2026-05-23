@@ -1,15 +1,21 @@
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createDatabaseClient, type DatabaseClient } from "@fantasy-sumo/db";
 import { buildApp } from "./app.js";
 
 let app: FastifyInstance;
+let client: DatabaseClient;
 
 beforeEach(() => {
-  app = buildApp();
+  client = createDatabaseClient(":memory:");
+  app = buildApp({
+    db: client.db,
+  });
 });
 
 afterEach(async () => {
   await app.close();
+  client.close();
 });
 
 describe("GET /api/health", () => {

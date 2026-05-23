@@ -54,12 +54,26 @@ Current routes:
 
 - `GET /api/health`
   - Returns a small JSON health payload.
+- `GET /api/basho/current`
+  - Returns the active basho, falling back to the latest available basho when none is active.
+- `GET /api/basho/:bashoId/rikishi`
+  - Returns a basho and its rikishi with banzuke rank data.
+- `POST /api/basho/:bashoId/teams`
+  - Creates a display-name-based fantasy team for the basho.
+  - Request body: `displayName`, optional `ownerName`, and `rikishiIds`.
+  - The current team size is 2 rikishi.
+  - Validates duplicate picks, exact team size, and whether each picked rikishi is on that basho's banzuke.
+- `GET /api/basho/:bashoId/teams/:teamId`
+  - Returns a fantasy team and its picks.
+- `GET /api/basho/:bashoId/leaderboard`
+  - Returns leaderboard entries calculated with the domain scoring module.
 
 Current limitations:
 
 - No auth.
-- No typed API contracts.
-- No fantasy team, tournament, scoring, result, or leaderboard endpoints yet.
+- No dedicated API client package.
+- No result import or manual result entry endpoints yet.
+- No pick-locking rules yet.
 
 ## Domain package
 
@@ -104,7 +118,6 @@ pnpm --filter @fantasy-sumo/db db:generate
 
 Current limitations:
 
-- No API routes use the repositories yet.
 - No live banzuke/results import yet.
 - No production database configuration yet.
 

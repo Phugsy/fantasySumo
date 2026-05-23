@@ -15,7 +15,7 @@ The original app was an unfinished barebones prototype. Treat the removed legacy
 - Back end: Fastify, TypeScript, Node.
 - Shared code: `packages/domain` for framework-free domain boundaries.
 - Data: SQLite via `packages/db`, with Drizzle schema, migration SQL, repositories, and seed data.
-- Existing behaviour: displays a foundation smoke page and exposes `GET /api/health`.
+- Existing behaviour: displays a foundation smoke page and exposes local game API routes for health, basho, rikishi, team creation/retrieval, and leaderboard data.
 
 ## Intended MVP direction
 
