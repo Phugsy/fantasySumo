@@ -33,16 +33,18 @@ The front end entry point is `apps/web/src/main.tsx`.
 
 Current behaviour:
 
-- Renders a basic Fantasy Sumo smoke page.
-- Shows the foundation choices: Vite + React, Fastify, and shared package boundary.
-- Has a Vitest smoke test through React Testing Library.
+- Fetches the current basho and its ranked rikishi from the Fastify API.
+- Lets a player select and deselect rikishi up to the current team size of 2.
+- Captures a display/team name and submits the team to the API.
+- Shows loading, empty, success, and API error states.
+- Has Vitest coverage through React Testing Library.
 
 Current limitations:
 
 - No routing.
-- No fantasy team selection flow yet.
 - No leaderboard UI yet.
-- No API-backed data display yet.
+- No result entry/import UI yet.
+- No persistence of the last created team in browser storage yet.
 
 ## Back end
 
