@@ -61,7 +61,7 @@ Current routes:
 - `POST /api/basho/:bashoId/teams`
   - Creates a display-name-based fantasy team for the basho.
   - Request body: `displayName`, optional `ownerName`, and `rikishiIds`.
-  - The temporary local MVP team size is 2 rikishi.
+  - The current team size is 2 rikishi.
   - Validates duplicate picks, exact team size, and whether each picked rikishi is on that basho's banzuke.
 - `GET /api/basho/:bashoId/teams/:teamId`
   - Returns a fantasy team and its picks.

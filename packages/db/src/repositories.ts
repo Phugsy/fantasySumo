@@ -41,6 +41,17 @@ export function createRepositories(db: SqliteDatabase) {
 
     insertFantasyTeam: (entry: FantasyTeam) =>
       db.insert(fantasyTeams).values(toFantasyTeamRow(entry)).run(),
+    insertFantasyTeamWithPicks: (
+      team: FantasyTeam,
+      picks: readonly FantasyPick[],
+    ) =>
+      db.transaction((transaction) => {
+        transaction.insert(fantasyTeams).values(toFantasyTeamRow(team)).run();
+
+        for (const pick of picks) {
+          transaction.insert(fantasyPicks).values(toFantasyPickRow(pick)).run();
+        }
+      }),
     getFantasyTeam: (id: FantasyTeam["id"]) => {
       const row = db
         .select()

@@ -8,7 +8,7 @@ The current codebase has been reset onto the clean rebuild foundation described 
 
 ## Current functionality
 
-At present, the app has the first local MVP foundations:
+At present, the app has the first local playable foundations:
 
 - A Vite + React front-end smoke page.
 - A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.

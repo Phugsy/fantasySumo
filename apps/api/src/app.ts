@@ -5,9 +5,9 @@ import {
   createRepositories,
   type SqliteDatabase,
 } from "@fantasy-sumo/db";
-import { registerMvpRoutes } from "./routes/mvp.js";
+import { registerBashoRoutes } from "./routes/basho.js";
 
-const MVP_TEAM_SIZE = 2;
+const TEAM_SIZE = 2;
 
 interface AppOptions {
   db?: SqliteDatabase;
@@ -37,11 +37,11 @@ export function buildApp(options: AppOptions = {}) {
     domain: "core-ready",
   }));
 
-  registerMvpRoutes(app, {
+  registerBashoRoutes(app, {
     repositories,
     now: options.now ?? (() => new Date()),
     teamIdFactory: options.teamIdFactory ?? randomUUID,
-    teamSize: options.teamSize ?? MVP_TEAM_SIZE,
+    teamSize: options.teamSize ?? TEAM_SIZE,
   });
 
   return app;

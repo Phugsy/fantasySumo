@@ -90,4 +90,32 @@ describe("repositories", () => {
         .map((team) => team.id),
     ).toContain("team-north");
   });
+
+  it("rolls back team creation when a pick insert fails", () => {
+    seedDatabase(client.db);
+    const repositories = createRepositories(client.db);
+
+    expect(() =>
+      repositories.insertFantasyTeamWithPicks(
+        {
+          id: "team-rollback",
+          bashoId: sampleBasho.id,
+          displayName: "Rollback Team",
+        },
+        [
+          {
+            teamId: "team-rollback",
+            rikishiId: "onosato",
+          },
+          {
+            teamId: "team-rollback",
+            rikishiId: "onosato",
+          },
+        ],
+      ),
+    ).toThrow();
+
+    expect(repositories.getFantasyTeam("team-rollback")).toBeUndefined();
+    expect(repositories.listFantasyPicksForTeam("team-rollback")).toEqual([]);
+  });
 });

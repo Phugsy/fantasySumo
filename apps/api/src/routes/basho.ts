@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import type { Repositories } from "@fantasy-sumo/db";
 import type { FantasyPick, FantasyTeam } from "@fantasy-sumo/domain";
 import {
@@ -13,13 +14,16 @@ interface RouteContext {
   teamSize: number;
 }
 
-interface CreateTeamBody {
-  displayName?: string;
-  ownerName?: string;
-  rikishiIds?: string[];
-}
+const createTeamBodySchema = z.object({
+  displayName: z.string().trim().min(1),
+  ownerName: z.string().trim().optional(),
+  rikishiIds: z.array(z.string().trim().min(1)),
+});
 
-export function registerMvpRoutes(app: FastifyInstance, context: RouteContext) {
+export function registerBashoRoutes(
+  app: FastifyInstance,
+  context: RouteContext,
+) {
   app.get("/api/basho/current", async (_request, reply) => {
     const currentBasho = findCurrentBasho(context.repositories);
 
@@ -72,109 +76,88 @@ export function registerMvpRoutes(app: FastifyInstance, context: RouteContext) {
 
   app.post<{
     Params: { bashoId: string };
-    Body: CreateTeamBody;
-  }>(
-    "/api/basho/:bashoId/teams",
-    {
-      schema: {
-        body: {
-          type: "object",
-          required: ["displayName", "rikishiIds"],
-          additionalProperties: false,
-          properties: {
-            displayName: { type: "string", minLength: 1 },
-            ownerName: { type: "string" },
-            rikishiIds: {
-              type: "array",
-              items: { type: "string", minLength: 1 },
-            },
-          },
-        },
-      },
-    },
-    async (request, reply) => {
-      const basho = context.repositories.getBasho(request.params.bashoId);
+    Body: unknown;
+  }>("/api/basho/:bashoId/teams", async (request, reply) => {
+    const basho = context.repositories.getBasho(request.params.bashoId);
 
-      if (basho === undefined) {
-        return reply.code(404).send({
-          error: "not-found",
-          message: `Basho ${request.params.bashoId} was not found.`,
-        });
-      }
+    if (basho === undefined) {
+      return reply.code(404).send({
+        error: "not-found",
+        message: `Basho ${request.params.bashoId} was not found.`,
+      });
+    }
 
-      const displayName = request.body.displayName?.trim() ?? "";
-      const ownerName = request.body.ownerName?.trim();
-      const rikishiIds = request.body.rikishiIds ?? [];
+    const parsedBody = createTeamBodySchema.safeParse(request.body);
 
-      if (displayName.length === 0) {
-        return reply.code(400).send({
-          error: "invalid-request",
-          message: "displayName is required.",
-        });
-      }
+    if (!parsedBody.success) {
+      return reply.code(400).send({
+        error: "invalid-request",
+        message: "Team creation request is invalid.",
+        details: parsedBody.error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message,
+        })),
+      });
+    }
 
-      const teamId = `team-${context.teamIdFactory()}`;
-      const picks = rikishiIds.map(
-        (rikishiId): FantasyPick => ({
-          teamId,
+    const { displayName, ownerName, rikishiIds } = parsedBody.data;
+    const teamId = `team-${context.teamIdFactory()}`;
+    const picks = rikishiIds.map(
+      (rikishiId): FantasyPick => ({
+        teamId,
+        rikishiId,
+      }),
+    );
+    const pickErrors = validateFantasyPicks(picks, {
+      teamSize: context.teamSize,
+    });
+
+    if (pickErrors.length > 0) {
+      return reply.code(400).send({
+        error: "invalid-picks",
+        message: "Fantasy team picks are invalid.",
+        details: pickErrors,
+      });
+    }
+
+    const validRikishiIds = new Set(
+      context.repositories
+        .listBanzukeEntriesForBasho(basho.id)
+        .map((entry) => entry.rikishiId),
+    );
+    const invalidRikishiIds = rikishiIds.filter(
+      (rikishiId) => !validRikishiIds.has(rikishiId),
+    );
+
+    if (invalidRikishiIds.length > 0) {
+      return reply.code(400).send({
+        error: "invalid-picks",
+        message: "Fantasy team picks include rikishi outside this basho.",
+        details: invalidRikishiIds.map((rikishiId) => ({
+          code: "unknown-rikishi",
+          message: `Rikishi ${rikishiId} is not available for basho ${basho.id}.`,
           rikishiId,
-        }),
-      );
-      const pickErrors = validateFantasyPicks(picks, {
-        teamSize: context.teamSize,
+        })),
       });
+    }
 
-      if (pickErrors.length > 0) {
-        return reply.code(400).send({
-          error: "invalid-picks",
-          message: "Fantasy team picks are invalid.",
-          details: pickErrors,
-        });
-      }
+    const team: FantasyTeam = {
+      id: teamId,
+      bashoId: basho.id,
+      displayName,
+      ...(ownerName === undefined || ownerName.length === 0
+        ? {}
+        : { ownerName }),
+      createdAt: context.now().toISOString(),
+    };
 
-      const validRikishiIds = new Set(
-        context.repositories
-          .listBanzukeEntriesForBasho(basho.id)
-          .map((entry) => entry.rikishiId),
-      );
-      const invalidRikishiIds = rikishiIds.filter(
-        (rikishiId) => !validRikishiIds.has(rikishiId),
-      );
+    context.repositories.insertFantasyTeamWithPicks(team, picks);
 
-      if (invalidRikishiIds.length > 0) {
-        return reply.code(400).send({
-          error: "invalid-picks",
-          message: "Fantasy team picks include rikishi outside this basho.",
-          details: invalidRikishiIds.map((rikishiId) => ({
-            code: "unknown-rikishi",
-            message: `Rikishi ${rikishiId} is not available for basho ${basho.id}.`,
-            rikishiId,
-          })),
-        });
-      }
-
-      const team: FantasyTeam = {
-        id: teamId,
-        bashoId: basho.id,
-        displayName,
-        ...(ownerName === undefined || ownerName.length === 0
-          ? {}
-          : { ownerName }),
-        createdAt: context.now().toISOString(),
-      };
-
-      context.repositories.insertFantasyTeam(team);
-
-      for (const pick of picks) {
-        context.repositories.insertFantasyPick(pick);
-      }
-
-      return reply.code(201).send({
-        team,
-        picks: context.repositories.listFantasyPicksForTeam(team.id),
-      });
-    },
-  );
+    return reply.code(201).send({
+      team,
+      picks: context.repositories.listFantasyPicksForTeam(team.id),
+    });
+  });
 
   app.get<{
     Params: { bashoId: string; teamId: string };
