@@ -119,6 +119,25 @@ describe("App", () => {
     expect(screen.getAllByText("1 win")).toHaveLength(2);
   });
 
+  it("keeps team selection available when the initial leaderboard load fails", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockInitialLeaderboardErrorFetch));
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "May 2026 Sample Basho" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Onosato/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
+
+    expect(
+      screen.getByText("Leaderboard unavailable right now."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("No teams have joined this basho yet."),
+    ).toBeInTheDocument();
+  });
+
   it("allows selecting and removing rikishi up to the team size", async () => {
     render(<App />);
 
@@ -166,6 +185,29 @@ describe("App", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Leaderboard" }),
+    ).toBeInTheDocument();
+  });
+
+  it("stays on team selection and shows the refresh error when standings fail after submit", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockSubmitLeaderboardErrorFetch()));
+    render(<App />);
+
+    await screen.findByRole("button", { name: /Onosato/ });
+    fireEvent.change(screen.getByLabelText("Team name"), {
+      target: { value: "East Stand Heroes" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Onosato/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Kotozakura/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit team" }));
+
+    expect(
+      await screen.findByText("East Stand Heroes submitted."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Unable to refresh leaderboard."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Selection" }),
     ).toBeInTheDocument();
   });
 
@@ -251,6 +293,50 @@ function mockEmptyLeaderboardFetch(
     bashoId: currentBasho.id,
     leaderboard: [],
   });
+}
+
+function mockInitialLeaderboardErrorFetch(
+  input: RequestInfo | URL,
+): Promise<Response> {
+  const url = String(input);
+
+  if (url !== "/api/basho/2026-05/leaderboard") {
+    return mockSuccessfulFetch(input);
+  }
+
+  return jsonResponse(
+    {
+      message: "Leaderboard unavailable right now.",
+    },
+    { status: 503 },
+  );
+}
+
+function mockSubmitLeaderboardErrorFetch(): (
+  input: RequestInfo | URL,
+) => Promise<Response> {
+  let leaderboardRequestCount = 0;
+
+  return (input: RequestInfo | URL) => {
+    const url = String(input);
+
+    if (url !== "/api/basho/2026-05/leaderboard") {
+      return mockSuccessfulFetch(input);
+    }
+
+    leaderboardRequestCount += 1;
+
+    if (leaderboardRequestCount === 1) {
+      return mockSuccessfulFetch(input);
+    }
+
+    return jsonResponse(
+      {
+        message: "Unable to refresh leaderboard.",
+      },
+      { status: 503 },
+    );
+  };
 }
 
 function mockValidationErrorFetch(input: RequestInfo | URL): Promise<Response> {
