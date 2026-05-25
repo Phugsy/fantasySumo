@@ -1,0 +1,129 @@
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import type { FormEvent } from "react";
+import { describe, expect, it, vi } from "vitest";
+import { TeamSelection } from "./TeamSelection";
+import type { CreatedTeamResponse, RankedRikishi } from "../types";
+
+const rikishi: RankedRikishi[] = [
+  {
+    id: "onosato",
+    shikona: "Onosato",
+    heya: "Nishonoseki",
+    rank: "Ozeki",
+    rankOrder: 1,
+  },
+  {
+    id: "kotozakura",
+    shikona: "Kotozakura",
+    heya: "Sadogatake",
+    rank: "Ozeki",
+    rankOrder: 2,
+  },
+  {
+    id: "hoshoryu",
+    shikona: "Hoshoryu",
+    heya: "Tatsunami",
+    rank: "Sekiwake",
+    rankOrder: 3,
+  },
+];
+
+const onosato = rikishi[0] as RankedRikishi;
+const kotozakura = rikishi[1] as RankedRikishi;
+
+const createdTeam: CreatedTeamResponse = {
+  team: {
+    id: "team-east",
+    displayName: "East Stand Heroes",
+  },
+  picks: [{ rikishiId: "onosato" }, { rikishiId: "kotozakura" }],
+};
+
+describe("TeamSelection", () => {
+  it("shows selection state and disables extra picks when the team is full", () => {
+    renderTeamSelection({
+      selectedIds: ["onosato", "kotozakura"],
+      selectedRikishi: [onosato, kotozakura],
+    });
+
+    const banzuke = screen.getByRole("region", { name: "Choose rikishi" });
+
+    expect(
+      within(banzuke).getByRole("button", { name: /Onosato/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(banzuke).getByRole("button", { name: /Kotozakura/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(banzuke).getByRole("button", { name: /Hoshoryu/ }),
+    ).toBeDisabled();
+  });
+
+  it("emits input, pick, remove, and submit events", () => {
+    const onDisplayNameChange = vi.fn();
+    const onSubmit = vi.fn((event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+    });
+    const onToggleRikishi = vi.fn();
+
+    renderTeamSelection({
+      displayName: "",
+      onDisplayNameChange,
+      onSubmit,
+      onToggleRikishi,
+    });
+
+    fireEvent.change(screen.getByLabelText("Team name"), {
+      target: { value: "East Stand Heroes" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Onosato/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Kotozakura" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit team" }));
+
+    expect(onDisplayNameChange).toHaveBeenCalledWith("East Stand Heroes");
+    expect(onToggleRikishi).toHaveBeenCalledWith("onosato");
+    expect(onToggleRikishi).toHaveBeenCalledWith("kotozakura");
+    expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
+  it("shows form errors and submission confirmation", () => {
+    renderTeamSelection({
+      createdTeam,
+      errorMessage: "Unable to refresh leaderboard.",
+    });
+
+    expect(
+      screen.getByText("Unable to refresh leaderboard."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("East Stand Heroes submitted."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("2 rikishi selected for this basho."),
+    ).toBeInTheDocument();
+  });
+});
+
+function renderTeamSelection(
+  props: Partial<Parameters<typeof TeamSelection>[0]> = {},
+) {
+  const selectedIds = props.selectedIds ?? ["kotozakura"];
+  const selectedRikishi = props.selectedRikishi ?? [kotozakura];
+
+  return render(
+    <TeamSelection
+      canSubmit={props.canSubmit ?? true}
+      createdTeam={props.createdTeam ?? null}
+      displayName={props.displayName ?? "East Stand Heroes"}
+      errorMessage={props.errorMessage ?? null}
+      onDisplayNameChange={props.onDisplayNameChange ?? vi.fn()}
+      onSubmit={props.onSubmit ?? vi.fn()}
+      onToggleRikishi={props.onToggleRikishi ?? vi.fn()}
+      rikishi={props.rikishi ?? rikishi}
+      selectedIds={selectedIds}
+      selectedRikishi={selectedRikishi}
+      submitState={props.submitState ?? "idle"}
+      teamSize={props.teamSize ?? 2}
+    />,
+  );
+}

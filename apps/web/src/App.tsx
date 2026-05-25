@@ -1,6 +1,12 @@
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { getErrorMessage, getJson, postJson } from "./api";
+import {
+  createFantasyTeam,
+  fetchBashoRikishi,
+  fetchCurrentBasho,
+  fetchLeaderboard,
+  getErrorMessage,
+} from "./api";
 import { BashoPanel } from "./components/BashoPanel";
 import { LeaderboardPanel } from "./components/LeaderboardPanel";
 import { PageHeader } from "./components/PageHeader";
@@ -9,7 +15,6 @@ import { ViewSwitch } from "./components/ViewSwitch";
 import type {
   ActiveView,
   Basho,
-  BashoRikishiResponse,
   CreatedTeamResponse,
   LeaderboardEntry,
   LeaderboardResponse,
@@ -40,10 +45,8 @@ export function App() {
 
     async function loadBasho() {
       try {
-        const currentBasho = await getJson<Basho>("/api/basho/current");
-        const bashoRikishi = await getJson<BashoRikishiResponse>(
-          `/api/basho/${currentBasho.id}/rikishi`,
-        );
+        const currentBasho = await fetchCurrentBasho();
+        const bashoRikishi = await fetchBashoRikishi(currentBasho.id);
 
         if (!isCurrent) {
           return;
@@ -57,9 +60,7 @@ export function App() {
         setLoadState(bashoRikishi.rikishi.length === 0 ? "empty" : "ready");
 
         try {
-          const leaderboardResponse = await getJson<LeaderboardResponse>(
-            `/api/basho/${currentBasho.id}/leaderboard`,
-          );
+          const leaderboardResponse = await fetchLeaderboard(currentBasho.id);
 
           if (!isCurrent) {
             return;
@@ -137,20 +138,15 @@ export function App() {
     setCreatedTeam(null);
 
     try {
-      const response = await postJson<CreatedTeamResponse>(
-        `/api/basho/${basho.id}/teams`,
-        {
-          displayName: displayName.trim(),
-          rikishiIds: selectedIds,
-        },
-      );
+      const response = await createFantasyTeam(basho.id, {
+        displayName: displayName.trim(),
+        rikishiIds: selectedIds,
+      });
 
       setCreatedTeam(response);
 
       try {
-        const leaderboardResponse = await getJson<LeaderboardResponse>(
-          `/api/basho/${basho.id}/leaderboard`,
-        );
+        const leaderboardResponse = await fetchLeaderboard(basho.id);
 
         setLeaderboard(leaderboardResponse.leaderboard);
         setExpandedTeamId(getExpandedTeamId(leaderboardResponse, response));
