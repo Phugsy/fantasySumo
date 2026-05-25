@@ -10,7 +10,7 @@ The current codebase has been reset onto the clean rebuild foundation described 
 
 At present, the app has the first local playable foundations:
 
-- A Vite + React front-end smoke page.
+- A Vite + React front end for creating a fantasy team from seeded basho data.
 - A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.
 - A shared TypeScript domain package with MVP types, validation, scoring, and leaderboard logic.
 - A local SQLite + Drizzle database package with schema, migration, repositories, and sample seed data.
@@ -93,12 +93,14 @@ By default, the database package writes local SQLite data to `packages/db/data/f
 DATABASE_URL=file:./data/dev.sqlite pnpm db:seed
 ```
 
+The local team size defaults to `2`. Override it for the API with `TEAM_SIZE`.
+
 ## Security note
 
 The local database uses a file path only and does not require credentials. Keep future secrets out of source control.
 
 ## Recommended next steps
 
-1. Wire API routes to the database repositories.
-2. Build the first team selection flow against seeded data.
-3. Implement the smallest playable MVP: pick a team, enter/import results, calculate scores, show leaderboard.
+1. Add result entry/import and make the leaderboard visible in the web app.
+2. Persist or retrieve the latest submitted team for follow-up views.
+3. Decide pick locking and whether the configured team size should move into database-backed basho settings.

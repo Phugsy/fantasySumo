@@ -33,16 +33,18 @@ The front end entry point is `apps/web/src/main.tsx`.
 
 Current behaviour:
 
-- Renders a basic Fantasy Sumo smoke page.
-- Shows the foundation choices: Vite + React, Fastify, and shared package boundary.
-- Has a Vitest smoke test through React Testing Library.
+- Fetches the current basho and its ranked rikishi from the Fastify API.
+- Lets a player select and deselect rikishi up to the API-configured team size.
+- Captures a display/team name and submits the team to the API.
+- Shows loading, empty, success, and API error states.
+- Has Vitest coverage through React Testing Library.
 
 Current limitations:
 
 - No routing.
-- No fantasy team selection flow yet.
 - No leaderboard UI yet.
-- No API-backed data display yet.
+- No result entry/import UI yet.
+- No persistence of the last created team in browser storage yet.
 
 ## Back end
 
@@ -55,13 +57,13 @@ Current routes:
 - `GET /api/health`
   - Returns a small JSON health payload.
 - `GET /api/basho/current`
-  - Returns the active basho, falling back to the latest available basho when none is active.
+  - Returns the active basho and configured team size, falling back to the latest available basho when none is active.
 - `GET /api/basho/:bashoId/rikishi`
   - Returns a basho and its rikishi with banzuke rank data.
 - `POST /api/basho/:bashoId/teams`
   - Creates a display-name-based fantasy team for the basho.
   - Request body: `displayName`, optional `ownerName`, and `rikishiIds`.
-  - The current team size is 2 rikishi.
+  - The current team size defaults to 2 rikishi and can be changed with `TEAM_SIZE`.
   - Validates duplicate picks, exact team size, and whether each picked rikishi is on that basho's banzuke.
 - `GET /api/basho/:bashoId/teams/:teamId`
   - Returns a fantasy team and its picks.

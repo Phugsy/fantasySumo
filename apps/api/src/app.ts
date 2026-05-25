@@ -5,9 +5,8 @@ import {
   createRepositories,
   type SqliteDatabase,
 } from "@fantasy-sumo/db";
+import { getTeamSize } from "./config.js";
 import { registerBashoRoutes } from "./routes/basho.js";
-
-const TEAM_SIZE = 2;
 
 interface AppOptions {
   db?: SqliteDatabase;
@@ -41,7 +40,7 @@ export function buildApp(options: AppOptions = {}) {
     repositories,
     now: options.now ?? (() => new Date()),
     teamIdFactory: options.teamIdFactory ?? randomUUID,
-    teamSize: options.teamSize ?? TEAM_SIZE,
+    teamSize: options.teamSize ?? getTeamSize(),
   });
 
   return app;

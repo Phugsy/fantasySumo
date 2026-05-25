@@ -1,16 +1,189 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
+const currentBasho = {
+  id: "2026-05",
+  name: "May 2026 Sample Basho",
+  startDate: "2026-05-10",
+  endDate: "2026-05-24",
+  status: "active",
+  teamSize: 2,
+};
+
+const rankedRikishi = [
+  {
+    id: "onosato",
+    shikona: "Onosato",
+    heya: "Nishonoseki",
+    rank: "Ozeki",
+    rankOrder: 1,
+  },
+  {
+    id: "kotozakura",
+    shikona: "Kotozakura",
+    heya: "Sadogatake",
+    rank: "Ozeki",
+    rankOrder: 2,
+  },
+  {
+    id: "hoshoryu",
+    shikona: "Hoshoryu",
+    heya: "Tatsunami",
+    rank: "Sekiwake",
+    rankOrder: 3,
+  },
+];
+
+beforeEach(() => {
+  vi.stubGlobal("fetch", vi.fn(mockSuccessfulFetch));
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe("App", () => {
-  it("renders the foundation smoke page", () => {
+  it("loads the current basho and rikishi", async () => {
     render(<App />);
 
     expect(
-      screen.getByRole("heading", { name: "Fantasy Sumo" }),
+      screen.getByText("Loading the current basho..."),
     ).toBeInTheDocument();
-    expect(screen.getByText("Vite + React")).toBeInTheDocument();
-    expect(screen.getByText("Fastify")).toBeInTheDocument();
-    expect(screen.getByText("Domain core")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "May 2026 Sample Basho" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Onosato/ })).toBeInTheDocument();
+    expect(screen.getByText("0 of 2 selected")).toBeInTheDocument();
+  });
+
+  it("allows selecting and removing rikishi up to the team size", async () => {
+    render(<App />);
+
+    await screen.findByRole("button", { name: /Onosato/ });
+    fireEvent.click(screen.getByRole("button", { name: /Onosato/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Kotozakura/ }));
+
+    expect(screen.getByText("2 of 2 selected")).toBeInTheDocument();
+    expect(screen.getByText("Team full")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Hoshoryu/ })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Onosato" }));
+
+    expect(screen.getByText("1 of 2 selected")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Hoshoryu/ })).not.toBeDisabled();
+  });
+
+  it("submits a selected team and shows confirmation", async () => {
+    const fetchMock = vi.fn(mockSuccessfulFetch);
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    await screen.findByRole("button", { name: /Onosato/ });
+    fireEvent.change(screen.getByLabelText("Team name"), {
+      target: { value: "East Stand Heroes" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Onosato/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Kotozakura/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit team" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/basho/2026-05/teams", {
+        body: JSON.stringify({
+          displayName: "East Stand Heroes",
+          rikishiIds: ["onosato", "kotozakura"],
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      }),
+    );
+    expect(
+      await screen.findByText("East Stand Heroes submitted."),
+    ).toBeInTheDocument();
+  });
+
+  it("displays API validation errors", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockValidationErrorFetch));
+    render(<App />);
+
+    await screen.findByRole("button", { name: /Onosato/ });
+    fireEvent.change(screen.getByLabelText("Team name"), {
+      target: { value: "East Stand Heroes" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Onosato/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Kotozakura/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit team" }));
+
+    expect(
+      await screen.findByText(
+        "Fantasy team picks are invalid. Expected 2 picks, received 1.",
+      ),
+    ).toBeInTheDocument();
   });
 });
+
+function mockSuccessfulFetch(input: RequestInfo | URL): Promise<Response> {
+  const url = String(input);
+
+  if (url === "/api/basho/current") {
+    return jsonResponse(currentBasho);
+  }
+
+  if (url === "/api/basho/2026-05/rikishi") {
+    return jsonResponse({
+      basho: currentBasho,
+      rikishi: rankedRikishi,
+    });
+  }
+
+  if (url === "/api/basho/2026-05/teams") {
+    return jsonResponse(
+      {
+        team: {
+          id: "team-east-stand",
+          displayName: "East Stand Heroes",
+        },
+        picks: [{ rikishiId: "onosato" }, { rikishiId: "kotozakura" }],
+      },
+      { status: 201 },
+    );
+  }
+
+  return jsonResponse({ message: "Not found" }, { status: 404 });
+}
+
+function mockValidationErrorFetch(input: RequestInfo | URL): Promise<Response> {
+  const url = String(input);
+
+  if (url !== "/api/basho/2026-05/teams") {
+    return mockSuccessfulFetch(input);
+  }
+
+  return jsonResponse(
+    {
+      message: "Fantasy team picks are invalid.",
+      details: [
+        {
+          message: "Expected 2 picks, received 1.",
+        },
+      ],
+    },
+    { status: 400 },
+  );
+}
+
+function jsonResponse(
+  body: unknown,
+  init: ResponseInit = {},
+): Promise<Response> {
+  return Promise.resolve(
+    new Response(JSON.stringify(body), {
+      headers: {
+        "Content-Type": "application/json",
+      },
+      status: init.status ?? 200,
+    }),
+  );
+}
