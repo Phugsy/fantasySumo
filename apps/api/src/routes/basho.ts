@@ -34,7 +34,10 @@ export function registerBashoRoutes(
       });
     }
 
-    return currentBasho;
+    return {
+      ...currentBasho,
+      teamSize: context.teamSize,
+    };
   });
 
   app.get<{

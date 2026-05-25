@@ -1,14 +1,13 @@
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 
-const TEAM_SIZE = 2;
-
 interface Basho {
   id: string;
   name: string;
   startDate: string;
   endDate: string;
   status: "upcoming" | "active" | "complete";
+  teamSize: number;
 }
 
 interface RankedRikishi {
@@ -20,7 +19,7 @@ interface RankedRikishi {
 }
 
 interface BashoRikishiResponse {
-  basho: Basho;
+  basho: Omit<Basho, "teamSize">;
   rikishi: RankedRikishi[];
 }
 
@@ -69,7 +68,10 @@ export function App() {
           return;
         }
 
-        setBasho(bashoRikishi.basho);
+        setBasho({
+          ...bashoRikishi.basho,
+          teamSize: currentBasho.teamSize,
+        });
         setRikishi(bashoRikishi.rikishi);
         setLoadState(bashoRikishi.rikishi.length === 0 ? "empty" : "ready");
       } catch (error) {
@@ -96,12 +98,13 @@ export function App() {
         .filter((entry): entry is RankedRikishi => entry !== undefined),
     [rikishi, selectedIds],
   );
-  const picksRemaining = TEAM_SIZE - selectedIds.length;
+  const teamSize = basho?.teamSize ?? 0;
+  const picksRemaining = Math.max(teamSize - selectedIds.length, 0);
   const canSubmit =
     loadState === "ready" &&
     submitState === "idle" &&
     displayName.trim().length > 0 &&
-    selectedIds.length === TEAM_SIZE;
+    selectedIds.length === teamSize;
 
   function toggleRikishi(rikishiId: string) {
     setErrorMessage(null);
@@ -111,7 +114,7 @@ export function App() {
         return current.filter((id) => id !== rikishiId);
       }
 
-      if (current.length >= TEAM_SIZE) {
+      if (current.length >= teamSize) {
         return current;
       }
 
@@ -154,8 +157,8 @@ export function App() {
         <div>
           <h1 id="page-title">Build your basho team</h1>
           <p className="lede">
-            Pick {TEAM_SIZE} rikishi from the current banzuke and enter a team
-            name to join the local leaderboard.
+            Pick rikishi from the current banzuke and enter a team name to join
+            the local leaderboard.
           </p>
         </div>
       </section>
@@ -190,7 +193,7 @@ export function App() {
             </p>
             <div className="progress-wrap" aria-label="Pick progress">
               <span>
-                {selectedIds.length} of {TEAM_SIZE} selected
+                {selectedIds.length} of {teamSize} selected
               </span>
               <strong>
                 {picksRemaining === 0
@@ -209,7 +212,7 @@ export function App() {
               {rikishi.map((entry) => {
                 const isSelected = selectedIds.includes(entry.id);
                 const isDisabled =
-                  !isSelected && selectedIds.length >= TEAM_SIZE;
+                  !isSelected && selectedIds.length >= teamSize;
 
                 return (
                   <button
@@ -355,8 +358,16 @@ function getErrorMessage(error: unknown): string {
 }
 
 function formatDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+
+  if (match === null) {
+    return value;
+  }
+
+  const [, year, month, day] = match;
+
   return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
-  }).format(new Date(value));
+  }).format(new Date(Number(year), Number(month) - 1, Number(day)));
 }

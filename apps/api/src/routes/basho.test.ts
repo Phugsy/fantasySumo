@@ -45,6 +45,7 @@ describe("basho routes", () => {
       id: "2026-05",
       name: "May 2026 Sample Basho",
       status: "active",
+      teamSize: 2,
     });
   });
 
