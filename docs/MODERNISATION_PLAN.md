@@ -29,6 +29,8 @@ Update: the rebuild foundation now exists as a pnpm workspace with Vite + React,
 
 Update: the local MVP persistence layer now uses SQLite with Drizzle schema definitions, migration SQL, repository functions, and seed data in `packages/db`.
 
+Update: the web app now supports team selection plus a leaderboard view backed by the local API.
+
 ### Phase 0: Preserve current knowledge
 
 - Add docs describing product intent, current architecture, and roadmap.
@@ -126,8 +128,7 @@ The app currently imports banzuke data from sumo.or.jp. Before relying on this:
 1. Add a pure scoring module with tests.
 2. Add a minimal domain model for basho, rikishi, teams, picks, and results.
 3. Create a first team selection screen using seeded data.
-4. Add API routes backed by database repositories.
-5. Add a result import or manual result entry path.
+4. Add a result import or manual result entry path.
 
 ## Avoid initially
 

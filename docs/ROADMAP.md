@@ -41,7 +41,7 @@ Goal: make the core game loop work locally.
 - [x] Add team selection flow.
 - [ ] Add result import or manual result entry.
 - [x] Add leaderboard calculation.
-- [ ] Add leaderboard UI.
+- [x] Add leaderboard UI.
 
 ## Stage 4: Friendly single-league version
 
@@ -52,7 +52,7 @@ Goal: make it usable by a small group of friends.
 - [ ] Add pick-locking before basho starts.
 - [ ] Add basic admin flow for importing data.
 - [ ] Improve responsive UI.
-- [ ] Add error/loading/empty states.
+- [x] Add error/loading/empty states.
 
 ## Stage 5: Public-ready version
 

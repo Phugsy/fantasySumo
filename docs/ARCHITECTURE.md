@@ -12,7 +12,7 @@ Fantasy Sumo now uses a small pnpm workspace:
 
 ```text
 apps/
-  web/          Vite + React smoke app
+  web/          Vite + React app shell
   api/          Fastify API
 packages/
   domain/       Shared TypeScript domain types, validation, scoring
@@ -34,15 +34,16 @@ The front end entry point is `apps/web/src/main.tsx`.
 Current behaviour:
 
 - Fetches the current basho and its ranked rikishi from the Fastify API.
+- Fetches leaderboard standings from the Fastify API.
 - Lets a player select and deselect rikishi up to the API-configured team size.
 - Captures a display/team name and submits the team to the API.
+- Shows ordered team standings with expandable picked-rikishi score breakdowns.
 - Shows loading, empty, success, and API error states.
 - Has Vitest coverage through React Testing Library.
 
 Current limitations:
 
 - No routing.
-- No leaderboard UI yet.
 - No result entry/import UI yet.
 - No persistence of the last created team in browser storage yet.
 
