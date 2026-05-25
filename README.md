@@ -10,13 +10,13 @@ The current codebase has been reset onto the clean rebuild foundation described 
 
 At present, the app has the first local playable foundations:
 
-- A Vite + React front end for creating a fantasy team from seeded basho data.
+- A Vite + React front end for creating a fantasy team from seeded basho data and viewing leaderboard standings.
 - A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.
 - A shared TypeScript domain package with MVP types, validation, scoring, and leaderboard logic.
 - A local SQLite + Drizzle database package with schema, migration, repositories, and sample seed data.
 - Vitest, ESLint, and Prettier wired through pnpm scripts.
 
-It is not yet a playable fantasy game.
+It is close to a local playable loop, but still needs a result entry/import path before it is useful during a real basho.
 
 ## Tech Stack
 
@@ -101,6 +101,6 @@ The local database uses a file path only and does not require credentials. Keep 
 
 ## Recommended next steps
 
-1. Add result entry/import and make the leaderboard visible in the web app.
+1. Add result entry/import so standings can be updated during a basho.
 2. Persist or retrieve the latest submitted team for follow-up views.
 3. Decide pick locking and whether the configured team size should move into database-backed basho settings.

@@ -35,6 +35,52 @@ const rankedRikishi = [
   },
 ];
 
+const leaderboard = [
+  {
+    rank: 1,
+    teamId: "team-east",
+    displayName: "East Side",
+    score: 2,
+    rikishiScores: [
+      {
+        rikishiId: "onosato",
+        wins: 1,
+        score: 1,
+      },
+      {
+        rikishiId: "kirishima",
+        wins: 1,
+        score: 1,
+      },
+    ],
+  },
+  {
+    rank: 2,
+    teamId: "team-west",
+    displayName: "West Side",
+    score: 1,
+    rikishiScores: [
+      {
+        rikishiId: "kotozakura",
+        wins: 1,
+        score: 1,
+      },
+      {
+        rikishiId: "hoshoryu",
+        wins: 0,
+        score: 0,
+      },
+    ],
+  },
+  {
+    rank: 3,
+    teamId: "team-tie",
+    displayName: "Tie Side",
+    score: 1,
+    rikishiScores: [],
+  },
+];
+
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(mockSuccessfulFetch));
 });
@@ -55,6 +101,22 @@ describe("App", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Onosato/ })).toBeInTheDocument();
     expect(screen.getByText("0 of 2 selected")).toBeInTheDocument();
+  });
+
+  it("displays leaderboard standings and team score details", async () => {
+    render(<App />);
+
+    await screen.findByRole("button", { name: "Leaderboard" });
+    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
+
+    expect(
+      screen.getByRole("heading", { name: "Leaderboard" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("East Side")).toBeInTheDocument();
+    expect(screen.getByText("2 pts")).toBeInTheDocument();
+    expect(screen.getAllByText("Tied on score")).toHaveLength(2);
+    expect(screen.getByText("Onosato")).toBeInTheDocument();
+    expect(screen.getAllByText("1 win")).toHaveLength(2);
   });
 
   it("allows selecting and removing rikishi up to the team size", async () => {
@@ -102,6 +164,9 @@ describe("App", () => {
     expect(
       await screen.findByText("East Stand Heroes submitted."),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Leaderboard" }),
+    ).toBeInTheDocument();
   });
 
   it("displays API validation errors", async () => {
@@ -122,6 +187,18 @@ describe("App", () => {
       ),
     ).toBeInTheDocument();
   });
+
+  it("shows an empty leaderboard state", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockEmptyLeaderboardFetch));
+    render(<App />);
+
+    await screen.findByRole("button", { name: "Leaderboard" });
+    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
+
+    expect(
+      screen.getByText("No teams have joined this basho yet."),
+    ).toBeInTheDocument();
+  });
 });
 
 function mockSuccessfulFetch(input: RequestInfo | URL): Promise<Response> {
@@ -135,6 +212,13 @@ function mockSuccessfulFetch(input: RequestInfo | URL): Promise<Response> {
     return jsonResponse({
       basho: currentBasho,
       rikishi: rankedRikishi,
+    });
+  }
+
+  if (url === "/api/basho/2026-05/leaderboard") {
+    return jsonResponse({
+      bashoId: currentBasho.id,
+      leaderboard,
     });
   }
 
@@ -152,6 +236,21 @@ function mockSuccessfulFetch(input: RequestInfo | URL): Promise<Response> {
   }
 
   return jsonResponse({ message: "Not found" }, { status: 404 });
+}
+
+function mockEmptyLeaderboardFetch(
+  input: RequestInfo | URL,
+): Promise<Response> {
+  const url = String(input);
+
+  if (url !== "/api/basho/2026-05/leaderboard") {
+    return mockSuccessfulFetch(input);
+  }
+
+  return jsonResponse({
+    bashoId: currentBasho.id,
+    leaderboard: [],
+  });
 }
 
 function mockValidationErrorFetch(input: RequestInfo | URL): Promise<Response> {
