@@ -1,5 +1,5 @@
-import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import type { FormEvent, MutableRefObject } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createFantasyTeam,
   fetchBashoRikishi,
@@ -17,6 +17,7 @@ import type {
   Basho,
   CreatedTeamResponse,
   LeaderboardEntry,
+  LeaderboardLoadState,
   LeaderboardResponse,
   LoadState,
   RankedRikishi,
@@ -30,6 +31,8 @@ export function App() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>("selection");
+  const [leaderboardLoadState, setLeaderboardLoadState] =
+    useState<LeaderboardLoadState>("loading");
   const [displayName, setDisplayName] = useState("");
   const [submitState, setSubmitState] = useState<"idle" | "submitting">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -39,6 +42,7 @@ export function App() {
   const [createdTeam, setCreatedTeam] = useState<CreatedTeamResponse | null>(
     null,
   );
+  const leaderboardRequestIdRef = useRef(0);
 
   useEffect(() => {
     let isCurrent = true;
@@ -59,24 +63,35 @@ export function App() {
         setRikishi(bashoRikishi.rikishi);
         setLoadState(bashoRikishi.rikishi.length === 0 ? "empty" : "ready");
 
+        const requestId = nextLeaderboardRequestId(leaderboardRequestIdRef);
+        setLeaderboardLoadState("loading");
+
         try {
           const leaderboardResponse = await fetchLeaderboard(currentBasho.id);
 
-          if (!isCurrent) {
+          if (
+            !isCurrent ||
+            !isCurrentLeaderboardRequest(leaderboardRequestIdRef, requestId)
+          ) {
             return;
           }
 
           setLeaderboard(leaderboardResponse.leaderboard);
           setExpandedTeamId(leaderboardResponse.leaderboard[0]?.teamId ?? null);
           setLeaderboardErrorMessage(null);
+          setLeaderboardLoadState("ready");
         } catch (error) {
-          if (!isCurrent) {
+          if (
+            !isCurrent ||
+            !isCurrentLeaderboardRequest(leaderboardRequestIdRef, requestId)
+          ) {
             return;
           }
 
           setLeaderboard([]);
           setExpandedTeamId(null);
           setLeaderboardErrorMessage(getErrorMessage(error));
+          setLeaderboardLoadState("ready");
         }
       } catch (error) {
         if (!isCurrent) {
@@ -145,13 +160,26 @@ export function App() {
 
       setCreatedTeam(response);
 
+      const requestId = nextLeaderboardRequestId(leaderboardRequestIdRef);
+      setLeaderboardLoadState("loading");
+
       try {
         const leaderboardResponse = await fetchLeaderboard(basho.id);
 
+        if (!isCurrentLeaderboardRequest(leaderboardRequestIdRef, requestId)) {
+          return;
+        }
+
         setLeaderboard(leaderboardResponse.leaderboard);
         setExpandedTeamId(getExpandedTeamId(leaderboardResponse, response));
+        setLeaderboardLoadState("ready");
         setActiveView("leaderboard");
       } catch (error) {
+        if (!isCurrentLeaderboardRequest(leaderboardRequestIdRef, requestId)) {
+          return;
+        }
+
+        setLeaderboardLoadState("ready");
         setErrorMessage(getErrorMessage(error));
       }
     } catch (error) {
@@ -186,7 +214,11 @@ export function App() {
       {loadState === "ready" && basho !== null && (
         <>
           <BashoPanel basho={basho} selectedCount={selectedIds.length} />
-          <ViewSwitch activeView={activeView} onChange={setActiveView} />
+          <ViewSwitch
+            activeView={activeView}
+            disabled={submitState === "submitting"}
+            onChange={setActiveView}
+          />
 
           {activeView === "selection" && (
             <TeamSelection
@@ -214,6 +246,7 @@ export function App() {
               errorMessage={leaderboardErrorMessage}
               expandedTeamId={expandedTeamId}
               leaderboard={leaderboard}
+              loadState={leaderboardLoadState}
               onToggleTeam={(teamId) =>
                 setExpandedTeamId(expandedTeamId === teamId ? null : teamId)
               }
@@ -239,4 +272,18 @@ function getExpandedTeamId(
   }
 
   return leaderboardResponse.leaderboard[0]?.teamId ?? null;
+}
+
+function nextLeaderboardRequestId(
+  requestIdRef: MutableRefObject<number>,
+): number {
+  requestIdRef.current += 1;
+  return requestIdRef.current;
+}
+
+function isCurrentLeaderboardRequest(
+  requestIdRef: MutableRefObject<number>,
+  requestId: number,
+): boolean {
+  return requestIdRef.current === requestId;
 }

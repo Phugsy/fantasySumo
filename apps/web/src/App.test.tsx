@@ -138,6 +138,61 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows leaderboard loading before the initial standings request settles", async () => {
+    const leaderboardRequest = createDeferred<Response>();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(mockSlowInitialLeaderboardFetch(leaderboardRequest)),
+    );
+    render(<App />);
+
+    await screen.findByRole("heading", { name: "May 2026 Sample Basho" });
+    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
+
+    expect(screen.getByText("Loading leaderboard...")).toBeInTheDocument();
+    expect(
+      screen.queryByText("No teams have joined this basho yet."),
+    ).not.toBeInTheDocument();
+
+    leaderboardRequest.resolve(
+      createJsonResponse({
+        bashoId: currentBasho.id,
+        leaderboard,
+      }),
+    );
+  });
+
+  it("keeps newer submitted standings when the initial leaderboard request resolves late", async () => {
+    const initialLeaderboardRequest = createDeferred<Response>();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(mockStaleInitialLeaderboardFetch(initialLeaderboardRequest)),
+    );
+    render(<App />);
+
+    await screen.findByRole("button", { name: /Onosato/ });
+    fireEvent.change(screen.getByLabelText("Team name"), {
+      target: { value: "East Stand Heroes" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Onosato/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Kotozakura/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit team" }));
+
+    expect(await screen.findByText("4 pts")).toBeInTheDocument();
+
+    initialLeaderboardRequest.resolve(
+      createJsonResponse({
+        bashoId: currentBasho.id,
+        leaderboard,
+      }),
+    );
+    await initialLeaderboardRequest.promise;
+    await flushPromises();
+
+    expect(screen.getByText("4 pts")).toBeInTheDocument();
+    expect(screen.queryByText("East Side")).not.toBeInTheDocument();
+  });
+
   it("allows selecting and removing rikishi up to the team size", async () => {
     render(<App />);
 
@@ -312,6 +367,64 @@ function mockInitialLeaderboardErrorFetch(
   );
 }
 
+function mockSlowInitialLeaderboardFetch(
+  leaderboardRequest: Deferred<Response>,
+): (input: RequestInfo | URL) => Promise<Response> {
+  return (input: RequestInfo | URL) => {
+    const url = String(input);
+
+    if (url !== "/api/basho/2026-05/leaderboard") {
+      return mockSuccessfulFetch(input);
+    }
+
+    return leaderboardRequest.promise;
+  };
+}
+
+function mockStaleInitialLeaderboardFetch(
+  initialLeaderboardRequest: Deferred<Response>,
+): (input: RequestInfo | URL) => Promise<Response> {
+  let leaderboardRequestCount = 0;
+
+  return (input: RequestInfo | URL) => {
+    const url = String(input);
+
+    if (url !== "/api/basho/2026-05/leaderboard") {
+      return mockSuccessfulFetch(input);
+    }
+
+    leaderboardRequestCount += 1;
+
+    if (leaderboardRequestCount === 1) {
+      return initialLeaderboardRequest.promise;
+    }
+
+    return jsonResponse({
+      bashoId: currentBasho.id,
+      leaderboard: [
+        {
+          rank: 1,
+          teamId: "team-east-stand",
+          displayName: "East Stand Heroes",
+          score: 4,
+          rikishiScores: [
+            {
+              rikishiId: "onosato",
+              wins: 2,
+              score: 2,
+            },
+            {
+              rikishiId: "kotozakura",
+              wins: 2,
+              score: 2,
+            },
+          ],
+        },
+      ],
+    });
+  };
+}
+
 function mockSubmitLeaderboardErrorFetch(): (
   input: RequestInfo | URL,
 ) => Promise<Response> {
@@ -363,12 +476,41 @@ function jsonResponse(
   body: unknown,
   init: ResponseInit = {},
 ): Promise<Response> {
-  return Promise.resolve(
-    new Response(JSON.stringify(body), {
-      headers: {
-        "Content-Type": "application/json",
-      },
-      status: init.status ?? 200,
-    }),
-  );
+  return Promise.resolve(createJsonResponse(body, init));
+}
+
+function createJsonResponse(body: unknown, init: ResponseInit = {}): Response {
+  return new Response(JSON.stringify(body), {
+    headers: {
+      "Content-Type": "application/json",
+    },
+    status: init.status ?? 200,
+  });
+}
+
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (error: unknown) => void;
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve: (value: T) => void = () => undefined;
+  let reject: (error: unknown) => void = () => undefined;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+
+  return {
+    promise,
+    reject,
+    resolve,
+  };
+}
+
+function flushPromises(): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
 }

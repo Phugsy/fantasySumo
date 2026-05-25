@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type {
   CreatedTeamResponse,
   LeaderboardEntry,
+  LeaderboardLoadState,
   RankedRikishi,
 } from "../types";
 
@@ -10,6 +11,7 @@ interface LeaderboardPanelProps {
   errorMessage: string | null;
   expandedTeamId: string | null;
   leaderboard: LeaderboardEntry[];
+  loadState: LeaderboardLoadState;
   onToggleTeam: (teamId: string) => void;
   rikishi: RankedRikishi[];
 }
@@ -19,6 +21,7 @@ export function LeaderboardPanel({
   errorMessage,
   expandedTeamId,
   leaderboard,
+  loadState,
   onToggleTeam,
   rikishi,
 }: LeaderboardPanelProps) {
@@ -58,7 +61,11 @@ export function LeaderboardPanel({
         </div>
       )}
 
-      {leaderboard.length === 0 ? (
+      {loadState === "loading" ? (
+        <div className="state-panel leaderboard-empty" aria-live="polite">
+          Loading leaderboard...
+        </div>
+      ) : leaderboard.length === 0 ? (
         <div className="state-panel leaderboard-empty">
           No teams have joined this basho yet.
         </div>

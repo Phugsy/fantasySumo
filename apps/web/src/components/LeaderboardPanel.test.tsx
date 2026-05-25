@@ -49,6 +49,7 @@ describe("LeaderboardPanel", () => {
         errorMessage={null}
         expandedTeamId="team-east"
         leaderboard={leaderboard}
+        loadState="ready"
         onToggleTeam={vi.fn()}
         rikishi={rikishi}
       />,
@@ -69,6 +70,7 @@ describe("LeaderboardPanel", () => {
         errorMessage={null}
         expandedTeamId={null}
         leaderboard={leaderboard}
+        loadState="ready"
         onToggleTeam={onToggleTeam}
         rikishi={rikishi}
       />,
@@ -77,5 +79,24 @@ describe("LeaderboardPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /East Side/ }));
 
     expect(onToggleTeam).toHaveBeenCalledWith("team-east");
+  });
+
+  it("shows a loading state before leaderboard data settles", () => {
+    render(
+      <LeaderboardPanel
+        createdTeam={null}
+        errorMessage={null}
+        expandedTeamId={null}
+        leaderboard={[]}
+        loadState="loading"
+        onToggleTeam={vi.fn()}
+        rikishi={rikishi}
+      />,
+    );
+
+    expect(screen.getByText("Loading leaderboard...")).toBeInTheDocument();
+    expect(
+      screen.queryByText("No teams have joined this basho yet."),
+    ).not.toBeInTheDocument();
   });
 });

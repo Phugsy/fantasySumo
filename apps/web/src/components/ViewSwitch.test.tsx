@@ -19,4 +19,15 @@ describe("ViewSwitch", () => {
 
     expect(onChange).toHaveBeenCalledWith("leaderboard");
   });
+
+  it("disables view changes while requested", () => {
+    const onChange = vi.fn();
+
+    render(<ViewSwitch activeView="selection" disabled onChange={onChange} />);
+
+    expect(
+      screen.getByRole("button", { name: "Team selection" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Leaderboard" })).toBeDisabled();
+  });
 });

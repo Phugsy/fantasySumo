@@ -50,4 +50,5 @@ export interface RikishiScore {
 }
 
 export type LoadState = "loading" | "ready" | "empty" | "error";
+export type LeaderboardLoadState = "loading" | "ready";
 export type ActiveView = "selection" | "leaderboard";
