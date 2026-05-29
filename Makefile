@@ -1,6 +1,9 @@
 .DEFAULT_GOAL := help
 PNPM ?= $(shell if command -v pnpm >/dev/null 2>&1; then command -v pnpm; elif [ -x /opt/homebrew/bin/pnpm ]; then echo /opt/homebrew/bin/pnpm; else echo pnpm; fi)
-export PATH := $(dir $(PNPM)):$(PATH)
+PNPM_DIR := $(if $(filter /%,$(PNPM)),$(dir $(PNPM)))
+ifneq ($(PNPM_DIR),)
+export PATH := $(PNPM_DIR):$(PATH)
+endif
 
 .PHONY: help install dev dev-client dev-server build test lint format format-check check db-migrate db-seed clean
 
