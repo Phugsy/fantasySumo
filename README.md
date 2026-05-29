@@ -49,20 +49,20 @@ Use Node 24 and pnpm. The repo declares its Node version in `.nvmrc` and its pac
 Install dependencies:
 
 ```bash
-pnpm install
+make install
 ```
 
 Create a local database and seed sample MVP data:
 
 ```bash
-pnpm db:migrate
-pnpm db:seed
+make db-migrate
+make db-seed
 ```
 
 Run both the API and web dev servers:
 
 ```bash
-pnpm dev
+make dev
 ```
 
 Local URLs:
@@ -81,10 +81,7 @@ Useful API endpoints:
 Useful checks:
 
 ```bash
-pnpm build
-pnpm test
-pnpm lint
-pnpm format:check
+make check
 ```
 
 By default, the database package writes local SQLite data to `packages/db/data/fantasy-sumo.sqlite` when run through the pnpm scripts. Override this with `DATABASE_URL` using a `file:` SQLite URL, for example:
@@ -94,6 +91,21 @@ DATABASE_URL=file:./data/dev.sqlite pnpm db:seed
 ```
 
 The local team size defaults to `2`. Override it for the API with `TEAM_SIZE`.
+
+## Makefile commands
+
+Use `make help` to list the stable development commands. The Makefile is a thin wrapper over the existing pnpm scripts.
+It uses `pnpm` from `PATH` when available and can be overridden with `PNPM=/path/to/pnpm`.
+
+Common targets:
+
+- `make dev` - start the API and web client together.
+- `make dev-client` - start only the Vite web client.
+- `make dev-server` - start only the Fastify API.
+- `make test` - run all tests.
+- `make lint` - run ESLint.
+- `make build` - build all packages/apps.
+- `make check` - run lint, format check, tests, and build before a PR.
 
 ## Security note
 
