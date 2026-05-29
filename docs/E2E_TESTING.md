@@ -105,6 +105,22 @@ e2e-ui:
 
 Do not add E2E to `make check` until the suite is reliable and fast enough for routine PR validation. Before that, document it as an explicit pre-merge or feature-flow check.
 
+## Agent Completion Loop
+
+Once the Playwright harness exists, agents should use E2E as part of their completion loop for changes that affect the browser game flow.
+
+For relevant tickets, a change should not be considered complete until the agent has run the targeted E2E flow or the full `make e2e` suite and reported the result. This applies especially to work that changes:
+
+- team selection;
+- leaderboard display or ordering;
+- result entry/import flows;
+- API responses consumed by the React app;
+- database seed/reset behaviour used by the local player journey.
+
+If E2E cannot be run because of a local environment, browser install, sandbox, or port constraint, the agent should state that clearly in the PR summary and run the closest lower-level checks instead.
+
+Do not require E2E for documentation-only changes, isolated domain scoring changes, or API-only changes that have no browser journey impact unless the ticket explicitly asks for it.
+
 ## What Belongs In E2E
 
 Use E2E tests for user-visible journeys that cross the browser, API, domain logic, and database together:

@@ -41,6 +41,7 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 - Prefer explicit domain names: `Basho`, `Rikishi`, `Banzuke`, `FantasyTeam`, `Pick`, `Bout`, `Result`, `Leaderboard`.
 - Keep scoring logic isolated and well-tested.
 - Keep data import logic separate from scoring logic.
+- Once an E2E harness exists, use it to validate completion for changes that affect the browser game loop.
 
 ## Legacy hazards to handle carefully
 
@@ -67,4 +68,5 @@ A change is ready when:
 - It keeps or improves app setup reproducibility.
 - It avoids new secrets in source control.
 - It includes tests for scoring/data rules where practical.
+- It runs relevant E2E coverage when browser game-loop behaviour changes and an E2E harness exists.
 - It updates docs if it changes product rules, architecture, setup, or data assumptions.
