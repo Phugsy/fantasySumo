@@ -282,4 +282,4 @@ Prioritise tests for:
 4. Import parsing/mapping.
 5. Leaderboard ordering.
 
-UI tests can come later once the MVP flow stabilises.
+Browser E2E tests should follow the strategy in [E2E Testing Strategy](E2E_TESTING.md). Add Playwright once the core team-selection and leaderboard flows are stable enough to protect through the browser.

@@ -41,6 +41,7 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 - Prefer explicit domain names: `Basho`, `Rikishi`, `Banzuke`, `FantasyTeam`, `Pick`, `Bout`, `Result`, `Leaderboard`.
 - Keep scoring logic isolated and well-tested.
 - Keep data import logic separate from scoring logic.
+- Once an E2E harness exists, use it to validate completion for changes that affect the browser game loop.
 
 ## Legacy hazards to handle carefully
 
@@ -55,8 +56,9 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 3. Read `docs/ARCHITECTURE.md` for current implementation notes.
 4. Read `docs/MODERNISATION_PLAN.md` before upgrading dependencies.
 5. Read `docs/ROADMAP.md` before adding features.
-6. Prefer the Makefile command layer for common workflows: `make test`, `make lint`, `make build`, and `make check`.
-7. Keep PRs focused on the next MVP slice; do not rebuild the full product in one change.
+6. Read `docs/E2E_TESTING.md` before adding browser end-to-end tests.
+7. Prefer the Makefile command layer for common workflows: `make test`, `make lint`, `make build`, and `make check`.
+8. Keep PRs focused on the next MVP slice; do not rebuild the full product in one change.
 
 ## Definition of done for future changes
 
@@ -66,4 +68,5 @@ A change is ready when:
 - It keeps or improves app setup reproducibility.
 - It avoids new secrets in source control.
 - It includes tests for scoring/data rules where practical.
+- It runs relevant E2E coverage when browser game-loop behaviour changes and an E2E harness exists.
 - It updates docs if it changes product rules, architecture, setup, or data assumptions.
