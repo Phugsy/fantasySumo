@@ -56,9 +56,10 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 3. Read `docs/ARCHITECTURE.md` for current implementation notes.
 4. Read `docs/MODERNISATION_PLAN.md` before upgrading dependencies.
 5. Read `docs/ROADMAP.md` before adding features.
-6. Read `docs/E2E_TESTING.md` before adding browser end-to-end tests.
-7. Prefer the Makefile command layer for common workflows: `make test`, `make lint`, `make build`, and `make check`.
-8. Keep PRs focused on the next MVP slice; do not rebuild the full product in one change.
+6. Read `docs/DATA_IMPORT_STRATEGY.md` before adding or changing banzuke/result import behaviour.
+7. Read `docs/E2E_TESTING.md` before adding browser end-to-end tests.
+8. Prefer the Makefile command layer for common workflows: `make test`, `make lint`, `make build`, and `make check`.
+9. Keep PRs focused on the next MVP slice; do not rebuild the full product in one change.
 
 ## Definition of done for future changes
 

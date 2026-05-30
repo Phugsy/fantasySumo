@@ -121,8 +121,10 @@ pnpm --filter @fantasy-sumo/db db:generate
 
 Current limitations:
 
-- No live banzuke/results import yet.
+- No banzuke/results import UI or endpoints yet.
 - No production database configuration yet.
+
+The accepted MVP import direction is documented in [Data Import Strategy](DATA_IMPORT_STRATEGY.md). Prefer manual JSON/CSV imports first, then optional live source adapters later.
 
 ## Legacy stack snapshot
 
@@ -271,6 +273,8 @@ POST   /api/admin/basho/:bashoId/import-results
 ```
 
 Admin endpoints can be protected later. For early local development, they can remain local-only but should be clearly marked as unsafe for production.
+
+The first import implementation should follow [Data Import Strategy](DATA_IMPORT_STRATEGY.md): validate source-agnostic JSON import files, write them transactionally, and keep live source adapters separate from core import parsing.
 
 ## Testing priorities
 

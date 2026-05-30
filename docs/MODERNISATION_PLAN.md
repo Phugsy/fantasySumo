@@ -116,12 +116,16 @@ Before any deployment:
 
 ## Data-source investigation
 
-The app currently imports banzuke data from sumo.or.jp. Before relying on this:
+The accepted MVP data-source recommendation is documented in [Data Import Strategy](DATA_IMPORT_STRATEGY.md).
+
+The old app imported banzuke data from sumo.or.jp. Before relying on live sources:
 
 - Verify the endpoint still exists.
 - Check whether results data is available in a stable machine-readable format.
 - Consider a manual CSV/JSON import path as a fallback.
 - Keep data import adapters isolated so the data source can change.
+
+Current recommendation: build manual JSON/CSV import first, then add optional JSA or Sumo API adapters once the local import path is tested.
 
 ## Recommended first engineering tickets
 

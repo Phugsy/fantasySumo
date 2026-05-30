@@ -39,6 +39,7 @@ Start here:
 - `docs/PROJECT_BRIEF.md` - product intent and MVP definition.
 - `docs/ARCHITECTURE.md` - current architecture and suggested future boundaries.
 - `docs/adr/0001-rebuild-architecture.md` - accepted rebuild architecture decision.
+- `docs/DATA_IMPORT_STRATEGY.md` - MVP data-source investigation and import recommendation.
 - `docs/E2E_TESTING.md` - intended Playwright E2E strategy for the MVP game loop.
 - `docs/MODERNISATION_PLAN.md` - safe path for updating or rebuilding the app.
 - `docs/ROADMAP.md` - staged product/engineering roadmap.
