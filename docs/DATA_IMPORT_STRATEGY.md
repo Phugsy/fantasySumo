@@ -8,16 +8,27 @@ Last checked: 2026-05-30.
 
 ## Recommendation
 
-Use manual JSON/CSV import as the first MVP data path for banzuke and bout results.
+Use automated source-backed import as the MVP data path for banzuke and bout results.
 
-Do not make the MVP depend on live scraping or a third-party API. A small admin/import workflow backed by deterministic files is lower maintenance, easier to test, and enough to run a local or small-group Fantasy Sumo game during a basho.
+Manual entry was the pain point this app is intended to remove. Even if the available source endpoints are undocumented or third-party, maintaining source adapters is a better trade-off than asking an admin to hand-enter daily tournament data. A broken adapter should be fixed when source URLs or payloads change; those changes should be infrequent and easier to repair than manually running the game.
+
+Recommended MVP approach:
+
+- import banzuke from the Japan Sumo Association `indexAjax` endpoint first because it is official and currently machine-readable;
+- import daily results from Sumo API first because it provides documented torikumi/result-style endpoints;
+- keep an adapter boundary so JSA results, Sumo API, and future sources can produce the same internal import model;
+- support a manual trigger for an admin to run or rerun imports;
+- design the import service so it can later run from a scheduled job, e.g. once per day during a basho;
+- use manual JSON fixtures only as a fallback/debug/test path, not as the expected product workflow.
 
 Keep the import boundary source-agnostic:
 
-- parse and validate Fantasy Sumo import files first;
-- map validated imports into the existing `Basho`, `Rikishi`, `BanzukeEntry`, and `BoutResult` model;
-- keep source-specific adapters separate from the importer, so official or third-party sources can be added later without changing scoring;
-- support dry-run validation before writing to the database.
+- fetch source payloads in small source-specific adapters;
+- map source payloads into validated Fantasy Sumo import commands;
+- apply validated imports into the existing `Basho`, `Rikishi`, `BanzukeEntry`, and `BoutResult` model;
+- keep source-specific adapters separate from scoring and database writes;
+- support dry-run validation before writing to the database;
+- allow fallback between sources where practical.
 
 ## Source Investigation
 
@@ -52,7 +63,7 @@ Cons:
 - URL parameters are not self-describing;
 - result availability and backward compatibility are not guaranteed.
 
-Use this as a candidate adapter later, not as the MVP's only path.
+Use this as the first MVP banzuke adapter. Because it is not documented as a public API, isolate it behind an adapter and keep reduced fixtures that make payload changes easy to spot in tests.
 
 ### Japan Sumo Association results pages
 
@@ -82,7 +93,7 @@ Cons:
 - the official app result timing is useful for fans, but not a direct public data integration;
 - endpoint changes would break imports without warning.
 
-Do not build the first MVP around scraping official results pages.
+Do not build the first MVP around scraping official results pages unless Sumo API proves unsuitable. If a clean JSA results Ajax payload is confirmed later, add it as a higher-priority results adapter because it is official.
 
 ### Sumo API
 
@@ -110,7 +121,7 @@ Cons:
 - availability, schema, rate limits, and long-term maintenance are outside this repo's control;
 - should not be required for local tests or deterministic seed data.
 
-Use this as the first optional live adapter after manual import exists.
+Use this as the first MVP results adapter, and optionally as a backup banzuke adapter. It should map into the same internal import commands as the JSA banzuke adapter.
 
 ### SumoDB
 
@@ -147,11 +158,11 @@ Cons:
 
 Do not use a paid provider for MVP import work.
 
-## MVP Import Shape
+## Internal Import Shape
 
-Import files should be small, explicit, and easy to create by hand from a reliable source.
+Source adapters should emit small, explicit internal import commands. These commands can also be represented as JSON fixtures for tests, dry runs, and emergency debugging, but they are not the primary user workflow.
 
-Prefer JSON for the first implementation because it preserves types and nested data more clearly than CSV. CSV can be added once the JSON path is working, especially for result entry from spreadsheets.
+Prefer JSON for fixtures because it preserves types and nested data more clearly than CSV. CSV can be added later only if it is useful for debugging or emergency fallback.
 
 ### Banzuke import
 
@@ -260,17 +271,19 @@ For the first local MVP, a failed import can return a structured API error and l
 
 ## Proposed Implementation Path
 
-1. Add JSON import parser and validation functions for banzuke and results.
-2. Add repository/service functions that apply validated imports transactionally.
-3. Add local-only admin endpoints or scripts for importing JSON files.
-4. Add small sample import fixtures for tests.
-5. Add CSV support only if it makes manual operation easier after JSON works.
-6. Add optional source adapters later:
-   - JSA banzuke adapter using the currently working `indexAjax` endpoint;
-   - Sumo API adapter for banzuke and torikumi;
-   - no SumoDB scraper unless manual/API paths prove inadequate.
+1. Add internal import command types and validation functions for banzuke and results.
+2. Add a JSA banzuke source adapter using the currently working `indexAjax` endpoint.
+3. Add a Sumo API results source adapter using documented basho/torikumi endpoints.
+4. Add repository/service functions that apply validated imports transactionally.
+5. Add local-only admin endpoints or scripts to manually trigger source imports and dry runs.
+6. Add small reduced source fixtures for adapter tests and internal JSON fixtures for import-service tests.
+7. Add fallback source support:
+   - Sumo API banzuke as backup if JSA banzuke fails;
+   - JSA results adapter if a stable machine-readable result endpoint is confirmed;
+   - no SumoDB scraper unless API paths prove inadequate.
+8. Add scheduled execution later, e.g. once per day during active basho, after the triggerable import path is stable.
 
 ## Follow-Up Tickets
 
-- GitHub issue #25: implement manual JSON import for banzuke and results.
-- GitHub issue #26: investigate optional live source adapters after manual import exists.
+- GitHub issue #25: implement automated source-backed import for banzuke and results.
+- GitHub issue #26: add redundant/fallback source adapters after the first automated import path exists.
