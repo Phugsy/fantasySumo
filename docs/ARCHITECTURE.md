@@ -75,7 +75,7 @@ Current limitations:
 
 - No auth.
 - No dedicated API client package.
-- No result import or manual result entry endpoints yet.
+- No result import endpoints or job trigger yet.
 - No pick-locking rules yet.
 
 ## Domain package
@@ -121,8 +121,10 @@ pnpm --filter @fantasy-sumo/db db:generate
 
 Current limitations:
 
-- No live banzuke/results import yet.
+- No banzuke/results import UI or endpoints yet.
 - No production database configuration yet.
+
+The accepted MVP import direction is documented in [Data Import Strategy](DATA_IMPORT_STRATEGY.md). Prefer automated source-backed imports first, with manual triggers, dry runs, and JSON fixtures available for testing and emergency fallback.
 
 ## Legacy stack snapshot
 
@@ -271,6 +273,8 @@ POST   /api/admin/basho/:bashoId/import-results
 ```
 
 Admin endpoints can be protected later. For early local development, they can remain local-only but should be clearly marked as unsafe for production.
+
+The first import implementation should follow [Data Import Strategy](DATA_IMPORT_STRATEGY.md): fetch through source-specific adapters, validate source-agnostic import commands, write them transactionally, and keep import adapters separate from scoring.
 
 ## Testing priorities
 

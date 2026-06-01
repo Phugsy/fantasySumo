@@ -116,19 +116,23 @@ Before any deployment:
 
 ## Data-source investigation
 
-The app currently imports banzuke data from sumo.or.jp. Before relying on this:
+The accepted MVP data-source recommendation is documented in [Data Import Strategy](DATA_IMPORT_STRATEGY.md).
+
+The old app imported banzuke data from sumo.or.jp. Before relying on live sources:
 
 - Verify the endpoint still exists.
 - Check whether results data is available in a stable machine-readable format.
-- Consider a manual CSV/JSON import path as a fallback.
+- Keep a manual JSON path only as a fallback/debug fixture path.
 - Keep data import adapters isolated so the data source can change.
+
+Current recommendation: build automated source-backed import first, using the JSA banzuke endpoint and Sumo API results endpoints as the initial likely sources. Add manual triggers, dry runs, and fallback source support so the game can be operated without hand-entering daily results.
 
 ## Recommended first engineering tickets
 
 1. Add a pure scoring module with tests.
 2. Add a minimal domain model for basho, rikishi, teams, picks, and results.
 3. Create a first team selection screen using seeded data.
-4. Add a result import or manual result entry path.
+4. Add an automated result import path.
 
 ## Avoid initially
 

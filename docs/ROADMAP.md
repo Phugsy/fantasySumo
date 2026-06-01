@@ -39,7 +39,7 @@ Goal: make the core game loop work locally.
 - [x] Model fantasy teams and picks.
 - [x] Expose basho, rikishi, team, and leaderboard API routes.
 - [x] Add team selection flow.
-- [ ] Add result import or manual result entry.
+- [ ] Add automated source-backed import for banzuke and results.
 - [x] Add leaderboard calculation.
 - [x] Add leaderboard UI.
 
