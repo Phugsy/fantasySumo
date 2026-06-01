@@ -10,6 +10,8 @@
     "build": "pnpm -r --if-present build",
     "db:migrate": "pnpm --filter @fantasy-sumo/db db:migrate",
     "db:seed": "pnpm --filter @fantasy-sumo/db db:seed",
+    "import:banzuke": "pnpm --filter @fantasy-sumo/api import:banzuke",
+    "import:results": "pnpm --filter @fantasy-sumo/api import:results",
     "test": "pnpm --filter @fantasy-sumo/domain build && pnpm -r --if-present test",
     "lint": "eslint .",
     "format": "prettier --write .",

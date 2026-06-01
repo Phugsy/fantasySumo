@@ -4,7 +4,7 @@
 
 Accepted for the MVP import path.
 
-Last checked: 2026-05-30.
+Last checked: 2026-06-01.
 
 ## Recommendation
 
@@ -285,5 +285,4 @@ For the first local MVP, a failed import can return a structured API error and l
 
 ## Follow-Up Tickets
 
-- GitHub issue #25: implement automated source-backed import for banzuke and results.
 - GitHub issue #26: add redundant/fallback source adapters after the first automated import path exists.

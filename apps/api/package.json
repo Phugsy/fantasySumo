@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "pnpm --filter @fantasy-sumo/db build && tsx watch src/server.ts",
     "build": "pnpm --filter @fantasy-sumo/db build && tsc -p tsconfig.json",
+    "import:banzuke": "pnpm --filter @fantasy-sumo/db build && tsx src/scripts/import-banzuke.ts",
+    "import:results": "pnpm --filter @fantasy-sumo/db build && tsx src/scripts/import-results.ts",
     "start": "node dist/server.js",
     "test": "pnpm --filter @fantasy-sumo/db build && vitest run src"
   },

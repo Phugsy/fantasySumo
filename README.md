@@ -14,9 +14,10 @@ At present, the app has the first local playable foundations:
 - A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.
 - A shared TypeScript domain package with MVP types, validation, scoring, and leaderboard logic.
 - A local SQLite + Drizzle database package with schema, migration, repositories, and sample seed data.
+- Automated source-backed import commands and local admin endpoints for current banzuke and daily results.
 - Vitest, ESLint, and Prettier wired through pnpm scripts.
 
-It is close to a local playable loop, but still needs a result entry/import path before it is useful during a real basho.
+It is close to a local playable loop, but still needs pick locking and a friendlier admin UI before it is useful during a real basho.
 
 ## Tech Stack
 
@@ -79,6 +80,10 @@ Useful API endpoints:
 - `POST /api/basho/:bashoId/teams`
 - `GET /api/basho/:bashoId/teams/:teamId`
 - `GET /api/basho/:bashoId/leaderboard`
+- `POST /api/admin/import-banzuke`
+- `POST /api/admin/basho/:bashoId/import-results`
+
+The admin import endpoints are local development tools for now. Do not expose them publicly without authentication/protection.
 
 Useful checks:
 
@@ -94,6 +99,39 @@ DATABASE_URL=file:./data/dev.sqlite pnpm db:seed
 
 The local team size defaults to `2`. Override it for the API with `TEAM_SIZE`.
 
+## Data import
+
+Import current banzuke data from the Japan Sumo Association source:
+
+```bash
+make import-banzuke
+```
+
+Import daily Makuuchi results from Sumo API:
+
+```bash
+make import-results ARGS="-- --basho 2026-05 --day 1"
+```
+
+Both import paths support dry runs:
+
+```bash
+make import-banzuke ARGS="-- --dry-run"
+make import-results ARGS="-- --basho 2026-05 --day 1 --dry-run"
+```
+
+The API exposes equivalent local admin triggers:
+
+```bash
+curl -X POST "http://localhost:3000/api/admin/import-banzuke?dryRun=true" \
+  -H "content-type: application/json" \
+  -d '{}'
+
+curl -X POST "http://localhost:3000/api/admin/basho/2026-05/import-results?dryRun=true" \
+  -H "content-type: application/json" \
+  -d '{"day":1,"division":"Makuuchi"}'
+```
+
 ## Makefile commands
 
 Use `make help` to list the stable development commands. The Makefile is a thin wrapper over the existing pnpm scripts.
@@ -108,6 +146,8 @@ Common targets:
 - `make lint` - run ESLint.
 - `make build` - build all packages/apps.
 - `make check` - run lint, format check, tests, and build before a PR.
+- `make import-banzuke` - import current banzuke data from source.
+- `make import-results` - import one day of results from source.
 
 ## Security note
 
@@ -115,6 +155,6 @@ The local database uses a file path only and does not require credentials. Keep 
 
 ## Recommended next steps
 
-1. Add result entry/import so standings can be updated during a basho.
-2. Persist or retrieve the latest submitted team for follow-up views.
-3. Decide pick locking and whether the configured team size should move into database-backed basho settings.
+1. Persist or retrieve the latest submitted team for follow-up views.
+2. Decide pick locking and whether the configured team size should move into database-backed basho settings.
+3. Add a protected admin UI or scheduled job around the import service.
