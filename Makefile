@@ -5,7 +5,7 @@ ifneq ($(PNPM_DIR),)
 export PATH := $(PNPM_DIR):$(PATH)
 endif
 
-.PHONY: help install dev dev-client dev-server build test lint format format-check check db-migrate db-seed clean
+.PHONY: help install dev dev-client dev-server build test lint format format-check check db-migrate db-seed import-banzuke import-results clean
 
 help: ## Show available make targets.
 	@awk 'BEGIN {FS = ":.*## "; printf "Fantasy Sumo development commands:\n\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -50,6 +50,12 @@ db-migrate: ## Apply local database migrations.
 
 db-seed: ## Seed the local database.
 	$(PNPM) db:seed
+
+import-banzuke: ## Import current banzuke data from source.
+	$(PNPM) import:banzuke $(ARGS)
+
+import-results: ## Import daily results from source. Pass ARGS="-- --basho 2026-05 --day 1".
+	$(PNPM) import:results $(ARGS)
 
 clean: ## Remove generated build artifacts.
 	rm -rf apps/api/dist apps/web/dist packages/db/dist packages/domain/dist

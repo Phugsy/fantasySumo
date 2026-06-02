@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, notInArray } from "drizzle-orm";
 import type {
   BanzukeEntry,
   Basho,
@@ -20,17 +20,44 @@ import {
 export function createRepositories(db: SqliteDatabase) {
   const repositories = {
     insertBasho: (entry: Basho) => db.insert(basho).values(entry).run(),
+    upsertBasho: (entry: Basho) =>
+      db
+        .insert(basho)
+        .values(entry)
+        .onConflictDoUpdate({
+          target: basho.id,
+          set: entry,
+        })
+        .run(),
     listBashos: () => db.select().from(basho).orderBy(basho.startDate).all(),
     getBasho: (id: Basho["id"]) =>
       db.select().from(basho).where(eq(basho.id, id)).get(),
 
     insertRikishi: (entry: Rikishi) =>
       db.insert(rikishi).values(toRikishiRow(entry)).run(),
+    upsertRikishi: (entry: Rikishi) =>
+      db
+        .insert(rikishi)
+        .values(toRikishiRow(entry))
+        .onConflictDoUpdate({
+          target: rikishi.id,
+          set: toRikishiRow(entry),
+        })
+        .run(),
     listRikishi: () =>
       db.select().from(rikishi).orderBy(rikishi.shikona).all().map(toRikishi),
 
     insertBanzukeEntry: (entry: BanzukeEntry) =>
       db.insert(banzukeEntries).values(entry).run(),
+    upsertBanzukeEntry: (entry: BanzukeEntry) =>
+      db
+        .insert(banzukeEntries)
+        .values(entry)
+        .onConflictDoUpdate({
+          target: banzukeEntries.id,
+          set: entry,
+        })
+        .run(),
     listBanzukeEntriesForBasho: (bashoId: Basho["id"]) =>
       db
         .select()
@@ -87,6 +114,15 @@ export function createRepositories(db: SqliteDatabase) {
 
     insertBoutResult: (entry: BoutResult) =>
       db.insert(boutResults).values(toBoutResultRow(entry)).run(),
+    upsertBoutResult: (entry: BoutResult) =>
+      db
+        .insert(boutResults)
+        .values(toBoutResultRow(entry))
+        .onConflictDoUpdate({
+          target: boutResults.id,
+          set: toBoutResultRow(entry),
+        })
+        .run(),
     listBoutResultsForBasho: (bashoId: Basho["id"]) =>
       db
         .select()
@@ -95,6 +131,91 @@ export function createRepositories(db: SqliteDatabase) {
         .orderBy(boutResults.day)
         .all()
         .map(toBoutResult),
+    applyBanzukeImport: (importData: {
+      basho: Basho;
+      rikishi: readonly Rikishi[];
+      banzukeEntries: readonly BanzukeEntry[];
+    }) =>
+      db.transaction((transaction) => {
+        transaction
+          .insert(basho)
+          .values(importData.basho)
+          .onConflictDoUpdate({
+            target: basho.id,
+            set: importData.basho,
+          })
+          .run();
+
+        for (const entry of importData.rikishi) {
+          transaction
+            .insert(rikishi)
+            .values(toRikishiRow(entry))
+            .onConflictDoUpdate({
+              target: rikishi.id,
+              set: toRikishiRow(entry),
+            })
+            .run();
+        }
+
+        for (const entry of importData.banzukeEntries) {
+          transaction
+            .insert(banzukeEntries)
+            .values(entry)
+            .onConflictDoUpdate({
+              target: banzukeEntries.id,
+              set: entry,
+            })
+            .run();
+        }
+
+        if (importData.banzukeEntries.length > 0) {
+          transaction
+            .delete(banzukeEntries)
+            .where(
+              and(
+                eq(banzukeEntries.bashoId, importData.basho.id),
+                notInArray(
+                  banzukeEntries.id,
+                  importData.banzukeEntries.map((entry) => entry.id),
+                ),
+              ),
+            )
+            .run();
+        }
+      }),
+    applyBoutResultsImport: (importData: {
+      bashoId: Basho["id"];
+      day: BoutResult["day"];
+      results: readonly BoutResult[];
+    }) =>
+      db.transaction((transaction) => {
+        for (const entry of importData.results) {
+          transaction
+            .insert(boutResults)
+            .values(toBoutResultRow(entry))
+            .onConflictDoUpdate({
+              target: boutResults.id,
+              set: toBoutResultRow(entry),
+            })
+            .run();
+        }
+
+        if (importData.results.length > 0) {
+          transaction
+            .delete(boutResults)
+            .where(
+              and(
+                eq(boutResults.bashoId, importData.bashoId),
+                eq(boutResults.day, importData.day),
+                notInArray(
+                  boutResults.id,
+                  importData.results.map((entry) => entry.id),
+                ),
+              ),
+            )
+            .run();
+        }
+      }),
   };
 
   return repositories;

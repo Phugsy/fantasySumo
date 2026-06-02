@@ -44,7 +44,7 @@ Current behaviour:
 Current limitations:
 
 - No routing.
-- No result entry/import UI yet.
+- No result import UI yet.
 - No persistence of the last created team in browser storage yet.
 
 ## Back end
@@ -70,12 +70,24 @@ Current routes:
   - Returns a fantasy team and its picks.
 - `GET /api/basho/:bashoId/leaderboard`
   - Returns leaderboard entries calculated with the domain scoring module.
+- `POST /api/admin/import-banzuke`
+  - Fetches current Makuuchi banzuke data from the Japan Sumo Association `indexAjax` endpoint.
+  - Maps source payloads into local `Basho`, `Rikishi`, and `BanzukeEntry` records.
+  - Replaces stale banzuke rows for the imported basho without deleting rikishi, teams, or picks.
+  - Supports `?dryRun=true`.
+- `POST /api/admin/basho/:bashoId/import-results`
+  - Fetches one day of Makuuchi results from Sumo API by default.
+  - Request body: `day` and optional `division`.
+  - Maps source payloads into local `BoutResult` records using local shikona-based rikishi ids.
+  - Replaces stale result rows only for the imported basho/day.
+  - Supports `?dryRun=true`.
 
 Current limitations:
 
 - No auth.
 - No dedicated API client package.
-- No result import endpoints or job trigger yet.
+- Admin import endpoints are local-only and unprotected.
+- No scheduled import job yet.
 - No pick-locking rules yet.
 
 ## Domain package
@@ -109,6 +121,7 @@ Current behaviour:
 - Includes Drizzle migration SQL and metadata in `packages/db/drizzle`.
 - Uses `DATABASE_URL` for the local SQLite file path, defaulting to `file:./data/fantasy-sumo.sqlite` relative to the database package scripts.
 - Provides repository functions for reading and writing basho, rikishi, banzuke entries, fantasy teams, fantasy picks, and bout results.
+- Provides transactional upsert helpers for banzuke and bout result imports.
 - Provides sample seed data for one basho, four rikishi, two fantasy teams, picks, and bout results.
 
 Current scripts:
@@ -116,12 +129,14 @@ Current scripts:
 ```text
 pnpm db:migrate
 pnpm db:seed
+pnpm import:banzuke
+pnpm import:results -- --basho 2026-05 --day 1
 pnpm --filter @fantasy-sumo/db db:generate
 ```
 
 Current limitations:
 
-- No banzuke/results import UI or endpoints yet.
+- No banzuke/results import UI yet.
 - No production database configuration yet.
 
 The accepted MVP import direction is documented in [Data Import Strategy](DATA_IMPORT_STRATEGY.md). Prefer automated source-backed imports first, with manual triggers, dry runs, and JSON fixtures available for testing and emergency fallback.
@@ -268,7 +283,7 @@ GET    /api/basho/:bashoId/rikishi
 POST   /api/basho/:bashoId/teams
 GET    /api/basho/:bashoId/teams/:teamId
 GET    /api/basho/:bashoId/leaderboard
-POST   /api/admin/basho/:bashoId/import-banzuke
+POST   /api/admin/import-banzuke
 POST   /api/admin/basho/:bashoId/import-results
 ```
 
