@@ -26,6 +26,8 @@ export function importBanzuke(
   command: BanzukeImportCommand,
   options: ImportOptions = {},
 ): ImportResult {
+  // Validate source-shaped data before any database write so failed imports
+  // cannot leave the local game in a partly updated state.
   const issues = validateBanzukeImport(command);
 
   if (issues.length > 0) {
@@ -47,6 +49,7 @@ export function importBanzuke(
     repositories.listBanzukeEntriesForBasho(command.basho.id),
     command.banzukeEntries,
     isEqualBanzukeEntry,
+    { countDeleted: true },
   );
 
   if (options.dryRun !== true) {
@@ -69,6 +72,8 @@ export function importBoutResults(
   command: BoutResultsImportCommand,
   options: ImportOptions = {},
 ): ImportResult {
+  // Result imports are scoped to one basho/day. Reimporting that day should
+  // correct stale wins rather than append duplicate or outdated scoring rows.
   const issues = validateBoutResultsImport(repositories, command);
 
   if (issues.length > 0) {
@@ -77,13 +82,20 @@ export function importBoutResults(
 
   const summary = createEmptySummary();
   summary.results = summarizeMany(
-    repositories.listBoutResultsForBasho(command.bashoId),
+    repositories
+      .listBoutResultsForBasho(command.bashoId)
+      .filter((result) => result.day === command.results[0]?.day),
     command.results,
     isEqualBoutResult,
+    { countDeleted: true },
   );
 
   if (options.dryRun !== true) {
-    repositories.applyBoutResultsImport(command.results);
+    repositories.applyBoutResultsImport({
+      bashoId: command.bashoId,
+      day: command.results[0]!.day,
+      results: command.results,
+    });
   }
 
   return {
@@ -103,6 +115,13 @@ function validateBanzukeImport(
 
   if (command.basho.id.length === 0) {
     issues.push({ path: "basho.id", message: "Basho id is required." });
+  }
+
+  if (command.banzukeEntries.length === 0) {
+    issues.push({
+      path: "banzukeEntries",
+      message: "Banzuke import must contain at least one banzuke entry.",
+    });
   }
 
   for (const [index, entry] of command.banzukeEntries.entries()) {
@@ -162,6 +181,13 @@ function validateBoutResultsImport(
     });
   }
 
+  if (command.results.length === 0) {
+    issues.push({
+      path: "results",
+      message: "Result import must contain at least one bout result.",
+    });
+  }
+
   for (const [index, result] of command.results.entries()) {
     if (result.bashoId !== command.bashoId) {
       issues.push({
@@ -174,6 +200,13 @@ function validateBoutResultsImport(
       issues.push({
         path: `results.${index}.day`,
         message: "Result day must be between 1 and 15.",
+      });
+    }
+
+    if (result.day !== command.results[0]?.day) {
+      issues.push({
+        path: `results.${index}.day`,
+        message: "One result import can only replace a single basho day.",
       });
     }
 
@@ -193,6 +226,8 @@ function validateBoutResultsImport(
           message: `Rikishi ${rikishiId} does not exist.`,
         });
       } else if (!banzukeRikishiIds.has(rikishiId)) {
+        // Results must belong to rikishi on this basho's banzuke, not just
+        // any known rikishi from another tournament.
         issues.push({
           path: `results.${index}.${field}`,
           message: `Rikishi ${rikishiId} is not on the basho banzuke.`,
@@ -226,6 +261,7 @@ function createEmptyEntitySummary(): ImportEntitySummary {
     created: 0,
     updated: 0,
     skipped: 0,
+    deleted: 0,
   };
 }
 
@@ -251,11 +287,13 @@ function summarizeMany<T extends { id: string }>(
   existingEntries: readonly T[],
   nextEntries: readonly T[],
   isEqual: (left: T, right: T) => boolean,
+  options: { countDeleted?: boolean } = {},
 ): ImportEntitySummary {
   const summary = createEmptyEntitySummary();
   const existingById = new Map(
     existingEntries.map((entry) => [entry.id, entry]),
   );
+  const nextIds = new Set(nextEntries.map((entry) => entry.id));
 
   for (const entry of nextEntries) {
     const existing = existingById.get(entry.id);
@@ -266,6 +304,14 @@ function summarizeMany<T extends { id: string }>(
       summary.skipped += 1;
     } else {
       summary.updated += 1;
+    }
+  }
+
+  if (options.countDeleted === true) {
+    for (const existing of existingEntries) {
+      if (!nextIds.has(existing.id)) {
+        summary.deleted += 1;
+      }
     }
   }
 

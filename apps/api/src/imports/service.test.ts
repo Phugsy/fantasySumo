@@ -96,6 +96,23 @@ describe("import service", () => {
     });
   });
 
+  it("removes stale banzuke entries without deleting rikishi", () => {
+    const repositories = createRepositories(client.db);
+    importBanzuke(repositories, banzukeCommand);
+
+    const result = importBanzuke(repositories, {
+      ...banzukeCommand,
+      rikishi: [banzukeCommand.rikishi[0]!],
+      banzukeEntries: [banzukeCommand.banzukeEntries[0]!],
+    });
+
+    expect(result.summary.banzuke.deleted).toBe(1);
+    expect(repositories.listRikishi()).toHaveLength(2);
+    expect(repositories.listBanzukeEntriesForBasho("2026-05")).toEqual([
+      banzukeCommand.banzukeEntries[0],
+    ]);
+  });
+
   it("imports bout results after banzuke data exists", () => {
     const repositories = createRepositories(client.db);
     importBanzuke(repositories, banzukeCommand);
@@ -117,6 +134,66 @@ describe("import service", () => {
 
     expect(result.summary.results.created).toBe(1);
     expect(repositories.listBoutResultsForBasho("2026-05")).toHaveLength(1);
+  });
+
+  it("replaces stale results for the imported day only", () => {
+    const repositories = createRepositories(client.db);
+    importBanzuke(repositories, banzukeCommand);
+    importBoutResults(repositories, {
+      source: "test",
+      bashoId: "2026-05",
+      results: [
+        {
+          id: "2026-05-day-1-match-1",
+          bashoId: "2026-05",
+          day: 1,
+          winnerRikishiId: "onosato",
+          loserRikishiId: "kotozakura",
+        },
+        {
+          id: "2026-05-day-1-match-2",
+          bashoId: "2026-05",
+          day: 1,
+          winnerRikishiId: "kotozakura",
+          loserRikishiId: "onosato",
+        },
+      ],
+    });
+    importBoutResults(repositories, {
+      source: "test",
+      bashoId: "2026-05",
+      results: [
+        {
+          id: "2026-05-day-2-match-1",
+          bashoId: "2026-05",
+          day: 2,
+          winnerRikishiId: "onosato",
+          loserRikishiId: "kotozakura",
+        },
+      ],
+    });
+
+    const result = importBoutResults(repositories, {
+      source: "test",
+      bashoId: "2026-05",
+      results: [
+        {
+          id: "2026-05-day-1-match-1",
+          bashoId: "2026-05",
+          day: 1,
+          winnerRikishiId: "onosato",
+          loserRikishiId: "kotozakura",
+        },
+      ],
+    });
+
+    expect(result.summary.results.deleted).toBe(1);
+    expect(
+      repositories
+        .listBoutResultsForBasho("2026-05")
+        .map((entry) => entry.id)
+        .sort(),
+    ).toEqual(["2026-05-day-1-match-1", "2026-05-day-2-match-1"]);
   });
 
   it("rejects invalid result imports before writing", () => {

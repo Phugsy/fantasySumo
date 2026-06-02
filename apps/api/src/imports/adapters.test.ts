@@ -113,4 +113,31 @@ describe("source import adapters", () => {
       ],
     });
   });
+
+  it("uses winnerEn when numeric winner ids are missing", () => {
+    const command = mapSumoApiTorikumiPayload(
+      {
+        torikumi: [
+          {
+            bashoId: "202605",
+            day: 1,
+            matchNo: 1,
+            eastShikona: "Onosato",
+            westShikona: "Kotozakura",
+            kimarite: "oshidashi",
+            winnerEn: "Kotozakura",
+          },
+        ],
+      },
+      {
+        bashoId: "2026-05",
+        day: 1,
+      },
+    );
+
+    expect(command.results[0]).toMatchObject({
+      winnerRikishiId: "kotozakura",
+      loserRikishiId: "onosato",
+    });
+  });
 });

@@ -11,6 +11,7 @@ export interface ImportEntitySummary {
   created: number;
   updated: number;
   skipped: number;
+  deleted: number;
 }
 
 export type ImportSummary = Record<ImportEntityName, ImportEntitySummary>;

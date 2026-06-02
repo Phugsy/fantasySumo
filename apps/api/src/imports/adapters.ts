@@ -221,12 +221,14 @@ function resolveWinnerShikona(
     westShikona: string;
   },
 ): string {
-  if (row.winnerId === wrestlers.eastId) {
-    return wrestlers.eastShikona;
-  }
+  if (row.winnerId !== undefined) {
+    if (row.winnerId === wrestlers.eastId) {
+      return wrestlers.eastShikona;
+    }
 
-  if (row.winnerId === wrestlers.westId) {
-    return wrestlers.westShikona;
+    if (row.winnerId === wrestlers.westId) {
+      return wrestlers.westShikona;
+    }
   }
 
   const winnerEn = requiredString(row.winnerEn, "winnerEn");

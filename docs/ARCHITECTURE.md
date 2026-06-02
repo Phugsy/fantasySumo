@@ -73,11 +73,13 @@ Current routes:
 - `POST /api/admin/import-banzuke`
   - Fetches current Makuuchi banzuke data from the Japan Sumo Association `indexAjax` endpoint.
   - Maps source payloads into local `Basho`, `Rikishi`, and `BanzukeEntry` records.
+  - Replaces stale banzuke rows for the imported basho without deleting rikishi, teams, or picks.
   - Supports `?dryRun=true`.
 - `POST /api/admin/basho/:bashoId/import-results`
   - Fetches one day of Makuuchi results from Sumo API by default.
   - Request body: `day` and optional `division`.
   - Maps source payloads into local `BoutResult` records using local shikona-based rikishi ids.
+  - Replaces stale result rows only for the imported basho/day.
   - Supports `?dryRun=true`.
 
 Current limitations:

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, notInArray } from "drizzle-orm";
 import type {
   BanzukeEntry,
   Basho,
@@ -167,10 +167,29 @@ export function createRepositories(db: SqliteDatabase) {
             })
             .run();
         }
+
+        if (importData.banzukeEntries.length > 0) {
+          transaction
+            .delete(banzukeEntries)
+            .where(
+              and(
+                eq(banzukeEntries.bashoId, importData.basho.id),
+                notInArray(
+                  banzukeEntries.id,
+                  importData.banzukeEntries.map((entry) => entry.id),
+                ),
+              ),
+            )
+            .run();
+        }
       }),
-    applyBoutResultsImport: (results: readonly BoutResult[]) =>
+    applyBoutResultsImport: (importData: {
+      bashoId: Basho["id"];
+      day: BoutResult["day"];
+      results: readonly BoutResult[];
+    }) =>
       db.transaction((transaction) => {
-        for (const entry of results) {
+        for (const entry of importData.results) {
           transaction
             .insert(boutResults)
             .values(toBoutResultRow(entry))
@@ -178,6 +197,22 @@ export function createRepositories(db: SqliteDatabase) {
               target: boutResults.id,
               set: toBoutResultRow(entry),
             })
+            .run();
+        }
+
+        if (importData.results.length > 0) {
+          transaction
+            .delete(boutResults)
+            .where(
+              and(
+                eq(boutResults.bashoId, importData.bashoId),
+                eq(boutResults.day, importData.day),
+                notInArray(
+                  boutResults.id,
+                  importData.results.map((entry) => entry.id),
+                ),
+              ),
+            )
             .run();
         }
       }),

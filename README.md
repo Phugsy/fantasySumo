@@ -120,6 +120,8 @@ make import-banzuke ARGS="-- --dry-run"
 make import-results ARGS="-- --basho 2026-05 --day 1 --dry-run"
 ```
 
+Banzuke reimports replace the stored banzuke entries for that basho without deleting rikishi, teams, or picks. Result reimports replace only the imported basho/day, so rerunning day 1 cannot delete day 2 results.
+
 The API exposes equivalent local admin triggers:
 
 ```bash
