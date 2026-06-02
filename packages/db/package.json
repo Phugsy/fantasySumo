@@ -14,7 +14,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/scripts/migrate.ts",
     "db:seed": "tsx src/scripts/seed.ts",
-    "test": "vitest run src"
+    "db:seed:demo": "tsx src/scripts/seed-demo.ts",
+    "test": "pnpm --filter @fantasy-sumo/domain build && vitest run src"
   },
   "dependencies": {
     "@fantasy-sumo/domain": "workspace:*",

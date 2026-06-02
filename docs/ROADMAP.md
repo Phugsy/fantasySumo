@@ -42,6 +42,7 @@ Goal: make the core game loop work locally.
 - [x] Add automated source-backed import for banzuke and results.
 - [x] Add leaderboard calculation.
 - [x] Add leaderboard UI.
+- [x] Add deterministic demo data for local demos and future E2E fixtures.
 
 ## Stage 4: Friendly single-league version
 

@@ -2,10 +2,18 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { calculateLeaderboard } from "@fantasy-sumo/domain";
 import { createDatabaseClient, type DatabaseClient } from "./client.js";
+import {
+  demoBanzukeEntries,
+  demoBasho,
+  demoBoutResults,
+  demoFantasyTeams,
+  demoRikishi,
+} from "./demo-seed-data.js";
 import { runMigrations } from "./migrate.js";
 import { createRepositories } from "./repositories.js";
-import { seedDatabase } from "./seed.js";
+import { seedDatabase, seedDemoDatabase } from "./seed.js";
 import { sampleBasho, sampleFantasyTeams, sampleRikishi } from "./seed-data.js";
 
 let tmpRoot: string;
@@ -117,5 +125,57 @@ describe("repositories", () => {
 
     expect(repositories.getFantasyTeam("team-rollback")).toBeUndefined();
     expect(repositories.listFantasyPicksForTeam("team-rollback")).toEqual([]);
+  });
+
+  it("loads deterministic demo data for local demos and E2E fixtures", () => {
+    seedDemoDatabase(client.db);
+    const repositories = createRepositories(client.db);
+
+    expect(repositories.listBashos()).toEqual([demoBasho]);
+    expect(repositories.listRikishi()).toHaveLength(demoRikishi.length);
+    expect(repositories.listBanzukeEntriesForBasho(demoBasho.id)).toHaveLength(
+      demoBanzukeEntries.length,
+    );
+    expect(repositories.listFantasyTeamsForBasho(demoBasho.id)).toHaveLength(
+      demoFantasyTeams.length,
+    );
+    expect(repositories.listBoutResultsForBasho(demoBasho.id)).toHaveLength(
+      demoBoutResults.length,
+    );
+
+    const leaderboard = calculateLeaderboard(
+      repositories.listFantasyTeamsForBasho(demoBasho.id),
+      repositories.listFantasyPicksForBasho(demoBasho.id),
+      repositories.listBoutResultsForBasho(demoBasho.id),
+    );
+
+    expect(
+      leaderboard.map((entry) => ({
+        rank: entry.rank,
+        displayName: entry.displayName,
+        score: entry.score,
+      })),
+    ).toEqual([
+      {
+        rank: 1,
+        displayName: "Yusho Hunters",
+        score: 7,
+      },
+      {
+        rank: 2,
+        displayName: "Salt Circle",
+        score: 5,
+      },
+      {
+        rank: 3,
+        displayName: "Tachiai Titans",
+        score: 5,
+      },
+      {
+        rank: 4,
+        displayName: "Dohyo Dreamers",
+        score: 3,
+      },
+    ]);
   });
 });

@@ -14,7 +14,7 @@ The original app was an unfinished barebones prototype. Treat the removed legacy
 - Front end: Vite, React, TypeScript.
 - Back end: Fastify, TypeScript, Node.
 - Shared code: `packages/domain` for framework-free domain boundaries.
-- Data: SQLite via `packages/db`, with Drizzle schema, migration SQL, repositories, and seed data.
+- Data: SQLite via `packages/db`, with Drizzle schema, migration SQL, repositories, sample seed data, and deterministic demo seed data.
 - Existing behaviour: displays team selection and leaderboard views, and exposes local game API routes for health, basho, rikishi, team creation/retrieval, and leaderboard data.
 
 ## Intended MVP direction
@@ -58,8 +58,9 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 5. Read `docs/ROADMAP.md` before adding features.
 6. Read `docs/DATA_IMPORT_STRATEGY.md` before adding or changing banzuke/result import behaviour.
 7. Read `docs/E2E_TESTING.md` before adding browser end-to-end tests.
-8. Prefer the Makefile command layer for common workflows: `make test`, `make lint`, `make build`, and `make check`.
-9. Keep PRs focused on the next MVP slice; do not rebuild the full product in one change.
+8. Use `make db-seed-demo` or `make demo` when a deterministic browser-flow fixture is useful, especially for future E2E validation. These commands reset the configured local SQLite data.
+9. Prefer the Makefile command layer for common workflows: `make test`, `make lint`, `make build`, and `make check`.
+10. Keep PRs focused on the next MVP slice; do not rebuild the full product in one change.
 
 ## Definition of done for future changes
 
