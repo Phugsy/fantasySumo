@@ -10,6 +10,14 @@ export { migrateDatabase, runMigrations } from "./migrate.js";
 export { createRepositories } from "./repositories.js";
 export type { Repositories } from "./repositories.js";
 export {
+  demoBanzukeEntries,
+  demoBasho,
+  demoBoutResults,
+  demoFantasyPicks,
+  demoFantasyTeams,
+  demoRikishi,
+} from "./demo-seed-data.js";
+export {
   sampleBanzukeEntries,
   sampleBasho,
   sampleBoutResults,
@@ -17,4 +25,4 @@ export {
   sampleFantasyTeams,
   sampleRikishi,
 } from "./seed-data.js";
-export { seedDatabase } from "./seed.js";
+export { seedDatabase, seedDemoDatabase } from "./seed.js";

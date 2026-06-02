@@ -13,7 +13,7 @@ At present, the app has the first local playable foundations:
 - A Vite + React front end for creating a fantasy team from seeded basho data and viewing leaderboard standings.
 - A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.
 - A shared TypeScript domain package with MVP types, validation, scoring, and leaderboard logic.
-- A local SQLite + Drizzle database package with schema, migration, repositories, and sample seed data.
+- A local SQLite + Drizzle database package with schema, migration, repositories, sample seed data, and deterministic demo data.
 - Automated source-backed import commands and local admin endpoints for current banzuke and daily results.
 - Vitest, ESLint, and Prettier wired through pnpm scripts.
 
@@ -61,6 +61,21 @@ Create a local database and seed sample MVP data:
 make db-migrate
 make db-seed
 ```
+
+For demos, manual browser checks, and future E2E fixtures, use the deterministic demo basho seed instead:
+
+```bash
+make db-seed-demo
+make dev
+```
+
+Or reset the demo data and start both dev servers in one command:
+
+```bash
+make demo
+```
+
+Demo mode replaces the configured SQLite database contents with fake but stable basho, rikishi, team, pick, and result data. It does not use live sumo data, but it does exercise the same API, UI, database, and scoring logic as normal local development.
 
 Run both the API and web dev servers:
 
@@ -142,8 +157,10 @@ It uses `pnpm` from `PATH` when available and can be overridden with `PNPM=/path
 Common targets:
 
 - `make dev` - start the API and web client together.
+- `make demo` - reset deterministic demo data, then start the API and web client together.
 - `make dev-client` - start only the Vite web client.
 - `make dev-server` - start only the Fastify API.
+- `make db-seed-demo` - reset the configured SQLite database with deterministic demo data.
 - `make test` - run all tests.
 - `make lint` - run ESLint.
 - `make build` - build all packages/apps.

@@ -123,16 +123,20 @@ Current behaviour:
 - Provides repository functions for reading and writing basho, rikishi, banzuke entries, fantasy teams, fantasy picks, and bout results.
 - Provides transactional upsert helpers for banzuke and bout result imports.
 - Provides sample seed data for one basho, four rikishi, two fantasy teams, picks, and bout results.
+- Provides deterministic demo seed data for one active basho, eight rikishi, four fantasy teams, picks, and five days of bout results.
 
 Current scripts:
 
 ```text
 pnpm db:migrate
 pnpm db:seed
+pnpm db:seed:demo
 pnpm import:banzuke
 pnpm import:results -- --basho 2026-05 --day 1
 pnpm --filter @fantasy-sumo/db db:generate
 ```
+
+`pnpm db:seed:demo` is the preferred fixture for local demos, browser smoke checks, and the future Playwright E2E harness. It deliberately replaces the configured SQLite database contents with fake deterministic data while using the same database schema, repositories, API routes, UI, and domain scoring logic as the regular app.
 
 Current limitations:
 

@@ -1,3 +1,11 @@
+import type {
+  BanzukeEntry,
+  Basho,
+  BoutResult,
+  FantasyPick,
+  FantasyTeam,
+  Rikishi,
+} from "@fantasy-sumo/domain";
 import type { SqliteDatabase } from "./client.js";
 import {
   banzukeEntries,
@@ -8,6 +16,14 @@ import {
   rikishi,
 } from "./schema.js";
 import {
+  demoBanzukeEntries,
+  demoBasho,
+  demoBoutResults,
+  demoFantasyPicks,
+  demoFantasyTeams,
+  demoRikishi,
+} from "./demo-seed-data.js";
+import {
   sampleBanzukeEntries,
   sampleBasho,
   sampleBoutResults,
@@ -17,6 +33,28 @@ import {
 } from "./seed-data.js";
 
 export function seedDatabase(db: SqliteDatabase): void {
+  replaceSeedData(db, {
+    basho: sampleBasho,
+    rikishi: sampleRikishi,
+    banzukeEntries: sampleBanzukeEntries,
+    fantasyTeams: sampleFantasyTeams,
+    fantasyPicks: sampleFantasyPicks,
+    boutResults: sampleBoutResults,
+  });
+}
+
+export function seedDemoDatabase(db: SqliteDatabase): void {
+  replaceSeedData(db, {
+    basho: demoBasho,
+    rikishi: demoRikishi,
+    banzukeEntries: demoBanzukeEntries,
+    fantasyTeams: demoFantasyTeams,
+    fantasyPicks: demoFantasyPicks,
+    boutResults: demoBoutResults,
+  });
+}
+
+function replaceSeedData(db: SqliteDatabase, seedData: SeedData): void {
   db.delete(fantasyPicks).run();
   db.delete(fantasyTeams).run();
   db.delete(boutResults).run();
@@ -24,18 +62,35 @@ export function seedDatabase(db: SqliteDatabase): void {
   db.delete(rikishi).run();
   db.delete(basho).run();
 
-  db.insert(basho).values(sampleBasho).run();
-  db.insert(rikishi).values(sampleRikishi).run();
-  db.insert(banzukeEntries).values(sampleBanzukeEntries).run();
-  db.insert(fantasyTeams).values(sampleFantasyTeams).run();
+  db.insert(basho).values(seedData.basho).run();
+  db.insert(rikishi)
+    .values([...seedData.rikishi])
+    .run();
+  db.insert(banzukeEntries)
+    .values([...seedData.banzukeEntries])
+    .run();
+  db.insert(fantasyTeams)
+    .values([...seedData.fantasyTeams])
+    .run();
   db.insert(fantasyPicks)
     .values(
-      sampleFantasyPicks.map((pick) => ({
+      seedData.fantasyPicks.map((pick) => ({
         id: pick.id ?? `${pick.teamId}-${pick.rikishiId}`,
         teamId: pick.teamId,
         rikishiId: pick.rikishiId,
       })),
     )
     .run();
-  db.insert(boutResults).values(sampleBoutResults).run();
+  db.insert(boutResults)
+    .values([...seedData.boutResults])
+    .run();
+}
+
+interface SeedData {
+  basho: Basho;
+  rikishi: readonly Rikishi[];
+  banzukeEntries: readonly BanzukeEntry[];
+  fantasyTeams: readonly FantasyTeam[];
+  fantasyPicks: readonly FantasyPick[];
+  boutResults: readonly BoutResult[];
 }
