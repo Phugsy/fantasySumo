@@ -102,6 +102,26 @@ describe("TeamSelection", () => {
       screen.getByText("2 rikishi selected for this basho."),
     ).toBeInTheDocument();
   });
+
+  it("disables team editing when picks are locked", () => {
+    const onToggleRikishi = vi.fn();
+
+    renderTeamSelection({
+      isLocked: true,
+      lockMessage: "This basho has started, so picks are locked.",
+      onToggleRikishi,
+    });
+
+    expect(
+      screen.getByText("This basho has started, so picks are locked."),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Team name")).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Onosato/ })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Remove Kotozakura" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Submit team" })).toBeDisabled();
+  });
 });
 
 function renderTeamSelection(
@@ -116,6 +136,8 @@ function renderTeamSelection(
       createdTeam={props.createdTeam ?? null}
       displayName={props.displayName ?? "East Stand Heroes"}
       errorMessage={props.errorMessage ?? null}
+      isLocked={props.isLocked ?? false}
+      lockMessage={props.lockMessage}
       onDisplayNameChange={props.onDisplayNameChange ?? vi.fn()}
       onSubmit={props.onSubmit ?? vi.fn()}
       onToggleRikishi={props.onToggleRikishi ?? vi.fn()}

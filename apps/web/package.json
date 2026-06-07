@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -p tsconfig.json && vite build",
-    "test": "vitest run src"
+    "test": "pnpm --filter @fantasy-sumo/domain build && vitest run src"
   },
   "dependencies": {
     "@fantasy-sumo/domain": "workspace:*",

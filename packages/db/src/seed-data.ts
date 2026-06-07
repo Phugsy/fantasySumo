@@ -12,7 +12,8 @@ export const sampleBasho: Basho = {
   name: "May 2026 Sample Basho",
   startDate: "2026-05-10",
   endDate: "2026-05-24",
-  status: "active",
+  status: "upcoming",
+  currentDay: 0,
 };
 
 export const sampleRikishi: Rikishi[] = [

@@ -6,6 +6,8 @@ interface TeamSelectionProps {
   createdTeam: CreatedTeamResponse | null;
   displayName: string;
   errorMessage: string | null;
+  isLocked: boolean;
+  lockMessage?: string;
   onDisplayNameChange: (displayName: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onToggleRikishi: (rikishiId: string) => void;
@@ -21,6 +23,8 @@ export function TeamSelection({
   createdTeam,
   displayName,
   errorMessage,
+  isLocked,
+  lockMessage,
   onDisplayNameChange,
   onSubmit,
   onToggleRikishi,
@@ -39,10 +43,16 @@ export function TeamSelection({
           <p className="eyebrow">Banzuke</p>
           <h2 id="rikishi-title">Choose rikishi</h2>
         </div>
+        {isLocked && lockMessage !== undefined && (
+          <p className="form-message" role="status">
+            {lockMessage}
+          </p>
+        )}
         <div className="rikishi-list">
           {rikishi.map((entry) => {
             const isSelected = selectedIds.includes(entry.id);
-            const isDisabled = !isSelected && selectedIds.length >= teamSize;
+            const isDisabled =
+              isLocked || (!isSelected && selectedIds.length >= teamSize);
 
             return (
               <button
@@ -81,6 +91,7 @@ export function TeamSelection({
         <input
           id="displayName"
           name="displayName"
+          disabled={isLocked}
           value={displayName}
           onChange={(event) => onDisplayNameChange(event.target.value)}
           placeholder="East Stand Heroes"
@@ -92,6 +103,7 @@ export function TeamSelection({
               <span>{entry.shikona}</span>
               <button
                 type="button"
+                disabled={isLocked}
                 onClick={() => onToggleRikishi(entry.id)}
                 aria-label={`Remove ${entry.shikona}`}
               >
@@ -106,7 +118,11 @@ export function TeamSelection({
           ))}
         </ol>
 
-        <button className="submit-button" disabled={!canSubmit} type="submit">
+        <button
+          className="submit-button"
+          disabled={isLocked || !canSubmit}
+          type="submit"
+        >
           {submitState === "submitting" ? "Submitting..." : "Submit team"}
         </button>
 

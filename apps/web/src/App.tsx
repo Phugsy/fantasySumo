@@ -1,5 +1,6 @@
 import type { FormEvent, MutableRefObject } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { canEditFantasyPicks, getPickLockMessage } from "@fantasy-sumo/domain";
 import {
   createFantasyTeam,
   fetchBashoRikishi,
@@ -118,13 +119,21 @@ export function App() {
     [rikishi, selectedIds],
   );
   const teamSize = basho?.teamSize ?? 0;
+  const canEditPicks = basho === null ? false : canEditFantasyPicks(basho);
+  const pickLockMessage =
+    basho === null ? undefined : getPickLockMessage(basho);
   const canSubmit =
     loadState === "ready" &&
+    canEditPicks &&
     submitState === "idle" &&
     displayName.trim().length > 0 &&
     selectedIds.length === teamSize;
 
   function toggleRikishi(rikishiId: string) {
+    if (!canEditPicks) {
+      return;
+    }
+
     setErrorMessage(null);
     setCreatedTeam(null);
     setSelectedIds((current) => {
@@ -226,6 +235,8 @@ export function App() {
               createdTeam={createdTeam}
               displayName={displayName}
               errorMessage={errorMessage}
+              isLocked={!canEditPicks}
+              lockMessage={pickLockMessage}
               onDisplayNameChange={(nextDisplayName) => {
                 setDisplayName(nextDisplayName);
                 setCreatedTeam(null);

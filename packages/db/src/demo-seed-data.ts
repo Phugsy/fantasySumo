@@ -13,6 +13,7 @@ export const demoBasho: Basho = {
   startDate: "2026-05-10",
   endDate: "2026-05-24",
   status: "active",
+  currentDay: 5,
 };
 
 export const demoRikishi: Rikishi[] = [

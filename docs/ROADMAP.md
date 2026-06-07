@@ -39,6 +39,7 @@ Goal: make the core game loop work locally.
 - [x] Model fantasy teams and picks.
 - [x] Expose basho, rikishi, team, and leaderboard API routes.
 - [x] Add team selection flow.
+- [x] Add basho lifecycle states and pick-locking rules.
 - [x] Add automated source-backed import for banzuke and results.
 - [x] Add leaderboard calculation.
 - [x] Add leaderboard UI.
@@ -50,7 +51,6 @@ Goal: make it usable by a small group of friends.
 
 - [ ] Add simple user identity or display-name-based teams.
 - [ ] Add private league concept if needed.
-- [ ] Add pick-locking before basho starts.
 - [ ] Add basic admin flow for importing data.
 - [ ] Improve responsive UI.
 - [x] Add error/loading/empty states.

@@ -43,6 +43,7 @@ describe("source import adapters", () => {
         id: "2026-05",
         name: "2026 May Grand Sumo Tournament",
         status: "active",
+        currentDay: 3,
       },
       rikishi: [
         {

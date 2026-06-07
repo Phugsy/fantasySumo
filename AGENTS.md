@@ -13,7 +13,7 @@ The original app was an unfinished barebones prototype. Treat the removed legacy
 - Package manager: pnpm workspace.
 - Front end: Vite, React, TypeScript.
 - Back end: Fastify, TypeScript, Node.
-- Shared code: `packages/domain` for framework-free domain boundaries.
+- Shared code: `packages/domain` for framework-free domain boundaries, including basho lifecycle and pick-locking rules.
 - Data: SQLite via `packages/db`, with Drizzle schema, migration SQL, repositories, sample seed data, and deterministic demo seed data.
 - Existing behaviour: displays team selection and leaderboard views, and exposes local game API routes for health, basho, rikishi, team creation/retrieval, and leaderboard data.
 
@@ -40,6 +40,7 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 - Replace hard-coded credentials before any real deployment work.
 - Prefer explicit domain names: `Basho`, `Rikishi`, `Banzuke`, `FantasyTeam`, `Pick`, `Bout`, `Result`, `Leaderboard`.
 - Keep scoring logic isolated and well-tested.
+- Keep basho lifecycle and pick-locking rules in the domain/API layer; UI state should mirror those rules, not replace API enforcement.
 - Keep data import logic separate from scoring logic.
 - Once an E2E harness exists, use it to validate completion for changes that affect the browser game loop.
 

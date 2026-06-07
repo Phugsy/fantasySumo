@@ -19,19 +19,21 @@ import {
 
 export function createRepositories(db: SqliteDatabase) {
   const repositories = {
-    insertBasho: (entry: Basho) => db.insert(basho).values(entry).run(),
+    insertBasho: (entry: Basho) =>
+      db.insert(basho).values(toBashoRow(entry)).run(),
     upsertBasho: (entry: Basho) =>
       db
         .insert(basho)
-        .values(entry)
+        .values(toBashoRow(entry))
         .onConflictDoUpdate({
           target: basho.id,
-          set: entry,
+          set: toBashoRow(entry),
         })
         .run(),
-    listBashos: () => db.select().from(basho).orderBy(basho.startDate).all(),
+    listBashos: () =>
+      db.select().from(basho).orderBy(basho.startDate).all().map(toBasho),
     getBasho: (id: Basho["id"]) =>
-      db.select().from(basho).where(eq(basho.id, id)).get(),
+      toOptionalBasho(db.select().from(basho).where(eq(basho.id, id)).get()),
 
     insertRikishi: (entry: Rikishi) =>
       db.insert(rikishi).values(toRikishiRow(entry)).run(),
@@ -139,10 +141,10 @@ export function createRepositories(db: SqliteDatabase) {
       db.transaction((transaction) => {
         transaction
           .insert(basho)
-          .values(importData.basho)
+          .values(toBashoRow(importData.basho))
           .onConflictDoUpdate({
             target: basho.id,
-            set: importData.basho,
+            set: toBashoRow(importData.basho),
           })
           .run();
 
@@ -222,6 +224,30 @@ export function createRepositories(db: SqliteDatabase) {
 }
 
 export type Repositories = ReturnType<typeof createRepositories>;
+
+function toBashoRow(entry: Basho) {
+  return {
+    ...entry,
+    currentDay: entry.currentDay ?? null,
+  };
+}
+
+function toBasho(row: typeof basho.$inferSelect): Basho {
+  return {
+    id: row.id,
+    name: row.name,
+    startDate: row.startDate,
+    endDate: row.endDate,
+    status: row.status,
+    ...(row.currentDay === null ? {} : { currentDay: row.currentDay }),
+  };
+}
+
+function toOptionalBasho(
+  row: typeof basho.$inferSelect | undefined,
+): Basho | undefined {
+  return row === undefined ? undefined : toBasho(row);
+}
 
 function toRikishiRow(entry: Rikishi) {
   return {

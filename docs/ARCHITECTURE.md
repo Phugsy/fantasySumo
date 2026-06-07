@@ -124,6 +124,7 @@ Current behaviour:
 - Provides transactional upsert helpers for banzuke and bout result imports.
 - Provides sample seed data for one basho, four rikishi, two fantasy teams, picks, and bout results.
 - Provides deterministic demo seed data for one active basho, eight rikishi, four fantasy teams, picks, and five days of bout results.
+- Stores basho lifecycle status and current day progress.
 
 Current scripts:
 
@@ -239,7 +240,8 @@ Basho
   name
   startDate
   endDate
-  status: upcoming | active | complete
+  status: upcoming | locked | active | complete
+  currentDay optional
 
 Rikishi
   id
@@ -292,6 +294,15 @@ POST   /api/admin/basho/:bashoId/import-results
 ```
 
 Admin endpoints can be protected later. For early local development, they can remain local-only but should be clearly marked as unsafe for production.
+
+`POST /api/basho/:bashoId/teams` is allowed only while the basho status is `upcoming`. The API rejects team creation for `locked`, `active`, and `complete` basho with `409 picks-locked`; the UI mirrors that state but is not the source of enforcement.
+
+Lifecycle meanings:
+
+- `upcoming`: picks are open.
+- `locked`: picks are closed before scoring starts.
+- `active`: results are being applied day by day.
+- `complete`: final scores are available.
 
 The first import implementation should follow [Data Import Strategy](DATA_IMPORT_STRATEGY.md): fetch through source-specific adapters, validate source-agnostic import commands, write them transactionally, and keep import adapters separate from scoring.
 

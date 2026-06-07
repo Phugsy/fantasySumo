@@ -1,4 +1,5 @@
 import type { Basho } from "../types";
+import { getBashoLifecycleLabel } from "@fantasy-sumo/domain";
 
 interface BashoPanelProps {
   basho: Basho;
@@ -16,6 +17,12 @@ export function BashoPanel({ basho, selectedCount }: BashoPanelProps) {
       </div>
       <p className="basho-dates">
         {formatDate(basho.startDate)} to {formatDate(basho.endDate)}
+      </p>
+      <p className="lifecycle-state">
+        <strong>{getBashoLifecycleLabel(basho.status)}</strong>
+        {basho.currentDay === undefined || basho.currentDay === 0
+          ? null
+          : ` - Day ${basho.currentDay}`}
       </p>
       <div className="progress-wrap" aria-label="Pick progress">
         <span>
