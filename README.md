@@ -85,7 +85,7 @@ make dev
 
 Local URLs:
 
-- Web: `http://localhost:5173`
+- Web: `http://localhost:7866`
 - API health: `http://localhost:3000/api/health`
 
 Useful API endpoints:
