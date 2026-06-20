@@ -1,6 +1,5 @@
 import type { FormEvent, MutableRefObject } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { canEditFantasyPicks, getPickLockMessage } from "@fantasy-sumo/domain";
 import {
   createFantasyTeam,
   fetchBashoRikishi,
@@ -23,6 +22,7 @@ import type {
   LoadState,
   RankedRikishi,
 } from "./types";
+import { canEditFantasyPicks, getPickLockMessage } from "./lifecycle";
 
 export function App() {
   const [loadState, setLoadState] = useState<LoadState>("loading");

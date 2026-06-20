@@ -1,5 +1,5 @@
 import type { Basho } from "../types";
-import { getBashoLifecycleLabel } from "@fantasy-sumo/domain";
+import { getBashoLifecycleLabel } from "../lifecycle";
 
 interface BashoPanelProps {
   basho: Basho;

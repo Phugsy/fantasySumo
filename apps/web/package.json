@@ -4,12 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @fantasy-sumo/domain build && vite --host 0.0.0.0",
-    "build": "pnpm --filter @fantasy-sumo/domain build && tsc -p tsconfig.json && vite build",
-    "test": "pnpm --filter @fantasy-sumo/domain build && vitest run src"
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -p tsconfig.json && vite build",
+    "test": "vitest run src"
   },
   "dependencies": {
-    "@fantasy-sumo/domain": "workspace:*",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

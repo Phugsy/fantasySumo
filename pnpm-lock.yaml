@@ -63,9 +63,6 @@ importers:
 
   apps/web:
     dependencies:
-      '@fantasy-sumo/domain':
-        specifier: workspace:*
-        version: link:../../packages/domain
       react:
         specifier: ^19.2.0
         version: 19.2.6
