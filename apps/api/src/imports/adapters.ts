@@ -195,11 +195,16 @@ function resolveBashoStatus(payload: JsaBanzukePayload) {
     return "active";
   }
 
+  const currentDay = resolveCurrentDay(payload);
   const today = payload.BashoInfo?.today;
   const endDate = payload.BashoInfo?.end_date;
 
   if (today !== undefined && endDate !== undefined && today > endDate) {
     return "complete";
+  }
+
+  if (currentDay !== undefined && currentDay > 0) {
+    return "locked";
   }
 
   return "upcoming";

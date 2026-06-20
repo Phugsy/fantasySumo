@@ -226,6 +226,11 @@ export function registerBashoRoutes(
 
 function findCurrentBasho(repositories: Repositories) {
   const bashos = repositories.listBashos();
+  const latestFirst = [...bashos].reverse();
 
-  return bashos.find((basho) => basho.status === "active") ?? bashos.at(-1);
+  return (
+    latestFirst.find((basho) => basho.status === "active") ??
+    latestFirst.find((basho) => basho.status === "locked") ??
+    latestFirst.at(0)
+  );
 }

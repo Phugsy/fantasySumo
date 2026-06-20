@@ -52,6 +52,35 @@ describe("basho routes", () => {
     });
   });
 
+  it("prefers a locked current basho over a later upcoming basho", async () => {
+    const repositories = createRepositories(client.db);
+    repositories.upsertBasho({
+      ...sampleBasho,
+      status: "locked",
+      currentDay: 1,
+    });
+    repositories.insertBasho({
+      id: "2026-07",
+      name: "July 2026 Future Basho",
+      startDate: "2026-07-12",
+      endDate: "2026-07-26",
+      status: "upcoming",
+      currentDay: 0,
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/basho/current",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      id: "2026-05",
+      status: "locked",
+      currentDay: 1,
+    });
+  });
+
   it("returns rikishi for a basho with banzuke ranks", async () => {
     const response = await app.inject({
       method: "GET",

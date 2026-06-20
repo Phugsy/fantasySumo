@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "build": "tsc -p tsconfig.json && vite build",
+    "dev": "pnpm --filter @fantasy-sumo/domain build && vite --host 0.0.0.0",
+    "build": "pnpm --filter @fantasy-sumo/domain build && tsc -p tsconfig.json && vite build",
     "test": "pnpm --filter @fantasy-sumo/domain build && vitest run src"
   },
   "dependencies": {

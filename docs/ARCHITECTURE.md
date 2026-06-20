@@ -58,7 +58,7 @@ Current routes:
 - `GET /api/health`
   - Returns a small JSON health payload.
 - `GET /api/basho/current`
-  - Returns the active basho and configured team size, falling back to the latest available basho when none is active.
+  - Returns the active basho and configured team size, falling back to the latest locked basho, then the latest available basho.
 - `GET /api/basho/:bashoId/rikishi`
   - Returns a basho and its rikishi with banzuke rank data.
 - `POST /api/basho/:bashoId/teams`
@@ -123,7 +123,7 @@ Current behaviour:
 - Provides repository functions for reading and writing basho, rikishi, banzuke entries, fantasy teams, fantasy picks, and bout results.
 - Provides transactional upsert helpers for banzuke and bout result imports.
 - Provides sample seed data for one basho, four rikishi, two fantasy teams, picks, and bout results.
-- Provides deterministic demo seed data for one active basho, eight rikishi, four fantasy teams, picks, and five days of bout results.
+- Provides deterministic demo seed data for one pickable basho, eight rikishi, four fantasy teams, picks, and five days of bout results.
 - Stores basho lifecycle status and current day progress.
 
 Current scripts:

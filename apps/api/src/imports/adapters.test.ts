@@ -74,6 +74,33 @@ describe("source import adapters", () => {
     });
   });
 
+  it("locks imported basho once the start date has arrived before active scoring", () => {
+    const command = mapJsaBanzukePayload({
+      basho_name: "May Grand Sumo Tournament",
+      BashoInfo: {
+        start_date: "2026-05-10",
+        end_date: "2026-05-24",
+        today: "2026-05-10",
+        BattleNow: 0,
+        year_eng: "2026",
+      },
+      BanzukeTable: [
+        {
+          banzuke_id: 1,
+          banzuke_name: "Yokozuna",
+          rikishi_id: 3842,
+          shikona: "Hoshoryu",
+          heya_name: "Tatsunami",
+        },
+      ],
+    });
+
+    expect(command.basho).toMatchObject({
+      status: "locked",
+      currentDay: 1,
+    });
+  });
+
   it("maps Sumo API torikumi payloads into local result commands", () => {
     const command = mapSumoApiTorikumiPayload(
       {
