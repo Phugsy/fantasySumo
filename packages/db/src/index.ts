@@ -10,6 +10,15 @@ export { migrateDatabase, runMigrations } from "./migrate.js";
 export { createRepositories } from "./repositories.js";
 export type { Repositories } from "./repositories.js";
 export {
+  DEMO_BASHO_ID,
+  DEMO_FINAL_DAY,
+  advanceDemoBashoDay,
+  completeDemoBasho,
+  resetDemoProgression,
+  startDemoBasho,
+} from "./demo-progression.js";
+export type { DemoProgressionResult } from "./demo-progression.js";
+export {
   demoBanzukeEntries,
   demoBasho,
   demoBoutResults,

@@ -67,7 +67,7 @@ Preferred setup:
 - use a dedicated SQLite database file for E2E runs, configured through `DATABASE_URL`;
 - reset the database before each E2E test run by applying migrations and loading the deterministic demo seed data;
 - keep E2E seed data small, explicit, and close to the MVP game loop;
-- include enough seeded bout results to make leaderboard ordering meaningful;
+- use demo progression commands to apply enough bout results to make leaderboard ordering meaningful;
 - avoid mutating the default developer database at `packages/db/data/fantasy-sumo.sqlite`.
 
 The demo seed command is the intended fixture source:
@@ -77,6 +77,17 @@ make db-seed-demo
 ```
 
 For E2E, run it against a test-only `DATABASE_URL` so the reset cannot delete a developer's default local data. The demo seed uses fake data, but it flows through the real SQLite schema, repositories, Fastify API, React UI, and domain scoring code.
+
+The deterministic demo lifecycle can be used as fixture setup:
+
+```bash
+make demo-reset        # day 0, picks open, no results
+make demo-start        # picks locked, basho active, no results
+make demo-advance-day  # apply the next day of results
+make demo-complete     # apply all 15 days and complete the basho
+```
+
+Use `make demo-reset` before create-team flows that need picks open. Use `make demo-start` plus one or more `make demo-advance-day` runs before leaderboard flows that need scores to change incrementally.
 
 The eventual Playwright config should set a test-only `DATABASE_URL`, for example a file under a temporary or ignored E2E data directory. If tests need to inspect persisted state, prefer API assertions over direct database queries unless direct repository checks are clearly simpler.
 

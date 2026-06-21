@@ -18,7 +18,6 @@ import {
 import {
   demoBanzukeEntries,
   demoBasho,
-  demoBoutResults,
   demoFantasyPicks,
   demoFantasyTeams,
   demoRikishi,
@@ -50,7 +49,7 @@ export function seedDemoDatabase(db: SqliteDatabase): void {
     banzukeEntries: demoBanzukeEntries,
     fantasyTeams: demoFantasyTeams,
     fantasyPicks: demoFantasyPicks,
-    boutResults: demoBoutResults,
+    boutResults: [],
   });
 }
 
@@ -68,27 +67,41 @@ function replaceSeedData(db: SqliteDatabase, seedData: SeedData): void {
       currentDay: seedData.basho.currentDay ?? null,
     })
     .run();
-  db.insert(rikishi)
-    .values([...seedData.rikishi])
-    .run();
-  db.insert(banzukeEntries)
-    .values([...seedData.banzukeEntries])
-    .run();
-  db.insert(fantasyTeams)
-    .values([...seedData.fantasyTeams])
-    .run();
-  db.insert(fantasyPicks)
-    .values(
-      seedData.fantasyPicks.map((pick) => ({
-        id: pick.id ?? `${pick.teamId}-${pick.rikishiId}`,
-        teamId: pick.teamId,
-        rikishiId: pick.rikishiId,
-      })),
-    )
-    .run();
-  db.insert(boutResults)
-    .values([...seedData.boutResults])
-    .run();
+  if (seedData.rikishi.length > 0) {
+    db.insert(rikishi)
+      .values([...seedData.rikishi])
+      .run();
+  }
+
+  if (seedData.banzukeEntries.length > 0) {
+    db.insert(banzukeEntries)
+      .values([...seedData.banzukeEntries])
+      .run();
+  }
+
+  if (seedData.fantasyTeams.length > 0) {
+    db.insert(fantasyTeams)
+      .values([...seedData.fantasyTeams])
+      .run();
+  }
+
+  if (seedData.fantasyPicks.length > 0) {
+    db.insert(fantasyPicks)
+      .values(
+        seedData.fantasyPicks.map((pick) => ({
+          id: pick.id ?? `${pick.teamId}-${pick.rikishiId}`,
+          teamId: pick.teamId,
+          rikishiId: pick.rikishiId,
+        })),
+      )
+      .run();
+  }
+
+  if (seedData.boutResults.length > 0) {
+    db.insert(boutResults)
+      .values([...seedData.boutResults])
+      .run();
+  }
 }
 
 interface SeedData {
