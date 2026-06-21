@@ -43,6 +43,7 @@ describe("source import adapters", () => {
         id: "2026-05",
         name: "2026 May Grand Sumo Tournament",
         status: "active",
+        currentDay: 3,
       },
       rikishi: [
         {
@@ -70,6 +71,33 @@ describe("source import adapters", () => {
           rankOrder: 2,
         },
       ],
+    });
+  });
+
+  it("locks imported basho once the start date has arrived before active scoring", () => {
+    const command = mapJsaBanzukePayload({
+      basho_name: "May Grand Sumo Tournament",
+      BashoInfo: {
+        start_date: "2026-05-10",
+        end_date: "2026-05-24",
+        today: "2026-05-10",
+        BattleNow: 0,
+        year_eng: "2026",
+      },
+      BanzukeTable: [
+        {
+          banzuke_id: 1,
+          banzuke_name: "Yokozuna",
+          rikishi_id: 3842,
+          shikona: "Hoshoryu",
+          heya_name: "Tatsunami",
+        },
+      ],
+    });
+
+    expect(command.basho).toMatchObject({
+      status: "locked",
+      currentDay: 1,
     });
   });
 

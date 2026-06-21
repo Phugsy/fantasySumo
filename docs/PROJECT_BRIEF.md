@@ -79,3 +79,14 @@ Start with something simple and transparent:
 - Tied teams are allowed and are ordered deterministically by display name, then team id.
 
 Keep this in an isolated scoring module so future bonuses can be added safely.
+
+## Basho lifecycle
+
+The MVP lifecycle is:
+
+- `upcoming`: picks are open.
+- `locked`: picks are closed before results are scored.
+- `active`: results are being applied day by day.
+- `complete`: final scores are available.
+
+Fantasy teams and picks can be created only while the basho is `upcoming`.

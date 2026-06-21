@@ -3,7 +3,8 @@ export interface Basho {
   name: string;
   startDate: string;
   endDate: string;
-  status: "upcoming" | "active" | "complete";
+  status: "upcoming" | "locked" | "active" | "complete";
+  currentDay?: number;
   teamSize: number;
 }
 

@@ -9,7 +9,6 @@
     "test": "vitest run src"
   },
   "dependencies": {
-    "@fantasy-sumo/domain": "workspace:*",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

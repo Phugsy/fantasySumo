@@ -4,9 +4,11 @@ import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  createRepositories,
   createDatabaseClient,
   runMigrations,
   seedDatabase,
+  sampleBasho,
   type DatabaseClient,
 } from "@fantasy-sumo/db";
 import { buildApp } from "../app.js";
@@ -44,8 +46,38 @@ describe("basho routes", () => {
     expect(response.json()).toMatchObject({
       id: "2026-05",
       name: "May 2026 Sample Basho",
-      status: "active",
+      status: "upcoming",
+      currentDay: 0,
       teamSize: 2,
+    });
+  });
+
+  it("prefers a locked current basho over a later upcoming basho", async () => {
+    const repositories = createRepositories(client.db);
+    repositories.upsertBasho({
+      ...sampleBasho,
+      status: "locked",
+      currentDay: 1,
+    });
+    repositories.insertBasho({
+      id: "2026-07",
+      name: "July 2026 Future Basho",
+      startDate: "2026-07-12",
+      endDate: "2026-07-26",
+      status: "upcoming",
+      currentDay: 0,
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/basho/current",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      id: "2026-05",
+      status: "locked",
+      currentDay: 1,
     });
   });
 
@@ -176,6 +208,45 @@ describe("basho routes", () => {
       ],
     });
   });
+
+  it.each([
+    {
+      status: "locked",
+      expectedMessage: "Picks are locked for this basho.",
+    },
+    {
+      status: "active",
+      expectedMessage: "This basho has started, so picks are locked.",
+    },
+    {
+      status: "complete",
+      expectedMessage: "This basho is complete, so picks are closed.",
+    },
+  ] as const)(
+    "rejects team creation when a basho is $status",
+    async ({ status, expectedMessage }) => {
+      createRepositories(client.db).upsertBasho({
+        ...sampleBasho,
+        status,
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/basho/2026-05/teams",
+        payload: {
+          displayName: "Late Team",
+          rikishiIds: ["onosato", "kotozakura"],
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: "picks-locked",
+        message: expectedMessage,
+        bashoStatus: status,
+      });
+    },
+  );
 
   it("returns a leaderboard ordered by score", async () => {
     const response = await app.inject({

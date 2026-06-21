@@ -4,6 +4,8 @@ import type { Repositories } from "@fantasy-sumo/db";
 import type { FantasyPick, FantasyTeam } from "@fantasy-sumo/domain";
 import {
   calculateLeaderboard,
+  canEditFantasyPicks,
+  getPickLockMessage,
   validateFantasyPicks,
 } from "@fantasy-sumo/domain";
 
@@ -87,6 +89,16 @@ export function registerBashoRoutes(
       return reply.code(404).send({
         error: "not-found",
         message: `Basho ${request.params.bashoId} was not found.`,
+      });
+    }
+
+    if (!canEditFantasyPicks(basho)) {
+      return reply.code(409).send({
+        error: "picks-locked",
+        message:
+          getPickLockMessage(basho) ??
+          "Fantasy team picks are locked for this basho.",
+        bashoStatus: basho.status,
       });
     }
 
@@ -214,6 +226,11 @@ export function registerBashoRoutes(
 
 function findCurrentBasho(repositories: Repositories) {
   const bashos = repositories.listBashos();
+  const latestFirst = [...bashos].reverse();
 
-  return bashos.find((basho) => basho.status === "active") ?? bashos.at(-1);
+  return (
+    latestFirst.find((basho) => basho.status === "active") ??
+    latestFirst.find((basho) => basho.status === "locked") ??
+    latestFirst.at(0)
+  );
 }

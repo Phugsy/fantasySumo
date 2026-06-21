@@ -1,4 +1,4 @@
-export type BashoStatus = "upcoming" | "active" | "complete";
+export type BashoStatus = "upcoming" | "locked" | "active" | "complete";
 
 export interface Basho {
   id: string;
@@ -6,6 +6,7 @@ export interface Basho {
   startDate: string;
   endDate: string;
   status: BashoStatus;
+  currentDay?: number;
 }
 
 export interface Rikishi {

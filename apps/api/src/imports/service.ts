@@ -81,6 +81,16 @@ export function importBoutResults(
   }
 
   const summary = createEmptySummary();
+  const existingBasho = repositories.getBasho(command.bashoId);
+  const nextBasho =
+    existingBasho === undefined
+      ? undefined
+      : advanceBashoForResults(existingBasho, command.results[0]?.day);
+
+  if (nextBasho !== undefined) {
+    summary.basho = summarizeOne(existingBasho, nextBasho, isEqualBasho);
+  }
+
   summary.results = summarizeMany(
     repositories
       .listBoutResultsForBasho(command.bashoId)
@@ -91,6 +101,10 @@ export function importBoutResults(
   );
 
   if (options.dryRun !== true) {
+    if (nextBasho !== undefined) {
+      repositories.upsertBasho(nextBasho);
+    }
+
     repositories.applyBoutResultsImport({
       bashoId: command.bashoId,
       day: command.results[0]!.day,
@@ -265,6 +279,21 @@ function createEmptyEntitySummary(): ImportEntitySummary {
   };
 }
 
+function advanceBashoForResults(
+  basho: Basho,
+  importedDay: BoutResult["day"] | undefined,
+): Basho {
+  if (importedDay === undefined) {
+    return basho;
+  }
+
+  return {
+    ...basho,
+    status: basho.status === "complete" ? "complete" : "active",
+    currentDay: Math.max(basho.currentDay ?? 0, importedDay),
+  };
+}
+
 function summarizeOne<T>(
   existing: T | undefined,
   next: T,
@@ -324,7 +353,8 @@ function isEqualBasho(left: Basho, right: Basho) {
     left.name === right.name &&
     left.startDate === right.startDate &&
     left.endDate === right.endDate &&
-    left.status === right.status
+    left.status === right.status &&
+    left.currentDay === right.currentDay
   );
 }
 

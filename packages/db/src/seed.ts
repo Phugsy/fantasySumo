@@ -62,7 +62,12 @@ function replaceSeedData(db: SqliteDatabase, seedData: SeedData): void {
   db.delete(rikishi).run();
   db.delete(basho).run();
 
-  db.insert(basho).values(seedData.basho).run();
+  db.insert(basho)
+    .values({
+      ...seedData.basho,
+      currentDay: seedData.basho.currentDay ?? null,
+    })
+    .run();
   db.insert(rikishi)
     .values([...seedData.rikishi])
     .run();

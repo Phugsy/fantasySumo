@@ -11,8 +11,9 @@ export const basho = sqliteTable("basho", {
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),
   status: text("status", {
-    enum: ["upcoming", "active", "complete"],
+    enum: ["upcoming", "locked", "active", "complete"],
   }).notNull(),
+  currentDay: integer("current_day"),
 });
 
 export const rikishi = sqliteTable("rikishi", {

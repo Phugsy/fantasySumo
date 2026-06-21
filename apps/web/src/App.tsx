@@ -22,6 +22,7 @@ import type {
   LoadState,
   RankedRikishi,
 } from "./types";
+import { canEditFantasyPicks, getPickLockMessage } from "./lifecycle";
 
 export function App() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
@@ -118,13 +119,21 @@ export function App() {
     [rikishi, selectedIds],
   );
   const teamSize = basho?.teamSize ?? 0;
+  const canEditPicks = basho === null ? false : canEditFantasyPicks(basho);
+  const pickLockMessage =
+    basho === null ? undefined : getPickLockMessage(basho);
   const canSubmit =
     loadState === "ready" &&
+    canEditPicks &&
     submitState === "idle" &&
     displayName.trim().length > 0 &&
     selectedIds.length === teamSize;
 
   function toggleRikishi(rikishiId: string) {
+    if (!canEditPicks) {
+      return;
+    }
+
     setErrorMessage(null);
     setCreatedTeam(null);
     setSelectedIds((current) => {
@@ -226,6 +235,8 @@ export function App() {
               createdTeam={createdTeam}
               displayName={displayName}
               errorMessage={errorMessage}
+              isLocked={!canEditPicks}
+              lockMessage={pickLockMessage}
               onDisplayNameChange={(nextDisplayName) => {
                 setDisplayName(nextDisplayName);
                 setCreatedTeam(null);

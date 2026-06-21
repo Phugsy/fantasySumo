@@ -96,6 +96,33 @@ describe("import service", () => {
     });
   });
 
+  it("counts basho current-day changes in banzuke import summaries", () => {
+    const repositories = createRepositories(client.db);
+    importBanzuke(repositories, {
+      ...banzukeCommand,
+      basho: {
+        ...banzukeCommand.basho,
+        currentDay: 3,
+      },
+    });
+
+    const result = importBanzuke(
+      repositories,
+      {
+        ...banzukeCommand,
+        basho: {
+          ...banzukeCommand.basho,
+          currentDay: 4,
+        },
+      },
+      {
+        dryRun: true,
+      },
+    );
+
+    expect(result.summary.basho.updated).toBe(1);
+  });
+
   it("removes stale banzuke entries without deleting rikishi", () => {
     const repositories = createRepositories(client.db);
     importBanzuke(repositories, banzukeCommand);
@@ -115,7 +142,14 @@ describe("import service", () => {
 
   it("imports bout results after banzuke data exists", () => {
     const repositories = createRepositories(client.db);
-    importBanzuke(repositories, banzukeCommand);
+    importBanzuke(repositories, {
+      ...banzukeCommand,
+      basho: {
+        ...banzukeCommand.basho,
+        status: "upcoming",
+        currentDay: 0,
+      },
+    });
 
     const result = importBoutResults(repositories, {
       source: "test",
@@ -134,6 +168,48 @@ describe("import service", () => {
 
     expect(result.summary.results.created).toBe(1);
     expect(repositories.listBoutResultsForBasho("2026-05")).toHaveLength(1);
+    expect(repositories.getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 1,
+    });
+  });
+
+  it("reports basho lifecycle updates during result import dry runs", () => {
+    const repositories = createRepositories(client.db);
+    importBanzuke(repositories, {
+      ...banzukeCommand,
+      basho: {
+        ...banzukeCommand.basho,
+        status: "locked",
+        currentDay: 1,
+      },
+    });
+
+    const result = importBoutResults(
+      repositories,
+      {
+        source: "test",
+        bashoId: "2026-05",
+        results: [
+          {
+            id: "2026-05-day-2-match-1",
+            bashoId: "2026-05",
+            day: 2,
+            winnerRikishiId: "onosato",
+            loserRikishiId: "kotozakura",
+          },
+        ],
+      },
+      {
+        dryRun: true,
+      },
+    );
+
+    expect(result.summary.basho.updated).toBe(1);
+    expect(repositories.getBasho("2026-05")).toMatchObject({
+      status: "locked",
+      currentDay: 1,
+    });
   });
 
   it("replaces stale results for the imported day only", () => {

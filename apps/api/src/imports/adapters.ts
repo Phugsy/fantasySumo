@@ -85,6 +85,7 @@ export function mapJsaBanzukePayload(
       startDate,
       endDate,
       status: resolveBashoStatus(payload),
+      currentDay: resolveCurrentDay(payload),
     },
     rikishi: rows.map((row) => ({
       id: toLocalRikishiId(String(row.shikona)),
@@ -194,6 +195,7 @@ function resolveBashoStatus(payload: JsaBanzukePayload) {
     return "active";
   }
 
+  const currentDay = resolveCurrentDay(payload);
   const today = payload.BashoInfo?.today;
   const endDate = payload.BashoInfo?.end_date;
 
@@ -201,7 +203,38 @@ function resolveBashoStatus(payload: JsaBanzukePayload) {
     return "complete";
   }
 
+  if (currentDay !== undefined && currentDay > 0) {
+    return "locked";
+  }
+
   return "upcoming";
+}
+
+function resolveCurrentDay(payload: JsaBanzukePayload) {
+  const today = payload.BashoInfo?.today;
+  const startDate = payload.BashoInfo?.start_date;
+  const endDate = payload.BashoInfo?.end_date;
+
+  if (today === undefined || startDate === undefined || endDate === undefined) {
+    return undefined;
+  }
+
+  if (today < startDate) {
+    return 0;
+  }
+
+  const bashoLength = daysBetween(startDate, endDate) + 1;
+  const day = daysBetween(startDate, today) + 1;
+
+  return Math.min(Math.max(day, 0), bashoLength);
+}
+
+function daysBetween(startDate: string, endDate: string) {
+  return Math.floor(
+    (Date.parse(`${endDate}T00:00:00.000Z`) -
+      Date.parse(`${startDate}T00:00:00.000Z`)) /
+      86_400_000,
+  );
 }
 
 function requiredString(value: unknown, field: string): string {

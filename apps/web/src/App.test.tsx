@@ -7,7 +7,8 @@ const currentBasho = {
   name: "May 2026 Sample Basho",
   startDate: "2026-05-10",
   endDate: "2026-05-24",
-  status: "active",
+  status: "upcoming",
+  currentDay: 0,
   teamSize: 2,
 };
 
@@ -210,6 +211,28 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: /Hoshoryu/ })).not.toBeDisabled();
   });
 
+  it("shows locked basho messaging and prevents team selection", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) =>
+        mockSuccessfulFetch(input, {
+          ...currentBasho,
+          status: "active",
+          currentDay: 5,
+        }),
+      ),
+    );
+    render(<App />);
+
+    expect(
+      await screen.findByText("This basho has started, so picks are locked."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Scoring in progress")).toBeInTheDocument();
+    expect(screen.getByText(/Day 5/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Onosato/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Submit team" })).toBeDisabled();
+  });
+
   it("submits a selected team and shows confirmation", async () => {
     const fetchMock = vi.fn(mockSuccessfulFetch);
     vi.stubGlobal("fetch", fetchMock);
@@ -298,16 +321,19 @@ describe("App", () => {
   });
 });
 
-function mockSuccessfulFetch(input: RequestInfo | URL): Promise<Response> {
+function mockSuccessfulFetch(
+  input: RequestInfo | URL,
+  basho = currentBasho,
+): Promise<Response> {
   const url = String(input);
 
   if (url === "/api/basho/current") {
-    return jsonResponse(currentBasho);
+    return jsonResponse(basho);
   }
 
   if (url === "/api/basho/2026-05/rikishi") {
     return jsonResponse({
-      basho: currentBasho,
+      basho,
       rikishi: rankedRikishi,
     });
   }

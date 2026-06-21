@@ -12,12 +12,12 @@ At present, the app has the first local playable foundations:
 
 - A Vite + React front end for creating a fantasy team from seeded basho data and viewing leaderboard standings.
 - A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.
-- A shared TypeScript domain package with MVP types, validation, scoring, and leaderboard logic.
+- A shared TypeScript domain package with MVP types, lifecycle rules, validation, scoring, and leaderboard logic.
 - A local SQLite + Drizzle database package with schema, migration, repositories, sample seed data, and deterministic demo data.
 - Automated source-backed import commands and local admin endpoints for current banzuke and daily results.
 - Vitest, ESLint, and Prettier wired through pnpm scripts.
 
-It is close to a local playable loop, but still needs pick locking and a friendlier admin UI before it is useful during a real basho.
+It is close to a local playable loop, but still needs a friendlier admin UI before it is useful during a real basho.
 
 ## Tech Stack
 
@@ -85,7 +85,7 @@ make dev
 
 Local URLs:
 
-- Web: `http://localhost:5173`
+- Web: `http://localhost:7866`
 - API health: `http://localhost:3000/api/health`
 
 Useful API endpoints:
@@ -99,6 +99,17 @@ Useful API endpoints:
 - `POST /api/admin/basho/:bashoId/import-results`
 
 The admin import endpoints are local development tools for now. Do not expose them publicly without authentication/protection.
+
+## Basho lifecycle
+
+Basho records use this lifecycle:
+
+- `upcoming` - picks are open and fantasy teams can be created.
+- `locked` - picks are closed before scoring starts.
+- `active` - results are being applied and leaderboard scoring is in progress.
+- `complete` - final scores are available.
+
+The API enforces pick locking. `POST /api/basho/:bashoId/teams` succeeds only while the basho is `upcoming`; locked, active, and complete basho return a `409 picks-locked` response.
 
 Useful checks:
 
