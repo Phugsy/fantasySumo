@@ -89,6 +89,17 @@ make demo-complete     # apply all 15 days and complete the basho
 
 Use `make demo-reset` before create-team flows that need picks open. Use `make demo-start` plus one or more `make demo-advance-day` runs before leaderboard flows that need scores to change incrementally.
 
+Once the API server is running, E2E setup can call the equivalent local admin endpoints instead of shelling out:
+
+```bash
+curl -X POST http://localhost:3000/api/admin/demo/reset
+curl -X POST http://localhost:3000/api/admin/demo/start
+curl -X POST http://localhost:3000/api/admin/demo/advance-day
+curl -X POST http://localhost:3000/api/admin/demo/complete
+```
+
+Prefer the API endpoints inside browser/API integration tests because they exercise the same local app boundary a user-facing workflow depends on. Use the Make targets for pre-server fixture setup or manual development loops.
+
 The eventual Playwright config should set a test-only `DATABASE_URL`, for example a file under a temporary or ignored E2E data directory. If tests need to inspect persisted state, prefer API assertions over direct database queries unless direct repository checks are clearly simpler.
 
 ## Starting The App For E2E

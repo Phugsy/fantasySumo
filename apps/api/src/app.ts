@@ -6,6 +6,7 @@ import {
   type SqliteDatabase,
 } from "@fantasy-sumo/db";
 import { getTeamSize } from "./config.js";
+import { registerAdminDemoRoutes } from "./routes/admin-demo.js";
 import { registerAdminImportRoutes } from "./routes/admin-imports.js";
 import { registerBashoRoutes } from "./routes/basho.js";
 
@@ -47,6 +48,11 @@ export function buildApp(options: AppOptions = {}) {
   registerAdminImportRoutes(app, {
     repositories,
     sourceFetch: options.sourceFetch ?? fetch,
+  });
+  registerAdminDemoRoutes(app, {
+    db,
+    repositories,
+    now: options.now ?? (() => new Date()),
   });
 
   return app;

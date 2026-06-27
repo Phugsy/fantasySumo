@@ -106,6 +106,10 @@ Useful API endpoints:
 - `POST /api/basho/:bashoId/teams`
 - `GET /api/basho/:bashoId/teams/:teamId`
 - `GET /api/basho/:bashoId/leaderboard`
+- `POST /api/admin/demo/reset`
+- `POST /api/admin/demo/start`
+- `POST /api/admin/demo/advance-day`
+- `POST /api/admin/demo/complete`
 - `POST /api/admin/import-banzuke`
 - `POST /api/admin/basho/:bashoId/import-results`
 

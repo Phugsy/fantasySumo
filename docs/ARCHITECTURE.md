@@ -81,6 +81,14 @@ Current routes:
   - Maps source payloads into local `BoutResult` records using local shikona-based rikishi ids.
   - Replaces stale result rows only for the imported basho/day.
   - Supports `?dryRun=true`.
+- `POST /api/admin/demo/reset`
+  - Resets deterministic demo data to day 0 with picks open and no applied results.
+- `POST /api/admin/demo/start`
+  - Locks existing demo picks and starts the demo basho without applying results.
+- `POST /api/admin/demo/advance-day`
+  - Applies the next day of deterministic demo results.
+- `POST /api/admin/demo/complete`
+  - Applies all deterministic demo results and marks the demo basho complete.
 
 Current limitations:
 
@@ -124,7 +132,7 @@ Current behaviour:
 - Provides transactional upsert helpers for banzuke and bout result imports.
 - Provides sample seed data for one basho, four rikishi, two fantasy teams, picks, and bout results.
 - Provides deterministic demo seed data for one pickable basho, eight rikishi, four fantasy teams, picks, and a 15-day bout result fixture.
-- Provides demo progression commands that reset to day 0, start/lock picks, advance one day at a time, and complete the basho.
+- Provides demo progression API routes and commands that reset to day 0, start/lock picks, advance one day at a time, and complete the basho.
 - Stores basho lifecycle status and current day progress.
 
 Current scripts:
