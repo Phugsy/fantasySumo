@@ -82,12 +82,16 @@ Current routes:
   - Replaces stale result rows only for the imported basho/day.
   - Supports `?dryRun=true`.
 - `POST /api/admin/demo/reset`
+  - Requires `DEMO_ADMIN_TOKEN`.
   - Resets deterministic demo data to day 0 with picks open and no applied results.
 - `POST /api/admin/demo/start`
+  - Requires `DEMO_ADMIN_TOKEN`.
   - Locks existing demo picks and starts the demo basho without applying results.
 - `POST /api/admin/demo/advance-day`
+  - Requires `DEMO_ADMIN_TOKEN`.
   - Applies the next day of deterministic demo results.
 - `POST /api/admin/demo/complete`
+  - Requires `DEMO_ADMIN_TOKEN`.
   - Applies all deterministic demo results and marks the demo basho complete.
 
 Current limitations:

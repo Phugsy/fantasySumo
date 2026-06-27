@@ -92,10 +92,14 @@ Use `make demo-reset` before create-team flows that need picks open. Use `make d
 Once the API server is running, E2E setup can call the equivalent local admin endpoints instead of shelling out:
 
 ```bash
-curl -X POST http://localhost:3000/api/admin/demo/reset
-curl -X POST http://localhost:3000/api/admin/demo/start
-curl -X POST http://localhost:3000/api/admin/demo/advance-day
-curl -X POST http://localhost:3000/api/admin/demo/complete
+curl -X POST http://localhost:3000/api/admin/demo/reset \
+  -H "x-demo-admin-token: $DEMO_ADMIN_TOKEN"
+curl -X POST http://localhost:3000/api/admin/demo/start \
+  -H "x-demo-admin-token: $DEMO_ADMIN_TOKEN"
+curl -X POST http://localhost:3000/api/admin/demo/advance-day \
+  -H "x-demo-admin-token: $DEMO_ADMIN_TOKEN"
+curl -X POST http://localhost:3000/api/admin/demo/complete \
+  -H "x-demo-admin-token: $DEMO_ADMIN_TOKEN"
 ```
 
 Prefer the API endpoints inside browser/API integration tests because they exercise the same local app boundary a user-facing workflow depends on. Use the Make targets for pre-server fixture setup or manual development loops.

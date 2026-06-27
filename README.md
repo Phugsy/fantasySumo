@@ -113,6 +113,8 @@ Useful API endpoints:
 - `POST /api/admin/import-banzuke`
 - `POST /api/admin/basho/:bashoId/import-results`
 
+The demo admin endpoints require `DEMO_ADMIN_TOKEN` and an `x-demo-admin-token` header. They reset and mutate demo data, so do not expose them without that protection.
+
 The admin import endpoints are local development tools for now. Do not expose them publicly without authentication/protection.
 
 ## Basho lifecycle
@@ -139,6 +141,7 @@ DATABASE_URL=file:./data/dev.sqlite pnpm db:seed
 ```
 
 The local team size defaults to `2`. Override it for the API with `TEAM_SIZE`.
+Set `DEMO_ADMIN_TOKEN` to enable protected demo admin API controls.
 
 ## Data import
 

@@ -21,6 +21,7 @@ beforeEach(() => {
   runMigrations(client.db);
   app = buildApp({
     db: client.db,
+    demoAdminToken: "test-demo-token",
     now: () => new Date("2026-05-10T00:00:00.000Z"),
   });
 });
@@ -32,8 +33,21 @@ afterEach(async () => {
 });
 
 describe("admin demo routes", () => {
+  it("rejects demo progression requests without the configured token", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/admin/demo/reset",
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({
+      error: "demo-admin-unauthorized",
+    });
+  });
+
   it("resets, starts, advances, and completes demo progression", async () => {
     const resetResponse = await app.inject({
+      headers: demoAdminHeaders,
       method: "POST",
       url: "/api/admin/demo/reset",
     });
@@ -49,6 +63,7 @@ describe("admin demo routes", () => {
     });
 
     const startResponse = await app.inject({
+      headers: demoAdminHeaders,
       method: "POST",
       url: "/api/admin/demo/start",
     });
@@ -64,6 +79,7 @@ describe("admin demo routes", () => {
     });
 
     const advanceResponse = await app.inject({
+      headers: demoAdminHeaders,
       method: "POST",
       url: "/api/admin/demo/advance-day",
     });
@@ -88,6 +104,7 @@ describe("admin demo routes", () => {
     );
 
     const completeResponse = await app.inject({
+      headers: demoAdminHeaders,
       method: "POST",
       url: "/api/admin/demo/complete",
     });
@@ -112,3 +129,7 @@ describe("admin demo routes", () => {
     );
   });
 });
+
+const demoAdminHeaders = {
+  "x-demo-admin-token": "test-demo-token",
+};
