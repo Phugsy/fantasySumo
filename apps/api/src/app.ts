@@ -5,7 +5,8 @@ import {
   createRepositories,
   type SqliteDatabase,
 } from "@fantasy-sumo/db";
-import { getTeamSize } from "./config.js";
+import { getDemoAdminToken, getTeamSize } from "./config.js";
+import { registerAdminDemoRoutes } from "./routes/admin-demo.js";
 import { registerAdminImportRoutes } from "./routes/admin-imports.js";
 import { registerBashoRoutes } from "./routes/basho.js";
 
@@ -15,6 +16,8 @@ interface AppOptions {
   sourceFetch?: typeof fetch;
   teamIdFactory?: () => string;
   teamSize?: number;
+  demoAdminToken?: string;
+  allowUnprotectedDemoAdmin?: boolean;
 }
 
 export function buildApp(options: AppOptions = {}) {
@@ -47,6 +50,13 @@ export function buildApp(options: AppOptions = {}) {
   registerAdminImportRoutes(app, {
     repositories,
     sourceFetch: options.sourceFetch ?? fetch,
+  });
+  registerAdminDemoRoutes(app, {
+    allowUnprotectedDemoAdmin: options.allowUnprotectedDemoAdmin ?? false,
+    db,
+    demoAdminToken: options.demoAdminToken ?? getDemoAdminToken(),
+    repositories,
+    now: options.now ?? (() => new Date()),
   });
 
   return app;

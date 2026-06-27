@@ -5,7 +5,7 @@ ifneq ($(PNPM_DIR),)
 export PATH := $(PNPM_DIR):$(PATH)
 endif
 
-.PHONY: help install dev demo dev-client dev-server build test lint format format-check check db-migrate db-seed db-seed-demo import-banzuke import-results clean
+.PHONY: help install dev demo dev-client dev-server build test lint format format-check check db-migrate db-seed db-seed-demo demo-reset demo-start demo-advance-day demo-complete import-banzuke import-results clean
 
 help: ## Show available make targets.
 	@awk 'BEGIN {FS = ":.*## "; printf "Fantasy Sumo development commands:\n\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -58,6 +58,18 @@ db-seed: ## Seed the local database.
 
 db-seed-demo: ## Reset and seed the deterministic demo database.
 	$(PNPM) db:seed:demo
+
+demo-reset: ## Reset demo progression to day 0 with picks open and no results.
+	$(PNPM) demo:reset
+
+demo-start: ## Start the demo basho and lock existing picks without applying results.
+	$(PNPM) demo:start
+
+demo-advance-day: ## Apply the next day of deterministic demo results.
+	$(PNPM) demo:advance-day
+
+demo-complete: ## Apply all deterministic demo results and complete the basho.
+	$(PNPM) demo:complete
 
 import-banzuke: ## Import current banzuke data from source.
 	$(PNPM) import:banzuke $(ARGS)

@@ -15,6 +15,10 @@
     "db:migrate": "tsx src/scripts/migrate.ts",
     "db:seed": "tsx src/scripts/seed.ts",
     "db:seed:demo": "tsx src/scripts/seed-demo.ts",
+    "demo:reset": "pnpm --filter @fantasy-sumo/domain build && tsx src/scripts/demo-reset.ts",
+    "demo:start": "pnpm --filter @fantasy-sumo/domain build && tsx src/scripts/demo-start.ts",
+    "demo:advance-day": "pnpm --filter @fantasy-sumo/domain build && tsx src/scripts/demo-advance-day.ts",
+    "demo:complete": "pnpm --filter @fantasy-sumo/domain build && tsx src/scripts/demo-complete.ts",
     "test": "pnpm --filter @fantasy-sumo/domain build && vitest run src"
   },
   "dependencies": {

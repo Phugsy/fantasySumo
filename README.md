@@ -75,7 +75,18 @@ Or reset the demo data and start both dev servers in one command:
 make demo
 ```
 
-Demo mode replaces the configured SQLite database contents with fake but stable basho, rikishi, team, pick, and result data. It does not use live sumo data, but it does exercise the same API, UI, database, and scoring logic as normal local development.
+Demo mode replaces the configured SQLite database contents with fake but stable basho, rikishi, team, and pick data. It starts at day 0 with picks open and no applied results. It does not use live sumo data, but it does exercise the same API, UI, database, and scoring logic as normal local development.
+
+Progress the deterministic demo basho with:
+
+```bash
+make demo-reset        # reset to day 0, picks open, no results
+make demo-start        # lock picks and start the basho without results
+make demo-advance-day  # apply the next day of results
+make demo-complete     # apply all results and mark the basho complete
+```
+
+`make demo-advance-day` can be run repeatedly through day 15. Leaderboard scores update from the real stored bout results as each day is applied.
 
 Run both the API and web dev servers:
 
@@ -95,8 +106,14 @@ Useful API endpoints:
 - `POST /api/basho/:bashoId/teams`
 - `GET /api/basho/:bashoId/teams/:teamId`
 - `GET /api/basho/:bashoId/leaderboard`
+- `POST /api/admin/demo/reset`
+- `POST /api/admin/demo/start`
+- `POST /api/admin/demo/advance-day`
+- `POST /api/admin/demo/complete`
 - `POST /api/admin/import-banzuke`
 - `POST /api/admin/basho/:bashoId/import-results`
+
+The demo admin endpoints require `DEMO_ADMIN_TOKEN` and an `x-demo-admin-token` header. They reset and mutate demo data, so do not expose them without that protection.
 
 The admin import endpoints are local development tools for now. Do not expose them publicly without authentication/protection.
 
@@ -124,6 +141,7 @@ DATABASE_URL=file:./data/dev.sqlite pnpm db:seed
 ```
 
 The local team size defaults to `2`. Override it for the API with `TEAM_SIZE`.
+Set `DEMO_ADMIN_TOKEN` to enable protected demo admin API controls.
 
 ## Data import
 
@@ -172,6 +190,10 @@ Common targets:
 - `make dev-client` - start only the Vite web client.
 - `make dev-server` - start only the Fastify API.
 - `make db-seed-demo` - reset the configured SQLite database with deterministic demo data.
+- `make demo-reset` - reset demo progression to day 0 with picks open.
+- `make demo-start` - lock existing demo picks and start the basho without applying results.
+- `make demo-advance-day` - apply the next day of deterministic demo results.
+- `make demo-complete` - apply all deterministic demo results and complete the basho.
 - `make test` - run all tests.
 - `make lint` - run ESLint.
 - `make build` - build all packages/apps.

@@ -1,4 +1,4 @@
-import { and, eq, notInArray } from "drizzle-orm";
+import { and, eq, isNull, notInArray } from "drizzle-orm";
 import type {
   BanzukeEntry,
   Basho,
@@ -34,6 +34,12 @@ export function createRepositories(db: SqliteDatabase) {
       db.select().from(basho).orderBy(basho.startDate).all().map(toBasho),
     getBasho: (id: Basho["id"]) =>
       toOptionalBasho(db.select().from(basho).where(eq(basho.id, id)).get()),
+    updateBasho: (entry: Basho) =>
+      db
+        .update(basho)
+        .set(toBashoRow(entry))
+        .where(eq(basho.id, entry.id))
+        .run(),
 
     insertRikishi: (entry: Rikishi) =>
       db.insert(rikishi).values(toRikishiRow(entry)).run(),
@@ -98,6 +104,17 @@ export function createRepositories(db: SqliteDatabase) {
         .orderBy(fantasyTeams.displayName)
         .all()
         .map(toFantasyTeam),
+    lockFantasyTeamsForBasho: (
+      bashoId: Basho["id"],
+      lockedAt: NonNullable<FantasyTeam["lockedAt"]>,
+    ) =>
+      db
+        .update(fantasyTeams)
+        .set({ lockedAt })
+        .where(
+          and(eq(fantasyTeams.bashoId, bashoId), isNull(fantasyTeams.lockedAt)),
+        )
+        .run(),
 
     insertFantasyPick: (entry: FantasyPick) =>
       db.insert(fantasyPicks).values(toFantasyPickRow(entry)).run(),
@@ -133,6 +150,8 @@ export function createRepositories(db: SqliteDatabase) {
         .orderBy(boutResults.day)
         .all()
         .map(toBoutResult),
+    deleteBoutResultsForBasho: (bashoId: Basho["id"]) =>
+      db.delete(boutResults).where(eq(boutResults.bashoId, bashoId)).run(),
     applyBanzukeImport: (importData: {
       basho: Basho;
       rikishi: readonly Rikishi[];

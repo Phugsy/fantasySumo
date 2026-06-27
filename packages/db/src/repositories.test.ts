@@ -5,6 +5,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { calculateLeaderboard } from "@fantasy-sumo/domain";
 import { createDatabaseClient, type DatabaseClient } from "./client.js";
 import {
+  DEMO_FINAL_DAY,
+  advanceDemoBashoDay,
+  completeDemoBasho,
+  resetDemoProgression,
+  startDemoBasho,
+} from "./demo-progression.js";
+import {
   demoBanzukeEntries,
   demoBasho,
   demoBoutResults,
@@ -139,9 +146,7 @@ describe("repositories", () => {
     expect(repositories.listFantasyTeamsForBasho(demoBasho.id)).toHaveLength(
       demoFantasyTeams.length,
     );
-    expect(repositories.listBoutResultsForBasho(demoBasho.id)).toHaveLength(
-      demoBoutResults.length,
-    );
+    expect(repositories.listBoutResultsForBasho(demoBasho.id)).toEqual([]);
 
     const leaderboard = calculateLeaderboard(
       repositories.listFantasyTeamsForBasho(demoBasho.id),
@@ -158,24 +163,117 @@ describe("repositories", () => {
     ).toEqual([
       {
         rank: 1,
-        displayName: "Yusho Hunters",
-        score: 7,
+        displayName: "Dohyo Dreamers",
+        score: 0,
       },
       {
         rank: 2,
         displayName: "Salt Circle",
-        score: 5,
+        score: 0,
       },
       {
         rank: 3,
         displayName: "Tachiai Titans",
-        score: 5,
+        score: 0,
       },
       {
         rank: 4,
-        displayName: "Dohyo Dreamers",
-        score: 3,
+        displayName: "Yusho Hunters",
+        score: 0,
       },
     ]);
+  });
+
+  it("resets demo progression to a deterministic pre-basho state", () => {
+    seedDemoDatabase(client.db);
+    const repositories = createRepositories(client.db);
+
+    completeDemoBasho(repositories, () => new Date("2026-05-10T00:00:00.000Z"));
+    resetDemoProgression(client.db);
+
+    expect(repositories.getBasho(demoBasho.id)).toEqual(demoBasho);
+    expect(repositories.listBoutResultsForBasho(demoBasho.id)).toEqual([]);
+    expect(
+      repositories
+        .listFantasyTeamsForBasho(demoBasho.id)
+        .every((team) => team.lockedAt === undefined),
+    ).toBe(true);
+  });
+
+  it("starts and advances demo scoring one day at a time", () => {
+    seedDemoDatabase(client.db);
+    const repositories = createRepositories(client.db);
+    const now = () => new Date("2026-05-10T00:00:00.000Z");
+
+    const started = startDemoBasho(repositories, now);
+
+    expect(started.basho).toMatchObject({
+      status: "active",
+      currentDay: 0,
+    });
+    expect(started.appliedResults).toBe(0);
+    expect(
+      repositories
+        .listFantasyTeamsForBasho(demoBasho.id)
+        .every((team) => team.lockedAt === "2026-05-10T00:00:00.000Z"),
+    ).toBe(true);
+
+    const dayOne = advanceDemoBashoDay(repositories, now);
+
+    expect(dayOne.basho).toMatchObject({
+      status: "active",
+      currentDay: 1,
+    });
+    expect(
+      repositories
+        .listBoutResultsForBasho(demoBasho.id)
+        .map((result) => result.day),
+    ).toEqual([1, 1, 1, 1]);
+    expect(
+      dayOne.leaderboard.map((entry) => ({
+        displayName: entry.displayName,
+        score: entry.score,
+      })),
+    ).toEqual([
+      { displayName: "Dohyo Dreamers", score: 1 },
+      { displayName: "Salt Circle", score: 1 },
+      { displayName: "Tachiai Titans", score: 1 },
+      { displayName: "Yusho Hunters", score: 1 },
+    ]);
+
+    const dayTwo = advanceDemoBashoDay(repositories, now);
+
+    expect(dayTwo.basho.currentDay).toBe(2);
+    expect(dayTwo.appliedResults).toBe(8);
+    expect(
+      repositories
+        .listBoutResultsForBasho(demoBasho.id)
+        .map((result) => result.day),
+    ).toEqual([1, 1, 1, 1, 2, 2, 2, 2]);
+  });
+
+  it("can complete demo progression through the final day", () => {
+    seedDemoDatabase(client.db);
+    const repositories = createRepositories(client.db);
+
+    const completed = completeDemoBasho(
+      repositories,
+      () => new Date("2026-05-10T00:00:00.000Z"),
+    );
+
+    expect(completed.basho).toMatchObject({
+      status: "complete",
+      currentDay: DEMO_FINAL_DAY,
+    });
+    expect(completed.appliedResults).toBe(demoBoutResults.length);
+    expect(
+      repositories.listBoutResultsForBasho(demoBasho.id).at(-1),
+    ).toMatchObject({
+      day: DEMO_FINAL_DAY,
+    });
+    expect(completed.leaderboard[0]).toMatchObject({
+      displayName: "Yusho Hunters",
+      score: 22,
+    });
   });
 });

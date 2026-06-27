@@ -10,3 +10,9 @@ export function getTeamSize(): number {
 
   return DEFAULT_TEAM_SIZE;
 }
+
+export function getDemoAdminToken(): string | undefined {
+  const token = process.env.DEMO_ADMIN_TOKEN?.trim();
+
+  return token === undefined || token.length === 0 ? undefined : token;
+}

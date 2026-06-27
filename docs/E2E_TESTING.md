@@ -67,7 +67,7 @@ Preferred setup:
 - use a dedicated SQLite database file for E2E runs, configured through `DATABASE_URL`;
 - reset the database before each E2E test run by applying migrations and loading the deterministic demo seed data;
 - keep E2E seed data small, explicit, and close to the MVP game loop;
-- include enough seeded bout results to make leaderboard ordering meaningful;
+- use demo progression commands to apply enough bout results to make leaderboard ordering meaningful;
 - avoid mutating the default developer database at `packages/db/data/fantasy-sumo.sqlite`.
 
 The demo seed command is the intended fixture source:
@@ -77,6 +77,32 @@ make db-seed-demo
 ```
 
 For E2E, run it against a test-only `DATABASE_URL` so the reset cannot delete a developer's default local data. The demo seed uses fake data, but it flows through the real SQLite schema, repositories, Fastify API, React UI, and domain scoring code.
+
+The deterministic demo lifecycle can be used as fixture setup:
+
+```bash
+make demo-reset        # day 0, picks open, no results
+make demo-start        # picks locked, basho active, no results
+make demo-advance-day  # apply the next day of results
+make demo-complete     # apply all 15 days and complete the basho
+```
+
+Use `make demo-reset` before create-team flows that need picks open. Use `make demo-start` plus one or more `make demo-advance-day` runs before leaderboard flows that need scores to change incrementally.
+
+Once the API server is running, E2E setup can call the equivalent local admin endpoints instead of shelling out:
+
+```bash
+curl -X POST http://localhost:3000/api/admin/demo/reset \
+  -H "x-demo-admin-token: $DEMO_ADMIN_TOKEN"
+curl -X POST http://localhost:3000/api/admin/demo/start \
+  -H "x-demo-admin-token: $DEMO_ADMIN_TOKEN"
+curl -X POST http://localhost:3000/api/admin/demo/advance-day \
+  -H "x-demo-admin-token: $DEMO_ADMIN_TOKEN"
+curl -X POST http://localhost:3000/api/admin/demo/complete \
+  -H "x-demo-admin-token: $DEMO_ADMIN_TOKEN"
+```
+
+Prefer the API endpoints inside browser/API integration tests because they exercise the same local app boundary a user-facing workflow depends on. Use the Make targets for pre-server fixture setup or manual development loops.
 
 The eventual Playwright config should set a test-only `DATABASE_URL`, for example a file under a temporary or ignored E2E data directory. If tests need to inspect persisted state, prefer API assertions over direct database queries unless direct repository checks are clearly simpler.
 
