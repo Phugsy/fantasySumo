@@ -14,8 +14,24 @@ afterEach(() => {
 });
 
 describe("API config", () => {
-  it("fails closed for unprotected admin imports by default", () => {
+  it("allows unprotected admin imports for local dev with an unset node env", () => {
     process.env.NODE_ENV = "";
+    process.env.ALLOW_UNPROTECTED_ADMIN_IMPORTS = "";
+    process.env.VERCEL = "";
+
+    expect(allowsUnprotectedAdminImports()).toBe(true);
+  });
+
+  it("fails closed for unprotected admin imports on Vercel", () => {
+    process.env.NODE_ENV = "";
+    process.env.ALLOW_UNPROTECTED_ADMIN_IMPORTS = "";
+    process.env.VERCEL = "1";
+
+    expect(allowsUnprotectedAdminImports()).toBe(false);
+  });
+
+  it("fails closed for unprotected admin imports in explicit production", () => {
+    process.env.NODE_ENV = "production";
     process.env.ALLOW_UNPROTECTED_ADMIN_IMPORTS = "";
     process.env.VERCEL = "";
 
