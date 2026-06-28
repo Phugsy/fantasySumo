@@ -30,7 +30,7 @@ ADMIN_IMPORT_TOKEN=<long random token>
 DEMO_ADMIN_TOKEN=<long random token, only if demo admin controls are needed>
 ```
 
-`DATABASE_URL` must not be a `file:` SQLite URL on Vercel. File-backed SQLite is only supported for local development because Vercel function storage is ephemeral and cannot be used as production state.
+`DATABASE_URL` must not be a `file:` or `:memory:` SQLite URL on Vercel. SQLite is only supported for local development because Vercel function storage is ephemeral and cannot be used as production state.
 
 ## Production database direction
 
@@ -42,13 +42,13 @@ The database package now treats persistence as an adapter boundary:
 - `postgres:` and `postgresql:` `DATABASE_URL` values use the Postgres Drizzle adapter.
 - API code depends on the async `Repositories` contract, not a concrete database driver.
 
-Keep SQLite locally until there is a concrete reason to standardise development on local Postgres. It keeps the demo and contributor setup simple.
+Keep SQLite locally until there is a concrete reason to standardise development on local Postgres. It keeps the demo and contributor setup simple, but it does mean local smoke tests are not a perfect production proof. Any deploy-bound database change should also be validated against a real Postgres database before release.
 
 ## Admin endpoints
 
 The demo admin endpoints already require `DEMO_ADMIN_TOKEN` unless explicitly opened in tests.
 
-The source-backed import endpoints are local-open by default, but require `ADMIN_IMPORT_TOKEN` when `NODE_ENV=production` or `VERCEL=1`:
+The source-backed import endpoints require `ADMIN_IMPORT_TOKEN` by default. They can run without a token only when `NODE_ENV` is `development` or `test`, or when `ALLOW_UNPROTECTED_ADMIN_IMPORTS=true` is set explicitly for a local environment:
 
 ```bash
 curl -X POST "https://<deployment>/api/admin/import-banzuke?dryRun=true" \

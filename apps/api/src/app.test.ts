@@ -15,7 +15,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await app.close();
-  await await client.close();
+  await client.close();
 });
 
 describe("GET /api/health", () => {

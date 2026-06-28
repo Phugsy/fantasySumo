@@ -24,5 +24,9 @@ export function getAdminImportToken(): string | undefined {
 }
 
 export function allowsUnprotectedAdminImports(): boolean {
-  return process.env.NODE_ENV !== "production" && process.env.VERCEL !== "1";
+  return (
+    process.env.ALLOW_UNPROTECTED_ADMIN_IMPORTS === "true" ||
+    process.env.NODE_ENV === "development" ||
+    process.env.NODE_ENV === "test"
+  );
 }

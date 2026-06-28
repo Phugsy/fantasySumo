@@ -15,14 +15,17 @@ export function getDatabaseUrl(): string {
 export function getDatabaseProvider(
   databaseUrl = getDatabaseUrl(),
 ): DatabaseProvider {
+  if (process.env.VERCEL === "1" && !isPostgresUrl(databaseUrl)) {
+    throw new Error(
+      "Vercel deployments must use a managed postgres/postgresql DATABASE_URL.",
+    );
+  }
+
   if (databaseUrl === ":memory:" || databaseUrl.startsWith("file:")) {
     return "sqlite";
   }
 
-  if (
-    databaseUrl.startsWith("postgres://") ||
-    databaseUrl.startsWith("postgresql://")
-  ) {
+  if (isPostgresUrl(databaseUrl)) {
     return "postgres";
   }
 
@@ -32,20 +35,20 @@ export function getDatabaseProvider(
 }
 
 export function resolveSqlitePath(databaseUrl = getDatabaseUrl()): string {
-  if (databaseUrl === ":memory:") {
-    return databaseUrl;
-  }
-
   if (process.env.VERCEL === "1") {
-    if (databaseUrl.startsWith("file:")) {
+    if (databaseUrl === ":memory:" || databaseUrl.startsWith("file:")) {
       throw new Error(
-        "Vercel deployments must use a managed DATABASE_URL. File-backed SQLite is only supported for local development.",
+        "Vercel deployments must use a managed DATABASE_URL. SQLite is only supported for local development.",
       );
     }
 
     throw new Error(
       `Unsupported Vercel DATABASE_URL "${databaseUrl}". Use a managed postgres/postgresql URL.`,
     );
+  }
+
+  if (databaseUrl === ":memory:") {
+    return databaseUrl;
   }
 
   if (!databaseUrl.startsWith("file:")) {
@@ -61,6 +64,13 @@ export function resolveSqlitePath(databaseUrl = getDatabaseUrl()): string {
   }
 
   return resolve(packageRoot, sqlitePath);
+}
+
+function isPostgresUrl(databaseUrl: string): boolean {
+  return (
+    databaseUrl.startsWith("postgres://") ||
+    databaseUrl.startsWith("postgresql://")
+  );
 }
 
 export function ensureSqliteDirectory(databasePath: string): void {

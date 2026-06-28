@@ -35,6 +35,17 @@ describe("database config", () => {
     );
   });
 
+  it("rejects in-memory SQLite on Vercel", () => {
+    process.env.VERCEL = "1";
+
+    expect(() => getDatabaseProvider(":memory:")).toThrow(
+      "Vercel deployments must use a managed postgres/postgresql DATABASE_URL",
+    );
+    expect(() => resolveSqlitePath(":memory:")).toThrow(
+      "Vercel deployments must use a managed DATABASE_URL",
+    );
+  });
+
   it("detects SQLite and Postgres database providers", () => {
     expect(getDatabaseProvider(":memory:")).toBe("sqlite");
     expect(getDatabaseProvider("file:/tmp/fantasy-sumo.sqlite")).toBe("sqlite");
