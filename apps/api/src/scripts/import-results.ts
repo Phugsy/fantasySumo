@@ -29,18 +29,18 @@ if (bashoId === undefined || !Number.isInteger(day)) {
 const client = createDatabaseClient();
 
 try {
-  runMigrations(client.db);
+  await runMigrations(client);
 
   const command = await fetchSumoApiResultsImport(fetch, {
     bashoId,
     day,
     division,
   });
-  const result = importBoutResults(createRepositories(client.db), command, {
+  const result = await importBoutResults(createRepositories(client), command, {
     dryRun,
   });
 
   console.log(JSON.stringify(result, null, 2));
 } finally {
-  client.close();
+  await client.close();
 }

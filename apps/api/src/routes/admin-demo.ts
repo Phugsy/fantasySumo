@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { Repositories, SqliteDatabase } from "@fantasy-sumo/db";
+import type { Repositories } from "@fantasy-sumo/db";
 import {
   DEMO_BASHO_ID,
   advanceDemoBashoDay,
@@ -10,7 +10,6 @@ import {
 
 interface RouteContext {
   allowUnprotectedDemoAdmin: boolean;
-  db: SqliteDatabase;
   demoAdminToken?: string;
   repositories: Repositories;
   now: () => Date;
@@ -29,11 +28,11 @@ export function registerAdminDemoRoutes(
   });
 
   app.post("/api/admin/demo/reset", async () => {
-    resetDemoProgression(context.db);
+    await resetDemoProgression(context.repositories);
 
     return {
       action: "reset",
-      basho: context.repositories.getBasho(DEMO_BASHO_ID),
+      basho: await context.repositories.getBasho(DEMO_BASHO_ID),
       appliedResults: 0,
     };
   });
@@ -104,15 +103,17 @@ function getSuppliedDemoAdminToken(
   return undefined;
 }
 
-function sendDemoProgressionResult(
+async function sendDemoProgressionResult(
   reply: FastifyReply,
   action: string,
   run: () => ReturnType<typeof startDemoBasho>,
 ) {
   try {
+    const result = await run();
+
     return {
       action,
-      ...run(),
+      ...result,
     };
   } catch (error) {
     return reply.code(404).send({

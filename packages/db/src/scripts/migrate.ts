@@ -1,4 +1,4 @@
 import { migrateDatabase } from "../migrate.js";
 
-migrateDatabase();
+await migrateDatabase();
 console.log("Database migrations applied.");

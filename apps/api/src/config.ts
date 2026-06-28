@@ -16,3 +16,13 @@ export function getDemoAdminToken(): string | undefined {
 
   return token === undefined || token.length === 0 ? undefined : token;
 }
+
+export function getAdminImportToken(): string | undefined {
+  const token = process.env.ADMIN_IMPORT_TOKEN?.trim();
+
+  return token === undefined || token.length === 0 ? undefined : token;
+}
+
+export function allowsUnprotectedAdminImports(): boolean {
+  return process.env.NODE_ENV !== "production" && process.env.VERCEL !== "1";
+}

@@ -13,7 +13,7 @@ At present, the app has the first local playable foundations:
 - A Vite + React front end for creating a fantasy team from seeded basho data and viewing leaderboard standings.
 - A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.
 - A shared TypeScript domain package with MVP types, lifecycle rules, validation, scoring, and leaderboard logic.
-- A local SQLite + Drizzle database package with schema, migration, repositories, sample seed data, and deterministic demo data.
+- A swappable Drizzle database package with local SQLite, production Postgres, repositories, migrations, sample seed data, and deterministic demo data.
 - Automated source-backed import commands and local admin endpoints for current banzuke and daily results.
 - Vitest, ESLint, and Prettier wired through pnpm scripts.
 
@@ -26,7 +26,8 @@ It is close to a local playable loop, but still needs a friendlier admin UI befo
 - Vite
 - React
 - Fastify
-- SQLite
+- SQLite for local development
+- Postgres for production deployment
 - Drizzle
 - Vitest
 - ESLint
@@ -41,6 +42,7 @@ Start here:
 - `docs/ARCHITECTURE.md` - current architecture and suggested future boundaries.
 - `docs/adr/0001-rebuild-architecture.md` - accepted rebuild architecture decision.
 - `docs/DATA_IMPORT_STRATEGY.md` - MVP data-source investigation and import recommendation.
+- `docs/DEPLOYMENT.md` - Vercel and managed database deployment notes.
 - `docs/E2E_TESTING.md` - intended Playwright E2E strategy for the MVP game loop.
 - `docs/MODERNISATION_PLAN.md` - safe path for updating or rebuilding the app.
 - `docs/ROADMAP.md` - staged product/engineering roadmap.
@@ -140,6 +142,8 @@ By default, the database package writes local SQLite data to `packages/db/data/f
 DATABASE_URL=file:./data/dev.sqlite pnpm db:seed
 ```
 
+Use a `postgres:` or `postgresql:` `DATABASE_URL` for managed production persistence.
+
 The local team size defaults to `2`. Override it for the API with `TEAM_SIZE`.
 Set `DEMO_ADMIN_TOKEN` to enable protected demo admin API controls.
 
@@ -204,6 +208,8 @@ Common targets:
 ## Security note
 
 The local database uses a file path only and does not require credentials. Keep future secrets out of source control.
+
+For Vercel deployment prep and the managed Postgres production path, see `docs/DEPLOYMENT.md`.
 
 ## Recommended next steps
 

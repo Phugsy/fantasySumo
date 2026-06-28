@@ -6,16 +6,16 @@ import { buildApp } from "./app.js";
 let app: FastifyInstance;
 let client: DatabaseClient;
 
-beforeEach(() => {
+beforeEach(async () => {
   client = createDatabaseClient(":memory:");
   app = buildApp({
-    db: client.db,
+    db: client,
   });
 });
 
 afterEach(async () => {
   await app.close();
-  client.close();
+  await await client.close();
 });
 
 describe("GET /api/health", () => {

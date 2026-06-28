@@ -17,13 +17,13 @@ let app: FastifyInstance;
 let client: DatabaseClient;
 let tmpRoot: string;
 
-beforeEach(() => {
+beforeEach(async () => {
   tmpRoot = mkdtempSync(join(tmpdir(), "fantasy-sumo-api-"));
   client = createDatabaseClient(`file:${join(tmpRoot, "test.sqlite")}`);
-  runMigrations(client.db);
-  seedDatabase(client.db);
+  await runMigrations(client);
+  await seedDatabase(createRepositories(client));
   app = buildApp({
-    db: client.db,
+    db: client,
     now: () => new Date("2026-05-02T09:00:00.000Z"),
     teamIdFactory: () => "north",
   });
@@ -31,7 +31,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await app.close();
-  client.close();
+  await client.close();
   rmSync(tmpRoot, { force: true, recursive: true });
 });
 
@@ -53,7 +53,7 @@ describe("basho routes", () => {
   });
 
   it("prefers a locked current basho over a later upcoming basho", async () => {
-    const repositories = createRepositories(client.db);
+    const repositories = createRepositories(client);
     repositories.upsertBasho({
       ...sampleBasho,
       status: "locked",
@@ -225,7 +225,7 @@ describe("basho routes", () => {
   ] as const)(
     "rejects team creation when a basho is $status",
     async ({ status, expectedMessage }) => {
-      createRepositories(client.db).upsertBasho({
+      createRepositories(client).upsertBasho({
         ...sampleBasho,
         status,
       });

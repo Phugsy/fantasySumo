@@ -24,7 +24,8 @@
   "dependencies": {
     "@fantasy-sumo/domain": "workspace:*",
     "better-sqlite3": "^12.10.0",
-    "drizzle-orm": "^0.45.2"
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

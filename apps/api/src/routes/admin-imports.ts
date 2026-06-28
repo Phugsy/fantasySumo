@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { Repositories } from "@fantasy-sumo/db";
 import {
@@ -13,6 +13,8 @@ import {
 import type { SourceFetch } from "../imports/types.js";
 
 interface RouteContext {
+  adminImportToken?: string;
+  allowUnprotectedAdminImports: boolean;
   repositories: Repositories;
   sourceFetch: SourceFetch;
 }
@@ -38,6 +40,22 @@ export function registerAdminImportRoutes(
   app: FastifyInstance,
   context: RouteContext,
 ) {
+  app.addHook("preHandler", async (request, reply) => {
+    if (!request.url.startsWith("/api/admin/import-banzuke")) {
+      return;
+    }
+
+    return authorizeAdminImport(request, reply, context);
+  });
+
+  app.addHook("preHandler", async (request, reply) => {
+    if (!request.url.includes("/import-results")) {
+      return;
+    }
+
+    return authorizeAdminImport(request, reply, context);
+  });
+
   app.post<{
     Querystring: unknown;
     Body: unknown;
@@ -62,7 +80,7 @@ export function registerAdminImportRoutes(
         parsedBody.data,
       );
 
-      return importBanzuke(context.repositories, command, {
+      return await importBanzuke(context.repositories, command, {
         dryRun: parsedQuery.data.dryRun,
       });
     } catch (error) {
@@ -96,13 +114,60 @@ export function registerAdminImportRoutes(
         division: parsedBody.data.division,
       });
 
-      return importBoutResults(context.repositories, command, {
+      return await importBoutResults(context.repositories, command, {
         dryRun: parsedQuery.data.dryRun,
       });
     } catch (error) {
       return sendImportError(reply, error);
     }
   });
+}
+
+function authorizeAdminImport(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  context: RouteContext,
+) {
+  if (context.allowUnprotectedAdminImports) {
+    return;
+  }
+
+  if (context.adminImportToken === undefined) {
+    return reply.code(404).send({
+      error: "admin-import-disabled",
+      message: "Admin import controls are not enabled.",
+    });
+  }
+
+  if (getSuppliedAdminImportToken(request) !== context.adminImportToken) {
+    return reply.code(401).send({
+      error: "admin-import-unauthorized",
+      message: "Admin import controls require a valid token.",
+    });
+  }
+}
+
+function getSuppliedAdminImportToken(
+  request: FastifyRequest,
+): string | undefined {
+  const headerToken = request.headers["x-admin-import-token"];
+
+  if (Array.isArray(headerToken)) {
+    return headerToken[0];
+  }
+
+  if (headerToken !== undefined) {
+    return headerToken;
+  }
+
+  const authorization = request.headers.authorization;
+  const bearerPrefix = "Bearer ";
+
+  if (authorization?.startsWith(bearerPrefix)) {
+    return authorization.slice(bearerPrefix.length);
+  }
+
+  return undefined;
 }
 
 function formatZodIssues(result: z.ZodSafeParseResult<unknown>) {

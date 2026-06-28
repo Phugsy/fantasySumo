@@ -5,7 +5,12 @@ export {
   resolveSqlitePath,
 } from "./config.js";
 export { createDatabaseClient } from "./client.js";
-export type { DatabaseClient, SqliteDatabase } from "./client.js";
+export type {
+  AppDatabase,
+  DatabaseClient,
+  PostgresDatabase,
+  SqliteDatabase,
+} from "./client.js";
 export { migrateDatabase, runMigrations } from "./migrate.js";
 export { createRepositories } from "./repositories.js";
 export type { Repositories } from "./repositories.js";

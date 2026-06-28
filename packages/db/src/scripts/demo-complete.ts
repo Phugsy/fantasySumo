@@ -5,10 +5,10 @@ import { createRepositories } from "../repositories.js";
 const client = createDatabaseClient();
 
 try {
-  const result = completeDemoBasho(createRepositories(client.db));
+  const result = await completeDemoBasho(createRepositories(client));
   console.log(
     `Demo completed: status=${result.basho.status}, currentDay=${result.basho.currentDay ?? 0}, appliedResults=${result.appliedResults}.`,
   );
 } finally {
-  client.close();
+  await client.close();
 }

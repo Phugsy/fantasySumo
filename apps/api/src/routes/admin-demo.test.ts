@@ -15,12 +15,12 @@ let app: FastifyInstance;
 let client: DatabaseClient;
 let tmpRoot: string;
 
-beforeEach(() => {
+beforeEach(async () => {
   tmpRoot = mkdtempSync(join(tmpdir(), "fantasy-sumo-admin-demo-"));
   client = createDatabaseClient(`file:${join(tmpRoot, "test.sqlite")}`);
-  runMigrations(client.db);
+  await runMigrations(client);
   app = buildApp({
-    db: client.db,
+    db: client,
     demoAdminToken: "test-demo-token",
     now: () => new Date("2026-05-10T00:00:00.000Z"),
   });
@@ -28,7 +28,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await app.close();
-  client.close();
+  await client.close();
   rmSync(tmpRoot, { force: true, recursive: true });
 });
 

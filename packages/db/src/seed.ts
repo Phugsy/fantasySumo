@@ -6,15 +6,7 @@ import type {
   FantasyTeam,
   Rikishi,
 } from "@fantasy-sumo/domain";
-import type { SqliteDatabase } from "./client.js";
-import {
-  banzukeEntries,
-  basho,
-  boutResults,
-  fantasyPicks,
-  fantasyTeams,
-  rikishi,
-} from "./schema.js";
+import type { Repositories } from "./repositories.js";
 import {
   demoBanzukeEntries,
   demoBasho,
@@ -31,8 +23,8 @@ import {
   sampleRikishi,
 } from "./seed-data.js";
 
-export function seedDatabase(db: SqliteDatabase): void {
-  replaceSeedData(db, {
+export async function seedDatabase(repositories: Repositories): Promise<void> {
+  await replaceSeedData(repositories, {
     basho: sampleBasho,
     rikishi: sampleRikishi,
     banzukeEntries: sampleBanzukeEntries,
@@ -42,8 +34,10 @@ export function seedDatabase(db: SqliteDatabase): void {
   });
 }
 
-export function seedDemoDatabase(db: SqliteDatabase): void {
-  replaceSeedData(db, {
+export async function seedDemoDatabase(
+  repositories: Repositories,
+): Promise<void> {
+  await replaceSeedData(repositories, {
     basho: demoBasho,
     rikishi: demoRikishi,
     banzukeEntries: demoBanzukeEntries,
@@ -53,54 +47,28 @@ export function seedDemoDatabase(db: SqliteDatabase): void {
   });
 }
 
-function replaceSeedData(db: SqliteDatabase, seedData: SeedData): void {
-  db.delete(fantasyPicks).run();
-  db.delete(fantasyTeams).run();
-  db.delete(boutResults).run();
-  db.delete(banzukeEntries).run();
-  db.delete(rikishi).run();
-  db.delete(basho).run();
+async function replaceSeedData(
+  repositories: Repositories,
+  seedData: SeedData,
+): Promise<void> {
+  await repositories.resetData();
 
-  db.insert(basho)
-    .values({
-      ...seedData.basho,
-      currentDay: seedData.basho.currentDay ?? null,
-    })
-    .run();
-  if (seedData.rikishi.length > 0) {
-    db.insert(rikishi)
-      .values([...seedData.rikishi])
-      .run();
+  await repositories.applyBanzukeImport({
+    basho: seedData.basho,
+    rikishi: seedData.rikishi,
+    banzukeEntries: seedData.banzukeEntries,
+  });
+
+  for (const team of seedData.fantasyTeams) {
+    await repositories.insertFantasyTeam(team);
   }
 
-  if (seedData.banzukeEntries.length > 0) {
-    db.insert(banzukeEntries)
-      .values([...seedData.banzukeEntries])
-      .run();
+  for (const pick of seedData.fantasyPicks) {
+    await repositories.insertFantasyPick(pick);
   }
 
-  if (seedData.fantasyTeams.length > 0) {
-    db.insert(fantasyTeams)
-      .values([...seedData.fantasyTeams])
-      .run();
-  }
-
-  if (seedData.fantasyPicks.length > 0) {
-    db.insert(fantasyPicks)
-      .values(
-        seedData.fantasyPicks.map((pick) => ({
-          id: pick.id ?? `${pick.teamId}-${pick.rikishiId}`,
-          teamId: pick.teamId,
-          rikishiId: pick.rikishiId,
-        })),
-      )
-      .run();
-  }
-
-  if (seedData.boutResults.length > 0) {
-    db.insert(boutResults)
-      .values([...seedData.boutResults])
-      .run();
+  for (const result of seedData.boutResults) {
+    await repositories.upsertBoutResult(result);
   }
 }
 

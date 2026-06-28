@@ -27,7 +27,7 @@ export function registerBashoRoutes(
   context: RouteContext,
 ) {
   app.get("/api/basho/current", async (_request, reply) => {
-    const currentBasho = findCurrentBasho(context.repositories);
+    const currentBasho = await findCurrentBasho(context.repositories);
 
     if (currentBasho === undefined) {
       return reply.code(404).send({
@@ -45,7 +45,7 @@ export function registerBashoRoutes(
   app.get<{
     Params: { bashoId: string };
   }>("/api/basho/:bashoId/rikishi", async (request, reply) => {
-    const basho = context.repositories.getBasho(request.params.bashoId);
+    const basho = await context.repositories.getBasho(request.params.bashoId);
 
     if (basho === undefined) {
       return reply.code(404).send({
@@ -55,23 +55,24 @@ export function registerBashoRoutes(
     }
 
     const rikishiById = new Map(
-      context.repositories
-        .listRikishi()
-        .map((rikishi) => [rikishi.id, rikishi]),
+      (await context.repositories.listRikishi()).map((rikishi) => [
+        rikishi.id,
+        rikishi,
+      ]),
     );
-    const rikishi = context.repositories
-      .listBanzukeEntriesForBasho(basho.id)
-      .map((entry) => {
-        const rikishiEntry = rikishiById.get(entry.rikishiId);
+    const rikishi = (
+      await context.repositories.listBanzukeEntriesForBasho(basho.id)
+    ).map((entry) => {
+      const rikishiEntry = rikishiById.get(entry.rikishiId);
 
-        return {
-          id: entry.rikishiId,
-          shikona: rikishiEntry?.shikona ?? entry.rikishiId,
-          heya: rikishiEntry?.heya,
-          rank: entry.rank,
-          rankOrder: entry.rankOrder,
-        };
-      });
+      return {
+        id: entry.rikishiId,
+        shikona: rikishiEntry?.shikona ?? entry.rikishiId,
+        heya: rikishiEntry?.heya,
+        rank: entry.rank,
+        rankOrder: entry.rankOrder,
+      };
+    });
 
     return {
       basho,
@@ -83,7 +84,7 @@ export function registerBashoRoutes(
     Params: { bashoId: string };
     Body: unknown;
   }>("/api/basho/:bashoId/teams", async (request, reply) => {
-    const basho = context.repositories.getBasho(request.params.bashoId);
+    const basho = await context.repositories.getBasho(request.params.bashoId);
 
     if (basho === undefined) {
       return reply.code(404).send({
@@ -136,9 +137,9 @@ export function registerBashoRoutes(
     }
 
     const validRikishiIds = new Set(
-      context.repositories
-        .listBanzukeEntriesForBasho(basho.id)
-        .map((entry) => entry.rikishiId),
+      (await context.repositories.listBanzukeEntriesForBasho(basho.id)).map(
+        (entry) => entry.rikishiId,
+      ),
     );
     const invalidRikishiIds = rikishiIds.filter(
       (rikishiId) => !validRikishiIds.has(rikishiId),
@@ -166,18 +167,18 @@ export function registerBashoRoutes(
       createdAt: context.now().toISOString(),
     };
 
-    context.repositories.insertFantasyTeamWithPicks(team, picks);
+    await context.repositories.insertFantasyTeamWithPicks(team, picks);
 
     return reply.code(201).send({
       team,
-      picks: context.repositories.listFantasyPicksForTeam(team.id),
+      picks: await context.repositories.listFantasyPicksForTeam(team.id),
     });
   });
 
   app.get<{
     Params: { bashoId: string; teamId: string };
   }>("/api/basho/:bashoId/teams/:teamId", async (request, reply) => {
-    const basho = context.repositories.getBasho(request.params.bashoId);
+    const basho = await context.repositories.getBasho(request.params.bashoId);
 
     if (basho === undefined) {
       return reply.code(404).send({
@@ -186,7 +187,9 @@ export function registerBashoRoutes(
       });
     }
 
-    const team = context.repositories.getFantasyTeam(request.params.teamId);
+    const team = await context.repositories.getFantasyTeam(
+      request.params.teamId,
+    );
 
     if (team === undefined || team.bashoId !== basho.id) {
       return reply.code(404).send({
@@ -197,14 +200,14 @@ export function registerBashoRoutes(
 
     return {
       team,
-      picks: context.repositories.listFantasyPicksForTeam(team.id),
+      picks: await context.repositories.listFantasyPicksForTeam(team.id),
     };
   });
 
   app.get<{
     Params: { bashoId: string };
   }>("/api/basho/:bashoId/leaderboard", async (request, reply) => {
-    const basho = context.repositories.getBasho(request.params.bashoId);
+    const basho = await context.repositories.getBasho(request.params.bashoId);
 
     if (basho === undefined) {
       return reply.code(404).send({
@@ -216,16 +219,16 @@ export function registerBashoRoutes(
     return {
       bashoId: basho.id,
       leaderboard: calculateLeaderboard(
-        context.repositories.listFantasyTeamsForBasho(basho.id),
-        context.repositories.listFantasyPicksForBasho(basho.id),
-        context.repositories.listBoutResultsForBasho(basho.id),
+        await context.repositories.listFantasyTeamsForBasho(basho.id),
+        await context.repositories.listFantasyPicksForBasho(basho.id),
+        await context.repositories.listBoutResultsForBasho(basho.id),
       ),
     };
   });
 }
 
-function findCurrentBasho(repositories: Repositories) {
-  const bashos = repositories.listBashos();
+async function findCurrentBasho(repositories: Repositories) {
+  const bashos = await repositories.listBashos();
   const latestFirst = [...bashos].reverse();
 
   return (

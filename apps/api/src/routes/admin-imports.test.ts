@@ -14,12 +14,12 @@ let app: FastifyInstance;
 let client: DatabaseClient;
 let tmpRoot: string;
 
-beforeEach(() => {
+beforeEach(async () => {
   tmpRoot = mkdtempSync(join(tmpdir(), "fantasy-sumo-admin-imports-"));
   client = createDatabaseClient(`file:${join(tmpRoot, "test.sqlite")}`);
-  runMigrations(client.db);
+  await runMigrations(client);
   app = buildApp({
-    db: client.db,
+    db: client,
     sourceFetch: async (url) => {
       const sourceUrl = String(url);
 
@@ -75,11 +75,40 @@ beforeEach(() => {
 
 afterEach(async () => {
   await app.close();
-  client.close();
+  await client.close();
   rmSync(tmpRoot, { force: true, recursive: true });
 });
 
 describe("admin import routes", () => {
+  it("requires a token when unprotected imports are disabled", async () => {
+    await app.close();
+    app = buildApp({
+      adminImportToken: "test-import-token",
+      allowUnprotectedAdminImports: false,
+      db: client,
+      sourceFetch: async () => jsonResponse({}),
+    });
+
+    const unauthorizedResponse = await app.inject({
+      method: "POST",
+      url: "/api/admin/import-banzuke?dryRun=true",
+      payload: {},
+    });
+
+    expect(unauthorizedResponse.statusCode).toBe(401);
+
+    const authorizedResponse = await app.inject({
+      headers: {
+        "x-admin-import-token": "test-import-token",
+      },
+      method: "POST",
+      url: "/api/admin/import-banzuke?dryRun=true",
+      payload: {},
+    });
+
+    expect(authorizedResponse.statusCode).not.toBe(401);
+  });
+
   it("dry-runs and applies source-backed banzuke imports", async () => {
     const dryRunResponse = await app.inject({
       method: "POST",
