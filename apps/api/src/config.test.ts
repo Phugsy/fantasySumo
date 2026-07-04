@@ -22,17 +22,17 @@ describe("API config", () => {
     expect(allowsUnprotectedAdminImports()).toBe(true);
   });
 
-  it("fails closed for unprotected admin imports on Vercel", () => {
-    process.env.NODE_ENV = "";
+  it("fails closed for unprotected admin imports in explicit production", () => {
+    process.env.NODE_ENV = "production";
     process.env.ALLOW_UNPROTECTED_ADMIN_IMPORTS = "";
     process.env.VERCEL = "1";
 
     expect(allowsUnprotectedAdminImports()).toBe(false);
   });
 
-  it("fails closed for unprotected admin imports in explicit production", () => {
+  it("does not allow the unprotected import override in explicit production", () => {
     process.env.NODE_ENV = "production";
-    process.env.ALLOW_UNPROTECTED_ADMIN_IMPORTS = "";
+    process.env.ALLOW_UNPROTECTED_ADMIN_IMPORTS = "true";
     process.env.VERCEL = "";
 
     expect(allowsUnprotectedAdminImports()).toBe(false);
@@ -49,7 +49,7 @@ describe("API config", () => {
   it("allows explicit local opt-in for unprotected admin imports", () => {
     process.env.NODE_ENV = "";
     process.env.ALLOW_UNPROTECTED_ADMIN_IMPORTS = "true";
-    process.env.VERCEL = "1";
+    process.env.VERCEL = "";
 
     expect(allowsUnprotectedAdminImports()).toBe(true);
   });

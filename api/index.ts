@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { buildApp } from "../apps/api/src/app.js";
+import { handleVercelRequest } from "../apps/api/src/vercel-adapter.js";
 
 const app = buildApp();
 const appReady = app.ready();
@@ -9,5 +10,5 @@ export default async function handler(
   response: ServerResponse,
 ) {
   await appReady;
-  app.server.emit("request", request, response);
+  await handleVercelRequest(app, request, response);
 }

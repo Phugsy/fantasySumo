@@ -50,7 +50,7 @@ Keep SQLite locally until there is a concrete reason to standardise development 
 
 The demo admin endpoints already require `DEMO_ADMIN_TOKEN` unless explicitly opened in tests.
 
-The source-backed import endpoints require `ADMIN_IMPORT_TOKEN` by default. They can run without a token only when running locally with an unset `NODE_ENV`, when `NODE_ENV` is `development` or `test`, or when `ALLOW_UNPROTECTED_ADMIN_IMPORTS=true` is set explicitly for a local environment:
+The source-backed import endpoints require `ADMIN_IMPORT_TOKEN` by default. They can run without a token only outside production: when running locally with an unset `NODE_ENV`, when `NODE_ENV` is `development` or `test`, or when `ALLOW_UNPROTECTED_ADMIN_IMPORTS=true` is set explicitly for a local environment. `NODE_ENV=production` always requires the token.
 
 ```bash
 curl -X POST "https://<deployment>/api/admin/import-banzuke?dryRun=true" \
