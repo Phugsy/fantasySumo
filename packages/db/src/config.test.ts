@@ -8,10 +8,10 @@ import {
 } from "./config.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const originalVercel = process.env.VERCEL;
+const originalNodeEnv = process.env.NODE_ENV;
 
 afterEach(() => {
-  process.env.VERCEL = originalVercel;
+  process.env.NODE_ENV = originalNodeEnv;
 });
 
 describe("database config", () => {
@@ -27,22 +27,22 @@ describe("database config", () => {
     );
   });
 
-  it("rejects file-backed SQLite on Vercel", () => {
-    process.env.VERCEL = "1";
+  it("rejects file-backed SQLite in production", () => {
+    process.env.NODE_ENV = "production";
 
     expect(() => resolveSqlitePath("file:/tmp/fantasy-sumo.sqlite")).toThrow(
-      "Vercel deployments must use a managed DATABASE_URL",
+      "Production deployments must use a managed DATABASE_URL",
     );
   });
 
-  it("rejects in-memory SQLite on Vercel", () => {
-    process.env.VERCEL = "1";
+  it("rejects in-memory SQLite in production", () => {
+    process.env.NODE_ENV = "production";
 
     expect(() => getDatabaseProvider(":memory:")).toThrow(
-      "Vercel deployments must use a managed postgres/postgresql DATABASE_URL",
+      "Production deployments must use a managed postgres/postgresql DATABASE_URL",
     );
     expect(() => resolveSqlitePath(":memory:")).toThrow(
-      "Vercel deployments must use a managed DATABASE_URL",
+      "Production deployments must use a managed DATABASE_URL",
     );
   });
 

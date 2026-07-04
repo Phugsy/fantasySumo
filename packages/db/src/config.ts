@@ -15,9 +15,9 @@ export function getDatabaseUrl(): string {
 export function getDatabaseProvider(
   databaseUrl = getDatabaseUrl(),
 ): DatabaseProvider {
-  if (process.env.VERCEL === "1" && !isPostgresUrl(databaseUrl)) {
+  if (isProduction() && !isPostgresUrl(databaseUrl)) {
     throw new Error(
-      "Vercel deployments must use a managed postgres/postgresql DATABASE_URL.",
+      "Production deployments must use a managed postgres/postgresql DATABASE_URL.",
     );
   }
 
@@ -35,15 +35,15 @@ export function getDatabaseProvider(
 }
 
 export function resolveSqlitePath(databaseUrl = getDatabaseUrl()): string {
-  if (process.env.VERCEL === "1") {
+  if (isProduction()) {
     if (databaseUrl === ":memory:" || databaseUrl.startsWith("file:")) {
       throw new Error(
-        "Vercel deployments must use a managed DATABASE_URL. SQLite is only supported for local development.",
+        "Production deployments must use a managed DATABASE_URL. SQLite is only supported for local development.",
       );
     }
 
     throw new Error(
-      `Unsupported Vercel DATABASE_URL "${databaseUrl}". Use a managed postgres/postgresql URL.`,
+      `Unsupported production DATABASE_URL "${databaseUrl}". Use a managed postgres/postgresql URL.`,
     );
   }
 
@@ -71,6 +71,10 @@ function isPostgresUrl(databaseUrl: string): boolean {
     databaseUrl.startsWith("postgres://") ||
     databaseUrl.startsWith("postgresql://")
   );
+}
+
+function isProduction(): boolean {
+  return process.env.NODE_ENV?.trim() === "production";
 }
 
 export function ensureSqliteDirectory(databasePath: string): void {

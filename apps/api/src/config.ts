@@ -26,15 +26,5 @@ export function getAdminImportToken(): string | undefined {
 export function allowsUnprotectedAdminImports(): boolean {
   const nodeEnv = process.env.NODE_ENV?.trim();
 
-  if (nodeEnv === "production") {
-    return false;
-  }
-
-  return (
-    process.env.ALLOW_UNPROTECTED_ADMIN_IMPORTS === "true" ||
-    nodeEnv === "development" ||
-    nodeEnv === "test" ||
-    nodeEnv === undefined ||
-    nodeEnv === ""
-  );
+  return nodeEnv === "development" || nodeEnv === "test";
 }
