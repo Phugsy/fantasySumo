@@ -63,6 +63,8 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 9. Prefer the Makefile command layer for common workflows: `make test`, `make lint`, `make build`, and `make check`.
 10. Keep PRs focused on the next MVP slice; do not rebuild the full product in one change.
 
+For issue-to-PR work, use the repo-local process in `skills/fantasy-sumo-issue-loop/SKILL.md`. It can be invoked with a prompt such as: "Use the Fantasy Sumo issue loop on #44."
+
 ## Definition of done for future changes
 
 A change is ready when:
