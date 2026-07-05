@@ -122,7 +122,8 @@ When implemented, add scripts at the root so agents can run E2E consistently:
 {
   "scripts": {
     "e2e": "playwright test",
-    "e2e:ui": "playwright test --ui"
+    "e2e:ui": "playwright test --ui",
+    "e2e:install": "playwright install chromium"
   }
 }
 ```
@@ -135,9 +136,37 @@ e2e:
 
 e2e-ui:
 	$(PNPM) e2e:ui
+
+e2e-install:
+	$(PNPM) e2e:install
 ```
 
 Do not add E2E to `make check` until the suite is reliable and fast enough for routine PR validation. Before that, document it as an explicit pre-merge or feature-flow check.
+
+## Current Playwright Harness
+
+The initial harness for issue #23 lives in `e2e/` and is configured by `playwright.config.ts`.
+
+Run it with:
+
+```bash
+make e2e-install
+make e2e
+```
+
+The suite uses Chromium only for now, starts the local Fastify API and Vite web app, and runs with one worker because the tests reset shared deterministic demo data. By default it writes to a test-only SQLite file:
+
+```bash
+file:./data/e2e/fantasy-sumo-e2e.sqlite
+```
+
+That relative URL resolves inside `packages/db`, so it does not mutate the default developer database at `packages/db/data/fantasy-sumo.sqlite`. To use a different E2E database, set `E2E_DATABASE_URL`:
+
+```bash
+E2E_DATABASE_URL=file:./data/e2e/local-run.sqlite make e2e
+```
+
+Playwright uses ports `3000` for the API and `7866` for Vite. Stop any existing processes on those ports if the harness cannot start them. The protected demo admin controls are enabled with an E2E-only `DEMO_ADMIN_TOKEN` from the Playwright config; no live sumo data sources or production services are used.
 
 ## Agent Completion Loop
 
