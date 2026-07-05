@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @fantasy-sumo/db build && tsx watch src/server.ts",
+    "dev": "pnpm --filter @fantasy-sumo/db build && NODE_ENV=development tsx watch src/server.ts",
     "build": "pnpm --filter @fantasy-sumo/db build && tsc -p tsconfig.json",
     "import:banzuke": "pnpm --filter @fantasy-sumo/db build && tsx src/scripts/import-banzuke.ts",
     "import:results": "pnpm --filter @fantasy-sumo/db build && tsx src/scripts/import-results.ts",

@@ -26,29 +26,31 @@ import { sampleBasho, sampleFantasyTeams, sampleRikishi } from "./seed-data.js";
 let tmpRoot: string;
 let client: DatabaseClient;
 
-beforeEach(() => {
+beforeEach(async () => {
   tmpRoot = mkdtempSync(join(tmpdir(), "fantasy-sumo-db-"));
   client = createDatabaseClient(`file:${join(tmpRoot, "test.sqlite")}`);
-  runMigrations(client.db);
+  await runMigrations(client);
 });
 
-afterEach(() => {
-  client.close();
+afterEach(async () => {
+  await client.close();
   rmSync(tmpRoot, { force: true, recursive: true });
 });
 
 describe("repositories", () => {
-  it("reads seeded basho, rikishi, teams, picks, and bout results", () => {
-    seedDatabase(client.db);
-    const repositories = createRepositories(client.db);
+  it("reads seeded basho, rikishi, teams, picks, and bout results", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
 
-    expect(repositories.listBashos()).toEqual([sampleBasho]);
-    expect(repositories.listRikishi()).toHaveLength(sampleRikishi.length);
+    expect(await repositories.listBashos()).toEqual([sampleBasho]);
+    expect(await repositories.listRikishi()).toHaveLength(sampleRikishi.length);
     expect(
-      repositories.listBanzukeEntriesForBasho(sampleBasho.id).map((entry) => ({
-        rikishiId: entry.rikishiId,
-        rankOrder: entry.rankOrder,
-      })),
+      (await repositories.listBanzukeEntriesForBasho(sampleBasho.id)).map(
+        (entry) => ({
+          rikishiId: entry.rikishiId,
+          rankOrder: entry.rankOrder,
+        }),
+      ),
     ).toEqual([
       {
         rikishiId: "onosato",
@@ -67,10 +69,10 @@ describe("repositories", () => {
         rankOrder: 4,
       },
     ]);
-    expect(repositories.listFantasyTeamsForBasho(sampleBasho.id)).toEqual(
+    expect(await repositories.listFantasyTeamsForBasho(sampleBasho.id)).toEqual(
       sampleFantasyTeams,
     );
-    expect(repositories.listFantasyPicksForTeam("team-east")).toEqual([
+    expect(await repositories.listFantasyPicksForTeam("team-east")).toEqual([
       {
         id: "pick-east-kirishima",
         teamId: "team-east",
@@ -82,16 +84,16 @@ describe("repositories", () => {
         rikishiId: "onosato",
       },
     ]);
-    expect(repositories.listBoutResultsForBasho(sampleBasho.id)).toHaveLength(
-      3,
-    );
+    expect(
+      await repositories.listBoutResultsForBasho(sampleBasho.id),
+    ).toHaveLength(3);
   });
 
-  it("writes and reads a new fantasy team", () => {
-    seedDatabase(client.db);
-    const repositories = createRepositories(client.db);
+  it("writes and reads a new fantasy team", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
 
-    repositories.insertFantasyTeam({
+    await repositories.insertFantasyTeam({
       id: "team-north",
       bashoId: sampleBasho.id,
       displayName: "North Side",
@@ -100,17 +102,17 @@ describe("repositories", () => {
     });
 
     expect(
-      repositories
-        .listFantasyTeamsForBasho(sampleBasho.id)
-        .map((team) => team.id),
+      (await repositories.listFantasyTeamsForBasho(sampleBasho.id)).map(
+        (team) => team.id,
+      ),
     ).toContain("team-north");
   });
 
-  it("rolls back team creation when a pick insert fails", () => {
-    seedDatabase(client.db);
-    const repositories = createRepositories(client.db);
+  it("rolls back team creation when a pick insert fails", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
 
-    expect(() =>
+    await expect(
       repositories.insertFantasyTeamWithPicks(
         {
           id: "team-rollback",
@@ -128,30 +130,34 @@ describe("repositories", () => {
           },
         ],
       ),
-    ).toThrow();
+    ).rejects.toThrow();
 
-    expect(repositories.getFantasyTeam("team-rollback")).toBeUndefined();
-    expect(repositories.listFantasyPicksForTeam("team-rollback")).toEqual([]);
+    expect(await repositories.getFantasyTeam("team-rollback")).toBeUndefined();
+    expect(await repositories.listFantasyPicksForTeam("team-rollback")).toEqual(
+      [],
+    );
   });
 
-  it("loads deterministic demo data for local demos and E2E fixtures", () => {
-    seedDemoDatabase(client.db);
-    const repositories = createRepositories(client.db);
+  it("loads deterministic demo data for local demos and E2E fixtures", async () => {
+    await seedDemoDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
 
-    expect(repositories.listBashos()).toEqual([demoBasho]);
-    expect(repositories.listRikishi()).toHaveLength(demoRikishi.length);
-    expect(repositories.listBanzukeEntriesForBasho(demoBasho.id)).toHaveLength(
-      demoBanzukeEntries.length,
+    expect(await repositories.listBashos()).toEqual([demoBasho]);
+    expect(await repositories.listRikishi()).toHaveLength(demoRikishi.length);
+    expect(
+      await repositories.listBanzukeEntriesForBasho(demoBasho.id),
+    ).toHaveLength(demoBanzukeEntries.length);
+    expect(
+      await repositories.listFantasyTeamsForBasho(demoBasho.id),
+    ).toHaveLength(demoFantasyTeams.length);
+    expect(await repositories.listBoutResultsForBasho(demoBasho.id)).toEqual(
+      [],
     );
-    expect(repositories.listFantasyTeamsForBasho(demoBasho.id)).toHaveLength(
-      demoFantasyTeams.length,
-    );
-    expect(repositories.listBoutResultsForBasho(demoBasho.id)).toEqual([]);
 
     const leaderboard = calculateLeaderboard(
-      repositories.listFantasyTeamsForBasho(demoBasho.id),
-      repositories.listFantasyPicksForBasho(demoBasho.id),
-      repositories.listBoutResultsForBasho(demoBasho.id),
+      await repositories.listFantasyTeamsForBasho(demoBasho.id),
+      await repositories.listFantasyPicksForBasho(demoBasho.id),
+      await repositories.listBoutResultsForBasho(demoBasho.id),
     );
 
     expect(
@@ -184,28 +190,33 @@ describe("repositories", () => {
     ]);
   });
 
-  it("resets demo progression to a deterministic pre-basho state", () => {
-    seedDemoDatabase(client.db);
-    const repositories = createRepositories(client.db);
+  it("resets demo progression to a deterministic pre-basho state", async () => {
+    await seedDemoDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
 
-    completeDemoBasho(repositories, () => new Date("2026-05-10T00:00:00.000Z"));
-    resetDemoProgression(client.db);
+    await completeDemoBasho(
+      repositories,
+      () => new Date("2026-05-10T00:00:00.000Z"),
+    );
+    await resetDemoProgression(createRepositories(client));
 
-    expect(repositories.getBasho(demoBasho.id)).toEqual(demoBasho);
-    expect(repositories.listBoutResultsForBasho(demoBasho.id)).toEqual([]);
+    expect(await repositories.getBasho(demoBasho.id)).toEqual(demoBasho);
+    expect(await repositories.listBoutResultsForBasho(demoBasho.id)).toEqual(
+      [],
+    );
     expect(
-      repositories
-        .listFantasyTeamsForBasho(demoBasho.id)
-        .every((team) => team.lockedAt === undefined),
+      (await repositories.listFantasyTeamsForBasho(demoBasho.id)).every(
+        (team) => team.lockedAt === undefined,
+      ),
     ).toBe(true);
   });
 
-  it("starts and advances demo scoring one day at a time", () => {
-    seedDemoDatabase(client.db);
-    const repositories = createRepositories(client.db);
+  it("starts and advances demo scoring one day at a time", async () => {
+    await seedDemoDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
     const now = () => new Date("2026-05-10T00:00:00.000Z");
 
-    const started = startDemoBasho(repositories, now);
+    const started = await startDemoBasho(repositories, now);
 
     expect(started.basho).toMatchObject({
       status: "active",
@@ -213,21 +224,21 @@ describe("repositories", () => {
     });
     expect(started.appliedResults).toBe(0);
     expect(
-      repositories
-        .listFantasyTeamsForBasho(demoBasho.id)
-        .every((team) => team.lockedAt === "2026-05-10T00:00:00.000Z"),
+      (await repositories.listFantasyTeamsForBasho(demoBasho.id)).every(
+        (team) => team.lockedAt === "2026-05-10T00:00:00.000Z",
+      ),
     ).toBe(true);
 
-    const dayOne = advanceDemoBashoDay(repositories, now);
+    const dayOne = await advanceDemoBashoDay(repositories, now);
 
     expect(dayOne.basho).toMatchObject({
       status: "active",
       currentDay: 1,
     });
     expect(
-      repositories
-        .listBoutResultsForBasho(demoBasho.id)
-        .map((result) => result.day),
+      (await repositories.listBoutResultsForBasho(demoBasho.id)).map(
+        (result) => result.day,
+      ),
     ).toEqual([1, 1, 1, 1]);
     expect(
       dayOne.leaderboard.map((entry) => ({
@@ -241,22 +252,22 @@ describe("repositories", () => {
       { displayName: "Yusho Hunters", score: 1 },
     ]);
 
-    const dayTwo = advanceDemoBashoDay(repositories, now);
+    const dayTwo = await advanceDemoBashoDay(repositories, now);
 
     expect(dayTwo.basho.currentDay).toBe(2);
     expect(dayTwo.appliedResults).toBe(8);
     expect(
-      repositories
-        .listBoutResultsForBasho(demoBasho.id)
-        .map((result) => result.day),
+      (await repositories.listBoutResultsForBasho(demoBasho.id)).map(
+        (result) => result.day,
+      ),
     ).toEqual([1, 1, 1, 1, 2, 2, 2, 2]);
   });
 
-  it("can complete demo progression through the final day", () => {
-    seedDemoDatabase(client.db);
-    const repositories = createRepositories(client.db);
+  it("can complete demo progression through the final day", async () => {
+    await seedDemoDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
 
-    const completed = completeDemoBasho(
+    const completed = await completeDemoBasho(
       repositories,
       () => new Date("2026-05-10T00:00:00.000Z"),
     );
@@ -267,7 +278,7 @@ describe("repositories", () => {
     });
     expect(completed.appliedResults).toBe(demoBoutResults.length);
     expect(
-      repositories.listBoutResultsForBasho(demoBasho.id).at(-1),
+      (await repositories.listBoutResultsForBasho(demoBasho.id)).at(-1),
     ).toMatchObject({
       day: DEMO_FINAL_DAY,
     });

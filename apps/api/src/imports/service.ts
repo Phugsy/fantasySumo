@@ -21,11 +21,11 @@ export class ImportValidationError extends Error {
   }
 }
 
-export function importBanzuke(
+export async function importBanzuke(
   repositories: Repositories,
   command: BanzukeImportCommand,
   options: ImportOptions = {},
-): ImportResult {
+): Promise<ImportResult> {
   // Validate source-shaped data before any database write so failed imports
   // cannot leave the local game in a partly updated state.
   const issues = validateBanzukeImport(command);
@@ -36,24 +36,24 @@ export function importBanzuke(
 
   const summary = createEmptySummary();
   summary.basho = summarizeOne(
-    repositories.getBasho(command.basho.id),
+    await repositories.getBasho(command.basho.id),
     command.basho,
     isEqualBasho,
   );
   summary.rikishi = summarizeMany(
-    repositories.listRikishi(),
+    await repositories.listRikishi(),
     command.rikishi,
     isEqualRikishi,
   );
   summary.banzuke = summarizeMany(
-    repositories.listBanzukeEntriesForBasho(command.basho.id),
+    await repositories.listBanzukeEntriesForBasho(command.basho.id),
     command.banzukeEntries,
     isEqualBanzukeEntry,
     { countDeleted: true },
   );
 
   if (options.dryRun !== true) {
-    repositories.applyBanzukeImport({
+    await repositories.applyBanzukeImport({
       basho: command.basho,
       rikishi: command.rikishi,
       banzukeEntries: command.banzukeEntries,
@@ -67,21 +67,21 @@ export function importBanzuke(
   };
 }
 
-export function importBoutResults(
+export async function importBoutResults(
   repositories: Repositories,
   command: BoutResultsImportCommand,
   options: ImportOptions = {},
-): ImportResult {
+): Promise<ImportResult> {
   // Result imports are scoped to one basho/day. Reimporting that day should
   // correct stale wins rather than append duplicate or outdated scoring rows.
-  const issues = validateBoutResultsImport(repositories, command);
+  const issues = await validateBoutResultsImport(repositories, command);
 
   if (issues.length > 0) {
     throw new ImportValidationError(issues);
   }
 
   const summary = createEmptySummary();
-  const existingBasho = repositories.getBasho(command.bashoId);
+  const existingBasho = await repositories.getBasho(command.bashoId);
   const nextBasho =
     existingBasho === undefined
       ? undefined
@@ -92,9 +92,9 @@ export function importBoutResults(
   }
 
   summary.results = summarizeMany(
-    repositories
-      .listBoutResultsForBasho(command.bashoId)
-      .filter((result) => result.day === command.results[0]?.day),
+    (await repositories.listBoutResultsForBasho(command.bashoId)).filter(
+      (result) => result.day === command.results[0]?.day,
+    ),
     command.results,
     isEqualBoutResult,
     { countDeleted: true },
@@ -102,10 +102,10 @@ export function importBoutResults(
 
   if (options.dryRun !== true) {
     if (nextBasho !== undefined) {
-      repositories.upsertBasho(nextBasho);
+      await repositories.upsertBasho(nextBasho);
     }
 
-    repositories.applyBoutResultsImport({
+    await repositories.applyBoutResultsImport({
       bashoId: command.bashoId,
       day: command.results[0]!.day,
       results: command.results,
@@ -173,22 +173,22 @@ function validateBanzukeImport(
   return issues;
 }
 
-function validateBoutResultsImport(
+async function validateBoutResultsImport(
   repositories: Repositories,
   command: BoutResultsImportCommand,
-): ImportValidationIssue[] {
+): Promise<ImportValidationIssue[]> {
   const issues: ImportValidationIssue[] = [];
   const rikishiIds = new Set(
-    repositories.listRikishi().map((rikishi) => rikishi.id),
+    (await repositories.listRikishi()).map((rikishi) => rikishi.id),
   );
   const banzukeRikishiIds = new Set(
-    repositories
-      .listBanzukeEntriesForBasho(command.bashoId)
-      .map((entry) => entry.rikishiId),
+    (await repositories.listBanzukeEntriesForBasho(command.bashoId)).map(
+      (entry) => entry.rikishiId,
+    ),
   );
   const resultIds = new Set<string>();
 
-  if (repositories.getBasho(command.bashoId) === undefined) {
+  if ((await repositories.getBasho(command.bashoId)) === undefined) {
     issues.push({
       path: "bashoId",
       message: `Basho ${command.bashoId} does not exist.`,

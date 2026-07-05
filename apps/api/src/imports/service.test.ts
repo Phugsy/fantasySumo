@@ -57,48 +57,52 @@ const banzukeCommand: BanzukeImportCommand = {
   ],
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   tmpRoot = mkdtempSync(join(tmpdir(), "fantasy-sumo-import-"));
   client = createDatabaseClient(`file:${join(tmpRoot, "test.sqlite")}`);
-  runMigrations(client.db);
+  await runMigrations(client);
 });
 
-afterEach(() => {
-  client.close();
+afterEach(async () => {
+  await client.close();
   rmSync(tmpRoot, { force: true, recursive: true });
 });
 
 describe("import service", () => {
-  it("dry-runs banzuke imports without writing rows", () => {
-    const repositories = createRepositories(client.db);
-    const result = importBanzuke(repositories, banzukeCommand, {
+  it("dry-runs banzuke imports without writing rows", async () => {
+    const repositories = createRepositories(client);
+    const result = await importBanzuke(repositories, banzukeCommand, {
       dryRun: true,
     });
 
     expect(result.summary.basho.created).toBe(1);
     expect(result.summary.rikishi.created).toBe(2);
     expect(result.summary.banzuke.created).toBe(2);
-    expect(repositories.listBashos()).toEqual([]);
+    expect(await repositories.listBashos()).toEqual([]);
   });
 
-  it("applies banzuke imports transactionally and idempotently", () => {
-    const repositories = createRepositories(client.db);
+  it("applies banzuke imports transactionally and idempotently", async () => {
+    const repositories = createRepositories(client);
 
-    expect(importBanzuke(repositories, banzukeCommand).summary).toMatchObject({
+    expect(
+      (await importBanzuke(repositories, banzukeCommand)).summary,
+    ).toMatchObject({
       basho: { created: 1 },
       rikishi: { created: 2 },
       banzuke: { created: 2 },
     });
-    expect(importBanzuke(repositories, banzukeCommand).summary).toMatchObject({
+    expect(
+      (await importBanzuke(repositories, banzukeCommand)).summary,
+    ).toMatchObject({
       basho: { skipped: 1 },
       rikishi: { skipped: 2 },
       banzuke: { skipped: 2 },
     });
   });
 
-  it("counts basho current-day changes in banzuke import summaries", () => {
-    const repositories = createRepositories(client.db);
-    importBanzuke(repositories, {
+  it("counts basho current-day changes in banzuke import summaries", async () => {
+    const repositories = createRepositories(client);
+    await importBanzuke(repositories, {
       ...banzukeCommand,
       basho: {
         ...banzukeCommand.basho,
@@ -106,7 +110,7 @@ describe("import service", () => {
       },
     });
 
-    const result = importBanzuke(
+    const result = await importBanzuke(
       repositories,
       {
         ...banzukeCommand,
@@ -123,26 +127,26 @@ describe("import service", () => {
     expect(result.summary.basho.updated).toBe(1);
   });
 
-  it("removes stale banzuke entries without deleting rikishi", () => {
-    const repositories = createRepositories(client.db);
-    importBanzuke(repositories, banzukeCommand);
+  it("removes stale banzuke entries without deleting rikishi", async () => {
+    const repositories = createRepositories(client);
+    await importBanzuke(repositories, banzukeCommand);
 
-    const result = importBanzuke(repositories, {
+    const result = await importBanzuke(repositories, {
       ...banzukeCommand,
       rikishi: [banzukeCommand.rikishi[0]!],
       banzukeEntries: [banzukeCommand.banzukeEntries[0]!],
     });
 
     expect(result.summary.banzuke.deleted).toBe(1);
-    expect(repositories.listRikishi()).toHaveLength(2);
-    expect(repositories.listBanzukeEntriesForBasho("2026-05")).toEqual([
+    expect(await repositories.listRikishi()).toHaveLength(2);
+    expect(await repositories.listBanzukeEntriesForBasho("2026-05")).toEqual([
       banzukeCommand.banzukeEntries[0],
     ]);
   });
 
-  it("imports bout results after banzuke data exists", () => {
-    const repositories = createRepositories(client.db);
-    importBanzuke(repositories, {
+  it("imports bout results after banzuke data exists", async () => {
+    const repositories = createRepositories(client);
+    await importBanzuke(repositories, {
       ...banzukeCommand,
       basho: {
         ...banzukeCommand.basho,
@@ -151,7 +155,7 @@ describe("import service", () => {
       },
     });
 
-    const result = importBoutResults(repositories, {
+    const result = await importBoutResults(repositories, {
       source: "test",
       bashoId: "2026-05",
       results: [
@@ -167,16 +171,18 @@ describe("import service", () => {
     });
 
     expect(result.summary.results.created).toBe(1);
-    expect(repositories.listBoutResultsForBasho("2026-05")).toHaveLength(1);
-    expect(repositories.getBasho("2026-05")).toMatchObject({
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toHaveLength(
+      1,
+    );
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
       status: "active",
       currentDay: 1,
     });
   });
 
-  it("reports basho lifecycle updates during result import dry runs", () => {
-    const repositories = createRepositories(client.db);
-    importBanzuke(repositories, {
+  it("reports basho lifecycle updates during result import dry runs", async () => {
+    const repositories = createRepositories(client);
+    await importBanzuke(repositories, {
       ...banzukeCommand,
       basho: {
         ...banzukeCommand.basho,
@@ -185,7 +191,7 @@ describe("import service", () => {
       },
     });
 
-    const result = importBoutResults(
+    const result = await importBoutResults(
       repositories,
       {
         source: "test",
@@ -206,16 +212,16 @@ describe("import service", () => {
     );
 
     expect(result.summary.basho.updated).toBe(1);
-    expect(repositories.getBasho("2026-05")).toMatchObject({
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
       status: "locked",
       currentDay: 1,
     });
   });
 
-  it("replaces stale results for the imported day only", () => {
-    const repositories = createRepositories(client.db);
-    importBanzuke(repositories, banzukeCommand);
-    importBoutResults(repositories, {
+  it("replaces stale results for the imported day only", async () => {
+    const repositories = createRepositories(client);
+    await importBanzuke(repositories, banzukeCommand);
+    await importBoutResults(repositories, {
       source: "test",
       bashoId: "2026-05",
       results: [
@@ -235,7 +241,7 @@ describe("import service", () => {
         },
       ],
     });
-    importBoutResults(repositories, {
+    await importBoutResults(repositories, {
       source: "test",
       bashoId: "2026-05",
       results: [
@@ -249,7 +255,7 @@ describe("import service", () => {
       ],
     });
 
-    const result = importBoutResults(repositories, {
+    const result = await importBoutResults(repositories, {
       source: "test",
       bashoId: "2026-05",
       results: [
@@ -265,18 +271,17 @@ describe("import service", () => {
 
     expect(result.summary.results.deleted).toBe(1);
     expect(
-      repositories
-        .listBoutResultsForBasho("2026-05")
+      (await repositories.listBoutResultsForBasho("2026-05"))
         .map((entry) => entry.id)
         .sort(),
     ).toEqual(["2026-05-day-1-match-1", "2026-05-day-2-match-1"]);
   });
 
-  it("rejects invalid result imports before writing", () => {
-    const repositories = createRepositories(client.db);
-    importBanzuke(repositories, banzukeCommand);
+  it("rejects invalid result imports before writing", async () => {
+    const repositories = createRepositories(client);
+    await importBanzuke(repositories, banzukeCommand);
 
-    expect(() =>
+    await expect(
       importBoutResults(repositories, {
         source: "test",
         bashoId: "2026-05",
@@ -290,7 +295,7 @@ describe("import service", () => {
           },
         ],
       }),
-    ).toThrow(ImportValidationError);
-    expect(repositories.listBoutResultsForBasho("2026-05")).toEqual([]);
+    ).rejects.toThrow(ImportValidationError);
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toEqual([]);
   });
 });

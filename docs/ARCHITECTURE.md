@@ -16,7 +16,7 @@ apps/
   api/          Fastify API
 packages/
   domain/       Shared TypeScript domain types, validation, scoring
-  db/           SQLite schema, migrations, repositories, seed data
+  db/           Drizzle database adapters, migrations, repositories, seed data
 ```
 
 The active app is split into:
@@ -24,7 +24,7 @@ The active app is split into:
 - a React client built by Vite;
 - a Fastify API compiled by TypeScript;
 - a shared framework-free domain package with MVP types, pick validation, scoring, and leaderboard calculation;
-- a SQLite/Drizzle data package for local-first persistence;
+- a Drizzle data package with local SQLite and production Postgres adapters;
 - root pnpm scripts for dev, build, test, lint, and formatting.
 
 ## Front end
@@ -128,10 +128,12 @@ The data package entry point is `packages/db/src/index.ts`.
 
 Current behaviour:
 
-- Uses SQLite through `better-sqlite3`.
-- Defines the MVP schema with Drizzle table definitions.
-- Includes Drizzle migration SQL and metadata in `packages/db/drizzle`.
-- Uses `DATABASE_URL` for the local SQLite file path, defaulting to `file:./data/fantasy-sumo.sqlite` relative to the database package scripts.
+- Uses SQLite through `better-sqlite3` for local development.
+- Uses Postgres through `postgres` and Drizzle's `postgres-js` driver for production deployment.
+- Defines SQLite and Postgres MVP schemas with Drizzle table definitions.
+- Includes SQLite migration SQL in `packages/db/drizzle` and Postgres migration SQL in `packages/db/drizzle-pg`.
+- Uses `DATABASE_URL` to select the adapter: `file:` and `:memory:` use SQLite; `postgres:` and `postgresql:` use Postgres.
+- Exposes an async repository contract so API/domain workflows do not depend on a concrete database driver.
 - Provides repository functions for reading and writing basho, rikishi, banzuke entries, fantasy teams, fantasy picks, and bout results.
 - Provides transactional upsert helpers for banzuke and bout result imports.
 - Provides sample seed data for one basho, four rikishi, two fantasy teams, picks, and bout results.
@@ -159,7 +161,7 @@ pnpm --filter @fantasy-sumo/db db:generate
 Current limitations:
 
 - No banzuke/results import UI yet.
-- No production database configuration yet.
+- No hosted production database has been provisioned in the repo.
 
 The accepted MVP import direction is documented in [Data Import Strategy](DATA_IMPORT_STRATEGY.md). Prefer automated source-backed imports first, with manual triggers, dry runs, and JSON fixtures available for testing and emergency fallback.
 

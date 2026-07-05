@@ -2,7 +2,6 @@ import { calculateLeaderboard, type Basho } from "@fantasy-sumo/domain";
 import { demoBasho, demoBoutResults } from "./demo-seed-data.js";
 import type { Repositories } from "./repositories.js";
 import { seedDemoDatabase } from "./seed.js";
-import type { SqliteDatabase } from "./client.js";
 
 export const DEMO_BASHO_ID = demoBasho.id;
 export const DEMO_FINAL_DAY = Math.max(
@@ -15,38 +14,40 @@ export interface DemoProgressionResult {
   leaderboard: ReturnType<typeof calculateLeaderboard>;
 }
 
-export function resetDemoProgression(db: SqliteDatabase): void {
-  seedDemoDatabase(db);
+export async function resetDemoProgression(
+  repositories: Repositories,
+): Promise<void> {
+  await seedDemoDatabase(repositories);
 }
 
-export function startDemoBasho(
+export async function startDemoBasho(
   repositories: Repositories,
   now: () => Date = () => new Date(),
-): DemoProgressionResult {
-  const basho = requireDemoBasho(repositories);
+): Promise<DemoProgressionResult> {
+  const basho = await requireDemoBasho(repositories);
   const nextBasho: Basho = {
     ...basho,
     status: basho.status === "complete" ? "complete" : "active",
     currentDay: basho.currentDay ?? 0,
   };
 
-  repositories.lockFantasyTeamsForBasho(basho.id, now().toISOString());
-  repositories.updateBasho(nextBasho);
+  await repositories.lockFantasyTeamsForBasho(basho.id, now().toISOString());
+  await repositories.updateBasho(nextBasho);
 
   return describeDemoProgression(repositories, nextBasho);
 }
 
-export function advanceDemoBashoDay(
+export async function advanceDemoBashoDay(
   repositories: Repositories,
   now: () => Date = () => new Date(),
-): DemoProgressionResult {
-  const basho = requireDemoBasho(repositories);
+): Promise<DemoProgressionResult> {
+  const basho = await requireDemoBasho(repositories);
 
   if (basho.status === "upcoming" || basho.status === "locked") {
-    startDemoBasho(repositories, now);
+    await startDemoBasho(repositories, now);
   }
 
-  const currentBasho = requireDemoBasho(repositories);
+  const currentBasho = await requireDemoBasho(repositories);
   const currentDay = currentBasho.currentDay ?? 0;
 
   if (currentBasho.status === "complete" || currentDay >= DEMO_FINAL_DAY) {
@@ -65,30 +66,30 @@ export function advanceDemoBashoDay(
     currentDay: nextDay,
   };
 
-  repositories.applyBoutResultsImport({
+  await repositories.applyBoutResultsImport({
     bashoId: currentBasho.id,
     day: nextDay,
     results: dayResults,
   });
-  repositories.updateBasho(nextBasho);
+  await repositories.updateBasho(nextBasho);
 
   return describeDemoProgression(repositories, nextBasho);
 }
 
-export function completeDemoBasho(
+export async function completeDemoBasho(
   repositories: Repositories,
   now: () => Date = () => new Date(),
-): DemoProgressionResult {
-  const basho = requireDemoBasho(repositories);
+): Promise<DemoProgressionResult> {
+  const basho = await requireDemoBasho(repositories);
 
   if (basho.status === "upcoming" || basho.status === "locked") {
-    repositories.lockFantasyTeamsForBasho(basho.id, now().toISOString());
+    await repositories.lockFantasyTeamsForBasho(basho.id, now().toISOString());
   }
 
-  repositories.deleteBoutResultsForBasho(basho.id);
+  await repositories.deleteBoutResultsForBasho(basho.id);
 
   for (let day = 1; day <= DEMO_FINAL_DAY; day += 1) {
-    repositories.applyBoutResultsImport({
+    await repositories.applyBoutResultsImport({
       bashoId: basho.id,
       day,
       results: demoBoutResults.filter((result) => result.day === day),
@@ -101,13 +102,13 @@ export function completeDemoBasho(
     currentDay: DEMO_FINAL_DAY,
   };
 
-  repositories.updateBasho(nextBasho);
+  await repositories.updateBasho(nextBasho);
 
   return describeDemoProgression(repositories, nextBasho);
 }
 
-function requireDemoBasho(repositories: Repositories): Basho {
-  const basho = repositories.getBasho(DEMO_BASHO_ID);
+async function requireDemoBasho(repositories: Repositories): Promise<Basho> {
+  const basho = await repositories.getBasho(DEMO_BASHO_ID);
 
   if (basho === undefined) {
     throw new Error(
@@ -118,18 +119,18 @@ function requireDemoBasho(repositories: Repositories): Basho {
   return basho;
 }
 
-function describeDemoProgression(
+async function describeDemoProgression(
   repositories: Repositories,
   basho: Basho,
-): DemoProgressionResult {
-  const results = repositories.listBoutResultsForBasho(basho.id);
+): Promise<DemoProgressionResult> {
+  const results = await repositories.listBoutResultsForBasho(basho.id);
 
   return {
     basho,
     appliedResults: results.length,
     leaderboard: calculateLeaderboard(
-      repositories.listFantasyTeamsForBasho(basho.id),
-      repositories.listFantasyPicksForBasho(basho.id),
+      await repositories.listFantasyTeamsForBasho(basho.id),
+      await repositories.listFantasyPicksForBasho(basho.id),
       results,
       { throughDay: basho.currentDay },
     ),

@@ -3,20 +3,27 @@ import Fastify from "fastify";
 import {
   createDatabaseClient,
   createRepositories,
-  type SqliteDatabase,
+  type AppDatabase,
 } from "@fantasy-sumo/db";
-import { getDemoAdminToken, getTeamSize } from "./config.js";
+import {
+  allowsUnprotectedAdminImports,
+  getAdminImportToken,
+  getDemoAdminToken,
+  getTeamSize,
+} from "./config.js";
 import { registerAdminDemoRoutes } from "./routes/admin-demo.js";
 import { registerAdminImportRoutes } from "./routes/admin-imports.js";
 import { registerBashoRoutes } from "./routes/basho.js";
 
 interface AppOptions {
-  db?: SqliteDatabase;
+  db?: AppDatabase;
   now?: () => Date;
   sourceFetch?: typeof fetch;
   teamIdFactory?: () => string;
   teamSize?: number;
   demoAdminToken?: string;
+  adminImportToken?: string;
+  allowUnprotectedAdminImports?: boolean;
   allowUnprotectedDemoAdmin?: boolean;
 }
 
@@ -26,12 +33,12 @@ export function buildApp(options: AppOptions = {}) {
   const app = Fastify({
     logger: true,
   });
-  const db = options.db ?? ownedClient!.db;
+  const db = options.db ?? ownedClient!;
   const repositories = createRepositories(db);
 
   if (ownedClient !== undefined) {
     app.addHook("onClose", async () => {
-      ownedClient.close();
+      await ownedClient.close();
     });
   }
 
@@ -48,12 +55,14 @@ export function buildApp(options: AppOptions = {}) {
     teamSize: options.teamSize ?? getTeamSize(),
   });
   registerAdminImportRoutes(app, {
+    adminImportToken: options.adminImportToken ?? getAdminImportToken(),
+    allowUnprotectedAdminImports:
+      options.allowUnprotectedAdminImports ?? allowsUnprotectedAdminImports(),
     repositories,
     sourceFetch: options.sourceFetch ?? fetch,
   });
   registerAdminDemoRoutes(app, {
     allowUnprotectedDemoAdmin: options.allowUnprotectedDemoAdmin ?? false,
-    db,
     demoAdminToken: options.demoAdminToken ?? getDemoAdminToken(),
     repositories,
     now: options.now ?? (() => new Date()),

@@ -10,14 +10,14 @@ const dryRun = process.argv.includes("--dry-run");
 const client = createDatabaseClient();
 
 try {
-  runMigrations(client.db);
+  await runMigrations(client);
 
   const command = await fetchJsaBanzukeImport(fetch);
-  const result = importBanzuke(createRepositories(client.db), command, {
+  const result = await importBanzuke(createRepositories(client), command, {
     dryRun,
   });
 
   console.log(JSON.stringify(result, null, 2));
 } finally {
-  client.close();
+  await client.close();
 }

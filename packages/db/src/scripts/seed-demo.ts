@@ -1,13 +1,14 @@
 import { createDatabaseClient } from "../client.js";
 import { runMigrations } from "../migrate.js";
+import { createRepositories } from "../repositories.js";
 import { seedDemoDatabase } from "../seed.js";
 
 const client = createDatabaseClient();
 
 try {
-  runMigrations(client.db);
-  seedDemoDatabase(client.db);
+  await runMigrations(client);
+  await seedDemoDatabase(createRepositories(client));
   console.log("Demo database seeded.");
 } finally {
-  client.close();
+  await client.close();
 }

@@ -6,11 +6,47 @@ export const DEFAULT_DATABASE_URL = "file:./data/fantasy-sumo.sqlite";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
+export type DatabaseProvider = "sqlite" | "postgres";
+
 export function getDatabaseUrl(): string {
   return process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL;
 }
 
+export function getDatabaseProvider(
+  databaseUrl = getDatabaseUrl(),
+): DatabaseProvider {
+  if (isProduction() && !isPostgresUrl(databaseUrl)) {
+    throw new Error(
+      "Production deployments must use a managed postgres/postgresql DATABASE_URL.",
+    );
+  }
+
+  if (databaseUrl === ":memory:" || databaseUrl.startsWith("file:")) {
+    return "sqlite";
+  }
+
+  if (isPostgresUrl(databaseUrl)) {
+    return "postgres";
+  }
+
+  throw new Error(
+    `Unsupported DATABASE_URL "${databaseUrl}". Use a file: SQLite URL locally or a postgres/postgresql URL for production.`,
+  );
+}
+
 export function resolveSqlitePath(databaseUrl = getDatabaseUrl()): string {
+  if (isProduction()) {
+    if (databaseUrl === ":memory:" || databaseUrl.startsWith("file:")) {
+      throw new Error(
+        "Production deployments must use a managed DATABASE_URL. SQLite is only supported for local development.",
+      );
+    }
+
+    throw new Error(
+      `Unsupported production DATABASE_URL "${databaseUrl}". Use a managed postgres/postgresql URL.`,
+    );
+  }
+
   if (databaseUrl === ":memory:") {
     return databaseUrl;
   }
@@ -28,6 +64,17 @@ export function resolveSqlitePath(databaseUrl = getDatabaseUrl()): string {
   }
 
   return resolve(packageRoot, sqlitePath);
+}
+
+function isPostgresUrl(databaseUrl: string): boolean {
+  return (
+    databaseUrl.startsWith("postgres://") ||
+    databaseUrl.startsWith("postgresql://")
+  );
+}
+
+function isProduction(): boolean {
+  return process.env.NODE_ENV?.trim() === "production";
 }
 
 export function ensureSqliteDirectory(databasePath: string): void {
