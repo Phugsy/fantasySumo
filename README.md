@@ -97,6 +97,15 @@ Run both the API and web dev servers:
 make dev
 ```
 
+Run the browser E2E suite:
+
+```bash
+make e2e-install  # one-time Chromium install
+make e2e
+```
+
+The Playwright suite starts the Fastify API and Vite web app, resets deterministic demo data, and uses a dedicated SQLite database at `packages/db/data/e2e/fantasy-sumo-e2e.sqlite` by default. Override the test database with `E2E_DATABASE_URL=file:./data/e2e/another.sqlite`. Do not point E2E at the default developer database or production data.
+
 Local URLs:
 
 - Web: `http://localhost:7866`
@@ -203,6 +212,9 @@ Common targets:
 - `make lint` - run ESLint.
 - `make build` - build all packages/apps.
 - `make check` - run lint, format check, tests, and build before a PR.
+- `make e2e` - run Playwright against deterministic local demo data.
+- `make e2e-ui` - open the Playwright UI runner.
+- `make e2e-install` - install the Chromium browser used by the E2E suite.
 - `make import-banzuke` - import current banzuke data from source.
 - `make import-results` - import one day of results from source.
 
