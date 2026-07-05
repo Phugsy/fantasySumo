@@ -20,7 +20,8 @@ Also read the current issue and any linked issues, pull requests, or review comm
 2. Identify the issue goal, acceptance criteria, blockers, dependencies, and any explicit non-goals.
 3. Check the current branch and worktree. Do not revert unrelated user changes.
 4. Create or switch to a focused branch for the issue, normally named `codex/issue-<number>-<short-slug>`.
-5. Share a short execution plan before making edits when the work is more than a trivial documentation change.
+5. Ask concise clarifying questions before planning if the goal, acceptance criteria, safety boundary, or implementation direction is unclear.
+6. Share a short execution plan before making edits when the work is more than a trivial documentation change.
 
 If the issue is blocked by an unanswered product decision, missing secret, unavailable dependency, or conflicting in-progress work, state the blocker and avoid speculative implementation.
 
