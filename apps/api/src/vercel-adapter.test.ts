@@ -25,15 +25,18 @@ describe("Vercel adapter", () => {
     expect(JSON.parse(response.body)).toEqual({ name: "North Side" });
   });
 
-  it("forwards streamed request bodies to Fastify", async () => {
+  it("drops stale content lengths for reserialized parsed bodies", async () => {
     const app = Fastify();
     app.post("/api/echo", async (request) => request.body);
 
     const request = createRequest({
       method: "POST",
       url: "/api/echo",
-      headers: { "content-type": "application/json" },
-      streamBody: JSON.stringify({ name: "East Side" }),
+      headers: {
+        "content-length": "999",
+        "content-type": "application/json",
+      },
+      body: { name: "East Side" },
     });
     const response = createResponse();
 
@@ -50,13 +53,10 @@ interface RequestOptions {
   url: string;
   headers: Record<string, string>;
   body?: unknown;
-  streamBody?: string;
 }
 
 function createRequest(options: RequestOptions): IncomingMessage {
-  const request = Readable.from(
-    options.streamBody === undefined ? [] : [options.streamBody],
-  ) as IncomingMessage & { body?: unknown };
+  const request = Readable.from([]) as IncomingMessage & { body?: unknown };
 
   request.method = options.method;
   request.url = options.url;
