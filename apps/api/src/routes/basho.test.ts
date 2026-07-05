@@ -255,6 +255,16 @@ describe("basho routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      basho: {
+        id: "2026-05",
+        name: "May 2026 Sample Basho",
+        status: "upcoming",
+        currentDay: 0,
+      },
+      bashoId: "2026-05",
+      totalDays: 15,
+    });
     expect(
       response
         .json()

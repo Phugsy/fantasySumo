@@ -216,15 +216,33 @@ export function registerBashoRoutes(
       });
     }
 
+    const boutResults = await context.repositories.listBoutResultsForBasho(
+      basho.id,
+    );
+
     return {
+      basho,
       bashoId: basho.id,
+      totalDays: getBashoTotalDays(basho),
       leaderboard: calculateLeaderboard(
         await context.repositories.listFantasyTeamsForBasho(basho.id),
         await context.repositories.listFantasyPicksForBasho(basho.id),
-        await context.repositories.listBoutResultsForBasho(basho.id),
+        boutResults,
       ),
     };
   });
+}
+
+function getBashoTotalDays(basho: { startDate: string; endDate: string }) {
+  const startDate = Date.parse(`${basho.startDate}T00:00:00.000Z`);
+  const endDate = Date.parse(`${basho.endDate}T00:00:00.000Z`);
+
+  if (Number.isNaN(startDate) || Number.isNaN(endDate) || endDate < startDate) {
+    return undefined;
+  }
+
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
+  return Math.floor((endDate - startDate) / millisecondsPerDay) + 1;
 }
 
 async function findCurrentBasho(repositories: Repositories) {

@@ -362,6 +362,23 @@ input:focus,
   background: #fffaf2;
 }
 
+.leaderboard-context {
+  display: grid;
+  gap: 4px;
+  margin: -4px 0 18px;
+  padding: 12px;
+  border: 1px solid #d9d0c2;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1f2b31;
+}
+
+.leaderboard-context span {
+  color: #60717a;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
 .leaderboard-empty {
   border-style: dashed;
   background: transparent;

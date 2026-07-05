@@ -32,7 +32,9 @@ export interface CreatedTeamResponse {
 }
 
 export interface LeaderboardResponse {
+  basho: Omit<Basho, "teamSize">;
   bashoId: string;
+  totalDays?: number;
   leaderboard: LeaderboardEntry[];
 }
 

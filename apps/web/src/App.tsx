@@ -29,6 +29,9 @@ export function App() {
   const [basho, setBasho] = useState<Basho | null>(null);
   const [rikishi, setRikishi] = useState<RankedRikishi[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardTotalDays, setLeaderboardTotalDays] = useState<
+    number | undefined
+  >(undefined);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>("selection");
@@ -77,6 +80,10 @@ export function App() {
             return;
           }
 
+          setBasho((current) =>
+            mergeLeaderboardBasho(current, leaderboardResponse),
+          );
+          setLeaderboardTotalDays(leaderboardResponse.totalDays);
           setLeaderboard(leaderboardResponse.leaderboard);
           setExpandedTeamId(leaderboardResponse.leaderboard[0]?.teamId ?? null);
           setLeaderboardErrorMessage(null);
@@ -179,6 +186,10 @@ export function App() {
           return;
         }
 
+        setBasho((current) =>
+          mergeLeaderboardBasho(current, leaderboardResponse),
+        );
+        setLeaderboardTotalDays(leaderboardResponse.totalDays);
         setLeaderboard(leaderboardResponse.leaderboard);
         setExpandedTeamId(getExpandedTeamId(leaderboardResponse, response));
         setLeaderboardLoadState("ready");
@@ -253,6 +264,7 @@ export function App() {
 
           {activeView === "leaderboard" && (
             <LeaderboardPanel
+              basho={basho}
               createdTeam={createdTeam}
               errorMessage={leaderboardErrorMessage}
               expandedTeamId={expandedTeamId}
@@ -262,12 +274,23 @@ export function App() {
                 setExpandedTeamId(expandedTeamId === teamId ? null : teamId)
               }
               rikishi={rikishi}
+              totalDays={leaderboardTotalDays}
             />
           )}
         </>
       )}
     </main>
   );
+}
+
+function mergeLeaderboardBasho(
+  currentBasho: Basho | null,
+  leaderboardResponse: LeaderboardResponse,
+): Basho {
+  return {
+    ...leaderboardResponse.basho,
+    teamSize: currentBasho?.teamSize ?? 0,
+  };
 }
 
 function getExpandedTeamId(

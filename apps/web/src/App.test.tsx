@@ -135,7 +135,9 @@ describe("App", () => {
       screen.getByText("Leaderboard unavailable right now."),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("No teams have joined this basho yet."),
+      screen.getByText(
+        "No teams have joined this basho yet. Picks are still open.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -156,10 +158,7 @@ describe("App", () => {
     ).not.toBeInTheDocument();
 
     leaderboardRequest.resolve(
-      createJsonResponse({
-        bashoId: currentBasho.id,
-        leaderboard,
-      }),
+      createJsonResponse(createLeaderboardResponse({ entries: leaderboard })),
     );
   });
 
@@ -182,10 +181,7 @@ describe("App", () => {
     expect(await screen.findByText("4 pts")).toBeInTheDocument();
 
     initialLeaderboardRequest.resolve(
-      createJsonResponse({
-        bashoId: currentBasho.id,
-        leaderboard,
-      }),
+      createJsonResponse(createLeaderboardResponse({ entries: leaderboard })),
     );
     await initialLeaderboardRequest.promise;
     await flushPromises();
@@ -316,8 +312,32 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
 
     expect(
-      screen.getByText("No teams have joined this basho yet."),
+      screen.getByText(
+        "No teams have joined this basho yet. Picks are still open.",
+      ),
     ).toBeInTheDocument();
+  });
+
+  it("uses leaderboard metadata to show the simulated basho day", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) =>
+        mockSuccessfulFetch(input, {
+          ...currentBasho,
+          status: "active",
+          currentDay: 1,
+        }),
+      ),
+    );
+    render(<App />);
+
+    await screen.findByRole("button", { name: "Leaderboard" });
+    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
+
+    expect(
+      screen.getByText("May 2026 Sample Basho - Day 1 of 15"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Status: Scoring in progress")).toBeInTheDocument();
   });
 });
 
@@ -339,10 +359,12 @@ function mockSuccessfulFetch(
   }
 
   if (url === "/api/basho/2026-05/leaderboard") {
-    return jsonResponse({
-      bashoId: currentBasho.id,
-      leaderboard,
-    });
+    return jsonResponse(
+      createLeaderboardResponse({
+        basho,
+        entries: leaderboard,
+      }),
+    );
   }
 
   if (url === "/api/basho/2026-05/teams") {
@@ -370,10 +392,7 @@ function mockEmptyLeaderboardFetch(
     return mockSuccessfulFetch(input);
   }
 
-  return jsonResponse({
-    bashoId: currentBasho.id,
-    leaderboard: [],
-  });
+  return jsonResponse(createLeaderboardResponse({ entries: [] }));
 }
 
 function mockInitialLeaderboardErrorFetch(
@@ -425,29 +444,52 @@ function mockStaleInitialLeaderboardFetch(
       return initialLeaderboardRequest.promise;
     }
 
-    return jsonResponse({
-      bashoId: currentBasho.id,
-      leaderboard: [
-        {
-          rank: 1,
-          teamId: "team-east-stand",
-          displayName: "East Stand Heroes",
-          score: 4,
-          rikishiScores: [
-            {
-              rikishiId: "onosato",
-              wins: 2,
-              score: 2,
-            },
-            {
-              rikishiId: "kotozakura",
-              wins: 2,
-              score: 2,
-            },
-          ],
-        },
-      ],
-    });
+    return jsonResponse(
+      createLeaderboardResponse({
+        entries: [
+          {
+            rank: 1,
+            teamId: "team-east-stand",
+            displayName: "East Stand Heroes",
+            score: 4,
+            rikishiScores: [
+              {
+                rikishiId: "onosato",
+                wins: 2,
+                score: 2,
+              },
+              {
+                rikishiId: "kotozakura",
+                wins: 2,
+                score: 2,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+  };
+}
+
+function createLeaderboardResponse({
+  basho = currentBasho,
+  entries = leaderboard,
+}: {
+  basho?: typeof currentBasho;
+  entries?: typeof leaderboard;
+} = {}) {
+  return {
+    basho: {
+      id: basho.id,
+      name: basho.name,
+      startDate: basho.startDate,
+      endDate: basho.endDate,
+      status: basho.status,
+      currentDay: basho.currentDay,
+    },
+    bashoId: basho.id,
+    totalDays: 15,
+    leaderboard: entries,
   };
 }
 
