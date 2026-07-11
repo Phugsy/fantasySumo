@@ -14,7 +14,6 @@ import {
 } from "./api";
 import {
   getNeonAccessToken,
-  getNeonSession,
   isNeonAuthConfigured,
   signInWithNeon,
   signOutNeon,
@@ -235,16 +234,12 @@ export function App() {
     try {
       const session =
         authMode === "neon"
-          ? intent === "sign-up"
-            ? await signUpWithNeon({
-                displayName: accountDisplayName.trim(),
-                email: accountEmail.trim(),
-                password: accountPassword,
-              })
-            : await signInWithNeon({
-                email: accountEmail.trim(),
-                password: accountPassword,
-              })
+          ? await submitNeonAccount({
+              displayName: accountDisplayName.trim(),
+              email: accountEmail.trim(),
+              intent,
+              password: accountPassword,
+            })
           : await createSession({
               email: accountEmail.trim(),
               displayName: accountDisplayName.trim(),
@@ -441,11 +436,42 @@ export function App() {
 async function loadInitialSession(
   neonAuthConfigured: boolean,
 ): Promise<SessionResponse> {
-  const apiSession = await fetchSession();
+  return fetchSession().catch(() => ({
+    mode: neonAuthConfigured ? "neon" : "local",
+    user: null,
+  }));
+}
 
-  return apiSession.mode === "neon" && neonAuthConfigured
-    ? getNeonSession()
-    : apiSession;
+async function submitNeonAccount(input: {
+  displayName: string;
+  email: string;
+  intent: "sign-in" | "sign-up";
+  password: string;
+}): Promise<SessionResponse> {
+  if (input.intent === "sign-up") {
+    await signUpWithNeon({
+      displayName: input.displayName,
+      email: input.email,
+      password: input.password,
+    });
+  } else {
+    await signInWithNeon({
+      email: input.email,
+      password: input.password,
+    });
+  }
+
+  setAuthTokenProvider(getNeonAccessToken);
+
+  const session = await fetchSession();
+
+  if (session.user === null) {
+    throw new Error(
+      "Signed in, but the app could not verify your session. Please refresh and try again.",
+    );
+  }
+
+  return session;
 }
 
 function mergeLeaderboardBasho(
