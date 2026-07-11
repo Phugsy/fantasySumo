@@ -121,6 +121,17 @@ describe("App", () => {
     expect(screen.getByText("player@example.com")).toBeInTheDocument();
   });
 
+  it("shows public basho data when the session probe is unauthorized", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockUnauthorizedSessionFetch));
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "May 2026 Sample Basho" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Onosato/ })).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+  });
+
   it("keeps the account panel available when initial basho loading is unauthorized", async () => {
     vi.stubGlobal("fetch", vi.fn(mockUnauthorizedBashoFetch));
     render(<App />);
@@ -133,6 +144,29 @@ describe("App", () => {
     expect(
       screen.getByText("Sign in before loading data."),
     ).toBeInTheDocument();
+  });
+
+  it("reloads basho data after sign in if startup was unauthorized", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockBashoUnauthorizedUntilLoginFetch()));
+    render(<App />);
+
+    expect(await screen.findByLabelText("Email")).toBeInTheDocument();
+    expect(
+      screen.getByText("Sign in before loading data."),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "player@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Display name"), {
+      target: { value: "New Player" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "May 2026 Sample Basho" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Onosato/ })).toBeInTheDocument();
   });
 
   it("displays leaderboard standings and team score details", async () => {
@@ -466,6 +500,23 @@ function mockAnonymousFetch(
   return mockSuccessfulFetch(input);
 }
 
+function mockUnauthorizedSessionFetch(
+  input: RequestInfo | URL,
+): Promise<Response> {
+  const url = String(input);
+
+  if (url === "/api/session") {
+    return jsonResponse(
+      {
+        message: "Sign in before loading your session.",
+      },
+      { status: 401 },
+    );
+  }
+
+  return mockSuccessfulFetch(input);
+}
+
 function mockUnauthorizedBashoFetch(
   input: RequestInfo | URL,
 ): Promise<Response> {
@@ -488,6 +539,51 @@ function mockUnauthorizedBashoFetch(
   }
 
   return mockSuccessfulFetch(input);
+}
+
+function mockBashoUnauthorizedUntilLoginFetch(): (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) => Promise<Response> {
+  let signedIn = false;
+
+  return (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+
+    if (url === "/api/session" && init?.method === "POST") {
+      signedIn = true;
+
+      return jsonResponse(
+        {
+          mode: "local",
+          user: {
+            id: "local-user",
+            email: "player@example.com",
+            displayName: "New Player",
+          },
+        },
+        { status: 201 },
+      );
+    }
+
+    if (url === "/api/session") {
+      return jsonResponse({
+        mode: "local",
+        user: null,
+      });
+    }
+
+    if (url === "/api/basho/current" && !signedIn) {
+      return jsonResponse(
+        {
+          message: "Sign in before loading data.",
+        },
+        { status: 401 },
+      );
+    }
+
+    return mockSuccessfulFetch(input);
+  };
 }
 
 function mockEmptyLeaderboardFetch(

@@ -81,7 +81,7 @@ export function App() {
   useEffect(() => {
     let isCurrent = true;
 
-    async function loadBasho() {
+    async function loadInitialPage() {
       const neonAuthConfigured = isNeonAuthConfigured();
 
       try {
@@ -90,16 +90,11 @@ export function App() {
         }
 
         const session = await loadInitialSession(neonAuthConfigured).catch(
-          (error) => {
-            if (isCurrent) {
-              setSessionErrorMessage(getErrorMessage(error));
-            }
-
-            return {
+          () =>
+            ({
               mode: neonAuthConfigured ? "neon" : "local",
               user: null,
-            } satisfies SessionResponse;
-          },
+            }) satisfies SessionResponse,
         );
 
         if (!isCurrent) {
@@ -112,59 +107,7 @@ export function App() {
         setAccountDisplayName(session.user?.displayName ?? "");
         setSessionState("ready");
 
-        const currentBasho = await fetchCurrentBasho();
-        const bashoRikishi = await fetchBashoRikishi(currentBasho.id);
-        const myTeam =
-          session.user === null
-            ? null
-            : await fetchMyTeam(currentBasho.id).catch(() => null);
-
-        if (!isCurrent) {
-          return;
-        }
-
-        setBasho({
-          ...bashoRikishi.basho,
-          teamSize: currentBasho.teamSize,
-        });
-        setRikishi(bashoRikishi.rikishi);
-        applyMyTeam(myTeam, setDisplayName, setSelectedIds);
-        setLoadState(bashoRikishi.rikishi.length === 0 ? "empty" : "ready");
-
-        const requestId = nextLeaderboardRequestId(leaderboardRequestIdRef);
-        setLeaderboardLoadState("loading");
-
-        try {
-          const leaderboardResponse = await fetchLeaderboard(currentBasho.id);
-
-          if (
-            !isCurrent ||
-            !isCurrentLeaderboardRequest(leaderboardRequestIdRef, requestId)
-          ) {
-            return;
-          }
-
-          setBasho((current) =>
-            mergeLeaderboardBasho(current, leaderboardResponse),
-          );
-          setLeaderboardTotalDays(leaderboardResponse.totalDays);
-          setLeaderboard(leaderboardResponse.leaderboard);
-          setExpandedTeamId(leaderboardResponse.leaderboard[0]?.teamId ?? null);
-          setLeaderboardErrorMessage(null);
-          setLeaderboardLoadState("ready");
-        } catch (error) {
-          if (
-            !isCurrent ||
-            !isCurrentLeaderboardRequest(leaderboardRequestIdRef, requestId)
-          ) {
-            return;
-          }
-
-          setLeaderboard([]);
-          setExpandedTeamId(null);
-          setLeaderboardErrorMessage(getErrorMessage(error));
-          setLeaderboardLoadState("ready");
-        }
+        await loadBashoData(session, () => isCurrent);
       } catch (error) {
         if (!isCurrent) {
           return;
@@ -176,7 +119,7 @@ export function App() {
       }
     }
 
-    void loadBasho();
+    void loadInitialPage();
 
     return () => {
       isCurrent = false;
@@ -311,10 +254,7 @@ export function App() {
       setSessionUser(session.user);
       setAccountPassword("");
 
-      if (basho !== null && session.user !== null) {
-        const myTeam = await fetchMyTeam(basho.id).catch(() => null);
-        applyMyTeam(myTeam, setDisplayName, setSelectedIds);
-      }
+      await loadBashoData(session, () => true);
     } catch (error) {
       setSessionErrorMessage(getErrorMessage(error));
     } finally {
@@ -338,6 +278,72 @@ export function App() {
       setSessionErrorMessage(getErrorMessage(error));
     } finally {
       setSessionState("ready");
+    }
+  }
+
+  async function loadBashoData(
+    session: SessionResponse,
+    isCurrent: () => boolean,
+  ) {
+    if (basho === null) {
+      setLoadState("loading");
+    }
+
+    setErrorMessage(null);
+    setLeaderboardErrorMessage(null);
+
+    const currentBasho = await fetchCurrentBasho();
+    const bashoRikishi = await fetchBashoRikishi(currentBasho.id);
+    const myTeam =
+      session.user === null
+        ? null
+        : await fetchMyTeam(currentBasho.id).catch(() => null);
+
+    if (!isCurrent()) {
+      return;
+    }
+
+    setBasho({
+      ...bashoRikishi.basho,
+      teamSize: currentBasho.teamSize,
+    });
+    setRikishi(bashoRikishi.rikishi);
+    applyMyTeam(myTeam, setDisplayName, setSelectedIds);
+    setLoadState(bashoRikishi.rikishi.length === 0 ? "empty" : "ready");
+
+    const requestId = nextLeaderboardRequestId(leaderboardRequestIdRef);
+    setLeaderboardLoadState("loading");
+
+    try {
+      const leaderboardResponse = await fetchLeaderboard(currentBasho.id);
+
+      if (
+        !isCurrent() ||
+        !isCurrentLeaderboardRequest(leaderboardRequestIdRef, requestId)
+      ) {
+        return;
+      }
+
+      setBasho((current) =>
+        mergeLeaderboardBasho(current, leaderboardResponse),
+      );
+      setLeaderboardTotalDays(leaderboardResponse.totalDays);
+      setLeaderboard(leaderboardResponse.leaderboard);
+      setExpandedTeamId(leaderboardResponse.leaderboard[0]?.teamId ?? null);
+      setLeaderboardErrorMessage(null);
+      setLeaderboardLoadState("ready");
+    } catch (error) {
+      if (
+        !isCurrent() ||
+        !isCurrentLeaderboardRequest(leaderboardRequestIdRef, requestId)
+      ) {
+        return;
+      }
+
+      setLeaderboard([]);
+      setExpandedTeamId(null);
+      setLeaderboardErrorMessage(getErrorMessage(error));
+      setLeaderboardLoadState("ready");
     }
   }
 
