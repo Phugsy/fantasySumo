@@ -49,7 +49,15 @@ export interface Repositories {
     team: FantasyTeam,
     picks: readonly FantasyPick[],
   ) => Promise<void>;
+  saveFantasyTeamWithPicks: (
+    team: FantasyTeam,
+    picks: readonly FantasyPick[],
+  ) => Promise<void>;
   getFantasyTeam: (id: FantasyTeam["id"]) => Promise<FantasyTeam | undefined>;
+  getFantasyTeamForOwner: (
+    bashoId: Basho["id"],
+    ownerUserId: NonNullable<FantasyTeam["ownerUserId"]>,
+  ) => Promise<FantasyTeam | undefined>;
   listFantasyTeamsForBasho: (bashoId: Basho["id"]) => Promise<FantasyTeam[]>;
   lockFantasyTeamsForBasho: (
     bashoId: Basho["id"],
@@ -176,11 +184,49 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
         }
       });
     },
+    saveFantasyTeamWithPicks: async (team, picks) => {
+      db.transaction((transaction) => {
+        transaction
+          .insert(sqlite.fantasyTeams)
+          .values(toFantasyTeamRow(team))
+          .onConflictDoUpdate({
+            target: sqlite.fantasyTeams.id,
+            set: toFantasyTeamRow(team),
+          })
+          .run();
+
+        transaction
+          .delete(sqlite.fantasyPicks)
+          .where(eq(sqlite.fantasyPicks.teamId, team.id))
+          .run();
+
+        for (const pick of picks) {
+          transaction
+            .insert(sqlite.fantasyPicks)
+            .values(toFantasyPickRow(pick))
+            .run();
+        }
+      });
+    },
     getFantasyTeam: async (id) => {
       const row = db
         .select()
         .from(sqlite.fantasyTeams)
         .where(eq(sqlite.fantasyTeams.id, id))
+        .get();
+
+      return row === undefined ? undefined : toFantasyTeam(row);
+    },
+    getFantasyTeamForOwner: async (bashoId, ownerUserId) => {
+      const row = db
+        .select()
+        .from(sqlite.fantasyTeams)
+        .where(
+          and(
+            eq(sqlite.fantasyTeams.bashoId, bashoId),
+            eq(sqlite.fantasyTeams.ownerUserId, ownerUserId),
+          ),
+        )
         .get();
 
       return row === undefined ? undefined : toFantasyTeam(row);
@@ -420,12 +466,48 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
         }
       });
     },
+    saveFantasyTeamWithPicks: async (team, picks) => {
+      await db.transaction(async (transaction) => {
+        await transaction
+          .insert(pg.fantasyTeams)
+          .values(toFantasyTeamRow(team))
+          .onConflictDoUpdate({
+            target: pg.fantasyTeams.id,
+            set: toFantasyTeamRow(team),
+          });
+
+        await transaction
+          .delete(pg.fantasyPicks)
+          .where(eq(pg.fantasyPicks.teamId, team.id));
+
+        for (const pick of picks) {
+          await transaction
+            .insert(pg.fantasyPicks)
+            .values(toFantasyPickRow(pick));
+        }
+      });
+    },
     getFantasyTeam: async (id) => {
       const row = (
         await db
           .select()
           .from(pg.fantasyTeams)
           .where(eq(pg.fantasyTeams.id, id))
+      ).at(0);
+
+      return row === undefined ? undefined : toFantasyTeam(row);
+    },
+    getFantasyTeamForOwner: async (bashoId, ownerUserId) => {
+      const row = (
+        await db
+          .select()
+          .from(pg.fantasyTeams)
+          .where(
+            and(
+              eq(pg.fantasyTeams.bashoId, bashoId),
+              eq(pg.fantasyTeams.ownerUserId, ownerUserId),
+            ),
+          )
       ).at(0);
 
       return row === undefined ? undefined : toFantasyTeam(row);
@@ -612,6 +694,7 @@ function toFantasyTeamRow(entry: FantasyTeam) {
   return {
     ...entry,
     ownerName: entry.ownerName ?? null,
+    ownerUserId: entry.ownerUserId ?? null,
     createdAt: entry.createdAt ?? null,
     lockedAt: entry.lockedAt ?? null,
   };
@@ -625,6 +708,7 @@ function toFantasyTeam(
     bashoId: row.bashoId,
     displayName: row.displayName,
     ...(row.ownerName === null ? {} : { ownerName: row.ownerName }),
+    ...(row.ownerUserId === null ? {} : { ownerUserId: row.ownerUserId }),
     ...(row.createdAt === null ? {} : { createdAt: row.createdAt }),
     ...(row.lockedAt === null ? {} : { lockedAt: row.lockedAt }),
   };

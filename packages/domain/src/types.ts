@@ -28,6 +28,7 @@ export interface FantasyTeam {
   bashoId: Basho["id"];
   displayName: string;
   ownerName?: string;
+  ownerUserId?: string;
   createdAt?: string;
   lockedAt?: string;
 }

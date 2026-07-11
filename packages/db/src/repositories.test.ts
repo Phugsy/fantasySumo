@@ -108,6 +108,85 @@ describe("repositories", () => {
     ).toContain("team-north");
   });
 
+  it("writes and replaces one owned fantasy team for a basho", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
+
+    await repositories.saveFantasyTeamWithPicks(
+      {
+        id: "team-owned",
+        bashoId: sampleBasho.id,
+        displayName: "North Side",
+        ownerName: "New Player",
+        ownerUserId: "user-new-player",
+        createdAt: "2026-05-02T10:00:00.000Z",
+      },
+      [
+        {
+          teamId: "team-owned",
+          rikishiId: "onosato",
+        },
+        {
+          teamId: "team-owned",
+          rikishiId: "kirishima",
+        },
+      ],
+    );
+
+    expect(
+      await repositories.getFantasyTeamForOwner(
+        sampleBasho.id,
+        "user-new-player",
+      ),
+    ).toMatchObject({
+      id: "team-owned",
+      ownerUserId: "user-new-player",
+    });
+
+    await repositories.saveFantasyTeamWithPicks(
+      {
+        id: "team-owned",
+        bashoId: sampleBasho.id,
+        displayName: "North Side Updated",
+        ownerName: "New Player",
+        ownerUserId: "user-new-player",
+        createdAt: "2026-05-02T10:00:00.000Z",
+      },
+      [
+        {
+          teamId: "team-owned",
+          rikishiId: "kotozakura",
+        },
+        {
+          teamId: "team-owned",
+          rikishiId: "hoshoryu",
+        },
+      ],
+    );
+
+    expect(
+      await repositories.getFantasyTeamForOwner(
+        sampleBasho.id,
+        "user-new-player",
+      ),
+    ).toMatchObject({
+      id: "team-owned",
+      displayName: "North Side Updated",
+    });
+    expect(await repositories.listFantasyPicksForTeam("team-owned")).toEqual([
+      {
+        id: "team-owned-hoshoryu",
+        teamId: "team-owned",
+        rikishiId: "hoshoryu",
+      },
+      {
+        id: "team-owned-kotozakura",
+        teamId: "team-owned",
+        rikishiId: "kotozakura",
+      },
+    ]);
+  });
+
   it("rolls back team creation when a pick insert fails", async () => {
     await seedDatabase(createRepositories(client));
     const repositories = createRepositories(client);

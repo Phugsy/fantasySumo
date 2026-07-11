@@ -15,6 +15,13 @@
       "when": 1780675200000,
       "tag": "0001_basho_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783288247453,
+      "tag": "0002_clumsy_big_bertha",
+      "breakpoints": true
     }
   ]
 }
