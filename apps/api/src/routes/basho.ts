@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { Repositories } from "@fantasy-sumo/db";
 import type { FantasyPick, FantasyTeam } from "@fantasy-sumo/domain";
+import type { AuthService } from "../auth.js";
 import {
   calculateLeaderboard,
   canEditFantasyPicks,
@@ -10,6 +11,7 @@ import {
 } from "@fantasy-sumo/domain";
 
 interface RouteContext {
+  auth: AuthService;
   repositories: Repositories;
   now: () => Date;
   teamIdFactory: () => string;
@@ -84,6 +86,15 @@ export function registerBashoRoutes(
     Params: { bashoId: string };
     Body: unknown;
   }>("/api/basho/:bashoId/teams", async (request, reply) => {
+    const currentUser = await context.auth.getCurrentUser(request);
+
+    if (currentUser === undefined) {
+      return reply.code(401).send({
+        error: "unauthenticated",
+        message: "Sign in before creating a fantasy team.",
+      });
+    }
+
     const basho = await context.repositories.getBasho(request.params.bashoId);
 
     if (basho === undefined) {
@@ -116,8 +127,12 @@ export function registerBashoRoutes(
       });
     }
 
-    const { displayName, ownerName, rikishiIds } = parsedBody.data;
-    const teamId = `team-${context.teamIdFactory()}`;
+    const { displayName, rikishiIds } = parsedBody.data;
+    const existingTeam = await context.repositories.getFantasyTeamForOwner(
+      basho.id,
+      currentUser.id,
+    );
+    const teamId = existingTeam?.id ?? `team-${context.teamIdFactory()}`;
     const picks = rikishiIds.map(
       (rikishiId): FantasyPick => ({
         teamId,
@@ -161,23 +176,65 @@ export function registerBashoRoutes(
       id: teamId,
       bashoId: basho.id,
       displayName,
-      ...(ownerName === undefined || ownerName.length === 0
+      ownerUserId: currentUser.id,
+      ...(currentUser.displayName === undefined ||
+      currentUser.displayName.length === 0
         ? {}
-        : { ownerName }),
-      createdAt: context.now().toISOString(),
+        : { ownerName: currentUser.displayName }),
+      createdAt: existingTeam?.createdAt ?? context.now().toISOString(),
     };
 
-    await context.repositories.insertFantasyTeamWithPicks(team, picks);
+    await context.repositories.saveFantasyTeamWithPicks(team, picks);
 
-    return reply.code(201).send({
+    return reply.code(existingTeam === undefined ? 201 : 200).send({
       team,
       picks: await context.repositories.listFantasyPicksForTeam(team.id),
     });
   });
 
   app.get<{
+    Params: { bashoId: string };
+  }>("/api/basho/:bashoId/my-team", async (request, reply) => {
+    const currentUser = await context.auth.getCurrentUser(request);
+
+    if (currentUser === undefined) {
+      return reply.code(401).send({
+        error: "unauthenticated",
+        message: "Sign in before viewing your fantasy team.",
+      });
+    }
+
+    const basho = await context.repositories.getBasho(request.params.bashoId);
+
+    if (basho === undefined) {
+      return reply.code(404).send({
+        error: "not-found",
+        message: `Basho ${request.params.bashoId} was not found.`,
+      });
+    }
+
+    const team = await context.repositories.getFantasyTeamForOwner(
+      basho.id,
+      currentUser.id,
+    );
+
+    if (team === undefined) {
+      return reply.code(404).send({
+        error: "not-found",
+        message: "You do not have a fantasy team for this basho yet.",
+      });
+    }
+
+    return {
+      team,
+      picks: await context.repositories.listFantasyPicksForTeam(team.id),
+    };
+  });
+
+  app.get<{
     Params: { bashoId: string; teamId: string };
   }>("/api/basho/:bashoId/teams/:teamId", async (request, reply) => {
+    const currentUser = await context.auth.getCurrentUser(request);
     const basho = await context.repositories.getBasho(request.params.bashoId);
 
     if (basho === undefined) {
@@ -195,6 +252,16 @@ export function registerBashoRoutes(
       return reply.code(404).send({
         error: "not-found",
         message: `Team ${request.params.teamId} was not found for basho ${basho.id}.`,
+      });
+    }
+
+    if (
+      team.ownerUserId !== undefined &&
+      (currentUser === undefined || team.ownerUserId !== currentUser.id)
+    ) {
+      return reply.code(403).send({
+        error: "forbidden",
+        message: "You cannot view another user's private fantasy team.",
       });
     }
 

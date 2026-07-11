@@ -103,12 +103,13 @@ describe("basho routes", () => {
   });
 
   it("creates and retrieves a fantasy team", async () => {
+    const headers = await signIn();
     const createResponse = await app.inject({
+      headers,
       method: "POST",
       url: "/api/basho/2026-05/teams",
       payload: {
         displayName: "North Side",
-        ownerName: "New Player",
         rikishiIds: ["onosato", "kotozakura"],
       },
     });
@@ -120,6 +121,7 @@ describe("basho routes", () => {
         bashoId: "2026-05",
         displayName: "North Side",
         ownerName: "New Player",
+        ownerUserId: expect.stringMatching(/^local-/),
         createdAt: "2026-05-02T09:00:00.000Z",
       },
       picks: [
@@ -137,6 +139,7 @@ describe("basho routes", () => {
     });
 
     const getResponse = await app.inject({
+      headers,
       method: "GET",
       url: "/api/basho/2026-05/teams/team-north",
     });
@@ -148,8 +151,94 @@ describe("basho routes", () => {
     });
   });
 
-  it("rejects invalid team picks", async () => {
+  it("requires a signed-in user before creating a fantasy team", async () => {
     const response = await app.inject({
+      method: "POST",
+      url: "/api/basho/2026-05/teams",
+      payload: {
+        displayName: "North Side",
+        rikishiIds: ["onosato", "kotozakura"],
+      },
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({
+      error: "unauthenticated",
+    });
+  });
+
+  it("updates the signed-in user's existing fantasy team", async () => {
+    const headers = await signIn();
+
+    const firstResponse = await app.inject({
+      headers,
+      method: "POST",
+      url: "/api/basho/2026-05/teams",
+      payload: {
+        displayName: "North Side",
+        rikishiIds: ["onosato", "kotozakura"],
+      },
+    });
+    const updateResponse = await app.inject({
+      headers,
+      method: "POST",
+      url: "/api/basho/2026-05/teams",
+      payload: {
+        displayName: "North Side Updated",
+        rikishiIds: ["hoshoryu", "kirishima"],
+      },
+    });
+
+    expect(firstResponse.statusCode).toBe(201);
+    expect(updateResponse.statusCode).toBe(200);
+    expect(updateResponse.json().team).toMatchObject({
+      id: "team-north",
+      displayName: "North Side Updated",
+    });
+    expect(updateResponse.json().picks).toEqual([
+      {
+        id: "team-north-hoshoryu",
+        teamId: "team-north",
+        rikishiId: "hoshoryu",
+      },
+      {
+        id: "team-north-kirishima",
+        teamId: "team-north",
+        rikishiId: "kirishima",
+      },
+    ]);
+  });
+
+  it("returns the signed-in user's team for a basho", async () => {
+    const headers = await signIn();
+
+    await app.inject({
+      headers,
+      method: "POST",
+      url: "/api/basho/2026-05/teams",
+      payload: {
+        displayName: "North Side",
+        rikishiIds: ["onosato", "kotozakura"],
+      },
+    });
+
+    const response = await app.inject({
+      headers,
+      method: "GET",
+      url: "/api/basho/2026-05/my-team",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().team).toMatchObject({
+      id: "team-north",
+      ownerUserId: expect.stringMatching(/^local-/),
+    });
+  });
+
+  it("rejects invalid team picks", async () => {
+    const headers = await signIn();
+    const response = await app.inject({
+      headers,
       method: "POST",
       url: "/api/basho/2026-05/teams",
       payload: {
@@ -171,7 +260,9 @@ describe("basho routes", () => {
   });
 
   it("rejects malformed team creation requests", async () => {
+    const headers = await signIn();
     const response = await app.inject({
+      headers,
       method: "POST",
       url: "/api/basho/2026-05/teams",
       payload: {
@@ -188,7 +279,9 @@ describe("basho routes", () => {
   });
 
   it("rejects picks outside the requested basho", async () => {
+    const headers = await signIn();
     const response = await app.inject({
+      headers,
       method: "POST",
       url: "/api/basho/2026-05/teams",
       payload: {
@@ -225,12 +318,14 @@ describe("basho routes", () => {
   ] as const)(
     "rejects team creation when a basho is $status",
     async ({ status, expectedMessage }) => {
+      const headers = await signIn();
       createRepositories(client).upsertBasho({
         ...sampleBasho,
         status,
       });
 
       const response = await app.inject({
+        headers,
         method: "POST",
         url: "/api/basho/2026-05/teams",
         payload: {
@@ -311,3 +406,22 @@ describe("basho routes", () => {
     });
   });
 });
+
+async function signIn() {
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/session",
+    payload: {
+      email: "new.player@example.com",
+      displayName: "New Player",
+    },
+  });
+  const cookie = response.headers["set-cookie"];
+
+  expect(response.statusCode).toBe(201);
+  expect(cookie).toBeDefined();
+
+  return {
+    cookie: Array.isArray(cookie) ? cookie[0] : cookie,
+  };
+}
