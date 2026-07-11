@@ -121,6 +121,17 @@ describe("App", () => {
     expect(screen.getByText("player@example.com")).toBeInTheDocument();
   });
 
+  it("keeps the account panel available when initial basho loading is unauthorized", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockUnauthorizedBashoFetch));
+    render(<App />);
+
+    expect(await screen.findByLabelText("Email")).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+    expect(
+      screen.getByText("Sign in before loading data."),
+    ).toBeInTheDocument();
+  });
+
   it("displays leaderboard standings and team score details", async () => {
     render(<App />);
 
@@ -447,6 +458,30 @@ function mockAnonymousFetch(
       mode: "local",
       user: null,
     });
+  }
+
+  return mockSuccessfulFetch(input);
+}
+
+function mockUnauthorizedBashoFetch(
+  input: RequestInfo | URL,
+): Promise<Response> {
+  const url = String(input);
+
+  if (url === "/api/session") {
+    return jsonResponse({
+      mode: "neon",
+      user: null,
+    });
+  }
+
+  if (url === "/api/basho/current") {
+    return jsonResponse(
+      {
+        message: "Sign in before loading data.",
+      },
+      { status: 401 },
+    );
   }
 
   return mockSuccessfulFetch(input);

@@ -82,16 +82,36 @@ export function App() {
     let isCurrent = true;
 
     async function loadBasho() {
+      const neonAuthConfigured = isNeonAuthConfigured();
+
       try {
-        if (isNeonAuthConfigured()) {
+        if (neonAuthConfigured) {
           setAuthTokenProvider(getNeonAccessToken);
         }
 
-        const apiSession = await fetchSession();
-        const session =
-          apiSession.mode === "neon" && isNeonAuthConfigured()
-            ? await getNeonSession()
-            : apiSession;
+        const session = await loadInitialSession(neonAuthConfigured).catch(
+          (error) => {
+            if (isCurrent) {
+              setSessionErrorMessage(getErrorMessage(error));
+            }
+
+            return {
+              mode: neonAuthConfigured ? "neon" : "local",
+              user: null,
+            } satisfies SessionResponse;
+          },
+        );
+
+        if (!isCurrent) {
+          return;
+        }
+
+        setAuthMode(session.mode);
+        setSessionUser(session.user);
+        setAccountEmail(session.user?.email ?? "");
+        setAccountDisplayName(session.user?.displayName ?? "");
+        setSessionState("ready");
+
         const currentBasho = await fetchCurrentBasho();
         const bashoRikishi = await fetchBashoRikishi(currentBasho.id);
         const myTeam =
@@ -103,11 +123,6 @@ export function App() {
           return;
         }
 
-        setAuthMode(session.mode);
-        setSessionUser(session.user);
-        setAccountEmail(session.user?.email ?? "");
-        setAccountDisplayName(session.user?.displayName ?? "");
-        setSessionState("ready");
         setBasho({
           ...bashoRikishi.basho,
           teamSize: currentBasho.teamSize,
@@ -336,6 +351,22 @@ export function App() {
         </section>
       )}
 
+      <AccountPanel
+        email={accountEmail}
+        errorMessage={sessionErrorMessage}
+        mode={authMode}
+        onDisplayNameChange={setAccountDisplayName}
+        onEmailChange={setAccountEmail}
+        onPasswordChange={setAccountPassword}
+        onSignIn={handleSignIn}
+        onSignOut={handleSignOut}
+        onSignUp={handleSignUp}
+        password={accountPassword}
+        sessionState={sessionState}
+        user={sessionUser}
+        userDisplayName={accountDisplayName}
+      />
+
       {loadState === "error" && (
         <section className="state-panel error-state" role="alert">
           {errorMessage ?? "Unable to load basho data."}
@@ -350,21 +381,6 @@ export function App() {
 
       {loadState === "ready" && basho !== null && (
         <>
-          <AccountPanel
-            email={accountEmail}
-            errorMessage={sessionErrorMessage}
-            mode={authMode}
-            onDisplayNameChange={setAccountDisplayName}
-            onEmailChange={setAccountEmail}
-            onPasswordChange={setAccountPassword}
-            onSignIn={handleSignIn}
-            onSignOut={handleSignOut}
-            onSignUp={handleSignUp}
-            password={accountPassword}
-            sessionState={sessionState}
-            user={sessionUser}
-            userDisplayName={accountDisplayName}
-          />
           <BashoPanel basho={basho} selectedCount={selectedIds.length} />
           <ViewSwitch
             activeView={activeView}
@@ -413,6 +429,16 @@ export function App() {
       )}
     </main>
   );
+}
+
+async function loadInitialSession(
+  neonAuthConfigured: boolean,
+): Promise<SessionResponse> {
+  const apiSession = await fetchSession();
+
+  return apiSession.mode === "neon" && neonAuthConfigured
+    ? getNeonSession()
+    : apiSession;
 }
 
 function mergeLeaderboardBasho(
