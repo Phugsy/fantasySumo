@@ -28,15 +28,20 @@ Set these in Vercel before exposing the app:
 ```text
 DATABASE_URL=<managed Postgres connection string>
 TEAM_SIZE=2
+AUTH_MODE=neon
+NEON_AUTH_JWKS_URL=<Neon Auth JWKS URL>
+NEON_AUTH_ISSUER=<optional expected JWT issuer>
+NEON_AUTH_AUDIENCE=<optional expected JWT audience>
+VITE_NEON_AUTH_URL=<Neon Auth client URL>
 ADMIN_IMPORT_TOKEN=<long random token>
 DEMO_ADMIN_TOKEN=<long random token, only if demo admin controls are needed>
 ```
 
 `DATABASE_URL` must not be a `file:` or `:memory:` SQLite URL when `NODE_ENV=production`. SQLite is only supported for local development because serverless function storage is ephemeral and cannot be used as production state.
 
-## Production database direction
+## Production database and auth direction
 
-Use managed Postgres for production persistence. Supabase Postgres is the default recommendation for this hobby-scale deployment unless Neon has a stronger operational reason at setup time.
+Use Neon Postgres for production persistence. The app still treats Postgres as a `DATABASE_URL`-selected adapter, but Neon is the intended production provider because it can host the production database and pair naturally with Neon Auth.
 
 The database package now treats persistence as an adapter boundary:
 
@@ -44,7 +49,15 @@ The database package now treats persistence as an adapter boundary:
 - `postgres:` and `postgresql:` `DATABASE_URL` values use the Postgres Drizzle adapter.
 - API code depends on the async `Repositories` contract, not a concrete database driver.
 
-Keep SQLite locally until there is a concrete reason to standardise development on local Postgres. It keeps the demo and contributor setup simple, but it does mean local smoke tests are not a perfect production proof. Any deploy-bound database change should also be validated against a real Postgres database before release.
+Keep SQLite locally until there is a concrete reason to standardise development on local Postgres. It keeps the demo and contributor setup simple, but it does mean local smoke tests are not a perfect production proof. Any deploy-bound database change should also be validated against a real Neon Postgres database before release.
+
+Authentication is also behind an app boundary:
+
+- Local development and tests use `AUTH_MODE=local`, which provides a small cookie-based development session through `POST /api/session`.
+- Production uses `AUTH_MODE=neon`. The React app authenticates with Neon Auth, sends the Neon JWT in `Authorization: Bearer <token>`, and the Fastify API verifies it with `NEON_AUTH_JWKS_URL`.
+- The verified JWT `sub` claim is the Neon user id and becomes the stored team `ownerUserId`.
+
+Do not set `AUTH_MODE=neon` without `NEON_AUTH_JWKS_URL`; the API will fail closed and treat requests as unauthenticated.
 
 ## Admin endpoints
 
@@ -63,10 +76,10 @@ The same token can also be supplied with `Authorization: Bearer <token>`.
 
 ## First deployment checklist
 
-1. Create a managed Postgres database, preferably Supabase Postgres.
+1. Create a Neon project with a Postgres database.
 2. Add the Vercel project from the GitHub repo root.
 3. Configure the environment variables above for preview and production.
 4. Run migrations against the managed database with the production `DATABASE_URL`.
 5. Seed or import the initial basho and banzuke data.
-6. Smoke-test health, current basho, team creation, import dry-runs, result imports, and leaderboard updates.
+6. Smoke-test health, Neon sign-in/sign-up, current basho, owned team creation, import dry-runs, result imports, and leaderboard updates.
 7. Document the database backup and restore process from the chosen provider.

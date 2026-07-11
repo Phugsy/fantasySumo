@@ -25,6 +25,7 @@ The active app is split into:
 - a Fastify API compiled by TypeScript;
 - a shared framework-free domain package with MVP types, pick validation, scoring, and leaderboard calculation;
 - a Drizzle data package with local SQLite and production Postgres adapters;
+- an API auth boundary with local development sessions and production Neon Auth JWT verification;
 - root pnpm scripts for dev, build, test, lint, and formatting.
 
 ## Front end
@@ -36,7 +37,8 @@ Current behaviour:
 - Fetches the current basho and its ranked rikishi from the Fastify API.
 - Fetches leaderboard standings from the Fastify API.
 - Lets a player select and deselect rikishi up to the API-configured team size.
-- Captures a display/team name and submits the team to the API.
+- Captures a display/team name and submits the team to the API for the signed-in/current user.
+- Provides a local development sign-in panel that establishes the current user session.
 - Shows ordered team standings with expandable picked-rikishi score breakdowns.
 - Shows loading, empty, success, and API error states.
 - Has Vitest coverage through React Testing Library.
@@ -62,14 +64,25 @@ Current routes:
 - `GET /api/basho/:bashoId/rikishi`
   - Returns a basho and its rikishi with banzuke rank data.
 - `POST /api/basho/:bashoId/teams`
-  - Creates a display-name-based fantasy team for the basho.
-  - Request body: `displayName`, optional `ownerName`, and `rikishiIds`.
+  - Creates or updates the signed-in user's fantasy team for the basho.
+  - Request body: `displayName` and `rikishiIds`.
   - The current team size defaults to 2 rikishi and can be changed with `TEAM_SIZE`.
   - Validates duplicate picks, exact team size, and whether each picked rikishi is on that basho's banzuke.
+  - Enforces one owned team per user per basho and preserves basho pick-locking rules.
+- `GET /api/basho/:bashoId/my-team`
+  - Requires a current user.
+  - Returns the current user's fantasy team and picks for the basho.
 - `GET /api/basho/:bashoId/teams/:teamId`
   - Returns a fantasy team and its picks.
+  - Owned teams can only be viewed by their owner; legacy unowned seed/demo teams remain readable.
 - `GET /api/basho/:bashoId/leaderboard`
   - Returns leaderboard entries calculated with the domain scoring module.
+- `GET /api/session`
+  - Returns the current authenticated user or `null`.
+- `POST /api/session`
+  - In local auth mode only, establishes a development session from email and display name.
+- `DELETE /api/session`
+  - Clears the local development session cookie.
 - `POST /api/admin/import-banzuke`
   - Fetches current Makuuchi banzuke data from the Japan Sumo Association `indexAjax` endpoint.
   - Maps source payloads into local `Basho`, `Rikishi`, and `BanzukeEntry` records.
@@ -96,11 +109,10 @@ Current routes:
 
 Current limitations:
 
-- No auth.
+- Auth remains intentionally small. Local development uses a cookie-based development session, while production identity comes from Neon Auth JWTs verified by the API auth boundary.
 - No dedicated API client package.
 - Admin import endpoints are local-only and unprotected.
 - No scheduled import job yet.
-- No pick-locking rules yet.
 
 ## Domain package
 
@@ -135,6 +147,7 @@ Current behaviour:
 - Uses `DATABASE_URL` to select the adapter: `file:` and `:memory:` use SQLite; `postgres:` and `postgresql:` use Postgres.
 - Exposes an async repository contract so API/domain workflows do not depend on a concrete database driver.
 - Provides repository functions for reading and writing basho, rikishi, banzuke entries, fantasy teams, fantasy picks, and bout results.
+- Stores optional `ownerUserId` on fantasy teams so authenticated ownership can be enforced without coupling the database package to Neon Auth implementation details.
 - Provides transactional upsert helpers for banzuke and bout result imports.
 - Provides sample seed data for one basho, four rikishi, two fantasy teams, picks, and bout results.
 - Provides deterministic demo seed data for one pickable basho, eight rikishi, four fantasy teams, picks, and a 15-day bout result fixture.
