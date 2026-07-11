@@ -1,12 +1,26 @@
 import type { FormEvent, MutableRefObject } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  clearSession,
+  createSession,
   createFantasyTeam,
   fetchBashoRikishi,
   fetchCurrentBasho,
   fetchLeaderboard,
+  fetchMyTeam,
+  fetchSession,
   getErrorMessage,
+  setAuthTokenProvider,
 } from "./api";
+import {
+  getNeonAccessToken,
+  getNeonSession,
+  isNeonAuthConfigured,
+  signInWithNeon,
+  signOutNeon,
+  signUpWithNeon,
+} from "./authClient";
+import { AccountPanel } from "./components/AccountPanel";
 import { BashoPanel } from "./components/BashoPanel";
 import { LeaderboardPanel } from "./components/LeaderboardPanel";
 import { PageHeader } from "./components/PageHeader";
@@ -21,11 +35,21 @@ import type {
   LeaderboardResponse,
   LoadState,
   RankedRikishi,
+  SessionResponse,
+  SessionUser,
+  TeamResponse,
 } from "./types";
 import { canEditFantasyPicks, getPickLockMessage } from "./lifecycle";
 
 export function App() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
+  const [sessionState, setSessionState] = useState<
+    "loading" | "ready" | "submitting"
+  >("loading");
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [authMode, setAuthMode] = useState<SessionResponse["mode"] | null>(
+    null,
+  );
   const [basho, setBasho] = useState<Basho | null>(null);
   const [rikishi, setRikishi] = useState<RankedRikishi[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -38,8 +62,14 @@ export function App() {
   const [leaderboardLoadState, setLeaderboardLoadState] =
     useState<LeaderboardLoadState>("loading");
   const [displayName, setDisplayName] = useState("");
+  const [accountEmail, setAccountEmail] = useState("");
+  const [accountDisplayName, setAccountDisplayName] = useState("");
+  const [accountPassword, setAccountPassword] = useState("");
   const [submitState, setSubmitState] = useState<"idle" | "submitting">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [sessionErrorMessage, setSessionErrorMessage] = useState<string | null>(
+    null,
+  );
   const [leaderboardErrorMessage, setLeaderboardErrorMessage] = useState<
     string | null
   >(null);
@@ -53,18 +83,37 @@ export function App() {
 
     async function loadBasho() {
       try {
+        if (isNeonAuthConfigured()) {
+          setAuthTokenProvider(getNeonAccessToken);
+        }
+
+        const apiSession = await fetchSession();
+        const session =
+          apiSession.mode === "neon" && isNeonAuthConfigured()
+            ? await getNeonSession()
+            : apiSession;
         const currentBasho = await fetchCurrentBasho();
         const bashoRikishi = await fetchBashoRikishi(currentBasho.id);
+        const myTeam =
+          session.user === null
+            ? null
+            : await fetchMyTeam(currentBasho.id).catch(() => null);
 
         if (!isCurrent) {
           return;
         }
 
+        setAuthMode(session.mode);
+        setSessionUser(session.user);
+        setAccountEmail(session.user?.email ?? "");
+        setAccountDisplayName(session.user?.displayName ?? "");
+        setSessionState("ready");
         setBasho({
           ...bashoRikishi.basho,
           teamSize: currentBasho.teamSize,
         });
         setRikishi(bashoRikishi.rikishi);
+        applyMyTeam(myTeam, setDisplayName, setSelectedIds);
         setLoadState(bashoRikishi.rikishi.length === 0 ? "empty" : "ready");
 
         const requestId = nextLeaderboardRequestId(leaderboardRequestIdRef);
@@ -107,6 +156,7 @@ export function App() {
         }
 
         setErrorMessage(getErrorMessage(error));
+        setSessionState("ready");
         setLoadState("error");
       }
     }
@@ -131,6 +181,7 @@ export function App() {
     basho === null ? undefined : getPickLockMessage(basho);
   const canSubmit =
     loadState === "ready" &&
+    sessionUser !== null &&
     canEditPicks &&
     submitState === "idle" &&
     displayName.trim().length > 0 &&
@@ -209,6 +260,72 @@ export function App() {
     }
   }
 
+  async function handleSignIn(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    await submitAccount("sign-in");
+  }
+
+  async function handleSignUp() {
+    await submitAccount("sign-up");
+  }
+
+  async function submitAccount(intent: "sign-in" | "sign-up") {
+    setSessionState("submitting");
+    setSessionErrorMessage(null);
+
+    try {
+      const session =
+        authMode === "neon"
+          ? intent === "sign-up"
+            ? await signUpWithNeon({
+                displayName: accountDisplayName.trim(),
+                email: accountEmail.trim(),
+                password: accountPassword,
+              })
+            : await signInWithNeon({
+                email: accountEmail.trim(),
+                password: accountPassword,
+              })
+          : await createSession({
+              email: accountEmail.trim(),
+              displayName: accountDisplayName.trim(),
+            });
+
+      setAuthMode(session.mode);
+      setSessionUser(session.user);
+      setAccountPassword("");
+
+      if (basho !== null && session.user !== null) {
+        const myTeam = await fetchMyTeam(basho.id).catch(() => null);
+        applyMyTeam(myTeam, setDisplayName, setSelectedIds);
+      }
+    } catch (error) {
+      setSessionErrorMessage(getErrorMessage(error));
+    } finally {
+      setSessionState("ready");
+    }
+  }
+
+  async function handleSignOut() {
+    setSessionState("submitting");
+    setSessionErrorMessage(null);
+
+    try {
+      if (authMode === "neon") {
+        await signOutNeon();
+      } else {
+        await clearSession();
+      }
+      setSessionUser(null);
+      setCreatedTeam(null);
+    } catch (error) {
+      setSessionErrorMessage(getErrorMessage(error));
+    } finally {
+      setSessionState("ready");
+    }
+  }
+
   return (
     <main className="app-shell">
       <PageHeader />
@@ -233,6 +350,21 @@ export function App() {
 
       {loadState === "ready" && basho !== null && (
         <>
+          <AccountPanel
+            email={accountEmail}
+            errorMessage={sessionErrorMessage}
+            mode={authMode}
+            onDisplayNameChange={setAccountDisplayName}
+            onEmailChange={setAccountEmail}
+            onPasswordChange={setAccountPassword}
+            onSignIn={handleSignIn}
+            onSignOut={handleSignOut}
+            onSignUp={handleSignUp}
+            password={accountPassword}
+            sessionState={sessionState}
+            user={sessionUser}
+            userDisplayName={accountDisplayName}
+          />
           <BashoPanel basho={basho} selectedCount={selectedIds.length} />
           <ViewSwitch
             activeView={activeView}
@@ -291,6 +423,19 @@ function mergeLeaderboardBasho(
     ...leaderboardResponse.basho,
     teamSize: currentBasho?.teamSize ?? 0,
   };
+}
+
+function applyMyTeam(
+  myTeam: TeamResponse | null,
+  setDisplayName: (displayName: string) => void,
+  setSelectedIds: (selectedIds: string[]) => void,
+) {
+  if (myTeam === null) {
+    return;
+  }
+
+  setDisplayName(myTeam.team.displayName);
+  setSelectedIds(myTeam.picks.map((pick) => pick.rikishiId));
 }
 
 function getExpandedTeamId(

@@ -165,6 +165,7 @@ h2 {
   font-size: 1rem;
 }
 
+.account-panel,
 .rikishi-section,
 .summary-panel,
 .state-panel {
@@ -173,9 +174,54 @@ h2 {
   background: #fffaf2;
 }
 
+.account-panel,
 .rikishi-section,
 .summary-panel {
   padding: 20px;
+}
+
+.account-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.account-form {
+  display: grid;
+  gap: 10px;
+}
+
+.account-summary {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid #d9d0c2;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.account-summary strong,
+.account-summary span {
+  display: block;
+}
+
+.account-summary span {
+  color: #60717a;
+  font-size: 0.9rem;
+}
+
+.account-summary button {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #18333d;
+  color: #ffffff;
+  font-weight: 800;
 }
 
 .state-panel {
@@ -274,10 +320,12 @@ input {
 }
 
 input:focus,
+.account-summary button:focus-visible,
 .view-switch button:focus-visible,
 .rikishi-row:focus-visible,
 .leaderboard-summary:focus-visible,
 .selected-list button:focus-visible,
+.secondary-button:focus-visible,
 .submit-button:focus-visible {
   outline: 3px solid #4a8f9f;
   outline-offset: 2px;
@@ -332,8 +380,23 @@ input:focus,
   font-weight: 900;
 }
 
+.secondary-button {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #18333d;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #18333d;
+  font-weight: 900;
+}
+
 .submit-button:disabled {
   background: #c9beb3;
+  color: #6f665e;
+}
+
+.secondary-button:disabled {
+  border-color: #c9beb3;
   color: #6f665e;
 }
 
@@ -491,6 +554,7 @@ input:focus,
   }
 
   .page-header,
+  .account-panel,
   .selection-layout,
   .basho-panel,
   .leaderboard-summary,

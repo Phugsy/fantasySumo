@@ -104,6 +104,23 @@ describe("App", () => {
     expect(screen.getByText("0 of 2 selected")).toBeInTheDocument();
   });
 
+  it("lets an anonymous local user sign in before saving a team", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockAnonymousFetch));
+    render(<App />);
+
+    expect(await screen.findByLabelText("Email")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "player@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Display name"), {
+      target: { value: "New Player" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(await screen.findByText("New Player")).toBeInTheDocument();
+    expect(screen.getByText("player@example.com")).toBeInTheDocument();
+  });
+
   it("displays leaderboard standings and team score details", async () => {
     render(<App />);
 
@@ -248,6 +265,7 @@ describe("App", () => {
           displayName: "East Stand Heroes",
           rikishiIds: ["onosato", "kotozakura"],
         }),
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
         },
@@ -343,9 +361,21 @@ describe("App", () => {
 
 function mockSuccessfulFetch(
   input: RequestInfo | URL,
-  basho = currentBasho,
+  maybeBasho: typeof currentBasho | RequestInit = currentBasho,
 ): Promise<Response> {
   const url = String(input);
+  const basho = "id" in maybeBasho ? maybeBasho : currentBasho;
+
+  if (url === "/api/session") {
+    return jsonResponse({
+      mode: "local",
+      user: {
+        id: "local-user",
+        email: "player@example.com",
+        displayName: "New Player",
+      },
+    });
+  }
 
   if (url === "/api/basho/current") {
     return jsonResponse(basho);
@@ -367,6 +397,15 @@ function mockSuccessfulFetch(
     );
   }
 
+  if (url === "/api/basho/2026-05/my-team") {
+    return jsonResponse(
+      {
+        message: "You do not have a fantasy team for this basho yet.",
+      },
+      { status: 404 },
+    );
+  }
+
   if (url === "/api/basho/2026-05/teams") {
     return jsonResponse(
       {
@@ -381,6 +420,36 @@ function mockSuccessfulFetch(
   }
 
   return jsonResponse({ message: "Not found" }, { status: 404 });
+}
+
+function mockAnonymousFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const url = String(input);
+
+  if (url === "/api/session" && init?.method === "POST") {
+    return jsonResponse(
+      {
+        mode: "local",
+        user: {
+          id: "local-user",
+          email: "player@example.com",
+          displayName: "New Player",
+        },
+      },
+      { status: 201 },
+    );
+  }
+
+  if (url === "/api/session") {
+    return jsonResponse({
+      mode: "local",
+      user: null,
+    });
+  }
+
+  return mockSuccessfulFetch(input);
 }
 
 function mockEmptyLeaderboardFetch(
