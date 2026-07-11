@@ -1,6 +1,9 @@
 import { createAuthClient } from "@neondatabase/neon-js/auth";
 import type { SessionResponse, SessionUser } from "./types";
 
+const PASSWORD_REQUIREMENTS_MESSAGE =
+  "Choose a stronger password. Use at least 8 characters and avoid common passwords.";
+
 const neonAuthUrl = import.meta.env.VITE_NEON_AUTH_URL as string | undefined;
 const neonAuthClient =
   neonAuthUrl === undefined || neonAuthUrl.trim().length === 0
@@ -59,7 +62,9 @@ export async function signInWithNeon(input: {
   const response = await neonAuthClient.signIn.email(input);
 
   if (response.error !== null) {
-    throw new Error(response.error.message ?? "Unable to sign in.");
+    throw new Error(
+      getNeonAuthErrorMessage(response.error.message, "Unable to sign in."),
+    );
   }
 
   return getNeonSession();
@@ -81,7 +86,12 @@ export async function signUpWithNeon(input: {
   });
 
   if (response.error !== null) {
-    throw new Error(response.error.message ?? "Unable to create account.");
+    throw new Error(
+      getNeonAuthErrorMessage(
+        response.error.message,
+        "Unable to create account.",
+      ),
+    );
   }
 
   return getNeonSession();
@@ -95,8 +105,32 @@ export async function signOutNeon(): Promise<void> {
   const response = await neonAuthClient.signOut();
 
   if (response.error !== null) {
-    throw new Error(response.error.message ?? "Unable to sign out.");
+    throw new Error(
+      getNeonAuthErrorMessage(response.error.message, "Unable to sign out."),
+    );
   }
+}
+
+export function getNeonAuthErrorMessage(
+  message: string | undefined,
+  fallback: string,
+): string {
+  if (message === undefined || message.trim().length === 0) {
+    return fallback;
+  }
+
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    normalizedMessage.includes("password") &&
+    (normalizedMessage.includes("security requirements") ||
+      normalizedMessage.includes("too short") ||
+      normalizedMessage.includes("weak"))
+  ) {
+    return PASSWORD_REQUIREMENTS_MESSAGE;
+  }
+
+  return message;
 }
 
 function toSessionUser(user: {

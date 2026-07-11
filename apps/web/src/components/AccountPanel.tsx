@@ -81,6 +81,7 @@ export function AccountPanel({
                 Password
               </label>
               <input
+                aria-describedby="account-password-hint"
                 id="account-password"
                 name="password"
                 type="password"
@@ -88,6 +89,9 @@ export function AccountPanel({
                 onChange={(event) => onPasswordChange(event.target.value)}
                 placeholder="Password"
               />
+              <p className="field-hint" id="account-password-hint">
+                Use at least 8 characters and avoid common passwords.
+              </p>
             </>
           )}
 

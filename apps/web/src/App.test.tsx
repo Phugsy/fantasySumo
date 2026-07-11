@@ -128,6 +128,9 @@ describe("App", () => {
     expect(await screen.findByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(
+      screen.getByText("Use at least 8 characters and avoid common passwords."),
+    ).toBeInTheDocument();
+    expect(
       screen.getByText("Sign in before loading data."),
     ).toBeInTheDocument();
   });
