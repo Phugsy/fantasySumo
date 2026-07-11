@@ -309,6 +309,7 @@ export function App() {
     });
     setRikishi(bashoRikishi.rikishi);
     applyMyTeam(myTeam, setDisplayName, setSelectedIds);
+    setActiveView(myTeam === null ? "selection" : "leaderboard");
     setLoadState(bashoRikishi.rikishi.length === 0 ? "empty" : "ready");
 
     const requestId = nextLeaderboardRequestId(leaderboardRequestIdRef);

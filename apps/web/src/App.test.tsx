@@ -169,6 +169,25 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: /Onosato/ })).toBeInTheDocument();
   });
 
+  it("shows the leaderboard after sign in when the user already has picks", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockExistingTeamAfterLoginFetch));
+    render(<App />);
+
+    expect(await screen.findByLabelText("Email")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "player@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Display name"), {
+      target: { value: "New Player" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Leaderboard" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Existing Champions")).toBeInTheDocument();
+  });
+
   it("displays leaderboard standings and team score details", async () => {
     render(<App />);
 
@@ -584,6 +603,62 @@ function mockBashoUnauthorizedUntilLoginFetch(): (
 
     return mockSuccessfulFetch(input);
   };
+}
+
+function mockExistingTeamAfterLoginFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const url = String(input);
+
+  if (url === "/api/session" && init?.method === "POST") {
+    return jsonResponse(
+      {
+        mode: "local",
+        user: {
+          id: "local-user",
+          email: "player@example.com",
+          displayName: "New Player",
+        },
+      },
+      { status: 201 },
+    );
+  }
+
+  if (url === "/api/session") {
+    return jsonResponse({
+      mode: "local",
+      user: null,
+    });
+  }
+
+  if (url === "/api/basho/2026-05/my-team") {
+    return jsonResponse({
+      team: {
+        id: "team-existing",
+        displayName: "Existing Champions",
+      },
+      picks: [{ rikishiId: "onosato" }, { rikishiId: "kotozakura" }],
+    });
+  }
+
+  if (url === "/api/basho/2026-05/leaderboard") {
+    return jsonResponse(
+      createLeaderboardResponse({
+        entries: [
+          {
+            rank: 1,
+            teamId: "team-existing",
+            displayName: "Existing Champions",
+            score: 0,
+            rikishiScores: [],
+          },
+        ],
+      }),
+    );
+  }
+
+  return mockSuccessfulFetch(input);
 }
 
 function mockEmptyLeaderboardFetch(
