@@ -59,6 +59,8 @@ Authentication is also behind an app boundary:
 
 Do not set `AUTH_MODE=neon` without `NEON_AUTH_JWKS_URL`; the API will fail closed and treat requests as unauthenticated.
 
+Neon Auth also requires each deployed app origin to be added as a trusted domain in Neon Console -> Auth -> Configuration -> Domains. Add the exact production and preview origins with protocol and no trailing slash, for example `https://fantasy-sumo.vercel.app`. Wildcard subdomains are not supported, so each Vercel preview domain that needs auth testing must be added explicitly.
+
 ## Admin endpoints
 
 The demo admin endpoints already require `DEMO_ADMIN_TOKEN` unless explicitly opened in tests.
@@ -79,7 +81,8 @@ The same token can also be supplied with `Authorization: Bearer <token>`.
 1. Create a Neon project with a Postgres database.
 2. Add the Vercel project from the GitHub repo root.
 3. Configure the environment variables above for preview and production.
-4. Run migrations against the managed database with the production `DATABASE_URL`.
-5. Seed or import the initial basho and banzuke data.
-6. Smoke-test health, Neon sign-in/sign-up, current basho, owned team creation, import dry-runs, result imports, and leaderboard updates.
-7. Document the database backup and restore process from the chosen provider.
+4. Add the deployed Vercel app origin to Neon Auth trusted domains.
+5. Run migrations against the managed database with the production `DATABASE_URL`.
+6. Seed or import the initial basho and banzuke data.
+7. Smoke-test health, Neon sign-in/sign-up, current basho, owned team creation, import dry-runs, result imports, and leaderboard updates.
+8. Document the database backup and restore process from the chosen provider.
