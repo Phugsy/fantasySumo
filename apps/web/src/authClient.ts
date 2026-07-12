@@ -130,6 +130,10 @@ export function getNeonAuthErrorMessage(
     return PASSWORD_REQUIREMENTS_MESSAGE;
   }
 
+  if (normalizedMessage.includes("invalid origin")) {
+    return `Neon Auth rejected this origin (${window.location.origin}). Add this exact URL in Neon Auth trusted domains.`;
+  }
+
   return message;
 }
 

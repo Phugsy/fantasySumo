@@ -33,11 +33,16 @@ export function AccountPanel({
   userDisplayName,
 }: AccountPanelProps) {
   const isNeonMode = mode === "neon";
-  const canSubmit =
+  const canSignIn =
+    sessionState !== "submitting" &&
+    email.trim().length > 0 &&
+    (isNeonMode ? password.length > 0 : userDisplayName.trim().length > 0);
+  const canSignUp =
+    isNeonMode &&
     sessionState !== "submitting" &&
     email.trim().length > 0 &&
     userDisplayName.trim().length > 0 &&
-    (!isNeonMode || password.length > 0);
+    password.length > 0;
 
   return (
     <section className="account-panel" aria-labelledby="account-title">
@@ -95,13 +100,13 @@ export function AccountPanel({
             </>
           )}
 
-          <button className="submit-button" disabled={!canSubmit} type="submit">
+          <button className="submit-button" disabled={!canSignIn} type="submit">
             {sessionState === "submitting" ? "Signing in..." : "Sign in"}
           </button>
           {isNeonMode && (
             <button
               className="secondary-button"
-              disabled={!canSubmit}
+              disabled={!canSignUp}
               type="button"
               onClick={onSignUp}
             >

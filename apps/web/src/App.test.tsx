@@ -146,6 +146,17 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
+  it("explains raw public API 401 responses as deployment access issues", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockRawUnauthorizedBashoFetch));
+    render(<App />);
+
+    expect(
+      await screen.findByText(
+        "Public basho data is unavailable because this deployment is returning HTTP 401 for anonymous API requests.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("reloads basho data after sign in if startup was unauthorized", async () => {
     vi.stubGlobal("fetch", vi.fn(mockBashoUnauthorizedUntilLoginFetch()));
     render(<App />);
@@ -555,6 +566,25 @@ function mockUnauthorizedBashoFetch(
       },
       { status: 401 },
     );
+  }
+
+  return mockSuccessfulFetch(input);
+}
+
+function mockRawUnauthorizedBashoFetch(
+  input: RequestInfo | URL,
+): Promise<Response> {
+  const url = String(input);
+
+  if (url === "/api/session") {
+    return jsonResponse({
+      mode: "neon",
+      user: null,
+    });
+  }
+
+  if (url === "/api/basho/current") {
+    return Promise.resolve(new Response("HTTP 401", { status: 401 }));
   }
 
   return mockSuccessfulFetch(input);

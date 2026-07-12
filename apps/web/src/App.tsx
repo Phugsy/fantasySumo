@@ -112,7 +112,7 @@ export function App() {
           return;
         }
 
-        setErrorMessage(getErrorMessage(error));
+        setErrorMessage(getPublicDataErrorMessage(error));
         setSessionState("ready");
         setLoadState("error");
       }
@@ -431,6 +431,16 @@ export function App() {
       )}
     </main>
   );
+}
+
+function getPublicDataErrorMessage(error: unknown): string {
+  const message = getErrorMessage(error);
+
+  return message === "HTTP 401" ||
+    message === "Request failed with status 401." ||
+    message.includes("status 401")
+    ? "Public basho data is unavailable because this deployment is returning HTTP 401 for anonymous API requests."
+    : message;
 }
 
 async function loadInitialSession(

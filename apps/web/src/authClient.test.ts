@@ -21,4 +21,12 @@ describe("getNeonAuthErrorMessage", () => {
       ),
     ).toBe("Invalid email or password");
   });
+
+  it("adds the current origin to Neon invalid-origin errors", () => {
+    expect(
+      getNeonAuthErrorMessage("Invalid origin", "Unable to sign in."),
+    ).toBe(
+      "Neon Auth rejected this origin (http://localhost:3000). Add this exact URL in Neon Auth trusted domains.",
+    );
+  });
 });
