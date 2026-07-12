@@ -436,9 +436,7 @@ export function App() {
 function getPublicDataErrorMessage(error: unknown): string {
   const message = getErrorMessage(error);
 
-  return message === "HTTP 401" ||
-    message === "Request failed with status 401." ||
-    message.includes("status 401")
+  return message.includes("401")
     ? "Public basho data is unavailable because this deployment is returning HTTP 401 for anonymous API requests."
     : message;
 }
@@ -473,15 +471,46 @@ async function submitNeonAccount(input: {
 
   setAuthTokenProvider(getNeonAccessToken);
 
-  const session = await fetchSession();
+  const session = await waitForVerifiedSession();
 
   if (session.user === null) {
     throw new Error(
-      "Signed in, but the app could not verify your session. Please refresh and try again.",
+      "Signed in, but the app could not verify your session yet. Please try signing in again.",
     );
   }
 
   return session;
+}
+
+async function waitForVerifiedSession(): Promise<SessionResponse> {
+  const maxAttempts = 8;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const session = await fetchSession();
+
+      if (session.user !== null || attempt === maxAttempts) {
+        return session;
+      }
+    } catch (error) {
+      if (attempt === maxAttempts) {
+        throw error;
+      }
+    }
+
+    await wait(250);
+  }
+
+  return {
+    mode: "neon",
+    user: null,
+  };
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }
 
 function mergeLeaderboardBasho(

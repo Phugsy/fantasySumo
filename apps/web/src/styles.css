@@ -193,6 +193,31 @@ h2 {
   gap: 10px;
 }
 
+.auth-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid #d9d0c2;
+  border-radius: 8px;
+  background: #f0eae0;
+}
+
+.auth-mode-switch button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #31444d;
+  font-weight: 900;
+}
+
+.auth-mode-switch button.active {
+  background: #ffffff;
+  color: #8e2e2b;
+  box-shadow: 0 1px 2px rgba(31, 43, 49, 0.12);
+}
+
 .account-summary {
   display: flex;
   gap: 14px;
@@ -327,6 +352,7 @@ input {
 
 input:focus,
 .account-summary button:focus-visible,
+.auth-mode-switch button:focus-visible,
 .view-switch button:focus-visible,
 .rikishi-row:focus-visible,
 .leaderboard-summary:focus-visible,

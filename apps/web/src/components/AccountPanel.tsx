@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import type { SessionResponse, SessionUser } from "../types";
 
 interface AccountPanelProps {
@@ -33,6 +33,10 @@ export function AccountPanel({
   userDisplayName,
 }: AccountPanelProps) {
   const isNeonMode = mode === "neon";
+  const [authIntent, setAuthIntent] = useState<"sign-in" | "register">(
+    "sign-in",
+  );
+  const isRegistering = !isNeonMode || authIntent === "register";
   const canSignIn =
     sessionState !== "submitting" &&
     email.trim().length > 0 &&
@@ -43,6 +47,17 @@ export function AccountPanel({
     email.trim().length > 0 &&
     userDisplayName.trim().length > 0 &&
     password.length > 0;
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    if (isNeonMode && authIntent === "register") {
+      event.preventDefault();
+      onSignUp();
+
+      return;
+    }
+
+    onSignIn(event);
+  }
 
   return (
     <section className="account-panel" aria-labelledby="account-title">
@@ -56,7 +71,26 @@ export function AccountPanel({
           Checking your session...
         </p>
       ) : user === null ? (
-        <form className="account-form" onSubmit={onSignIn}>
+        <form className="account-form" onSubmit={handleSubmit}>
+          {isNeonMode && (
+            <div className="auth-mode-switch" aria-label="Account action">
+              <button
+                className={authIntent === "sign-in" ? "active" : ""}
+                type="button"
+                onClick={() => setAuthIntent("sign-in")}
+              >
+                Sign in
+              </button>
+              <button
+                className={authIntent === "register" ? "active" : ""}
+                type="button"
+                onClick={() => setAuthIntent("register")}
+              >
+                Register
+              </button>
+            </div>
+          )}
+
           <label className="field-label" htmlFor="account-email">
             Email
           </label>
@@ -69,16 +103,20 @@ export function AccountPanel({
             placeholder="you@example.com"
           />
 
-          <label className="field-label" htmlFor="account-display-name">
-            Display name
-          </label>
-          <input
-            id="account-display-name"
-            name="displayName"
-            value={userDisplayName}
-            onChange={(event) => onDisplayNameChange(event.target.value)}
-            placeholder="East Stand"
-          />
+          {isRegistering && (
+            <>
+              <label className="field-label" htmlFor="account-display-name">
+                Display name
+              </label>
+              <input
+                id="account-display-name"
+                name="displayName"
+                value={userDisplayName}
+                onChange={(event) => onDisplayNameChange(event.target.value)}
+                placeholder="East Stand"
+              />
+            </>
+          )}
 
           {isNeonMode && (
             <>
@@ -100,19 +138,19 @@ export function AccountPanel({
             </>
           )}
 
-          <button className="submit-button" disabled={!canSignIn} type="submit">
-            {sessionState === "submitting" ? "Signing in..." : "Sign in"}
+          <button
+            className="submit-button"
+            disabled={authIntent === "register" ? !canSignUp : !canSignIn}
+            type="submit"
+          >
+            {sessionState === "submitting"
+              ? authIntent === "register"
+                ? "Creating account..."
+                : "Signing in..."
+              : authIntent === "register"
+                ? "Create account"
+                : "Sign in"}
           </button>
-          {isNeonMode && (
-            <button
-              className="secondary-button"
-              disabled={!canSignUp}
-              type="button"
-              onClick={onSignUp}
-            >
-              Create account
-            </button>
-          )}
         </form>
       ) : (
         <div className="account-summary">
