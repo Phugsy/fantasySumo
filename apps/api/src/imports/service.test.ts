@@ -180,6 +180,84 @@ describe("import service", () => {
     });
   });
 
+  it("imports source-provided cross-division opponents without adding them to the banzuke", async () => {
+    const repositories = createRepositories(client);
+    await importBanzuke(repositories, banzukeCommand);
+
+    const result = await importBoutResults(repositories, {
+      source: "test",
+      bashoId: "2026-05",
+      rikishi: [
+        {
+          id: "onosato",
+          shikona: "Onosato",
+        },
+        {
+          id: "juryo-visitor",
+          shikona: "Juryo Visitor",
+        },
+      ],
+      results: [
+        {
+          id: "2026-05-day-1-match-1",
+          bashoId: "2026-05",
+          day: 1,
+          winnerRikishiId: "onosato",
+          loserRikishiId: "juryo-visitor",
+        },
+      ],
+    });
+
+    expect(result.summary.rikishi.created).toBe(1);
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toHaveLength(
+      1,
+    );
+    expect(
+      await repositories.listBanzukeEntriesForBasho("2026-05"),
+    ).toHaveLength(2);
+    expect(
+      (await repositories.listRikishi()).find(
+        (rikishi) => rikishi.id === "onosato",
+      ),
+    ).toMatchObject({
+      id: "onosato",
+      shikona: "Onosato",
+      heya: "Nishonoseki",
+    });
+  });
+
+  it("rejects source-provided results with no target banzuke rikishi", async () => {
+    const repositories = createRepositories(client);
+    await importBanzuke(repositories, banzukeCommand);
+
+    await expect(
+      importBoutResults(repositories, {
+        source: "test",
+        bashoId: "2026-05",
+        rikishi: [
+          {
+            id: "juryo-winner",
+            shikona: "Juryo Winner",
+          },
+          {
+            id: "juryo-loser",
+            shikona: "Juryo Loser",
+          },
+        ],
+        results: [
+          {
+            id: "2026-05-day-1-match-1",
+            bashoId: "2026-05",
+            day: 1,
+            winnerRikishiId: "juryo-winner",
+            loserRikishiId: "juryo-loser",
+          },
+        ],
+      }),
+    ).rejects.toThrow(ImportValidationError);
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toEqual([]);
+  });
+
   it("reports basho lifecycle updates during result import dry runs", async () => {
     const repositories = createRepositories(client);
     await importBanzuke(repositories, {
