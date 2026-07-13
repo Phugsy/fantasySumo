@@ -99,6 +99,11 @@ export async function importBoutResults(
     isEqualBoutResult,
     { countDeleted: true },
   );
+  summary.rikishi = summarizeMany(
+    await repositories.listRikishi(),
+    command.rikishi ?? [],
+    isEqualRikishi,
+  );
 
   if (options.dryRun !== true) {
     if (nextBasho !== undefined) {
@@ -108,6 +113,7 @@ export async function importBoutResults(
     await repositories.applyBoutResultsImport({
       bashoId: command.bashoId,
       day: command.results[0]!.day,
+      rikishi: command.rikishi,
       results: command.results,
     });
   }
@@ -181,6 +187,12 @@ async function validateBoutResultsImport(
   const rikishiIds = new Set(
     (await repositories.listRikishi()).map((rikishi) => rikishi.id),
   );
+  const importedRikishiIds = new Set(
+    (command.rikishi ?? []).map((rikishi) => rikishi.id),
+  );
+  for (const rikishiId of importedRikishiIds) {
+    rikishiIds.add(rikishiId);
+  }
   const banzukeRikishiIds = new Set(
     (await repositories.listBanzukeEntriesForBasho(command.bashoId)).map(
       (entry) => entry.rikishiId,
@@ -231,6 +243,10 @@ async function validateBoutResultsImport(
       });
     }
 
+    const hasBanzukeRikishi =
+      banzukeRikishiIds.has(result.winnerRikishiId) ||
+      banzukeRikishiIds.has(result.loserRikishiId);
+
     for (const field of ["winnerRikishiId", "loserRikishiId"] as const) {
       const rikishiId = result[field];
 
@@ -239,14 +255,25 @@ async function validateBoutResultsImport(
           path: `results.${index}.${field}`,
           message: `Rikishi ${rikishiId} does not exist.`,
         });
-      } else if (!banzukeRikishiIds.has(rikishiId)) {
+      } else if (
+        !banzukeRikishiIds.has(rikishiId) &&
+        !importedRikishiIds.has(rikishiId)
+      ) {
         // Results must belong to rikishi on this basho's banzuke, not just
-        // any known rikishi from another tournament.
+        // any known rikishi from another tournament. Source-provided rikishi
+        // are allowed for cross-division bouts against the target banzuke.
         issues.push({
           path: `results.${index}.${field}`,
           message: `Rikishi ${rikishiId} is not on the basho banzuke.`,
         });
       }
+    }
+
+    if (!hasBanzukeRikishi) {
+      issues.push({
+        path: `results.${index}`,
+        message: "At least one rikishi must be on the basho banzuke.",
+      });
     }
 
     if (resultIds.has(result.id)) {

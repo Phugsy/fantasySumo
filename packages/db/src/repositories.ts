@@ -24,6 +24,7 @@ export interface BanzukeImportData {
 export interface BoutResultsImportData {
   bashoId: Basho["id"];
   day: BoutResult["day"];
+  rikishi?: readonly Rikishi[];
   results: readonly BoutResult[];
 }
 
@@ -301,6 +302,17 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
     },
     applyBoutResultsImport: async (importData) => {
       db.transaction((transaction) => {
+        for (const entry of importData.rikishi ?? []) {
+          transaction
+            .insert(sqlite.rikishi)
+            .values(toRikishiRow(entry))
+            .onConflictDoUpdate({
+              target: sqlite.rikishi.id,
+              set: toRikishiRow(entry),
+            })
+            .run();
+        }
+
         for (const entry of importData.results) {
           transaction
             .insert(sqlite.boutResults)
@@ -540,6 +552,16 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
     },
     applyBoutResultsImport: async (importData) => {
       await db.transaction(async (transaction) => {
+        for (const entry of importData.rikishi ?? []) {
+          await transaction
+            .insert(pg.rikishi)
+            .values(toRikishiRow(entry))
+            .onConflictDoUpdate({
+              target: pg.rikishi.id,
+              set: toRikishiRow(entry),
+            });
+        }
+
         for (const entry of importData.results) {
           await transaction
             .insert(pg.boutResults)
