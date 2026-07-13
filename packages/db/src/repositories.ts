@@ -306,10 +306,7 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
           transaction
             .insert(sqlite.rikishi)
             .values(toRikishiRow(entry))
-            .onConflictDoUpdate({
-              target: sqlite.rikishi.id,
-              set: toRikishiRow(entry),
-            })
+            .onConflictDoNothing({ target: sqlite.rikishi.id })
             .run();
         }
 
@@ -556,10 +553,7 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
           await transaction
             .insert(pg.rikishi)
             .values(toRikishiRow(entry))
-            .onConflictDoUpdate({
-              target: pg.rikishi.id,
-              set: toRikishiRow(entry),
-            });
+            .onConflictDoNothing({ target: pg.rikishi.id });
         }
 
         for (const entry of importData.results) {

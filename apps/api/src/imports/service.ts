@@ -82,6 +82,13 @@ export async function importBoutResults(
 
   const summary = createEmptySummary();
   const existingBasho = await repositories.getBasho(command.bashoId);
+  const existingRikishi = await repositories.listRikishi();
+  const existingRikishiIds = new Set(
+    existingRikishi.map((rikishi) => rikishi.id),
+  );
+  const missingSourceRikishi = (command.rikishi ?? []).filter(
+    (rikishi) => !existingRikishiIds.has(rikishi.id),
+  );
   const nextBasho =
     existingBasho === undefined
       ? undefined
@@ -100,8 +107,8 @@ export async function importBoutResults(
     { countDeleted: true },
   );
   summary.rikishi = summarizeMany(
-    await repositories.listRikishi(),
-    command.rikishi ?? [],
+    existingRikishi,
+    missingSourceRikishi,
     isEqualRikishi,
   );
 
@@ -113,7 +120,7 @@ export async function importBoutResults(
     await repositories.applyBoutResultsImport({
       bashoId: command.bashoId,
       day: command.results[0]!.day,
-      rikishi: command.rikishi,
+      rikishi: missingSourceRikishi,
       results: command.results,
     });
   }

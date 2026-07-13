@@ -191,7 +191,6 @@ describe("import service", () => {
         {
           id: "onosato",
           shikona: "Onosato",
-          heya: "Nishonoseki",
         },
         {
           id: "juryo-visitor",
@@ -216,6 +215,15 @@ describe("import service", () => {
     expect(
       await repositories.listBanzukeEntriesForBasho("2026-05"),
     ).toHaveLength(2);
+    expect(
+      (await repositories.listRikishi()).find(
+        (rikishi) => rikishi.id === "onosato",
+      ),
+    ).toMatchObject({
+      id: "onosato",
+      shikona: "Onosato",
+      heya: "Nishonoseki",
+    });
   });
 
   it("rejects source-provided results with no target banzuke rikishi", async () => {
