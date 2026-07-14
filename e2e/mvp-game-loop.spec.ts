@@ -90,6 +90,47 @@ test("prevents incomplete and overfull team submissions", async ({ page }) => {
   await expect(submitButton).toBeDisabled();
 });
 
+test("keeps navigation, ranks, and core views usable at supported widths", async ({
+  page,
+}) => {
+  for (const viewport of [
+    { width: 375, height: 812 },
+    { width: 768, height: 1024 },
+    { width: 1280, height: 900 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+
+    await expect(
+      page.getByRole("navigation", { name: "Primary navigation" }),
+    ).toBeVisible();
+
+    const longRank = page.getByText("Maegashira #1", { exact: true });
+    await expect(longRank).toBeVisible();
+    expect(
+      await longRank.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth,
+      ),
+    ).toBe(true);
+
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+
+    await page.getByRole("button", { name: "Leaderboard" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Follow the leaderboard" }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+  }
+});
+
 async function resetDemo(request: APIRequestContext) {
   const response = await request.post("/api/admin/demo/reset", {
     headers: demoAdminHeaders,

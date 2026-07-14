@@ -7,6 +7,7 @@ import type {
   RankedRikishi,
 } from "../types";
 import { getBashoLifecycleLabel } from "../lifecycle";
+import "./LeaderboardPanel.css";
 
 interface LeaderboardPanelProps {
   basho: Basho;
