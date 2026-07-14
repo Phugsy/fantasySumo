@@ -29,6 +29,7 @@ Set these in Vercel before exposing the app:
 DATABASE_URL=<managed Postgres connection string>
 TEAM_SIZE=2
 ADMIN_IMPORT_TOKEN=<long random token>
+CRON_SECRET=<long random token>
 DEMO_ADMIN_TOKEN=<long random token, only if demo admin controls are needed>
 ```
 
@@ -60,6 +61,54 @@ curl -X POST "https://<deployment>/api/admin/import-banzuke?dryRun=true" \
 ```
 
 The same token can also be supplied with `Authorization: Bearer <token>`.
+
+## Scheduled daily results import
+
+The root `vercel.json` configures one production cron invocation:
+
+```json
+{
+  "path": "/api/cron/import-results",
+  "schedule": "0 10 * * *"
+}
+```
+
+Vercel cron schedules use UTC, so this runs daily at **10:00 UTC / 19:00 JST**.
+That is after the expected end of the top-division bouts. The daily schedule is
+compatible with Vercel Hobby's once-per-day cron limit; manual imports remain
+the recovery path for delayed source data or a missed run.
+
+Set `CRON_SECRET` on the production deployment. Vercel sends it to the cron
+route as `Authorization: Bearer <CRON_SECRET>`. The route is disabled when the
+secret is missing and rejects requests with a missing or incorrect bearer
+token. Cron jobs run on production deployments, not previews.
+
+On each authenticated invocation, the route:
+
+1. finds bashos whose stored lifecycle status is `active`;
+2. excludes the deterministic demo basho;
+3. refuses to import if more than one live basho is active;
+4. calculates the expected basho day from the current date in `Asia/Tokyo` and
+   the stored basho start date;
+5. skips without contacting the source when no live basho is active or the
+   date is outside the active basho's stored date window;
+6. runs the existing Sumo API adapter and transactional daily result import.
+
+Re-running the route on the same Japan calendar day targets the same basho/day.
+The importer replaces only that day's stable result IDs, so retries correct or
+skip existing rows without duplicating scores, teams, or picks. The response
+and Vercel function logs include the status, basho ID, day, Japan date, and skip
+reason when applicable. Source, validation, or ambiguous-active-basho errors
+are logged and return a non-2xx response so Vercel does not record silent
+success.
+
+For a controlled manual check, call the deployed route with the same bearer
+header Vercel uses:
+
+```bash
+curl "https://<deployment>/api/cron/import-results" \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
 
 ## First deployment checklist
 

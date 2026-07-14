@@ -93,14 +93,19 @@ Current routes:
 - `POST /api/admin/demo/complete`
   - Requires `DEMO_ADMIN_TOKEN`.
   - Applies all deterministic demo results and marks the demo basho complete.
+- `GET /api/cron/import-results`
+  - Requires Vercel's `Authorization: Bearer <CRON_SECRET>` header.
+  - Selects the single active non-demo basho and derives its day from the
+    current calendar date in `Asia/Tokyo`.
+  - Reuses the source adapter and transactional result import service used by
+    the manual admin route.
+  - Returns structured imported/skipped status and logs success or failure.
 
 Current limitations:
 
 - No auth.
 - No dedicated API client package.
-- Admin import endpoints are local-only and unprotected.
-- No scheduled import job yet.
-- No pick-locking rules yet.
+- No admin UI yet.
 
 ## Domain package
 

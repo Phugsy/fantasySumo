@@ -277,11 +277,13 @@ For the first local MVP, a failed import can return a structured API error and l
 4. Add repository/service functions that apply validated imports transactionally.
 5. Add local-only admin endpoints or scripts to manually trigger source imports and dry runs.
 6. Add small reduced source fixtures for adapter tests and internal JSON fixtures for import-service tests.
-7. Add fallback source support:
+7. Add a protected scheduled production trigger that selects one active live
+   basho, derives the current day in Japan time, and reuses the result import
+   service. Keep deterministic demo bashos outside this path.
+8. Add fallback source support:
    - Sumo API banzuke as backup if JSA banzuke fails;
    - JSA results adapter if a stable machine-readable result endpoint is confirmed;
    - no SumoDB scraper unless API paths prove inadequate.
-8. Add scheduled execution later, e.g. once per day during active basho, after the triggerable import path is stable.
 
 ## Follow-Up Tickets
 

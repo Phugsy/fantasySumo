@@ -124,6 +124,7 @@ Useful API endpoints:
 - `POST /api/admin/demo/complete`
 - `POST /api/admin/import-banzuke`
 - `POST /api/admin/basho/:bashoId/import-results`
+- `GET /api/cron/import-results`
 
 The demo admin endpoints require `DEMO_ADMIN_TOKEN` and an `x-demo-admin-token` header. They reset and mutate demo data, so do not expose them without that protection.
 
@@ -156,6 +157,7 @@ Use a `postgres:` or `postgresql:` `DATABASE_URL` for managed production persist
 
 The local team size defaults to `2`. Override it for the API with `TEAM_SIZE`.
 Set `DEMO_ADMIN_TOKEN` to enable protected demo admin API controls.
+Set `CRON_SECRET` in production to authenticate Vercel's scheduled results import.
 
 ## Data import
 
@@ -191,6 +193,12 @@ curl -X POST "http://localhost:3000/api/admin/basho/2026-05/import-results?dryRu
   -H "content-type: application/json" \
   -d '{"day":1,"division":"Makuuchi"}'
 ```
+
+Production deployments also expose a Vercel Cron-only
+`GET /api/cron/import-results` path. It selects the single active live basho,
+derives the current basho day in Japan time, and reuses the same transactional
+result import service as the manual trigger. See `docs/DEPLOYMENT.md` for the
+schedule and authentication details.
 
 ## Makefile commands
 
@@ -228,4 +236,4 @@ For Vercel deployment prep and the managed Postgres production path, see `docs/D
 
 1. Persist or retrieve the latest submitted team for follow-up views.
 2. Decide pick locking and whether the configured team size should move into database-backed basho settings.
-3. Add a protected admin UI or scheduled job around the import service.
+3. Add a protected admin UI around the import service.

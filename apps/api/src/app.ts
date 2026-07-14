@@ -8,12 +8,14 @@ import {
 import {
   allowsUnprotectedAdminImports,
   getAdminImportToken,
+  getCronSecret,
   getDemoAdminToken,
   getTeamSize,
 } from "./config.js";
 import { registerAdminDemoRoutes } from "./routes/admin-demo.js";
 import { registerAdminImportRoutes } from "./routes/admin-imports.js";
 import { registerBashoRoutes } from "./routes/basho.js";
+import { registerScheduledImportRoutes } from "./routes/scheduled-imports.js";
 
 interface AppOptions {
   db?: AppDatabase;
@@ -23,6 +25,7 @@ interface AppOptions {
   teamSize?: number;
   demoAdminToken?: string;
   adminImportToken?: string;
+  cronSecret?: string;
   allowUnprotectedAdminImports?: boolean;
   allowUnprotectedDemoAdmin?: boolean;
 }
@@ -66,6 +69,12 @@ export function buildApp(options: AppOptions = {}) {
     demoAdminToken: options.demoAdminToken ?? getDemoAdminToken(),
     repositories,
     now: options.now ?? (() => new Date()),
+  });
+  registerScheduledImportRoutes(app, {
+    cronSecret: options.cronSecret ?? getCronSecret(),
+    now: options.now ?? (() => new Date()),
+    repositories,
+    sourceFetch: options.sourceFetch ?? fetch,
   });
 
   return app;

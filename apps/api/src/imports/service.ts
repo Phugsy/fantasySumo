@@ -113,11 +113,8 @@ export async function importBoutResults(
   );
 
   if (options.dryRun !== true) {
-    if (nextBasho !== undefined) {
-      await repositories.upsertBasho(nextBasho);
-    }
-
     await repositories.applyBoutResultsImport({
+      ...(nextBasho === undefined ? {} : { basho: nextBasho }),
       bashoId: command.bashoId,
       day: command.results[0]!.day,
       rikishi: missingSourceRikishi,
