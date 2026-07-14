@@ -1,5 +1,6 @@
 import type { ActiveView } from "../types";
 import { ViewSwitch } from "./ViewSwitch";
+import "./AppHeader.css";
 
 interface AppHeaderProps {
   activeView: ActiveView;

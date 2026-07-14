@@ -1,5 +1,6 @@
 import type { Basho } from "../types";
 import { getBashoLifecycleLabel } from "../lifecycle";
+import "./BashoPanel.css";
 
 interface BashoPanelProps {
   basho: Basho;

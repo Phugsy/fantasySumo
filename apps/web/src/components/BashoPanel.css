@@ -1,0 +1,71 @@
+.basho-panel {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto auto minmax(190px, auto);
+  gap: 24px;
+  align-items: center;
+  padding: 20px 22px;
+  border-left: 4px solid var(--vermilion);
+}
+
+.basho-panel .section-heading {
+  margin-bottom: 0;
+}
+
+.basho-dates,
+.lifecycle-state {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.basho-dates {
+  color: var(--muted);
+}
+
+.lifecycle-state {
+  color: var(--moss);
+}
+
+.progress-wrap {
+  min-width: 190px;
+  padding: 11px 14px;
+  border: 1px solid #ceddd6;
+  border-radius: 9px;
+  background: var(--moss-light);
+  color: #263f38;
+}
+
+.progress-wrap span,
+.progress-wrap strong {
+  display: block;
+}
+
+.progress-wrap span {
+  font-size: 0.82rem;
+}
+
+.progress-wrap strong {
+  font-size: 0.96rem;
+}
+
+@media (max-width: 920px) {
+  .basho-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .progress-wrap {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .basho-panel {
+    grid-template-columns: 1fr;
+    gap: 13px;
+    padding: 18px;
+  }
+
+  .basho-dates,
+  .lifecycle-state {
+    white-space: normal;
+  }
+}

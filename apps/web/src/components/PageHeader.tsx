@@ -1,4 +1,5 @@
 import type { ActiveView } from "../types";
+import "./PageHeader.css";
 
 interface PageHeaderProps {
   activeView: ActiveView;

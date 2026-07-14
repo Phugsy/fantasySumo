@@ -1,4 +1,5 @@
 import type { ActiveView } from "../types";
+import "./ViewSwitch.css";
 
 interface ViewSwitchProps {
   activeView: ActiveView;
@@ -20,7 +21,7 @@ export function ViewSwitch({
         onClick={() => onChange("selection")}
         aria-current={activeView === "selection" ? "page" : undefined}
       >
-        Current basho
+        My stable
       </button>
       <button
         type="button"
