@@ -7,11 +7,11 @@ import {
   fetchLeaderboard,
   getErrorMessage,
 } from "./api";
+import { AppHeader } from "./components/AppHeader";
 import { BashoPanel } from "./components/BashoPanel";
 import { LeaderboardPanel } from "./components/LeaderboardPanel";
 import { PageHeader } from "./components/PageHeader";
 import { TeamSelection } from "./components/TeamSelection";
-import { ViewSwitch } from "./components/ViewSwitch";
 import type {
   ActiveView,
   Basho,
@@ -210,76 +210,78 @@ export function App() {
   }
 
   return (
-    <main className="app-shell">
-      <PageHeader />
+    <div className="site-shell">
+      <AppHeader
+        activeView={activeView}
+        disabled={loadState !== "ready" || submitState === "submitting"}
+        onChange={setActiveView}
+      />
+      <main className="app-shell">
+        <PageHeader activeView={activeView} />
 
-      {loadState === "loading" && (
-        <section className="state-panel" aria-live="polite">
-          Loading the current basho...
-        </section>
-      )}
+        {loadState === "loading" && (
+          <section className="state-panel" aria-live="polite">
+            Loading the current basho...
+          </section>
+        )}
 
-      {loadState === "error" && (
-        <section className="state-panel error-state" role="alert">
-          {errorMessage ?? "Unable to load basho data."}
-        </section>
-      )}
+        {loadState === "error" && (
+          <section className="state-panel error-state" role="alert">
+            {errorMessage ?? "Unable to load basho data."}
+          </section>
+        )}
 
-      {loadState === "empty" && (
-        <section className="state-panel">
-          No rikishi are available for the current basho yet.
-        </section>
-      )}
+        {loadState === "empty" && (
+          <section className="state-panel">
+            No rikishi are available for the current basho yet.
+          </section>
+        )}
 
-      {loadState === "ready" && basho !== null && (
-        <>
-          <BashoPanel basho={basho} selectedCount={selectedIds.length} />
-          <ViewSwitch
-            activeView={activeView}
-            disabled={submitState === "submitting"}
-            onChange={setActiveView}
-          />
+        {loadState === "ready" && basho !== null && (
+          <>
+            <BashoPanel basho={basho} selectedCount={selectedIds.length} />
 
-          {activeView === "selection" && (
-            <TeamSelection
-              canSubmit={canSubmit}
-              createdTeam={createdTeam}
-              displayName={displayName}
-              errorMessage={errorMessage}
-              isLocked={!canEditPicks}
-              lockMessage={pickLockMessage}
-              onDisplayNameChange={(nextDisplayName) => {
-                setDisplayName(nextDisplayName);
-                setCreatedTeam(null);
-              }}
-              onSubmit={handleSubmit}
-              onToggleRikishi={toggleRikishi}
-              rikishi={rikishi}
-              selectedIds={selectedIds}
-              selectedRikishi={selectedRikishi}
-              submitState={submitState}
-              teamSize={teamSize}
-            />
-          )}
+            {activeView === "selection" && (
+              <TeamSelection
+                canSubmit={canSubmit}
+                createdTeam={createdTeam}
+                displayName={displayName}
+                errorMessage={errorMessage}
+                isLocked={!canEditPicks}
+                lockMessage={pickLockMessage}
+                onDisplayNameChange={(nextDisplayName) => {
+                  setDisplayName(nextDisplayName);
+                  setCreatedTeam(null);
+                }}
+                onSubmit={handleSubmit}
+                onToggleRikishi={toggleRikishi}
+                rikishi={rikishi}
+                selectedIds={selectedIds}
+                selectedRikishi={selectedRikishi}
+                submitState={submitState}
+                teamSize={teamSize}
+              />
+            )}
 
-          {activeView === "leaderboard" && (
-            <LeaderboardPanel
-              basho={basho}
-              createdTeam={createdTeam}
-              errorMessage={leaderboardErrorMessage}
-              expandedTeamId={expandedTeamId}
-              leaderboard={leaderboard}
-              loadState={leaderboardLoadState}
-              onToggleTeam={(teamId) =>
-                setExpandedTeamId(expandedTeamId === teamId ? null : teamId)
-              }
-              rikishi={rikishi}
-              totalDays={leaderboardTotalDays}
-            />
-          )}
-        </>
-      )}
-    </main>
+            {activeView === "leaderboard" && (
+              <LeaderboardPanel
+                basho={basho}
+                createdTeam={createdTeam}
+                errorMessage={leaderboardErrorMessage}
+                expandedTeamId={expandedTeamId}
+                leaderboard={leaderboard}
+                loadState={leaderboardLoadState}
+                onToggleTeam={(teamId) =>
+                  setExpandedTeamId(expandedTeamId === teamId ? null : teamId)
+                }
+                rikishi={rikishi}
+                totalDays={leaderboardTotalDays}
+              />
+            )}
+          </>
+        )}
+      </main>
+    </div>
   );
 }
 

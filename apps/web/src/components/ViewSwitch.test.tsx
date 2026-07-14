@@ -8,7 +8,7 @@ describe("ViewSwitch", () => {
 
     render(<ViewSwitch activeView="selection" onChange={onChange} />);
 
-    expect(screen.getByRole("button", { name: "Team selection" })).toHaveClass(
+    expect(screen.getByRole("button", { name: "Current basho" })).toHaveClass(
       "active",
     );
     expect(screen.getByRole("button", { name: "Leaderboard" })).not.toHaveClass(
@@ -26,7 +26,7 @@ describe("ViewSwitch", () => {
     render(<ViewSwitch activeView="selection" disabled onChange={onChange} />);
 
     expect(
-      screen.getByRole("button", { name: "Team selection" }),
+      screen.getByRole("button", { name: "Current basho" }),
     ).toBeDisabled();
     expect(screen.getByRole("button", { name: "Leaderboard" })).toBeDisabled();
   });
