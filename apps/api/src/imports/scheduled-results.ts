@@ -35,11 +35,31 @@ export async function runScheduledResultsImport(
     (options.now ?? (() => new Date()))(),
     JAPAN_TIME_ZONE,
   );
-  const activeBashos = (await repositories.listBashos()).filter(
-    (basho) => basho.status === "active" && basho.id !== DEMO_BASHO_ID,
+  const liveBashos = (await repositories.listBashos()).filter(
+    (basho) =>
+      (basho.status === "locked" || basho.status === "active") &&
+      basho.id !== DEMO_BASHO_ID,
   );
+  const eligibleBashos = liveBashos.flatMap((basho) => {
+    const day = resolveBashoDay(basho, japanDate);
 
-  if (activeBashos.length === 0) {
+    if (day === undefined || (basho.status === "locked" && day !== 1)) {
+      return [];
+    }
+
+    return [{ basho, day }];
+  });
+
+  if (eligibleBashos.length === 0) {
+    if (liveBashos.length === 1) {
+      return {
+        status: "skipped",
+        reason: "outside-basho-window",
+        bashoId: liveBashos[0]!.id,
+        japanDate,
+      };
+    }
+
     return {
       status: "skipped",
       reason: "no-active-basho",
@@ -47,25 +67,15 @@ export async function runScheduledResultsImport(
     };
   }
 
-  if (activeBashos.length > 1) {
+  if (eligibleBashos.length > 1) {
     throw new Error(
-      `Scheduled results import found multiple active live bashos: ${activeBashos
-        .map((basho) => basho.id)
+      `Scheduled results import found multiple eligible live bashos: ${eligibleBashos
+        .map(({ basho }) => basho.id)
         .join(", ")}.`,
     );
   }
 
-  const basho = activeBashos[0]!;
-  const day = resolveBashoDay(basho, japanDate);
-
-  if (day === undefined) {
-    return {
-      status: "skipped",
-      reason: "outside-basho-window",
-      bashoId: basho.id,
-      japanDate,
-    };
-  }
+  const { basho, day } = eligibleBashos[0]!;
 
   const command = await fetchSumoApiResultsImport(sourceFetch, {
     bashoId: basho.id,

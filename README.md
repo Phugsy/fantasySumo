@@ -195,10 +195,10 @@ curl -X POST "http://localhost:3000/api/admin/basho/2026-05/import-results?dryRu
 ```
 
 Production deployments also expose a Vercel Cron-only
-`GET /api/cron/import-results` path. It selects the single active live basho,
-derives the current basho day in Japan time, and reuses the same transactional
-result import service as the manual trigger. See `docs/DEPLOYMENT.md` for the
-schedule and authentication details.
+`GET /api/cron/import-results` path. It selects the single eligible live basho,
+including a locked basho on day 1, derives the current basho day in Japan time,
+and reuses the same transactional result import service as the manual trigger.
+See `docs/DEPLOYMENT.md` for the schedule and authentication details.
 
 ## Makefile commands
 

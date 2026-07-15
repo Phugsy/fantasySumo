@@ -69,14 +69,16 @@ The root `vercel.json` configures one production cron invocation:
 ```json
 {
   "path": "/api/cron/import-results",
-  "schedule": "0 10 * * *"
+  "schedule": "0 11 * * *"
 }
 ```
 
-Vercel cron schedules use UTC, so this runs daily at **10:00 UTC / 19:00 JST**.
-That is after the expected end of the top-division bouts. The daily schedule is
-compatible with Vercel Hobby's once-per-day cron limit; manual imports remain
-the recovery path for delayed source data or a missed run.
+Vercel cron schedules use UTC. On a Hobby project, this schedule runs once
+between **11:00-11:59 UTC / 20:00-20:59 JST**, because Hobby cron invocation
+precision is hourly. That leaves at least two hours after the expected 18:00
+JST end of the top-division bouts. Vercel does not retry failed cron
+invocations, so manual imports remain the recovery path for delayed or
+incomplete source data, a failed invocation, or a missed run.
 
 Set `CRON_SECRET` on the production deployment. Vercel sends it to the cron
 route as `Authorization: Bearer <CRON_SECRET>`. The route is disabled when the
@@ -85,20 +87,23 @@ token. Cron jobs run on production deployments, not previews.
 
 On each authenticated invocation, the route:
 
-1. finds bashos whose stored lifecycle status is `active`;
+1. finds live bashos whose stored lifecycle status is `locked` or `active`;
 2. excludes the deterministic demo basho;
-3. refuses to import if more than one live basho is active;
-4. calculates the expected basho day from the current date in `Asia/Tokyo` and
+3. allows a `locked` basho to become the day-one target, and otherwise targets
+   the single date-eligible `active` basho;
+4. refuses to import if more than one live basho is eligible;
+5. calculates the expected basho day from the current date in `Asia/Tokyo` and
    the stored basho start date;
-5. skips without contacting the source when no live basho is active or the
+6. skips without contacting the source when no live basho is eligible or the
    date is outside the active basho's stored date window;
-6. runs the existing Sumo API adapter and transactional daily result import.
+7. runs the existing Sumo API adapter and transactional daily result import,
+   moving `locked` to `active` on day 1 and `active` to `complete` on day 15.
 
 Re-running the route on the same Japan calendar day targets the same basho/day.
 The importer replaces only that day's stable result IDs, so retries correct or
 skip existing rows without duplicating scores, teams, or picks. The response
 and Vercel function logs include the status, basho ID, day, Japan date, and skip
-reason when applicable. Source, validation, or ambiguous-active-basho errors
+reason when applicable. Source, validation, or ambiguous-live-basho errors
 are logged and return a non-2xx response so Vercel does not record silent
 success.
 

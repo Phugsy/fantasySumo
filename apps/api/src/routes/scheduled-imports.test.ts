@@ -47,7 +47,7 @@ describe("scheduled result import route", () => {
   });
 
   it("imports the Japan-calendar basho day and safely reruns that same day", async () => {
-    await seedActiveBasho("2026-05");
+    await seedLiveBasho("2026-05");
     let requestedUrl = "";
     app = createApp(async (url) => {
       requestedUrl = String(url);
@@ -95,7 +95,55 @@ describe("scheduled result import route", () => {
     });
   });
 
-  it("skips cleanly when there is no active live basho", async () => {
+  it("imports day one for a locked basho and advances it to active", async () => {
+    await seedLiveBasho("2026-05", { status: "locked", currentDay: 0 });
+    app = createApp(
+      async () => resultsResponse(1),
+      new Date("2026-05-10T02:00:00.000Z"),
+    );
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "imported",
+      bashoId: "2026-05",
+      day: 1,
+    });
+    expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 1,
+    });
+  });
+
+  it("completes the basho atomically with its day 15 results", async () => {
+    await seedLiveBasho("2026-05", { currentDay: 14 });
+    app = createApp(
+      async () => resultsResponse(15),
+      new Date("2026-05-24T02:00:00.000Z"),
+    );
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "imported",
+      bashoId: "2026-05",
+      day: 15,
+      import: {
+        summary: {
+          basho: { updated: 1 },
+          results: { created: 1 },
+        },
+      },
+    });
+    expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
+      status: "complete",
+      currentDay: 15,
+    });
+  });
+
+  it("skips cleanly when there is no eligible live basho", async () => {
     let fetchCalls = 0;
     app = createApp(async () => {
       fetchCalls += 1;
@@ -114,7 +162,7 @@ describe("scheduled result import route", () => {
   });
 
   it("does not treat the deterministic demo basho as a live import target", async () => {
-    await seedActiveBasho(DEMO_BASHO_ID);
+    await seedLiveBasho(DEMO_BASHO_ID);
     app = createApp();
 
     const response = await injectCron(app);
@@ -127,7 +175,7 @@ describe("scheduled result import route", () => {
   });
 
   it("reports source failures as unsuccessful cron responses", async () => {
-    await seedActiveBasho("2026-05");
+    await seedLiveBasho("2026-05");
     app = createApp(async () => new Response(null, { status: 503 }));
 
     const response = await injectCron(app);
@@ -144,8 +192,8 @@ describe("scheduled result import route", () => {
   });
 
   it("fails safely when more than one live basho is marked active", async () => {
-    await seedActiveBasho("2026-05");
-    await seedActiveBasho("2026-05-conflict");
+    await seedLiveBasho("2026-05");
+    await seedLiveBasho("2026-05-conflict");
     app = createApp();
 
     const response = await injectCron(app);
@@ -158,11 +206,16 @@ describe("scheduled result import route", () => {
   });
 });
 
-function createApp(sourceFetch: typeof fetch = async () => resultsResponse()) {
+function createApp(
+  sourceFetch: typeof fetch = async () => resultsResponse(),
+  now = NOW,
+) {
   return buildApp({
+    adminImportToken: "separate-admin-import-token",
+    allowUnprotectedAdminImports: false,
     cronSecret: CRON_SECRET,
     db: client,
-    now: () => NOW,
+    now: () => now,
     sourceFetch,
   });
 }
@@ -177,7 +230,10 @@ function injectCron(instance: FastifyInstance) {
   });
 }
 
-async function seedActiveBasho(bashoId: string) {
+async function seedLiveBasho(
+  bashoId: string,
+  options: { status?: "active" | "locked"; currentDay?: number } = {},
+) {
   const repositories = createRepositories(client);
 
   await repositories.insertBasho({
@@ -185,8 +241,8 @@ async function seedActiveBasho(bashoId: string) {
     name: "May 2026",
     startDate: "2026-05-10",
     endDate: "2026-05-24",
-    status: "active",
-    currentDay: 2,
+    status: options.status ?? "active",
+    currentDay: options.currentDay ?? 2,
   });
   await repositories.upsertRikishi({
     id: "onosato",
@@ -214,14 +270,14 @@ async function seedActiveBasho(bashoId: string) {
   });
 }
 
-function resultsResponse() {
+function resultsResponse(day = 3) {
   return new Response(
     JSON.stringify({
       torikumi: [
         {
-          id: "202605-3-1-4227-3661",
+          id: `202605-${day}-1-4227-3661`,
           bashoId: "202605",
-          day: 3,
+          day,
           matchNo: 1,
           eastId: 4227,
           eastShikona: "Onosato",

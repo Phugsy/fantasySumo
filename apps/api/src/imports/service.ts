@@ -320,7 +320,8 @@ function advanceBashoForResults(
 
   return {
     ...basho,
-    status: basho.status === "complete" ? "complete" : "active",
+    status:
+      basho.status === "complete" || importedDay === 15 ? "complete" : "active",
     currentDay: Math.max(basho.currentDay ?? 0, importedDay),
   };
 }
