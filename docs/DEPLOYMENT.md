@@ -87,17 +87,19 @@ token. Cron jobs run on production deployments, not previews.
 
 On each authenticated invocation, the route:
 
-1. finds live bashos whose stored lifecycle status is `locked` or `active`;
+1. finds schedulable bashos whose stored lifecycle status is `upcoming`,
+   `locked`, or `active`;
 2. excludes the deterministic demo basho;
-3. allows a `locked` basho to become the day-one target, and otherwise targets
-   the single date-eligible `active` basho;
+3. allows an `upcoming` or `locked` basho to become the day-one target, and
+   otherwise targets the single date-eligible `active` basho;
 4. refuses to import if more than one live basho is eligible;
 5. calculates the expected basho day from the current date in `Asia/Tokyo` and
    the stored basho start date;
 6. skips without contacting the source when no live basho is eligible or the
    date is outside the active basho's stored date window;
 7. runs the existing Sumo API adapter and transactional daily result import,
-   moving `locked` to `active` on day 1 and `active` to `complete` on day 15.
+   moving `upcoming` or `locked` to `active` on day 1 and `active` to
+   `complete` on day 15.
 
 Re-running the route on the same Japan calendar day targets the same basho/day.
 The importer replaces only that day's stable result IDs, so retries correct or

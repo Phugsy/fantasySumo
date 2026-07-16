@@ -116,6 +116,27 @@ describe("scheduled result import route", () => {
     });
   });
 
+  it("imports day one for an upcoming basho created by an early banzuke import", async () => {
+    await seedLiveBasho("2026-05", { status: "upcoming", currentDay: 0 });
+    app = createApp(
+      async () => resultsResponse(1),
+      new Date("2026-05-10T02:00:00.000Z"),
+    );
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "imported",
+      bashoId: "2026-05",
+      day: 1,
+    });
+    expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 1,
+    });
+  });
+
   it("completes the basho atomically with its day 15 results", async () => {
     await seedLiveBasho("2026-05", { currentDay: 14 });
     app = createApp(
@@ -232,7 +253,10 @@ function injectCron(instance: FastifyInstance) {
 
 async function seedLiveBasho(
   bashoId: string,
-  options: { status?: "active" | "locked"; currentDay?: number } = {},
+  options: {
+    status?: "active" | "locked" | "upcoming";
+    currentDay?: number;
+  } = {},
 ) {
   const repositories = createRepositories(client);
 

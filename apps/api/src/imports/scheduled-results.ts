@@ -35,15 +35,17 @@ export async function runScheduledResultsImport(
     (options.now ?? (() => new Date()))(),
     JAPAN_TIME_ZONE,
   );
-  const liveBashos = (await repositories.listBashos()).filter(
+  const scheduledBashos = (await repositories.listBashos()).filter(
     (basho) =>
-      (basho.status === "locked" || basho.status === "active") &&
+      (basho.status === "upcoming" ||
+        basho.status === "locked" ||
+        basho.status === "active") &&
       basho.id !== DEMO_BASHO_ID,
   );
-  const eligibleBashos = liveBashos.flatMap((basho) => {
+  const eligibleBashos = scheduledBashos.flatMap((basho) => {
     const day = resolveBashoDay(basho, japanDate);
 
-    if (day === undefined || (basho.status === "locked" && day !== 1)) {
+    if (day === undefined || (basho.status !== "active" && day !== 1)) {
       return [];
     }
 
@@ -51,11 +53,11 @@ export async function runScheduledResultsImport(
   });
 
   if (eligibleBashos.length === 0) {
-    if (liveBashos.length === 1) {
+    if (scheduledBashos.length === 1) {
       return {
         status: "skipped",
         reason: "outside-basho-window",
-        bashoId: liveBashos[0]!.id,
+        bashoId: scheduledBashos[0]!.id,
         japanDate,
       };
     }
