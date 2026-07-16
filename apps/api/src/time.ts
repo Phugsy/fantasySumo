@@ -1,7 +1,7 @@
 const JAPAN_TIME_ZONE = "Asia/Tokyo";
 
 export function formatJapanDate(date: Date): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
+  const parts = new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
     month: "2-digit",
     timeZone: JAPAN_TIME_ZONE,

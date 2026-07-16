@@ -16,7 +16,6 @@ import { registerAdminDemoRoutes } from "./routes/admin-demo.js";
 import { registerAdminImportRoutes } from "./routes/admin-imports.js";
 import { registerBashoRoutes } from "./routes/basho.js";
 import { registerScheduledImportRoutes } from "./routes/scheduled-imports.js";
-import { registerScheduledPickLockRoutes } from "./routes/scheduled-pick-lock.js";
 
 interface AppOptions {
   db?: AppDatabase;
@@ -77,11 +76,5 @@ export function buildApp(options: AppOptions = {}) {
     repositories,
     sourceFetch: options.sourceFetch ?? fetch,
   });
-  registerScheduledPickLockRoutes(app, {
-    cronSecret: options.cronSecret ?? getCronSecret(),
-    now: options.now ?? (() => new Date()),
-    repositories,
-  });
-
   return app;
 }

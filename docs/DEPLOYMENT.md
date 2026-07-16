@@ -37,7 +37,8 @@ DEMO_ADMIN_TOKEN=<long random token, only if demo admin controls are needed>
 
 ## Production database direction
 
-Use managed Postgres for production persistence. Supabase Postgres is the default recommendation for this hobby-scale deployment unless Neon has a stronger operational reason at setup time.
+Production uses managed Neon Postgres. Keep the generic `DATABASE_URL` and
+repository adapter boundary so the application remains portable.
 
 The database package now treats persistence as an adapter boundary:
 
@@ -64,15 +65,10 @@ The same token can also be supplied with `Authorization: Bearer <token>`.
 
 ## Scheduled production jobs
 
-The root `vercel.json` configures the two daily production cron invocations
-allowed by the Vercel Hobby plan:
+The root `vercel.json` configures one daily production cron invocation:
 
 ```json
 [
-  {
-    "path": "/api/cron/lock-picks",
-    "schedule": "0 15 * * *"
-  },
   {
     "path": "/api/cron/import-results",
     "schedule": "0 11 * * *"
@@ -81,65 +77,37 @@ allowed by the Vercel Hobby plan:
 ```
 
 Vercel cron schedules use UTC. Japan does not observe daylight saving time, so
-the pick-lock schedule runs once between **15:00-15:59 UTC / 00:00-00:59 JST**
-on the following calendar day. The results schedule runs once between
-**11:00-11:59 UTC / 20:00-20:59 JST**. These are hourly windows because Hobby
-cron invocation precision is hourly. The results window leaves at least two
-hours after the expected 18:00 JST end of the top-division bouts. Vercel does
-not retry failed cron invocations.
+the job runs once between **11:00-11:59 UTC / 20:00-20:59 JST**. The window
+leaves at least two hours after the expected 18:00 JST end of the top-division
+bouts. Hobby cron invocation precision is hourly. Vercel does not retry failed
+cron invocations.
 
 Set `CRON_SECRET` on the production deployment. Vercel sends it to the cron
-routes as `Authorization: Bearer <CRON_SECRET>`. Both routes are disabled when
-the secret is missing and reject requests with a missing or incorrect bearer
+route as `Authorization: Bearer <CRON_SECRET>`. The route is disabled when
+the secret is missing and rejects requests with a missing or incorrect bearer
 token. Cron jobs run on production deployments, not previews.
 
-### Day-before pick lock
+### Day-before pick lock and daily results
 
-On each authenticated `GET /api/cron/lock-picks` invocation, the route:
+On each authenticated invocation, the route calculates the current date in
+`Asia/Tokyo` and selects at most one non-demo basho:
 
-1. calculates the current date in `Asia/Tokyo`;
-2. finds the single non-demo `upcoming` basho whose lock date has arrived;
-3. atomically changes that basho to `locked` and stamps `lockedAt` on its
-   existing fantasy teams;
-4. skips cleanly when no basho is due and fails without mutation when more than
-   one basho is eligible.
+1. on day 0, the calendar day before `basho.startDate`, it atomically changes
+   the upcoming basho to `locked` and stamps `lockedAt` on existing teams;
+2. on days 1-15, it derives the basho day and runs the source-backed,
+   transactional result import;
+3. it skips without contacting the results source outside that window;
+4. it fails without mutation when more than one basho is eligible.
 
-The lock date is the calendar day before `basho.startDate`. The route remains
-eligible through the basho window so a missed run can catch up, and rerunning
-after a successful lock is a safe no-op. Independently, team creation compares
-the current Japan date with the same deadline and returns `409 picks-locked`
-even if the stored basho status is stale. This prevents a missed cron from
-allowing late picks. The known deterministic demo basho is excluded from both
-calendar enforcement and the production lifecycle cron; its protected demo
-controls remain the source of progression.
+Rerunning day 0 after a successful lock is a safe no-op. Independently, team
+creation compares the current Japan date with the same deadline and returns
+`409 picks-locked` even if the persisted status is stale. Basho API reads also
+expose an effective `locked` status, so the client does not advertise open
+picks while the cron/database update is pending. The deterministic demo basho
+is exempt; its protected controls remain the source of progression.
 
 Banzuke reimports preserve the most advanced stored basho lifecycle state, so
 running a refresh after this job cannot regress `locked` back to `upcoming`.
-
-For a controlled manual lock or recovery check:
-
-```bash
-curl "https://<deployment>/api/cron/lock-picks" \
-  -H "Authorization: Bearer $CRON_SECRET"
-```
-
-### Daily results import
-
-On each authenticated invocation, the route:
-
-1. finds schedulable bashos whose stored lifecycle status is `upcoming`,
-   `locked`, or `active`;
-2. excludes the deterministic demo basho;
-3. allows an `upcoming` or `locked` basho to become the day-one target, and
-   otherwise targets the single date-eligible `active` basho;
-4. refuses to import if more than one live basho is eligible;
-5. calculates the expected basho day from the current date in `Asia/Tokyo` and
-   the stored basho start date;
-6. skips without contacting the source when no live basho is eligible or the
-   date is outside the active basho's stored date window;
-7. runs the existing Sumo API adapter and transactional daily result import,
-   moving `upcoming` or `locked` to `active` on day 1 and `active` to
-   `complete` on day 15.
 
 Re-running the route on the same Japan calendar day targets the same basho/day.
 The importer replaces only that day's stable result IDs, so retries correct or
@@ -148,6 +116,13 @@ and Vercel function logs include the status, basho ID, day, Japan date, and skip
 reason when applicable. Source, validation, or ambiguous-live-basho errors
 are logged and return a non-2xx response so Vercel does not record silent
 success.
+
+This job necessarily reads and sometimes writes the authoritative Neon
+database. A Redis cache would add another network dependency without removing
+that database wake-up, so it is not used to address cron cold starts. On a
+scale-to-zero plan, occasional Neon connection wake-up latency is expected;
+keeping this as one daily function invocation avoids a second scheduled cold
+start while preserving database correctness.
 
 For a controlled manual check, call the deployed route with the same bearer
 header Vercel uses:
@@ -159,7 +134,7 @@ curl "https://<deployment>/api/cron/import-results" \
 
 ## First deployment checklist
 
-1. Create a managed Postgres database, preferably Supabase Postgres.
+1. Create the managed Neon Postgres database.
 2. Add the Vercel project from the GitHub repo root.
 3. Configure the environment variables above for preview and production.
 4. Run migrations against the managed database with the production `DATABASE_URL`.

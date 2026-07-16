@@ -187,7 +187,34 @@ describe("basho routes", () => {
     expect(atCutoff.json()).toMatchObject({
       error: "picks-locked",
       message: "Picks closed the day before this basho starts.",
-      bashoStatus: "upcoming",
+      bashoStatus: "locked",
+    });
+
+    const currentResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/current",
+    });
+
+    expect(currentResponse.statusCode).toBe(200);
+    expect(currentResponse.json()).toMatchObject({
+      id: "2026-05",
+      status: "locked",
+    });
+
+    const rikishiResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/rikishi",
+    });
+
+    expect(rikishiResponse.json().basho).toMatchObject({ status: "locked" });
+
+    const leaderboardResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/leaderboard",
+    });
+
+    expect(leaderboardResponse.json().basho).toMatchObject({
+      status: "locked",
     });
   });
 

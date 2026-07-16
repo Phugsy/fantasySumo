@@ -15,6 +15,13 @@ export type ScheduledResultsImportResult =
       japanDate: string;
     }
   | {
+      status: "locked";
+      bashoId: string;
+      day: 0;
+      japanDate: string;
+      lockedAt: string;
+    }
+  | {
       status: "imported";
       bashoId: string;
       day: number;
@@ -31,7 +38,8 @@ export async function runScheduledResultsImport(
   sourceFetch: SourceFetch,
   options: ScheduledResultsImportOptions = {},
 ): Promise<ScheduledResultsImportResult> {
-  const japanDate = formatJapanDate((options.now ?? (() => new Date()))());
+  const now = (options.now ?? (() => new Date()))();
+  const japanDate = formatJapanDate(now);
   const scheduledBashos = (await repositories.listBashos()).filter(
     (basho) =>
       (basho.status === "upcoming" ||
@@ -42,7 +50,7 @@ export async function runScheduledResultsImport(
   const eligibleBashos = scheduledBashos.flatMap((basho) => {
     const day = resolveBashoDay(basho, japanDate);
 
-    if (day === undefined || (basho.status !== "active" && day !== 1)) {
+    if (day === undefined || !isEligibleForScheduledUpdate(basho, day)) {
       return [];
     }
 
@@ -68,13 +76,31 @@ export async function runScheduledResultsImport(
 
   if (eligibleBashos.length > 1) {
     throw new Error(
-      `Scheduled results import found multiple eligible live bashos: ${eligibleBashos
+      `Scheduled basho update found multiple eligible live bashos: ${eligibleBashos
         .map(({ basho }) => basho.id)
         .join(", ")}.`,
     );
   }
 
   const { basho, day } = eligibleBashos[0]!;
+
+  if (day === 0) {
+    const lockedAt = now.toISOString();
+
+    await repositories.lockBashoAndFantasyTeams(basho.id, lockedAt);
+
+    return {
+      status: "locked",
+      bashoId: basho.id,
+      day,
+      japanDate,
+      lockedAt,
+    };
+  }
+
+  if (day === 1 && basho.status === "upcoming") {
+    await repositories.lockBashoAndFantasyTeams(basho.id, now.toISOString());
+  }
 
   const command = await fetchSumoApiResultsImport(sourceFetch, {
     bashoId: basho.id,
@@ -91,6 +117,18 @@ export async function runScheduledResultsImport(
   };
 }
 
+function isEligibleForScheduledUpdate(basho: Basho, day: number) {
+  if (day === 0) {
+    return basho.status === "upcoming";
+  }
+
+  if (day === 1) {
+    return true;
+  }
+
+  return basho.status === "active";
+}
+
 function resolveBashoDay(basho: Basho, japanDate: string) {
   const currentDate = parseDateOnly(japanDate);
   const startDate = parseDateOnly(basho.startDate);
@@ -100,7 +138,7 @@ function resolveBashoDay(basho: Basho, japanDate: string) {
     currentDate === undefined ||
     startDate === undefined ||
     endDate === undefined ||
-    currentDate < startDate ||
+    currentDate < startDate - MILLISECONDS_PER_DAY ||
     currentDate > endDate
   ) {
     return undefined;

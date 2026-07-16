@@ -95,6 +95,72 @@ describe("scheduled result import route", () => {
     });
   });
 
+  it("locks picks on day zero without fetching results and safely reruns", async () => {
+    await seedLiveBasho("2026-05", {
+      status: "upcoming",
+      currentDay: 0,
+      withTeam: true,
+    });
+    let fetchCalls = 0;
+    app = createApp(async () => {
+      fetchCalls += 1;
+      return resultsResponse();
+    }, new Date("2026-05-09T02:00:00.000Z"));
+
+    const firstResponse = await injectCron(app);
+
+    expect(firstResponse.statusCode).toBe(200);
+    expect(firstResponse.json()).toMatchObject({
+      status: "locked",
+      bashoId: "2026-05",
+      day: 0,
+      japanDate: "2026-05-09",
+      lockedAt: "2026-05-09T02:00:00.000Z",
+    });
+    expect(fetchCalls).toBe(0);
+
+    const repositories = createRepositories(client);
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "locked",
+      currentDay: 0,
+    });
+    expect(await repositories.getFantasyTeam("team-day-zero")).toMatchObject({
+      lockedAt: "2026-05-09T02:00:00.000Z",
+    });
+
+    const secondResponse = await injectCron(app);
+
+    expect(secondResponse.statusCode).toBe(200);
+    expect(secondResponse.json()).toMatchObject({
+      status: "skipped",
+      reason: "outside-basho-window",
+      bashoId: "2026-05",
+    });
+    expect(fetchCalls).toBe(0);
+  });
+
+  it("does not lock picks before day zero", async () => {
+    await seedLiveBasho("2026-05", { status: "upcoming", currentDay: 0 });
+    let fetchCalls = 0;
+    app = createApp(async () => {
+      fetchCalls += 1;
+      return resultsResponse();
+    }, new Date("2026-05-08T02:00:00.000Z"));
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "skipped",
+      reason: "outside-basho-window",
+      bashoId: "2026-05",
+    });
+    expect(fetchCalls).toBe(0);
+    expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
+      status: "upcoming",
+    });
+  });
+
   it("imports day one for a locked basho and advances it to active", async () => {
     await seedLiveBasho("2026-05", { status: "locked", currentDay: 0 });
     app = createApp(
@@ -117,7 +183,11 @@ describe("scheduled result import route", () => {
   });
 
   it("imports day one for an upcoming basho created by an early banzuke import", async () => {
-    await seedLiveBasho("2026-05", { status: "upcoming", currentDay: 0 });
+    await seedLiveBasho("2026-05", {
+      status: "upcoming",
+      currentDay: 0,
+      withTeam: true,
+    });
     app = createApp(
       async () => resultsResponse(1),
       new Date("2026-05-10T02:00:00.000Z"),
@@ -135,6 +205,9 @@ describe("scheduled result import route", () => {
       status: "active",
       currentDay: 1,
     });
+    expect(
+      await createRepositories(client).getFantasyTeam("team-day-zero"),
+    ).toMatchObject({ lockedAt: "2026-05-10T02:00:00.000Z" });
   });
 
   it("completes the basho atomically with its day 15 results", async () => {
@@ -256,6 +329,7 @@ async function seedLiveBasho(
   options: {
     status?: "active" | "locked" | "upcoming";
     currentDay?: number;
+    withTeam?: boolean;
   } = {},
 ) {
   const repositories = createRepositories(client);
@@ -292,6 +366,21 @@ async function seedLiveBasho(
     rank: "Ozeki",
     rankOrder: 2,
   });
+
+  if (options.withTeam === true) {
+    await repositories.insertFantasyTeamWithPicks(
+      {
+        id: "team-day-zero",
+        bashoId,
+        displayName: "Day Zero Team",
+        createdAt: "2026-05-01T12:00:00.000Z",
+      },
+      [
+        { teamId: "team-day-zero", rikishiId: "onosato" },
+        { teamId: "team-day-zero", rikishiId: "kotozakura" },
+      ],
+    );
+  }
 }
 
 function resultsResponse(day = 3) {

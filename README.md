@@ -27,7 +27,7 @@ It is close to a local playable loop, but still needs a friendlier admin UI befo
 - React
 - Fastify
 - SQLite for local development
-- Postgres for production deployment
+- Neon Postgres for production deployment
 - Drizzle
 - Vitest
 - ESLint
@@ -58,19 +58,16 @@ Install dependencies:
 make install
 ```
 
-Create a local database and seed sample MVP data:
+Create a local database with the deterministic, playable demo data:
 
 ```bash
 make db-migrate
-make db-seed
-```
-
-For demos, manual browser checks, and future E2E fixtures, use the deterministic demo basho seed instead:
-
-```bash
 make db-seed-demo
 make dev
 ```
+
+`make db-seed` remains available for dated sample/reference data, but that
+fixture follows real calendar locking and is not guaranteed to accept picks.
 
 Or reset the demo data and start both dev servers in one command:
 
@@ -125,7 +122,6 @@ Useful API endpoints:
 - `POST /api/admin/import-banzuke`
 - `POST /api/admin/basho/:bashoId/import-results`
 - `GET /api/cron/import-results`
-- `GET /api/cron/lock-picks`
 
 The demo admin endpoints require `DEMO_ADMIN_TOKEN` and an `x-demo-admin-token` header. They reset and mutate demo data, so do not expose them without that protection.
 
@@ -144,8 +140,10 @@ Basho records use this lifecycle:
 The API enforces pick locking. `POST /api/basho/:bashoId/teams` succeeds only
 while the basho is `upcoming` and the Japan-calendar lock date has not arrived;
 locked, active, complete, and overdue upcoming bashos return a
-`409 picks-locked` response. A protected daily cron changes the basho to
-`locked` and stamps existing teams at the start of the day before the basho.
+`409 picks-locked` response. Basho reads expose that effective date-based lock
+to the client even before the database status is updated. The protected daily
+cron persists the `locked` state and stamps existing teams on day 0, the
+calendar day before the basho.
 
 Useful checks:
 
@@ -163,8 +161,7 @@ Use a `postgres:` or `postgresql:` `DATABASE_URL` for managed production persist
 
 The local team size defaults to `2`. Override it for the API with `TEAM_SIZE`.
 Set `DEMO_ADMIN_TOKEN` to enable protected demo admin API controls.
-Set `CRON_SECRET` in production to authenticate Vercel's scheduled pick lock
-and results import.
+Set `CRON_SECRET` in production to authenticate Vercel's scheduled basho job.
 
 ## Data import
 
@@ -201,13 +198,12 @@ curl -X POST "http://localhost:3000/api/admin/basho/2026-05/import-results?dryRu
   -d '{"day":1,"division":"Makuuchi"}'
 ```
 
-Production deployments expose two Vercel Cron-only paths. `GET
-/api/cron/lock-picks` locks the single eligible upcoming basho at the start of
-the day before it begins in Japan. `GET /api/cron/import-results` selects the
-single eligible live basho, including an upcoming or locked basho on day 1,
-derives the current basho day in Japan time, and reuses the same transactional
-result import service as the manual trigger. See `docs/DEPLOYMENT.md` for the
-schedules and authentication details.
+Production deployments expose one Vercel Cron-only path. `GET
+/api/cron/import-results` locks the single eligible upcoming basho without
+contacting the results source on day 0, then derives and imports the current
+basho day on days 1-15. It accepts an upcoming or locked basho on day 1 as a
+safe catch-up path and reuses the manual trigger's transactional import
+service. See `docs/DEPLOYMENT.md` for schedule and authentication details.
 
 ## Makefile commands
 

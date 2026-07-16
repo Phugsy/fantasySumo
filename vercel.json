@@ -5,10 +5,6 @@
   "outputDirectory": "apps/web/dist",
   "crons": [
     {
-      "path": "/api/cron/lock-picks",
-      "schedule": "0 15 * * *"
-    },
-    {
       "path": "/api/cron/import-results",
       "schedule": "0 11 * * *"
     }

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { DEMO_BASHO_ID, type Repositories } from "@fantasy-sumo/db";
-import type { FantasyPick, FantasyTeam } from "@fantasy-sumo/domain";
+import type { Basho, FantasyPick, FantasyTeam } from "@fantasy-sumo/domain";
 import {
   calculateLeaderboard,
   canEditFantasyPicks,
@@ -28,7 +28,10 @@ export function registerBashoRoutes(
   context: RouteContext,
 ) {
   app.get("/api/basho/current", async (_request, reply) => {
-    const currentBasho = await findCurrentBasho(context.repositories);
+    const currentBasho = await findCurrentBasho(
+      context.repositories,
+      formatJapanDate(context.now()),
+    );
 
     if (currentBasho === undefined) {
       return reply.code(404).send({
@@ -46,14 +49,21 @@ export function registerBashoRoutes(
   app.get<{
     Params: { bashoId: string };
   }>("/api/basho/:bashoId/rikishi", async (request, reply) => {
-    const basho = await context.repositories.getBasho(request.params.bashoId);
+    const storedBasho = await context.repositories.getBasho(
+      request.params.bashoId,
+    );
 
-    if (basho === undefined) {
+    if (storedBasho === undefined) {
       return reply.code(404).send({
         error: "not-found",
         message: `Basho ${request.params.bashoId} was not found.`,
       });
     }
+
+    const basho = getEffectiveBasho(
+      storedBasho,
+      formatJapanDate(context.now()),
+    );
 
     const rikishiById = new Map(
       (await context.repositories.listRikishi()).map((rikishi) => [
@@ -103,7 +113,7 @@ export function registerBashoRoutes(
         message:
           getPickLockMessage(basho, japanDate) ??
           "Fantasy team picks are locked for this basho.",
-        bashoStatus: basho.status,
+        bashoStatus: getEffectiveBasho(basho, japanDate).status,
       });
     }
 
@@ -211,14 +221,21 @@ export function registerBashoRoutes(
   app.get<{
     Params: { bashoId: string };
   }>("/api/basho/:bashoId/leaderboard", async (request, reply) => {
-    const basho = await context.repositories.getBasho(request.params.bashoId);
+    const storedBasho = await context.repositories.getBasho(
+      request.params.bashoId,
+    );
 
-    if (basho === undefined) {
+    if (storedBasho === undefined) {
       return reply.code(404).send({
         error: "not-found",
         message: `Basho ${request.params.bashoId} was not found.`,
       });
     }
+
+    const basho = getEffectiveBasho(
+      storedBasho,
+      formatJapanDate(context.now()),
+    );
 
     const boutResults = await context.repositories.listBoutResultsForBasho(
       basho.id,
@@ -249,8 +266,22 @@ function getBashoTotalDays(basho: { startDate: string; endDate: string }) {
   return Math.floor((endDate - startDate) / millisecondsPerDay) + 1;
 }
 
-async function findCurrentBasho(repositories: Repositories) {
-  const bashos = await repositories.listBashos();
+function getEffectiveBasho(basho: Basho, japanDate?: string): Basho {
+  if (
+    basho.id !== DEMO_BASHO_ID &&
+    basho.status === "upcoming" &&
+    !canEditFantasyPicks(basho, japanDate)
+  ) {
+    return { ...basho, status: "locked" };
+  }
+
+  return basho;
+}
+
+async function findCurrentBasho(repositories: Repositories, japanDate: string) {
+  const bashos = (await repositories.listBashos()).map((basho) =>
+    getEffectiveBasho(basho, japanDate),
+  );
   const latestFirst = [...bashos].reverse();
 
   return (

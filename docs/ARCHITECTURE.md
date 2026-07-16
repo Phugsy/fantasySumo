@@ -24,7 +24,8 @@ The active app is split into:
 - a React client built by Vite;
 - a Fastify API compiled by TypeScript;
 - a shared framework-free domain package with MVP types, pick validation, scoring, and leaderboard calculation;
-- a Drizzle data package with local SQLite and production Postgres adapters;
+- a Drizzle data package with local SQLite and a production Neon Postgres
+  adapter;
 - root pnpm scripts for dev, build, test, lint, and formatting.
 
 ## Front end
@@ -97,22 +98,16 @@ Current routes:
   - Applies all deterministic demo results and marks the demo basho complete.
 - `GET /api/cron/import-results`
   - Requires Vercel's `Authorization: Bearer <CRON_SECRET>` header.
-  - Selects the single date-eligible non-demo basho, including an upcoming or
-    locked day-one basho, and derives its day from the current calendar date in
-    `Asia/Tokyo`.
+  - On day 0, locks the single eligible non-demo upcoming basho and its existing
+    teams without contacting the results source.
+  - On days 1-15, selects the single date-eligible basho and derives its day
+    from the current calendar date in `Asia/Tokyo`.
   - Reuses the source adapter and transactional result import service used by
     the manual admin route.
   - Moves an upcoming or locked basho to active with day 1 and completes it
     with day 15.
-  - Returns structured imported/skipped status and logs success or failure.
-- `GET /api/cron/lock-picks`
-  - Requires Vercel's `Authorization: Bearer <CRON_SECRET>` header.
-  - Selects one eligible non-demo upcoming basho from the start of the
-    Japan-calendar day before its start date.
-  - Atomically moves the basho to `locked` and stamps `lockedAt` on existing
-    fantasy teams.
-  - Is idempotent, catches up a still-upcoming basho on day one, and fails if
-    more than one basho is eligible.
+  - Returns structured locked/imported/skipped status and logs success or
+    failure.
 
 Current limitations:
 
@@ -147,7 +142,8 @@ The data package entry point is `packages/db/src/index.ts`.
 Current behaviour:
 
 - Uses SQLite through `better-sqlite3` for local development.
-- Uses Postgres through `postgres` and Drizzle's `postgres-js` driver for production deployment.
+- Uses Neon Postgres through `postgres` and Drizzle's `postgres-js` driver for
+  production deployment.
 - Defines SQLite and Postgres MVP schemas with Drizzle table definitions.
 - Includes SQLite migration SQL in `packages/db/drizzle` and Postgres migration SQL in `packages/db/drizzle-pg`.
 - Uses `DATABASE_URL` to select the adapter: `file:` and `:memory:` use SQLite; `postgres:` and `postgresql:` use Postgres.
@@ -338,8 +334,9 @@ the basho start date. The date check is a backstop when the lifecycle cron is
 delayed or missed. Deterministic demo data remains controlled by the protected
 demo lifecycle instead of real calendar dates. The API rejects team creation
 for overdue upcoming, `locked`, `active`, and `complete` production bashos with
-`409 picks-locked`; the UI mirrors stored lifecycle state but is not the source
-of enforcement.
+`409 picks-locked`. Basho read endpoints expose an effective `locked` status
+once the deadline arrives, so the UI mirrors the same date rule even before the
+scheduled job persists it; the API remains the source of enforcement.
 
 Lifecycle meanings:
 
