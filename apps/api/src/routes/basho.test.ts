@@ -148,6 +148,49 @@ describe("basho routes", () => {
     });
   });
 
+  it("rejects teams from the start of the day before the basho in Japan", async () => {
+    await app.close();
+    app = buildApp({
+      db: client,
+      now: () => new Date("2026-05-08T14:59:59.000Z"),
+      teamIdFactory: () => "before-cutoff",
+    });
+
+    const beforeCutoff = await app.inject({
+      method: "POST",
+      url: "/api/basho/2026-05/teams",
+      payload: {
+        displayName: "Just In Time",
+        rikishiIds: ["onosato", "kotozakura"],
+      },
+    });
+
+    expect(beforeCutoff.statusCode).toBe(201);
+
+    await app.close();
+    app = buildApp({
+      db: client,
+      now: () => new Date("2026-05-08T15:00:00.000Z"),
+      teamIdFactory: () => "at-cutoff",
+    });
+
+    const atCutoff = await app.inject({
+      method: "POST",
+      url: "/api/basho/2026-05/teams",
+      payload: {
+        displayName: "Too Late",
+        rikishiIds: ["onosato", "kotozakura"],
+      },
+    });
+
+    expect(atCutoff.statusCode).toBe(409);
+    expect(atCutoff.json()).toMatchObject({
+      error: "picks-locked",
+      message: "Picks closed the day before this basho starts.",
+      bashoStatus: "upcoming",
+    });
+  });
+
   it("rejects invalid team picks", async () => {
     const response = await app.inject({
       method: "POST",

@@ -127,6 +127,31 @@ describe("import service", () => {
     expect(result.summary.basho.updated).toBe(1);
   });
 
+  it("does not reopen a locked basho during a banzuke reimport", async () => {
+    const repositories = createRepositories(client);
+    await importBanzuke(repositories, {
+      ...banzukeCommand,
+      basho: {
+        ...banzukeCommand.basho,
+        status: "locked",
+        currentDay: 0,
+      },
+    });
+
+    await importBanzuke(repositories, {
+      ...banzukeCommand,
+      basho: {
+        ...banzukeCommand.basho,
+        status: "upcoming",
+      },
+    });
+
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "locked",
+      currentDay: 0,
+    });
+  });
+
   it("removes stale banzuke entries without deleting rikishi", async () => {
     const repositories = createRepositories(client);
     await importBanzuke(repositories, banzukeCommand);

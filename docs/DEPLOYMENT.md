@@ -62,28 +62,68 @@ curl -X POST "https://<deployment>/api/admin/import-banzuke?dryRun=true" \
 
 The same token can also be supplied with `Authorization: Bearer <token>`.
 
-## Scheduled daily results import
+## Scheduled production jobs
 
-The root `vercel.json` configures one production cron invocation:
+The root `vercel.json` configures the two daily production cron invocations
+allowed by the Vercel Hobby plan:
 
 ```json
-{
-  "path": "/api/cron/import-results",
-  "schedule": "0 11 * * *"
-}
+[
+  {
+    "path": "/api/cron/lock-picks",
+    "schedule": "0 15 * * *"
+  },
+  {
+    "path": "/api/cron/import-results",
+    "schedule": "0 11 * * *"
+  }
+]
 ```
 
-Vercel cron schedules use UTC. On a Hobby project, this schedule runs once
-between **11:00-11:59 UTC / 20:00-20:59 JST**, because Hobby cron invocation
-precision is hourly. That leaves at least two hours after the expected 18:00
-JST end of the top-division bouts. Vercel does not retry failed cron
-invocations, so manual imports remain the recovery path for delayed or
-incomplete source data, a failed invocation, or a missed run.
+Vercel cron schedules use UTC. Japan does not observe daylight saving time, so
+the pick-lock schedule runs once between **15:00-15:59 UTC / 00:00-00:59 JST**
+on the following calendar day. The results schedule runs once between
+**11:00-11:59 UTC / 20:00-20:59 JST**. These are hourly windows because Hobby
+cron invocation precision is hourly. The results window leaves at least two
+hours after the expected 18:00 JST end of the top-division bouts. Vercel does
+not retry failed cron invocations.
 
 Set `CRON_SECRET` on the production deployment. Vercel sends it to the cron
-route as `Authorization: Bearer <CRON_SECRET>`. The route is disabled when the
-secret is missing and rejects requests with a missing or incorrect bearer
+routes as `Authorization: Bearer <CRON_SECRET>`. Both routes are disabled when
+the secret is missing and reject requests with a missing or incorrect bearer
 token. Cron jobs run on production deployments, not previews.
+
+### Day-before pick lock
+
+On each authenticated `GET /api/cron/lock-picks` invocation, the route:
+
+1. calculates the current date in `Asia/Tokyo`;
+2. finds the single non-demo `upcoming` basho whose lock date has arrived;
+3. atomically changes that basho to `locked` and stamps `lockedAt` on its
+   existing fantasy teams;
+4. skips cleanly when no basho is due and fails without mutation when more than
+   one basho is eligible.
+
+The lock date is the calendar day before `basho.startDate`. The route remains
+eligible through the basho window so a missed run can catch up, and rerunning
+after a successful lock is a safe no-op. Independently, team creation compares
+the current Japan date with the same deadline and returns `409 picks-locked`
+even if the stored basho status is stale. This prevents a missed cron from
+allowing late picks. The known deterministic demo basho is excluded from both
+calendar enforcement and the production lifecycle cron; its protected demo
+controls remain the source of progression.
+
+Banzuke reimports preserve the most advanced stored basho lifecycle state, so
+running a refresh after this job cannot regress `locked` back to `upcoming`.
+
+For a controlled manual lock or recovery check:
+
+```bash
+curl "https://<deployment>/api/cron/lock-picks" \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+### Daily results import
 
 On each authenticated invocation, the route:
 

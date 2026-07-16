@@ -35,11 +35,9 @@ export async function importBanzuke(
   }
 
   const summary = createEmptySummary();
-  summary.basho = summarizeOne(
-    await repositories.getBasho(command.basho.id),
-    command.basho,
-    isEqualBasho,
-  );
+  const existingBasho = await repositories.getBasho(command.basho.id);
+  const nextBasho = preserveBashoProgress(existingBasho, command.basho);
+  summary.basho = summarizeOne(existingBasho, nextBasho, isEqualBasho);
   summary.rikishi = summarizeMany(
     await repositories.listRikishi(),
     command.rikishi,
@@ -54,7 +52,7 @@ export async function importBanzuke(
 
   if (options.dryRun !== true) {
     await repositories.applyBanzukeImport({
-      basho: command.basho,
+      basho: nextBasho,
       rikishi: command.rikishi,
       banzukeEntries: command.banzukeEntries,
     });
@@ -64,6 +62,38 @@ export async function importBanzuke(
     dryRun: options.dryRun === true,
     source: command.source,
     summary,
+  };
+}
+
+function preserveBashoProgress(
+  existingBasho: Basho | undefined,
+  importedBasho: Basho,
+): Basho {
+  if (existingBasho === undefined) {
+    return importedBasho;
+  }
+
+  const lifecycleOrder = {
+    upcoming: 0,
+    locked: 1,
+    active: 2,
+    complete: 3,
+  } as const;
+  const existingDay = existingBasho.currentDay;
+  const importedDay = importedBasho.currentDay;
+  const currentDay =
+    existingDay === undefined && importedDay === undefined
+      ? undefined
+      : Math.max(existingDay ?? 0, importedDay ?? 0);
+
+  return {
+    ...importedBasho,
+    status:
+      lifecycleOrder[existingBasho.status] >
+      lifecycleOrder[importedBasho.status]
+        ? existingBasho.status
+        : importedBasho.status,
+    ...(currentDay === undefined ? {} : { currentDay }),
   };
 }
 

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import type { Repositories } from "@fantasy-sumo/db";
+import { DEMO_BASHO_ID, type Repositories } from "@fantasy-sumo/db";
 import type { FantasyPick, FantasyTeam } from "@fantasy-sumo/domain";
 import {
   calculateLeaderboard,
@@ -8,6 +8,7 @@ import {
   getPickLockMessage,
   validateFantasyPicks,
 } from "@fantasy-sumo/domain";
+import { formatJapanDate } from "../time.js";
 
 interface RouteContext {
   repositories: Repositories;
@@ -93,11 +94,14 @@ export function registerBashoRoutes(
       });
     }
 
-    if (!canEditFantasyPicks(basho)) {
+    const japanDate =
+      basho.id === DEMO_BASHO_ID ? undefined : formatJapanDate(context.now());
+
+    if (!canEditFantasyPicks(basho, japanDate)) {
       return reply.code(409).send({
         error: "picks-locked",
         message:
-          getPickLockMessage(basho) ??
+          getPickLockMessage(basho, japanDate) ??
           "Fantasy team picks are locked for this basho.",
         bashoStatus: basho.status,
       });

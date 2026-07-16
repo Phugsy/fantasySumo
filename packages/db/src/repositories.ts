@@ -57,6 +57,10 @@ export interface Repositories {
     bashoId: Basho["id"],
     lockedAt: NonNullable<FantasyTeam["lockedAt"]>,
   ) => Promise<void>;
+  lockBashoAndFantasyTeams: (
+    bashoId: Basho["id"],
+    lockedAt: NonNullable<FantasyTeam["lockedAt"]>,
+  ) => Promise<void>;
 
   insertFantasyPick: (entry: FantasyPick) => Promise<void>;
   listFantasyPicksForTeam: (
@@ -205,6 +209,30 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
           ),
         )
         .run();
+    },
+    lockBashoAndFantasyTeams: async (bashoId, lockedAt) => {
+      db.transaction((transaction) => {
+        transaction
+          .update(sqlite.basho)
+          .set({ status: "locked" })
+          .where(
+            and(
+              eq(sqlite.basho.id, bashoId),
+              eq(sqlite.basho.status, "upcoming"),
+            ),
+          )
+          .run();
+        transaction
+          .update(sqlite.fantasyTeams)
+          .set({ lockedAt })
+          .where(
+            and(
+              eq(sqlite.fantasyTeams.bashoId, bashoId),
+              isNull(sqlite.fantasyTeams.lockedAt),
+            ),
+          )
+          .run();
+      });
     },
 
     insertFantasyPick: async (entry) => {
@@ -469,6 +497,25 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
             isNull(pg.fantasyTeams.lockedAt),
           ),
         );
+    },
+    lockBashoAndFantasyTeams: async (bashoId, lockedAt) => {
+      await db.transaction(async (transaction) => {
+        await transaction
+          .update(pg.basho)
+          .set({ status: "locked" })
+          .where(
+            and(eq(pg.basho.id, bashoId), eq(pg.basho.status, "upcoming")),
+          );
+        await transaction
+          .update(pg.fantasyTeams)
+          .set({ lockedAt })
+          .where(
+            and(
+              eq(pg.fantasyTeams.bashoId, bashoId),
+              isNull(pg.fantasyTeams.lockedAt),
+            ),
+          );
+      });
     },
 
     insertFantasyPick: async (entry) => {

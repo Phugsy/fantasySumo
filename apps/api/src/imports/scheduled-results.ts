@@ -3,8 +3,8 @@ import { DEMO_BASHO_ID, type Repositories } from "@fantasy-sumo/db";
 import { fetchSumoApiResultsImport } from "./adapters.js";
 import { importBoutResults } from "./service.js";
 import type { ImportResult, SourceFetch } from "./types.js";
+import { formatJapanDate } from "../time.js";
 
-const JAPAN_TIME_ZONE = "Asia/Tokyo";
 const MILLISECONDS_PER_DAY = 86_400_000;
 
 export type ScheduledResultsImportResult =
@@ -31,10 +31,7 @@ export async function runScheduledResultsImport(
   sourceFetch: SourceFetch,
   options: ScheduledResultsImportOptions = {},
 ): Promise<ScheduledResultsImportResult> {
-  const japanDate = formatDateInTimeZone(
-    (options.now ?? (() => new Date()))(),
-    JAPAN_TIME_ZONE,
-  );
+  const japanDate = formatJapanDate((options.now ?? (() => new Date()))());
   const scheduledBashos = (await repositories.listBashos()).filter(
     (basho) =>
       (basho.status === "upcoming" ||
@@ -120,18 +117,4 @@ function parseDateOnly(value: string) {
   const parsed = Date.parse(`${value}T00:00:00.000Z`);
 
   return Number.isNaN(parsed) ? undefined : parsed;
-}
-
-function formatDateInTimeZone(date: Date, timeZone: string) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone,
-    year: "numeric",
-  }).formatToParts(date);
-  const values = Object.fromEntries(
-    parts.map((part) => [part.type, part.value]),
-  );
-
-  return `${values.year}-${values.month}-${values.day}`;
 }

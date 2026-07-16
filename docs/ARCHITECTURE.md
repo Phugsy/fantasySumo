@@ -74,6 +74,8 @@ Current routes:
   - Fetches current Makuuchi banzuke data from the Japan Sumo Association `indexAjax` endpoint.
   - Maps source payloads into local `Basho`, `Rikishi`, and `BanzukeEntry` records.
   - Replaces stale banzuke rows for the imported basho without deleting rikishi, teams, or picks.
+  - Preserves the most advanced stored basho lifecycle state so a reimport
+    cannot reopen picks after locking.
   - Supports `?dryRun=true`.
 - `POST /api/admin/basho/:bashoId/import-results`
   - Fetches one day of Makuuchi results from Sumo API by default.
@@ -103,6 +105,14 @@ Current routes:
   - Moves an upcoming or locked basho to active with day 1 and completes it
     with day 15.
   - Returns structured imported/skipped status and logs success or failure.
+- `GET /api/cron/lock-picks`
+  - Requires Vercel's `Authorization: Bearer <CRON_SECRET>` header.
+  - Selects one eligible non-demo upcoming basho from the start of the
+    Japan-calendar day before its start date.
+  - Atomically moves the basho to `locked` and stamps `lockedAt` on existing
+    fantasy teams.
+  - Is idempotent, catches up a still-upcoming basho on day one, and fails if
+    more than one basho is eligible.
 
 Current limitations:
 
@@ -322,11 +332,18 @@ POST   /api/admin/basho/:bashoId/import-results
 
 Admin endpoints can be protected later. For early local development, they can remain local-only but should be clearly marked as unsafe for production.
 
-`POST /api/basho/:bashoId/teams` is allowed only while the basho status is `upcoming`. The API rejects team creation for `locked`, `active`, and `complete` basho with `409 picks-locked`; the UI mirrors that state but is not the source of enforcement.
+`POST /api/basho/:bashoId/teams` is allowed only while the basho status is
+`upcoming` and the current date in Japan is before the calendar day preceding
+the basho start date. The date check is a backstop when the lifecycle cron is
+delayed or missed. Deterministic demo data remains controlled by the protected
+demo lifecycle instead of real calendar dates. The API rejects team creation
+for overdue upcoming, `locked`, `active`, and `complete` production bashos with
+`409 picks-locked`; the UI mirrors stored lifecycle state but is not the source
+of enforcement.
 
 Lifecycle meanings:
 
-- `upcoming`: picks are open.
+- `upcoming`: picks are open before the day-before lock cutoff.
 - `locked`: picks are closed before scoring starts.
 - `active`: results are being applied day by day.
 - `complete`: final scores are available.

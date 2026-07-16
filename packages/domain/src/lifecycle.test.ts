@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Basho } from "./types.js";
 import {
   canEditFantasyPicks,
+  getFantasyPickLockDate,
   getBashoLifecycleLabel,
   getPickLockMessage,
 } from "./lifecycle.js";
@@ -26,6 +27,20 @@ describe("basho lifecycle", () => {
     );
   });
 
+  it("locks fantasy picks on the calendar day before the basho starts", () => {
+    expect(getFantasyPickLockDate(baseBasho)).toBe("2026-05-09");
+    expect(canEditFantasyPicks(baseBasho, "2026-05-08")).toBe(true);
+    expect(canEditFantasyPicks(baseBasho, "2026-05-09")).toBe(false);
+    expect(canEditFantasyPicks(baseBasho, "2026-05-10")).toBe(false);
+  });
+
+  it("fails closed when a dated pick check receives an invalid date", () => {
+    expect(
+      canEditFantasyPicks({ ...baseBasho, startDate: "invalid" }, "2026-05-08"),
+    ).toBe(false);
+    expect(canEditFantasyPicks(baseBasho, "invalid")).toBe(false);
+  });
+
   it("labels each lifecycle status for user-facing state", () => {
     expect(getBashoLifecycleLabel("upcoming")).toBe("Picks open");
     expect(getBashoLifecycleLabel("locked")).toBe("Picks locked");
@@ -45,6 +60,9 @@ describe("basho lifecycle", () => {
     );
     expect(getPickLockMessage({ ...baseBasho, status: "complete" })).toBe(
       "This basho is complete, so picks are closed.",
+    );
+    expect(getPickLockMessage(baseBasho, "2026-05-09")).toBe(
+      "Picks closed the day before this basho starts.",
     );
   });
 });
