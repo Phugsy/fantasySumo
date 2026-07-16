@@ -23,6 +23,12 @@ export function getAdminImportToken(): string | undefined {
   return token === undefined || token.length === 0 ? undefined : token;
 }
 
+export function getCronSecret(): string | undefined {
+  const secret = process.env.CRON_SECRET?.trim();
+
+  return secret === undefined || secret.length === 0 ? undefined : secret;
+}
+
 export function allowsUnprotectedAdminImports(): boolean {
   const nodeEnv = process.env.NODE_ENV?.trim();
 

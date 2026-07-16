@@ -49,7 +49,10 @@ export function registerAdminImportRoutes(
   });
 
   app.addHook("preHandler", async (request, reply) => {
-    if (!request.url.includes("/import-results")) {
+    if (
+      !request.url.startsWith("/api/admin/basho/") ||
+      !request.url.includes("/import-results")
+    ) {
       return;
     }
 

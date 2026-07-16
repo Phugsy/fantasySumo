@@ -97,6 +97,14 @@ describe("admin import routes", () => {
 
     expect(unauthorizedResponse.statusCode).toBe(401);
 
+    const unauthorizedResultsResponse = await app.inject({
+      method: "POST",
+      url: "/api/admin/basho/2026-05/import-results",
+      payload: { day: 1 },
+    });
+
+    expect(unauthorizedResultsResponse.statusCode).toBe(401);
+
     const authorizedResponse = await app.inject({
       headers: {
         "x-admin-import-token": "test-import-token",

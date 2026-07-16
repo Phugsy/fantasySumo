@@ -113,11 +113,8 @@ export async function importBoutResults(
   );
 
   if (options.dryRun !== true) {
-    if (nextBasho !== undefined) {
-      await repositories.upsertBasho(nextBasho);
-    }
-
     await repositories.applyBoutResultsImport({
+      ...(nextBasho === undefined ? {} : { basho: nextBasho }),
       bashoId: command.bashoId,
       day: command.results[0]!.day,
       rikishi: missingSourceRikishi,
@@ -323,7 +320,8 @@ function advanceBashoForResults(
 
   return {
     ...basho,
-    status: basho.status === "complete" ? "complete" : "active",
+    status:
+      basho.status === "complete" || importedDay === 15 ? "complete" : "active",
     currentDay: Math.max(basho.currentDay ?? 0, importedDay),
   };
 }
