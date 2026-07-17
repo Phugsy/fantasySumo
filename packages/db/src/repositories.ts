@@ -47,10 +47,10 @@ export interface Repositories {
   listBanzukeEntriesForBasho: (bashoId: Basho["id"]) => Promise<BanzukeEntry[]>;
 
   insertFantasyTeam: (entry: FantasyTeam) => Promise<void>;
-  insertFantasyTeamWithPicks: (
+  insertFantasyTeamWithPicksIfBashoUpcoming: (
     team: FantasyTeam,
     picks: readonly FantasyPick[],
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   getFantasyTeam: (id: FantasyTeam["id"]) => Promise<FantasyTeam | undefined>;
   listFantasyTeamsForBasho: (bashoId: Basho["id"]) => Promise<FantasyTeam[]>;
   lockFantasyTeamsForBasho: (
@@ -167,8 +167,18 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
     insertFantasyTeam: async (entry) => {
       db.insert(sqlite.fantasyTeams).values(toFantasyTeamRow(entry)).run();
     },
-    insertFantasyTeamWithPicks: async (team, picks) => {
+    insertFantasyTeamWithPicksIfBashoUpcoming: async (team, picks) =>
       db.transaction((transaction) => {
+        const basho = transaction
+          .select({ status: sqlite.basho.status })
+          .from(sqlite.basho)
+          .where(eq(sqlite.basho.id, team.bashoId))
+          .get();
+
+        if (basho?.status !== "upcoming") {
+          return false;
+        }
+
         transaction
           .insert(sqlite.fantasyTeams)
           .values(toFantasyTeamRow(team))
@@ -180,8 +190,9 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
             .values(toFantasyPickRow(pick))
             .run();
         }
-      });
-    },
+
+        return true;
+      }),
     getFantasyTeam: async (id) => {
       const row = db
         .select()
@@ -456,8 +467,20 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
     insertFantasyTeam: async (entry) => {
       await db.insert(pg.fantasyTeams).values(toFantasyTeamRow(entry));
     },
-    insertFantasyTeamWithPicks: async (team, picks) => {
-      await db.transaction(async (transaction) => {
+    insertFantasyTeamWithPicksIfBashoUpcoming: async (team, picks) =>
+      db.transaction(async (transaction) => {
+        const basho = (
+          await transaction
+            .select({ status: pg.basho.status })
+            .from(pg.basho)
+            .where(eq(pg.basho.id, team.bashoId))
+            .for("update")
+        ).at(0);
+
+        if (basho?.status !== "upcoming") {
+          return false;
+        }
+
         await transaction
           .insert(pg.fantasyTeams)
           .values(toFantasyTeamRow(team));
@@ -467,8 +490,9 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
             .insert(pg.fantasyPicks)
             .values(toFantasyPickRow(pick));
         }
-      });
-    },
+
+        return true;
+      }),
     getFantasyTeam: async (id) => {
       const row = (
         await db

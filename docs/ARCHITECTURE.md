@@ -101,8 +101,9 @@ Current routes:
   - On the evening before day 0, locks the single eligible non-demo upcoming
     basho and its existing teams without contacting the results source.
   - Catches up the same lock on day 0 if the earlier invocation was missed.
-  - On days 1-15, selects the single date-eligible basho and derives its day
-    from the current calendar date in `Asia/Tokyo`.
+  - On days 1-15, selects the single date-eligible basho, derives its day from
+    the current calendar date in `Asia/Tokyo`, and sequentially imports every
+    missing day after stored `currentDay` through that day.
   - Reuses the source adapter and transactional result import service used by
     the manual admin route.
   - Moves an upcoming or locked basho to active with day 1 and completes it
@@ -333,7 +334,9 @@ Admin endpoints can be protected later. For early local development, they can re
 status is `upcoming`. The API rejects team creation for `locked`, `active`, and
 `complete` bashos with `409 picks-locked`. Basho read endpoints expose the same
 persisted status, keeping the UI and API aligned and allowing an administrator
-to lock picks early when needed.
+to lock picks early when needed. Team creation rechecks the status while
+holding the basho row in the same transaction as the team insert, so it
+serializes with the scheduled lock update.
 
 Lifecycle meanings:
 

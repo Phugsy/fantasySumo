@@ -113,7 +113,7 @@ describe("repositories", () => {
     const repositories = createRepositories(client);
 
     await expect(
-      repositories.insertFantasyTeamWithPicks(
+      repositories.insertFantasyTeamWithPicksIfBashoUpcoming(
         {
           id: "team-rollback",
           bashoId: sampleBasho.id,
@@ -136,6 +136,34 @@ describe("repositories", () => {
     expect(await repositories.listFantasyPicksForTeam("team-rollback")).toEqual(
       [],
     );
+  });
+
+  it("checks the basho status inside guarded team creation", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
+
+    await repositories.updateBasho({ ...sampleBasho, status: "locked" });
+
+    const inserted =
+      await repositories.insertFantasyTeamWithPicksIfBashoUpcoming(
+        {
+          id: "team-after-lock",
+          bashoId: sampleBasho.id,
+          displayName: "After Lock",
+        },
+        [
+          { teamId: "team-after-lock", rikishiId: "onosato" },
+          { teamId: "team-after-lock", rikishiId: "kotozakura" },
+        ],
+      );
+
+    expect(inserted).toBe(false);
+    expect(
+      await repositories.getFantasyTeam("team-after-lock"),
+    ).toBeUndefined();
+    expect(
+      await repositories.listFantasyPicksForTeam("team-after-lock"),
+    ).toEqual([]);
   });
 
   it("loads deterministic demo data for local demos and E2E fixtures", async () => {

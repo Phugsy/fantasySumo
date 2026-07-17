@@ -97,28 +97,35 @@ On each authenticated invocation, the route calculates the current date in
    existing teams;
 2. on day 0, it applies that same lock as a catch-up if the earlier invocation
    was missed;
-3. on days 1-15, it derives the basho day and runs the source-backed,
-   transactional result import;
+3. on days 1-15, it derives the basho day and sequentially runs the
+   source-backed, transactional result import for every day after stored
+   `currentDay` through the derived day;
 4. it skips without contacting the results source outside that window;
 5. it fails without mutation when more than one basho is eligible.
 
 Rerunning after a successful lock is a safe no-op. Team creation and basho
 reads use only the persisted lifecycle status: `upcoming` keeps picks open,
 while `locked`, `active`, and `complete` close them. This lets an administrator
-lock earlier when needed and keeps the client and API aligned. The
-deterministic demo basho is exempt from the production cron; its protected
-controls remain the source of progression.
+lock earlier when needed and keeps the client and API aligned. The final team
+status check takes a Postgres row lock in the same transaction as its insert,
+so it serializes with the cron's basho update. The deterministic demo basho is
+exempt from the production cron; its protected controls remain the source of
+progression.
 
 Banzuke reimports preserve the most advanced stored basho lifecycle state, so
 running a refresh after this job cannot regress `locked` back to `upcoming`.
 
-Re-running the route on the same Japan calendar day targets the same basho/day.
-The importer replaces only that day's stable result IDs, so retries correct or
-skip existing rows without duplicating scores, teams, or picks. The response
-and Vercel function logs include the status, basho ID, day, Japan date, and skip
-reason when applicable. Source, validation, or ambiguous-live-basho errors
-are logged and return a non-2xx response so Vercel does not record silent
-success.
+Re-running the route on the same Japan calendar day reimports that day when no
+days are missing. A delayed run backfills from the day after stored
+`currentDay`; a locked basho therefore recovers from day 1, while an active
+basho resumes from its last successful day. Each day commits independently, so
+if a later source request fails, the next invocation resumes after the earlier
+successful days. The importer replaces only each day's stable result IDs, so
+retries correct or skip existing rows without duplicating scores, teams, or
+picks. The response and Vercel function logs include the status, basho ID,
+derived day, imported days, Japan date, and skip reason when applicable.
+Source, validation, or ambiguous-live-basho errors are logged and return a
+non-2xx response so Vercel does not record silent success.
 
 This job necessarily reads and sometimes writes the authoritative Neon
 database. A Redis cache would add another network dependency without removing

@@ -209,6 +209,61 @@ describe("scheduled result import route", () => {
     });
   });
 
+  it("backfills every missed day for a locked basho", async () => {
+    await seedLiveBasho("2026-05", { status: "locked", currentDay: 0 });
+    const requestedDays: number[] = [];
+    app = createApp(async (url) => {
+      const day = Number(String(url).split("/").at(-1));
+      requestedDays.push(day);
+      return resultsResponse(day);
+    }, new Date("2026-05-12T02:00:00.000Z"));
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "imported",
+      bashoId: "2026-05",
+      day: 3,
+      importedDays: [1, 2, 3],
+    });
+    expect(requestedDays).toEqual([1, 2, 3]);
+
+    const repositories = createRepositories(client);
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 3,
+    });
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toHaveLength(
+      3,
+    );
+  });
+
+  it("backfills from the day after the last active update", async () => {
+    await seedLiveBasho("2026-05", { status: "active", currentDay: 3 });
+    const requestedDays: number[] = [];
+    app = createApp(async (url) => {
+      const day = Number(String(url).split("/").at(-1));
+      requestedDays.push(day);
+      return resultsResponse(day);
+    }, new Date("2026-05-16T02:00:00.000Z"));
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "imported",
+      bashoId: "2026-05",
+      day: 7,
+      importedDays: [4, 5, 6, 7],
+    });
+    expect(requestedDays).toEqual([4, 5, 6, 7]);
+    expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 7,
+    });
+  });
+
   it("imports day one for an upcoming basho created by an early banzuke import", async () => {
     await seedLiveBasho("2026-05", {
       status: "upcoming",
@@ -395,7 +450,7 @@ async function seedLiveBasho(
   });
 
   if (options.withTeam === true) {
-    await repositories.insertFantasyTeamWithPicks(
+    await repositories.insertFantasyTeamWithPicksIfBashoUpcoming(
       {
         id: "team-day-zero",
         bashoId,

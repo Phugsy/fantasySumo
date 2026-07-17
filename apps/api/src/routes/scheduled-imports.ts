@@ -41,6 +41,8 @@ export function registerScheduledImportRoutes(
           bashoId: result.bashoId,
           day: result.status === "skipped" ? undefined : result.day,
           japanDate: result.japanDate,
+          importedDays:
+            result.status === "imported" ? result.importedDays : undefined,
           lockedAt: result.status === "locked" ? result.lockedAt : undefined,
           reason: result.status === "skipped" ? result.reason : undefined,
           status: result.status,

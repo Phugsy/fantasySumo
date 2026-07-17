@@ -144,6 +144,9 @@ The API enforces pick locking from persisted lifecycle state.
 `POST /api/basho/:bashoId/teams` succeeds only while the basho is `upcoming`;
 `locked`, `active`, and `complete` bashos return `409 picks-locked`. This also
 allows an administrator to lock picks early by changing the basho lifecycle.
+The repository rechecks that status inside the team-insert transaction, which
+serializes with the production lock update so an in-flight submission cannot
+slip through the transition.
 The protected daily cron normally persists the lock and stamps existing teams
 on the evening before day 0, where day 0 is the calendar day before the basho.
 
@@ -203,8 +206,9 @@ curl -X POST "http://localhost:3000/api/admin/basho/2026-05/import-results?dryRu
 Production deployments expose one Vercel Cron-only path. `GET
 /api/cron/import-results` locks the single eligible upcoming basho without
 contacting the results source on the evening before day 0, then derives and
-imports the current basho day on days 1-15. Day 0 and day 1 provide safe
-catch-up paths, and result imports reuse the manual trigger's transactional
+imports every missing basho day through the current day on days 1-15. Day 0
+provides a safe lock catch-up, and a later run resumes result imports from the
+day after `currentDay`. Result imports reuse the manual trigger's transactional
 service. See `docs/DEPLOYMENT.md` for schedule and authentication details.
 
 ## Makefile commands

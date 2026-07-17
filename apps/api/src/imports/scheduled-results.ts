@@ -25,6 +25,7 @@ export type ScheduledResultsImportResult =
       status: "imported";
       bashoId: string;
       day: number;
+      importedDays: number[];
       japanDate: string;
       import: ImportResult;
     };
@@ -98,20 +99,36 @@ export async function runScheduledResultsImport(
     };
   }
 
-  if (day === 1 && basho.status === "upcoming") {
+  if (basho.status === "upcoming") {
     await repositories.lockBashoAndFantasyTeams(basho.id, now.toISOString());
   }
 
-  const command = await fetchSumoApiResultsImport(sourceFetch, {
-    bashoId: basho.id,
-    day,
-  });
-  const importResult = await importBoutResults(repositories, command);
+  const firstImportDay = Math.min((basho.currentDay ?? 0) + 1, day);
+  const importedDays = Array.from(
+    { length: day - firstImportDay + 1 },
+    (_value, index) => firstImportDay + index,
+  );
+  let importResult: ImportResult | undefined;
+
+  for (const importDay of importedDays) {
+    const command = await fetchSumoApiResultsImport(sourceFetch, {
+      bashoId: basho.id,
+      day: importDay,
+    });
+    importResult = await importBoutResults(repositories, command);
+  }
+
+  if (importResult === undefined) {
+    throw new Error(
+      `Scheduled basho update resolved no import days for ${basho.id}.`,
+    );
+  }
 
   return {
     status: "imported",
     bashoId: basho.id,
     day,
+    importedDays,
     japanDate,
     import: importResult,
   };
@@ -122,11 +139,7 @@ function isEligibleForScheduledUpdate(basho: Basho, day: number) {
     return basho.status === "upcoming";
   }
 
-  if (day === 1) {
-    return true;
-  }
-
-  return basho.status === "active";
+  return day >= 1;
 }
 
 function resolveBashoDay(basho: Basho, japanDate: string) {
