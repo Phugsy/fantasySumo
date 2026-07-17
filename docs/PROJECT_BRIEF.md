@@ -90,5 +90,6 @@ The MVP lifecycle is:
 - `active`: results are being applied day by day.
 - `complete`: final scores are available.
 
-Fantasy teams and picks can be created only while the basho is `upcoming` and
-before the start of the calendar day before the basho in `Asia/Tokyo`.
+Fantasy teams and picks can be created only while the persisted basho status is
+`upcoming`. Moving the basho to `locked` closes picks immediately, including
+when an administrator chooses to lock earlier than the scheduled transition.

@@ -16,7 +16,6 @@ export type {
 } from "./types.js";
 export {
   canEditFantasyPicks,
-  getFantasyPickLockDate,
   getBashoLifecycleLabel,
   getPickLockMessage,
 } from "./lifecycle.js";

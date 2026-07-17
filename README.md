@@ -58,16 +58,20 @@ Install dependencies:
 make install
 ```
 
-Create a local database with the deterministic, playable demo data:
+Create a local database and seed sample MVP data:
 
 ```bash
 make db-migrate
+make db-seed
+```
+
+For demos, manual browser checks, and E2E fixtures, use the deterministic demo
+basho seed instead:
+
+```bash
 make db-seed-demo
 make dev
 ```
-
-`make db-seed` remains available for dated sample/reference data, but that
-fixture follows real calendar locking and is not guaranteed to accept picks.
 
 Or reset the demo data and start both dev servers in one command:
 
@@ -131,19 +135,17 @@ The admin import endpoints are local development tools for now. Do not expose th
 
 Basho records use this lifecycle:
 
-- `upcoming` - picks are open until the start of the calendar day before the
-  basho in Japan.
+- `upcoming` - picks are open.
 - `locked` - picks are closed before scoring starts.
 - `active` - results are being applied and leaderboard scoring is in progress.
 - `complete` - final scores are available.
 
-The API enforces pick locking. `POST /api/basho/:bashoId/teams` succeeds only
-while the basho is `upcoming` and the Japan-calendar lock date has not arrived;
-locked, active, complete, and overdue upcoming bashos return a
-`409 picks-locked` response. Basho reads expose that effective date-based lock
-to the client even before the database status is updated. The protected daily
-cron persists the `locked` state and stamps existing teams on day 0, the
-calendar day before the basho.
+The API enforces pick locking from persisted lifecycle state.
+`POST /api/basho/:bashoId/teams` succeeds only while the basho is `upcoming`;
+`locked`, `active`, and `complete` bashos return `409 picks-locked`. This also
+allows an administrator to lock picks early by changing the basho lifecycle.
+The protected daily cron normally persists the lock and stamps existing teams
+on the evening before day 0, where day 0 is the calendar day before the basho.
 
 Useful checks:
 
@@ -200,9 +202,9 @@ curl -X POST "http://localhost:3000/api/admin/basho/2026-05/import-results?dryRu
 
 Production deployments expose one Vercel Cron-only path. `GET
 /api/cron/import-results` locks the single eligible upcoming basho without
-contacting the results source on day 0, then derives and imports the current
-basho day on days 1-15. It accepts an upcoming or locked basho on day 1 as a
-safe catch-up path and reuses the manual trigger's transactional import
+contacting the results source on the evening before day 0, then derives and
+imports the current basho day on days 1-15. Day 0 and day 1 provide safe
+catch-up paths, and result imports reuse the manual trigger's transactional
 service. See `docs/DEPLOYMENT.md` for schedule and authentication details.
 
 ## Makefile commands

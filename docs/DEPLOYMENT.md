@@ -92,19 +92,22 @@ token. Cron jobs run on production deployments, not previews.
 On each authenticated invocation, the route calculates the current date in
 `Asia/Tokyo` and selects at most one non-demo basho:
 
-1. on day 0, the calendar day before `basho.startDate`, it atomically changes
-   the upcoming basho to `locked` and stamps `lockedAt` on existing teams;
-2. on days 1-15, it derives the basho day and runs the source-backed,
+1. on the evening before day 0, two calendar days before `basho.startDate`, it
+   atomically changes the upcoming basho to `locked` and stamps `lockedAt` on
+   existing teams;
+2. on day 0, it applies that same lock as a catch-up if the earlier invocation
+   was missed;
+3. on days 1-15, it derives the basho day and runs the source-backed,
    transactional result import;
-3. it skips without contacting the results source outside that window;
-4. it fails without mutation when more than one basho is eligible.
+4. it skips without contacting the results source outside that window;
+5. it fails without mutation when more than one basho is eligible.
 
-Rerunning day 0 after a successful lock is a safe no-op. Independently, team
-creation compares the current Japan date with the same deadline and returns
-`409 picks-locked` even if the persisted status is stale. Basho API reads also
-expose an effective `locked` status, so the client does not advertise open
-picks while the cron/database update is pending. The deterministic demo basho
-is exempt; its protected controls remain the source of progression.
+Rerunning after a successful lock is a safe no-op. Team creation and basho
+reads use only the persisted lifecycle status: `upcoming` keeps picks open,
+while `locked`, `active`, and `complete` close them. This lets an administrator
+lock earlier when needed and keeps the client and API aligned. The
+deterministic demo basho is exempt from the production cron; its protected
+controls remain the source of progression.
 
 Banzuke reimports preserve the most advanced stored basho lifecycle state, so
 running a refresh after this job cannot regress `locked` back to `upcoming`.

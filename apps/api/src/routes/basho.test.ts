@@ -148,47 +148,24 @@ describe("basho routes", () => {
     });
   });
 
-  it("rejects teams from the start of the day before the basho in Japan", async () => {
+  it("uses the stored upcoming status rather than the current date", async () => {
     await app.close();
     app = buildApp({
       db: client,
-      now: () => new Date("2026-05-08T14:59:59.000Z"),
-      teamIdFactory: () => "before-cutoff",
+      now: () => new Date("2026-05-25T12:00:00.000Z"),
+      teamIdFactory: () => "status-only",
     });
 
-    const beforeCutoff = await app.inject({
+    const response = await app.inject({
       method: "POST",
       url: "/api/basho/2026-05/teams",
       payload: {
-        displayName: "Just In Time",
+        displayName: "Status Controlled",
         rikishiIds: ["onosato", "kotozakura"],
       },
     });
 
-    expect(beforeCutoff.statusCode).toBe(201);
-
-    await app.close();
-    app = buildApp({
-      db: client,
-      now: () => new Date("2026-05-08T15:00:00.000Z"),
-      teamIdFactory: () => "at-cutoff",
-    });
-
-    const atCutoff = await app.inject({
-      method: "POST",
-      url: "/api/basho/2026-05/teams",
-      payload: {
-        displayName: "Too Late",
-        rikishiIds: ["onosato", "kotozakura"],
-      },
-    });
-
-    expect(atCutoff.statusCode).toBe(409);
-    expect(atCutoff.json()).toMatchObject({
-      error: "picks-locked",
-      message: "Picks closed the day before this basho starts.",
-      bashoStatus: "locked",
-    });
+    expect(response.statusCode).toBe(201);
 
     const currentResponse = await app.inject({
       method: "GET",
@@ -198,7 +175,7 @@ describe("basho routes", () => {
     expect(currentResponse.statusCode).toBe(200);
     expect(currentResponse.json()).toMatchObject({
       id: "2026-05",
-      status: "locked",
+      status: "upcoming",
     });
 
     const rikishiResponse = await app.inject({
@@ -206,7 +183,7 @@ describe("basho routes", () => {
       url: "/api/basho/2026-05/rikishi",
     });
 
-    expect(rikishiResponse.json().basho).toMatchObject({ status: "locked" });
+    expect(rikishiResponse.json().basho).toMatchObject({ status: "upcoming" });
 
     const leaderboardResponse = await app.inject({
       method: "GET",
@@ -214,7 +191,7 @@ describe("basho routes", () => {
     });
 
     expect(leaderboardResponse.json().basho).toMatchObject({
-      status: "locked",
+      status: "upcoming",
     });
   });
 

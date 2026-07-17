@@ -95,7 +95,7 @@ describe("scheduled result import route", () => {
     });
   });
 
-  it("locks picks on day zero without fetching results and safely reruns", async () => {
+  it("locks picks the day before day zero without fetching results and safely reruns", async () => {
     await seedLiveBasho("2026-05", {
       status: "upcoming",
       currentDay: 0,
@@ -105,7 +105,7 @@ describe("scheduled result import route", () => {
     app = createApp(async () => {
       fetchCalls += 1;
       return resultsResponse();
-    }, new Date("2026-05-09T02:00:00.000Z"));
+    }, new Date("2026-05-08T02:00:00.000Z"));
 
     const firstResponse = await injectCron(app);
 
@@ -113,9 +113,9 @@ describe("scheduled result import route", () => {
     expect(firstResponse.json()).toMatchObject({
       status: "locked",
       bashoId: "2026-05",
-      day: 0,
-      japanDate: "2026-05-09",
-      lockedAt: "2026-05-09T02:00:00.000Z",
+      day: -1,
+      japanDate: "2026-05-08",
+      lockedAt: "2026-05-08T02:00:00.000Z",
     });
     expect(fetchCalls).toBe(0);
 
@@ -125,7 +125,7 @@ describe("scheduled result import route", () => {
       currentDay: 0,
     });
     expect(await repositories.getFantasyTeam("team-day-zero")).toMatchObject({
-      lockedAt: "2026-05-09T02:00:00.000Z",
+      lockedAt: "2026-05-08T02:00:00.000Z",
     });
 
     const secondResponse = await injectCron(app);
@@ -139,13 +139,13 @@ describe("scheduled result import route", () => {
     expect(fetchCalls).toBe(0);
   });
 
-  it("does not lock picks before day zero", async () => {
+  it("does not lock picks before the day preceding day zero", async () => {
     await seedLiveBasho("2026-05", { status: "upcoming", currentDay: 0 });
     let fetchCalls = 0;
     app = createApp(async () => {
       fetchCalls += 1;
       return resultsResponse();
-    }, new Date("2026-05-08T02:00:00.000Z"));
+    }, new Date("2026-05-07T02:00:00.000Z"));
 
     const response = await injectCron(app);
 
@@ -158,6 +158,33 @@ describe("scheduled result import route", () => {
     expect(fetchCalls).toBe(0);
     expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
       status: "upcoming",
+    });
+  });
+
+  it("catches up an upcoming basho on day zero", async () => {
+    await seedLiveBasho("2026-05", {
+      status: "upcoming",
+      currentDay: 0,
+      withTeam: true,
+    });
+    let fetchCalls = 0;
+    app = createApp(async () => {
+      fetchCalls += 1;
+      return resultsResponse();
+    }, new Date("2026-05-09T02:00:00.000Z"));
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "locked",
+      bashoId: "2026-05",
+      day: 0,
+      japanDate: "2026-05-09",
+    });
+    expect(fetchCalls).toBe(0);
+    expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
+      status: "locked",
     });
   });
 

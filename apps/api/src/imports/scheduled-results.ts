@@ -17,7 +17,7 @@ export type ScheduledResultsImportResult =
   | {
       status: "locked";
       bashoId: string;
-      day: 0;
+      day: -1 | 0;
       japanDate: string;
       lockedAt: string;
     }
@@ -84,7 +84,7 @@ export async function runScheduledResultsImport(
 
   const { basho, day } = eligibleBashos[0]!;
 
-  if (day === 0) {
+  if (day === -1 || day === 0) {
     const lockedAt = now.toISOString();
 
     await repositories.lockBashoAndFantasyTeams(basho.id, lockedAt);
@@ -118,7 +118,7 @@ export async function runScheduledResultsImport(
 }
 
 function isEligibleForScheduledUpdate(basho: Basho, day: number) {
-  if (day === 0) {
+  if (day === -1 || day === 0) {
     return basho.status === "upcoming";
   }
 
@@ -138,7 +138,7 @@ function resolveBashoDay(basho: Basho, japanDate: string) {
     currentDate === undefined ||
     startDate === undefined ||
     endDate === undefined ||
-    currentDate < startDate - MILLISECONDS_PER_DAY ||
+    currentDate < startDate - 2 * MILLISECONDS_PER_DAY ||
     currentDate > endDate
   ) {
     return undefined;

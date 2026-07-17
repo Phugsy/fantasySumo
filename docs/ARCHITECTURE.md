@@ -98,8 +98,9 @@ Current routes:
   - Applies all deterministic demo results and marks the demo basho complete.
 - `GET /api/cron/import-results`
   - Requires Vercel's `Authorization: Bearer <CRON_SECRET>` header.
-  - On day 0, locks the single eligible non-demo upcoming basho and its existing
-    teams without contacting the results source.
+  - On the evening before day 0, locks the single eligible non-demo upcoming
+    basho and its existing teams without contacting the results source.
+  - Catches up the same lock on day 0 if the earlier invocation was missed.
   - On days 1-15, selects the single date-eligible basho and derives its day
     from the current calendar date in `Asia/Tokyo`.
   - Reuses the source adapter and transactional result import service used by
@@ -328,19 +329,15 @@ POST   /api/admin/basho/:bashoId/import-results
 
 Admin endpoints can be protected later. For early local development, they can remain local-only but should be clearly marked as unsafe for production.
 
-`POST /api/basho/:bashoId/teams` is allowed only while the basho status is
-`upcoming` and the current date in Japan is before the calendar day preceding
-the basho start date. The date check is a backstop when the lifecycle cron is
-delayed or missed. Deterministic demo data remains controlled by the protected
-demo lifecycle instead of real calendar dates. The API rejects team creation
-for overdue upcoming, `locked`, `active`, and `complete` production bashos with
-`409 picks-locked`. Basho read endpoints expose an effective `locked` status
-once the deadline arrives, so the UI mirrors the same date rule even before the
-scheduled job persists it; the API remains the source of enforcement.
+`POST /api/basho/:bashoId/teams` is allowed only while the persisted basho
+status is `upcoming`. The API rejects team creation for `locked`, `active`, and
+`complete` bashos with `409 picks-locked`. Basho read endpoints expose the same
+persisted status, keeping the UI and API aligned and allowing an administrator
+to lock picks early when needed.
 
 Lifecycle meanings:
 
-- `upcoming`: picks are open before the day-before lock cutoff.
+- `upcoming`: picks are open.
 - `locked`: picks are closed before scoring starts.
 - `active`: results are being applied day by day.
 - `complete`: final scores are available.
