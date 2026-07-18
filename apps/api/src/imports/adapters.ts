@@ -81,6 +81,7 @@ export function mapJsaBanzukePayload(
     source: "jsa-banzuke",
     basho: {
       id: bashoId,
+      isDemo: false,
       name: formatJsaBashoName(payload),
       startDate,
       endDate,

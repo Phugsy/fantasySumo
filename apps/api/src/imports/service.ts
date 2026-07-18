@@ -384,6 +384,7 @@ function summarizeMany<T extends { id: string }>(
 function isEqualBasho(left: Basho, right: Basho) {
   return (
     left.id === right.id &&
+    left.isDemo === right.isDemo &&
     left.name === right.name &&
     left.startDate === right.startDate &&
     left.endDate === right.endDate &&

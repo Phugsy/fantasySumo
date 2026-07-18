@@ -2,6 +2,7 @@ export type BashoStatus = "upcoming" | "locked" | "active" | "complete";
 
 export interface Basho {
   id: string;
+  isDemo: boolean;
   name: string;
   startDate: string;
   endDate: string;

@@ -19,7 +19,7 @@ dev: ## Start the API and Vite web app together.
 demo: ## Reset demo data and start the API and Vite web app.
 	$(PNPM) db:migrate
 	$(PNPM) db:seed:demo
-	$(PNPM) dev
+	VITE_BASHO_MODE=demo $(PNPM) dev
 
 dev-client: ## Start only the Vite web client.
 	$(PNPM) --filter @fantasy-sumo/domain build

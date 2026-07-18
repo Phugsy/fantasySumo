@@ -52,6 +52,26 @@ Keep SQLite locally until there is a concrete reason to standardise development 
 
 The demo admin endpoints already require `DEMO_ADMIN_TOKEN` unless explicitly opened in tests.
 
+Demo administration is also protected at the data boundary. The application
+supports one fixed deterministic demo basho. Reset and progression require its
+known ID and a persisted `isDemo: true` flag; reset fails closed if a live basho
+uses that ID. The scoped reset transaction deletes and recreates only the demo
+basho and its dependent banzuke, teams, picks, and results. It does not clear
+live bashos or overwrite shared rikishi metadata. Scheduled production imports
+exclude every basho marked as demo.
+
+The demo-flag migration deliberately classifies every existing basho as live.
+It never infers destructive permissions from an ID alone. If an operator has a
+verified legacy demo row, they must explicitly mark that row as demo after
+backing up the database, or recreate the deterministic demo fixture in a local
+database that does not contain an ID collision.
+
+`make demo` sets `VITE_BASHO_MODE=demo`, so the browser explicitly requests the
+fixed, flagged demo basho even when the same database also contains live data.
+Normal builds omit this flag and `/api/basho/current` continues to prefer live
+bashos. The explicit demo query still verifies both the fixed ID and `isDemo`
+classification before returning a basho.
+
 The source-backed import endpoints require `ADMIN_IMPORT_TOKEN` by default. They can run without a token only when `NODE_ENV` is `development` or `test`.
 
 ```bash
@@ -103,7 +123,7 @@ On each authenticated invocation, the route calculates the current date in
    day;
 4. after the end date, it keeps a locked or active basho eligible for final-day
    recovery until day 15 completes it;
-5. it fails without mutation when more than one basho is eligible.
+5. it fails without mutation when more than one live basho is eligible.
 
 Rerunning after a successful lock is a safe no-op. Team creation and basho
 reads use only the persisted lifecycle status: `upcoming` keeps picks open,

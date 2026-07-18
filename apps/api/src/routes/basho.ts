@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import type { Repositories } from "@fantasy-sumo/db";
+import { DEMO_BASHO_ID, type Repositories } from "@fantasy-sumo/db";
 import type { FantasyPick, FantasyTeam } from "@fantasy-sumo/domain";
 import {
   calculateLeaderboard,
@@ -22,25 +22,47 @@ const createTeamBodySchema = z.object({
   rikishiIds: z.array(z.string().trim().min(1)),
 });
 
+const currentBashoQuerySchema = z.object({
+  mode: z.enum(["demo"]).optional(),
+});
+
 export function registerBashoRoutes(
   app: FastifyInstance,
   context: RouteContext,
 ) {
-  app.get("/api/basho/current", async (_request, reply) => {
-    const currentBasho = await findCurrentBasho(context.repositories);
+  app.get<{ Querystring: unknown }>(
+    "/api/basho/current",
+    async (request, reply) => {
+      const parsedQuery = currentBashoQuerySchema.safeParse(request.query);
 
-    if (currentBasho === undefined) {
-      return reply.code(404).send({
-        error: "not-found",
-        message: "No basho is available.",
-      });
-    }
+      if (!parsedQuery.success) {
+        return reply.code(400).send({
+          error: "invalid-request",
+          message: "The current basho mode is invalid.",
+        });
+      }
 
-    return {
-      ...currentBasho,
-      teamSize: context.teamSize,
-    };
-  });
+      const currentBasho =
+        parsedQuery.data.mode === "demo"
+          ? await findDemoBasho(context.repositories)
+          : await findCurrentBasho(context.repositories);
+
+      if (currentBasho === undefined) {
+        return reply.code(404).send({
+          error: "not-found",
+          message:
+            parsedQuery.data.mode === "demo"
+              ? "The demo basho is not available."
+              : "No basho is available.",
+        });
+      }
+
+      return {
+        ...currentBasho,
+        teamSize: context.teamSize,
+      };
+    },
+  );
 
   app.get<{
     Params: { bashoId: string };
@@ -265,11 +287,18 @@ function getBashoTotalDays(basho: { startDate: string; endDate: string }) {
 
 async function findCurrentBasho(repositories: Repositories) {
   const bashos = await repositories.listBashos();
-  const latestFirst = [...bashos].reverse();
+  const liveBashos = bashos.filter((basho) => !basho.isDemo);
+  const candidates = liveBashos.length > 0 ? liveBashos : bashos;
+  const latestFirst = [...candidates].reverse();
 
   return (
     latestFirst.find((basho) => basho.status === "active") ??
     latestFirst.find((basho) => basho.status === "locked") ??
     latestFirst.at(0)
   );
+}
+
+async function findDemoBasho(repositories: Repositories) {
+  const basho = await repositories.getBasho(DEMO_BASHO_ID);
+  return basho?.isDemo === true ? basho : undefined;
 }

@@ -6,7 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEMO_FINAL_DAY,
   createDatabaseClient,
+  createRepositories,
   runMigrations,
+  seedDatabase,
+  sampleBasho,
   type DatabaseClient,
 } from "@fantasy-sumo/db";
 import { buildApp } from "../app.js";
@@ -163,6 +166,29 @@ describe("admin demo routes", () => {
         }),
       ]),
     );
+  });
+
+  it("preserves live basho data when the demo reset endpoint runs", async () => {
+    const repositories = createRepositories(client);
+    await seedDatabase(repositories);
+
+    const response = await app.inject({
+      headers: demoAdminHeaders,
+      method: "POST",
+      url: "/api/admin/demo/reset",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(await repositories.getBasho(sampleBasho.id)).toEqual(sampleBasho);
+    expect(
+      await repositories.listFantasyTeamsForBasho(sampleBasho.id),
+    ).not.toHaveLength(0);
+    expect(
+      await repositories.listFantasyPicksForBasho(sampleBasho.id),
+    ).not.toHaveLength(0);
+    expect(
+      await repositories.listBoutResultsForBasho(sampleBasho.id),
+    ).not.toHaveLength(0);
   });
 });
 

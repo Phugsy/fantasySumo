@@ -55,6 +55,7 @@ export default defineConfig({
       command: "pnpm --filter @fantasy-sumo/web dev",
       env: {
         ...process.env,
+        VITE_BASHO_MODE: "demo",
       },
       url: "http://127.0.0.1:7866",
       reuseExistingServer: !process.env.CI,

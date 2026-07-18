@@ -392,7 +392,7 @@ describe("scheduled result import route", () => {
   });
 
   it("does not treat the deterministic demo basho as a live import target", async () => {
-    await seedLiveBasho(DEMO_BASHO_ID);
+    await seedLiveBasho(DEMO_BASHO_ID, { isDemo: true });
     app = createApp();
 
     const response = await injectCron(app);
@@ -463,6 +463,7 @@ function injectCron(instance: FastifyInstance) {
 async function seedLiveBasho(
   bashoId: string,
   options: {
+    isDemo?: boolean;
     status?: "active" | "locked" | "upcoming";
     currentDay?: number;
     importedDays?: number[];
@@ -473,6 +474,7 @@ async function seedLiveBasho(
 
   await repositories.insertBasho({
     id: bashoId,
+    isDemo: options.isDemo ?? false,
     name: "May 2026",
     startDate: "2026-05-10",
     endDate: "2026-05-24",

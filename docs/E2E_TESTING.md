@@ -76,7 +76,13 @@ The demo seed command is the intended fixture source:
 make db-seed-demo
 ```
 
-For E2E, run it against a test-only `DATABASE_URL` so the reset cannot delete a developer's default local data. The demo seed uses fake data, but it flows through the real SQLite schema, repositories, Fastify API, React UI, and domain scoring code.
+For E2E, still run against a test-only `DATABASE_URL` so tests remain isolated
+from developer state. Demo reset itself is scoped to the known basho marked
+`isDemo` and cannot clear live bashos. The demo seed uses fake data, but it
+flows through the real SQLite schema, repositories, Fastify API, React UI, and
+domain scoring code. The Playwright web server sets `VITE_BASHO_MODE=demo` so
+the browser explicitly selects that fixture even if live records are also
+present.
 
 The deterministic demo lifecycle can be used as fixture setup:
 

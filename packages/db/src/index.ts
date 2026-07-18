@@ -14,8 +14,8 @@ export type {
 export { migrateDatabase, runMigrations } from "./migrate.js";
 export { createRepositories } from "./repositories.js";
 export type { Repositories } from "./repositories.js";
+export { DEMO_BASHO_ID } from "./demo-constants.js";
 export {
-  DEMO_BASHO_ID,
   DEMO_FINAL_DAY,
   advanceDemoBashoDay,
   completeDemoBasho,

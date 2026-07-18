@@ -13,7 +13,15 @@ interface ApiErrorBody {
 }
 
 export async function fetchCurrentBasho(): Promise<Basho> {
-  return getJson<Basho>("/api/basho/current");
+  return getJson<Basho>(getCurrentBashoUrl());
+}
+
+export function getCurrentBashoUrl(
+  mode: string | undefined = import.meta.env.VITE_BASHO_MODE,
+): string {
+  return mode === "demo"
+    ? "/api/basho/current?mode=demo"
+    : "/api/basho/current";
 }
 
 export async function fetchBashoRikishi(

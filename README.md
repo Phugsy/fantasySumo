@@ -70,7 +70,7 @@ basho seed instead:
 
 ```bash
 make db-seed-demo
-make dev
+VITE_BASHO_MODE=demo make dev
 ```
 
 Or reset the demo data and start both dev servers in one command:
@@ -79,7 +79,13 @@ Or reset the demo data and start both dev servers in one command:
 make demo
 ```
 
-Demo mode replaces the configured SQLite database contents with fake but stable basho, rikishi, team, and pick data. It starts at day 0 with picks open and no applied results. It does not use live sumo data, but it does exercise the same API, UI, database, and scoring logic as normal local development.
+Demo mode replaces only the fixed demo basho and its dependent banzuke, team,
+pick, and result data with fake but stable fixtures. Live bashos and shared
+rikishi metadata are preserved. The demo starts at day 0 with picks open and no
+applied results. It does not use live sumo data, but it exercises the same API,
+UI, database, and scoring logic as normal local development. The explicit
+`VITE_BASHO_MODE=demo` flag makes the browser request the fixed flagged demo;
+without it, current-basho selection remains live-first.
 
 Progress the deterministic demo basho with:
 
@@ -131,7 +137,10 @@ Useful API endpoints:
 - `POST /api/admin/basho/:bashoId/import-results`
 - `GET /api/cron/import-results`
 
-The demo admin endpoints require `DEMO_ADMIN_TOKEN` and an `x-demo-admin-token` header. They reset and mutate demo data, so do not expose them without that protection.
+The demo admin endpoints require `DEMO_ADMIN_TOKEN` and an
+`x-demo-admin-token` header. They operate only on the fixed basho ID whose
+persisted record is marked `isDemo`; a colliding live record fails closed.
+Keep the token private even though reset is scoped away from live bashos.
 
 The admin import endpoints are local development tools for now. Do not expose them publicly without authentication/protection.
 
@@ -228,7 +237,7 @@ Common targets:
 - `make demo` - reset deterministic demo data, then start the API and web client together.
 - `make dev-client` - start only the Vite web client.
 - `make dev-server` - start only the Fastify API.
-- `make db-seed-demo` - reset the configured SQLite database with deterministic demo data.
+- `make db-seed-demo` - reset the scoped deterministic demo basho data.
 - `make demo-reset` - reset demo progression to day 0 with picks open.
 - `make demo-start` - lock existing demo picks and start the basho without applying results.
 - `make demo-advance-day` - apply the next day of deterministic demo results.

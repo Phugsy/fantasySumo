@@ -5,6 +5,7 @@ import type { Basho, LeaderboardEntry, RankedRikishi } from "../types";
 
 const basho: Basho = {
   id: "2026-05",
+  isDemo: false,
   name: "Demo May Basho",
   startDate: "2026-05-10",
   endDate: "2026-05-24",

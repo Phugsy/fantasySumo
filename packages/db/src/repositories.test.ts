@@ -244,6 +244,75 @@ describe("repositories", () => {
     ]);
   });
 
+  it("resets demo data without changing live basho data or shared rikishi", async () => {
+    const repositories = createRepositories(client);
+    await seedDatabase(repositories);
+    await repositories.upsertRikishi({
+      id: "onosato",
+      shikona: "Onosato",
+      heya: "Live Metadata Stable",
+    });
+
+    await seedDemoDatabase(repositories);
+    await completeDemoBasho(repositories);
+    await resetDemoProgression(repositories);
+
+    expect(await repositories.getBasho(sampleBasho.id)).toEqual(sampleBasho);
+    expect(
+      await repositories.listBanzukeEntriesForBasho(sampleBasho.id),
+    ).toHaveLength(4);
+    expect(await repositories.listFantasyTeamsForBasho(sampleBasho.id)).toEqual(
+      sampleFantasyTeams,
+    );
+    expect(
+      await repositories.listFantasyPicksForBasho(sampleBasho.id),
+    ).toHaveLength(4);
+    expect(
+      await repositories.listBoutResultsForBasho(sampleBasho.id),
+    ).toHaveLength(3);
+    expect(
+      (await repositories.listRikishi()).find(
+        (rikishi) => rikishi.id === "onosato",
+      ),
+    ).toMatchObject({ heya: "Live Metadata Stable" });
+    expect(await repositories.getBasho(demoBasho.id)).toEqual(demoBasho);
+  });
+
+  it("fails closed when the demo id belongs to a live basho", async () => {
+    const repositories = createRepositories(client);
+    const collidingLiveBasho = {
+      ...demoBasho,
+      isDemo: false,
+      name: "Live Basho With Colliding ID",
+    };
+    await repositories.insertBasho(collidingLiveBasho);
+
+    await expect(seedDemoDatabase(repositories)).rejects.toThrow(
+      `Refusing to replace live basho ${demoBasho.id} with demo data.`,
+    );
+
+    expect(await repositories.getBasho(demoBasho.id)).toEqual(
+      collidingLiveBasho,
+    );
+  });
+
+  it("rejects resets for any other demo basho id", async () => {
+    const repositories = createRepositories(client);
+
+    await expect(
+      repositories.replaceDemoBashoData({
+        basho: { ...demoBasho, id: "demo-other" },
+        rikishi: [],
+        banzukeEntries: [],
+        fantasyTeams: [],
+        fantasyPicks: [],
+        boutResults: [],
+      }),
+    ).rejects.toThrow(
+      `Demo reset may only replace the fixed basho ${demoBasho.id}.`,
+    );
+  });
+
   it("resets demo progression to a deterministic pre-basho state", async () => {
     await seedDemoDatabase(createRepositories(client));
     const repositories = createRepositories(client);

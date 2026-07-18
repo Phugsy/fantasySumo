@@ -1,5 +1,5 @@
 import type { Basho } from "@fantasy-sumo/domain";
-import { DEMO_BASHO_ID, type Repositories } from "@fantasy-sumo/db";
+import type { Repositories } from "@fantasy-sumo/db";
 import { fetchSumoApiResultsImport } from "./adapters.js";
 import { importBoutResults } from "./service.js";
 import type { ImportResult, SourceFetch } from "./types.js";
@@ -46,7 +46,7 @@ export async function runScheduledResultsImport(
       (basho.status === "upcoming" ||
         basho.status === "locked" ||
         basho.status === "active") &&
-      basho.id !== DEMO_BASHO_ID,
+      !basho.isDemo,
   );
   const eligibleBashos = scheduledBashos.flatMap((basho) => {
     const day = resolveBashoDay(basho, japanDate);
