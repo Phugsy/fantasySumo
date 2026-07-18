@@ -6,7 +6,7 @@ Use this skill when the user asks to work an issue through the Fantasy Sumo repo
 Use the Fantasy Sumo issue loop on #44.
 ```
 
-This is a repo-local adapter for Fantasy Sumo's current architecture, data safety rules, and completion evidence. Keep it lightweight. It should help one issue become one focused draft PR; it should not automate issue intake, reviews, merges, or deployment.
+This is a repo-local adapter for Fantasy Sumo's current architecture, data safety rules, and completion evidence. Keep it lightweight. It should help one issue become one focused draft PR; hand pre-handoff review and later PR feedback to `skills/fantasy-sumo-pr-review-loop/SKILL.md`. It should not automate issue intake, merges, or deployment.
 
 ## Baseline Rules
 
@@ -86,6 +86,8 @@ For documentation-only changes, `make check` is usually sufficient if it covers 
 
 For changes that touch repo-root Vercel handlers such as `api/index.ts`, also run a direct TypeScript compile probe for that path or the relevant deployment build check, because root handlers may not be covered by package-level builds.
 
+After checks pass for a non-trivial code change, invoke `skills/fantasy-sumo-pr-review-loop/SKILL.md` in pre-handoff mode. Address accepted findings, revalidate, and record any finding that requires user input before calling the PR ready.
+
 ## E2E Rules
 
 Read `docs/E2E_TESTING.md` before adding or relying on E2E coverage.
@@ -114,11 +116,13 @@ Open a draft PR when the issue slice is implemented and relevant checks have bee
 - docs updated, if any;
 - known follow-up work or explicit non-goals.
 
-Do not mark the PR ready for review until required checks and issue-specific acceptance criteria are satisfied.
+Do not mark the PR ready for review until required checks, issue-specific acceptance criteria, and the pre-handoff review gate are satisfied.
+
+When Codex automations are available, start a PR-scoped scheduled babysitter after opening the draft PR. Invoke `skills/fantasy-sumo-pr-review-loop/SKILL.md` in scheduled mode, use an isolated worktree, and stop monitoring when the PR is merged or closed. The generated task prompt must explicitly authorize the skill's limited safe-fix writes: edit the PR branch, commit, push without force, reply to addressed review threads, and resolve only those addressed threads. It must repeat that merge, close, approval, branch deletion, and high-risk or ambiguous fixes are not authorized. If automation is unavailable, state that review follow-up remains manual.
 
 ## Automation Boundary
 
-This skill is manual or semi-manual. It does not create a fully automatic "new issue equals new PR" system.
+This skill is manual or semi-manual. It does not create a fully automatic "new issue equals new PR" system. After the draft PR exists, use `skills/fantasy-sumo-pr-review-loop/SKILL.md` for thread-aware feedback follow-up or a guarded scheduled babysitter.
 
 A later queue can add automation with safer constraints:
 

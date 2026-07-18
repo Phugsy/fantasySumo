@@ -44,6 +44,13 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 - Keep data import logic separate from scoring logic.
 - Once an E2E harness exists, use it to validate completion for changes that affect the browser game loop.
 
+## Review guidelines
+
+- Prioritize correctness, security, data integrity, basho lifecycle enforcement, transactional races, missed-cron recovery, deployment authentication, and SQLite/Postgres parity.
+- Require focused regression coverage when a change affects scoring, imports, pick locking, persistence, or production scheduling.
+- Treat unsupported product expansion, style-only preferences, and cleanup unrelated to the PR as non-blocking follow-up work.
+- Flag any path that can reopen picks, lose or duplicate results, partially commit imports, expose protected admin actions, or behave differently on Neon Postgres.
+
 ## Legacy hazards to handle carefully
 
 - The removed legacy database connection used hard-coded local credentials. Do not reintroduce credentials in source.
@@ -62,8 +69,13 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 8. Use `make db-seed-demo` or `make demo` when a deterministic browser-flow fixture is useful, especially for future E2E validation. These commands reset the configured local SQLite data.
 9. Prefer the Makefile command layer for common workflows: `make test`, `make lint`, `make build`, and `make check`.
 10. Keep PRs focused on the next MVP slice; do not rebuild the full product in one change.
+11. Before calling a non-trivial code change ready, use `skills/fantasy-sumo-pr-review-loop/SKILL.md` to run a dedicated review against the base branch.
 
 For issue-to-PR work, use the repo-local process in `skills/fantasy-sumo-issue-loop/SKILL.md`. It can be invoked with a prompt such as: "Use the Fantasy Sumo issue loop on #44."
+
+For pre-handoff review, PR comment follow-up, or scheduled PR babysitting, use `skills/fantasy-sumo-pr-review-loop/SKILL.md`.
+
+After opening a `codex/*` pull request, start a PR-scoped scheduled babysitter when Codex automations are available. Run it in an isolated worktree, limit automatic fixes to the safe scope in the review-loop skill, and stop it when the PR is merged or closed. Never auto-merge.
 
 ## Definition of done for future changes
 
@@ -75,3 +87,5 @@ A change is ready when:
 - It includes tests for scoring/data rules where practical.
 - It runs relevant E2E coverage when browser game-loop behaviour changes and an E2E harness exists.
 - It updates docs if it changes product rules, architecture, setup, or data assumptions.
+- It has passed a dedicated review against the base branch, with accepted findings fixed and revalidated.
+- It has no unresolved actionable P1/P2 review threads; ambiguous or higher-risk findings are explicitly handed back to the user.
