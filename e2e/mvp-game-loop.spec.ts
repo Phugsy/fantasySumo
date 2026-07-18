@@ -69,6 +69,69 @@ test("shows completed demo leaderboard entries in score order", async ({
   await expect(page.getByText(/wins/).first()).toBeVisible();
 });
 
+test("locks team selection after the demo basho starts", async ({
+  page,
+  request,
+}) => {
+  const unauthorizedResponse = await request.post("/api/admin/demo/start");
+  expect(unauthorizedResponse.status()).toBe(401);
+
+  const startResponse = await request.post("/api/admin/demo/start", {
+    headers: demoAdminHeaders,
+  });
+  await expect(startResponse).toBeOK();
+
+  await page.goto("/");
+
+  await expect(
+    page.getByText("This basho has started, so picks are locked."),
+  ).toBeVisible();
+  await expect(page.getByLabel("Team name")).toBeDisabled();
+  await expect(page.getByRole("button", { name: /Onosato/ })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Submit team" }),
+  ).toBeDisabled();
+
+  const lockedTeamResponse = await request.post(
+    "/api/basho/demo-2026-05/teams",
+    {
+      data: {
+        displayName: "Late Stable",
+        rikishiIds: ["onosato", "hoshoryu"],
+      },
+    },
+  );
+  expect(lockedTeamResponse.status()).toBe(409);
+  expect(await lockedTeamResponse.json()).toMatchObject({
+    error: "picks-locked",
+  });
+});
+
+test("advances the demo basho and refreshes scored leaderboard state", async ({
+  page,
+  request,
+}) => {
+  const startResponse = await request.post("/api/admin/demo/start", {
+    headers: demoAdminHeaders,
+  });
+  await expect(startResponse).toBeOK();
+
+  const advanceResponse = await request.post("/api/admin/demo/advance-day", {
+    headers: demoAdminHeaders,
+  });
+  await expect(advanceResponse).toBeOK();
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Leaderboard" }).click();
+
+  await expect(page.getByText("Demo May Basho - Day 1 of 15")).toBeVisible();
+  await expect(page.getByText("Status: Scoring in progress")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Dohyo Dreamers.*1 pts/ }),
+  ).toBeVisible();
+  await expect(page.getByText(/1 win/).first()).toBeVisible();
+});
+
 test("prevents incomplete and overfull team submissions", async ({ page }) => {
   await page.goto("/");
 
@@ -90,45 +153,38 @@ test("prevents incomplete and overfull team submissions", async ({ page }) => {
   await expect(submitButton).toBeDisabled();
 });
 
-test("keeps navigation, ranks, and core views usable at supported widths", async ({
+test("keeps navigation, ranks, and core views usable on the emulated device", async ({
   page,
 }) => {
-  for (const viewport of [
-    { width: 375, height: 812 },
-    { width: 768, height: 1024 },
-    { width: 1280, height: 900 },
-  ]) {
-    await page.setViewportSize(viewport);
-    await page.goto("/");
+  await page.goto("/");
 
-    await expect(
-      page.getByRole("navigation", { name: "Primary navigation" }),
-    ).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Primary navigation" }),
+  ).toBeVisible();
 
-    const longRank = page.getByText("Maegashira #1", { exact: true });
-    await expect(longRank).toBeVisible();
-    expect(
-      await longRank.evaluate(
-        (element) => element.scrollWidth <= element.clientWidth,
-      ),
-    ).toBe(true);
+  const longRank = page.getByText("Maegashira #1", { exact: true });
+  await expect(longRank).toBeVisible();
+  expect(
+    await longRank.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
 
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
-    ).toBe(true);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 
-    await page.getByRole("button", { name: "Leaderboard" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Follow the leaderboard" }),
-    ).toBeVisible();
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
-    ).toBe(true);
-  }
+  await page.getByRole("button", { name: "Leaderboard" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Follow the leaderboard" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 });
 
 async function resetDemo(request: APIRequestContext) {

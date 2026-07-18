@@ -20,12 +20,22 @@ export default defineConfig({
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: "http://127.0.0.1:7866",
-    trace: "on-first-retry",
+    screenshot: "only-on-failure",
+    trace: "retain-on-failure",
+    video: "retain-on-failure",
   },
   projects: [
     {
-      name: "chromium",
+      name: "desktop-chromium",
       use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "mobile-chromium",
+      use: { ...devices["Pixel 5"] },
+    },
+    {
+      name: "mobile-webkit",
+      use: { ...devices["iPhone 13"] },
     },
   ],
   webServer: [

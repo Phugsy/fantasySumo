@@ -56,7 +56,7 @@ e2e: ## Run Playwright E2E tests against deterministic demo data.
 e2e-ui: ## Open the Playwright UI runner.
 	$(PNPM) e2e:ui
 
-e2e-install: ## Install the Chromium browser used by Playwright.
+e2e-install: ## Install the Chromium and WebKit browsers used by Playwright.
 	$(PNPM) e2e:install
 
 db-migrate: ## Apply local database migrations.
