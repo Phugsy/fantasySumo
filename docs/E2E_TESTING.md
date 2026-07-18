@@ -154,7 +154,19 @@ make e2e-install
 make e2e
 ```
 
-The suite uses Chromium only for now, starts the local Fastify API and Vite web app, and runs with one worker because the tests reset shared deterministic demo data. By default it writes to a test-only SQLite file:
+The suite starts the local Fastify API and Vite web app and runs with one worker
+because the tests reset shared deterministic demo data. The core journey runs
+through three Playwright projects:
+
+- desktop Chromium using the Desktop Chrome device profile;
+- mobile Chromium using the Pixel 5 device profile;
+- mobile WebKit using the iPhone 13 device profile.
+
+These mobile projects emulate mobile browser behaviour, including their
+viewport, user agent, device scale, touch support, and browser engine. They are
+not substitutes for occasional testing on physical devices.
+
+By default the harness writes to a test-only SQLite file:
 
 ```bash
 file:./data/e2e/fantasy-sumo-e2e.sqlite
@@ -167,6 +179,24 @@ E2E_DATABASE_URL=file:./data/e2e/local-run.sqlite make e2e
 ```
 
 Playwright uses ports `3000` for the API and `7866` for Vite. Stop any existing processes on those ports if the harness cannot start them. The protected demo admin controls are enabled with an E2E-only `DEMO_ADMIN_TOKEN` from the Playwright config; no live sumo data sources or production services are used.
+
+The browser suite covers API-backed app loading, team creation, selection
+validation, pick locking, protected demo progression, score refreshes,
+leaderboard ordering, and responsive navigation. Admin-route configuration is
+also covered at the Fastify boundary: missing or invalid credentials are
+rejected, disabled demo routes return `404`, and enabled routes drive the real
+browser lifecycle tests.
+
+On failure Playwright retains a trace, screenshot, and video under
+`test-results/`. In CI, the HTML report and test artifacts are uploaded for
+inspection. Use the trace viewer locally with:
+
+```bash
+pnpm exec playwright show-trace test-results/<result-directory>/trace.zip
+```
+
+The GitHub Actions quality workflow runs `make check` and `make e2e` for pull
+requests and pushes to `master`.
 
 ## Agent Completion Loop
 
@@ -183,6 +213,34 @@ For relevant tickets, a change should not be considered complete until the agent
 If E2E cannot be run because of a local environment, browser install, sandbox, or port constraint, the agent should state that clearly in the PR summary and run the closest lower-level checks instead.
 
 Do not require E2E for documentation-only changes, isolated domain scoring changes, or API-only changes that have no browser journey impact unless the ticket explicitly asks for it.
+
+## Agent-Browser Visual Pass
+
+Use agent-browser as an exploratory visual layer when UI layout, responsive
+behaviour, interaction feedback, or a difficult-to-assert state changes. It
+supplements committed Playwright assertions; it is not a replacement or a CI
+gate.
+
+A useful pass should use separate desktop and mobile sessions and collect both
+semantic and visual evidence:
+
+```bash
+agent-browser --session fantasy-sumo-desktop set viewport 1440 900
+agent-browser --session fantasy-sumo-desktop open http://127.0.0.1:7866
+agent-browser --session fantasy-sumo-desktop snapshot -i
+agent-browser --session fantasy-sumo-desktop screenshot --full
+
+agent-browser --session fantasy-sumo-mobile set device "iPhone 14"
+agent-browser --session fantasy-sumo-mobile open http://127.0.0.1:7866
+agent-browser --session fantasy-sumo-mobile snapshot -i
+agent-browser --session fantasy-sumo-mobile screenshot --full
+```
+
+Exercise the relevant journey, re-snapshot after page changes, and inspect
+console messages, page errors, and API requests when the installed
+agent-browser version supports those debug commands. Report which sessions,
+viewports/devices, and interactions were checked. Close both sessions after the
+pass.
 
 ## What Belongs In E2E
 
@@ -207,13 +265,9 @@ Keep detailed rules and edge cases out of E2E when faster tests cover them bette
 
 E2E should prove that the pieces work together for the main game loop. It should not duplicate every lower-level rule.
 
-## Follow-Up Implementation Ticket
+## Deferred Journeys
 
-The Playwright implementation work is tracked in GitHub issue #23. That ticket should:
-
-- add Playwright and browser installation instructions;
-- add root `pnpm e2e` and `pnpm e2e:ui` scripts;
-- add `make e2e` and optionally `make e2e-ui`;
-- configure deterministic E2E database setup/reset;
-- cover the first smoke, create-team, leaderboard, and validation flows listed above;
-- document any sandbox or port requirements needed by Codex.
+Authentication, current-user team retrieval, pick editing, and browser-driven
+admin/import controls do not exist in the current UI. Add their E2E journeys in
+the feature tickets that introduce those behaviours instead of encoding
+speculative tests here.

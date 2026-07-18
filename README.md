@@ -101,11 +101,15 @@ make dev
 Run the browser E2E suite:
 
 ```bash
-make e2e-install  # one-time Chromium install
+make e2e-install  # one-time Chromium and WebKit install
 make e2e
 ```
 
 The Playwright suite starts the Fastify API and Vite web app, resets deterministic demo data, and uses a dedicated SQLite database at `packages/db/data/e2e/fantasy-sumo-e2e.sqlite` by default. Override the test database with `E2E_DATABASE_URL=file:./data/e2e/another.sqlite`. Do not point E2E at the default developer database or production data.
+
+The core journey runs in desktop Chrome, emulated mobile Chrome, and emulated
+mobile Safari/WebKit. Failures retain a trace, screenshot, and video under
+`test-results/`; CI also publishes the Playwright report and failure artifacts.
 
 Local URLs:
 
