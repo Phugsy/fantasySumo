@@ -76,6 +76,5 @@ export function buildApp(options: AppOptions = {}) {
     repositories,
     sourceFetch: options.sourceFetch ?? fetch,
   });
-
   return app;
 }

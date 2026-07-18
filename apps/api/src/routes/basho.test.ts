@@ -148,6 +148,53 @@ describe("basho routes", () => {
     });
   });
 
+  it("uses the stored upcoming status rather than the current date", async () => {
+    await app.close();
+    app = buildApp({
+      db: client,
+      now: () => new Date("2026-05-25T12:00:00.000Z"),
+      teamIdFactory: () => "status-only",
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/basho/2026-05/teams",
+      payload: {
+        displayName: "Status Controlled",
+        rikishiIds: ["onosato", "kotozakura"],
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+
+    const currentResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/current",
+    });
+
+    expect(currentResponse.statusCode).toBe(200);
+    expect(currentResponse.json()).toMatchObject({
+      id: "2026-05",
+      status: "upcoming",
+    });
+
+    const rikishiResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/rikishi",
+    });
+
+    expect(rikishiResponse.json().basho).toMatchObject({ status: "upcoming" });
+
+    const leaderboardResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/leaderboard",
+    });
+
+    expect(leaderboardResponse.json().basho).toMatchObject({
+      status: "upcoming",
+    });
+  });
+
   it("rejects invalid team picks", async () => {
     const response = await app.inject({
       method: "POST",

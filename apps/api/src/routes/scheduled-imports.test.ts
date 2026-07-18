@@ -47,7 +47,7 @@ describe("scheduled result import route", () => {
   });
 
   it("imports the Japan-calendar basho day and safely reruns that same day", async () => {
-    await seedLiveBasho("2026-05");
+    await seedLiveBasho("2026-05", { importedDays: [1, 2] });
     let requestedUrl = "";
     app = createApp(async (url) => {
       requestedUrl = String(url);
@@ -87,11 +87,104 @@ describe("scheduled result import route", () => {
 
     const repositories = createRepositories(client);
     expect(await repositories.listBoutResultsForBasho("2026-05")).toHaveLength(
-      1,
+      3,
     );
     expect(await repositories.getBasho("2026-05")).toMatchObject({
       status: "active",
       currentDay: 3,
+    });
+  });
+
+  it("locks picks the day before day zero without fetching results and safely reruns", async () => {
+    await seedLiveBasho("2026-05", {
+      status: "upcoming",
+      currentDay: 0,
+      withTeam: true,
+    });
+    let fetchCalls = 0;
+    app = createApp(async () => {
+      fetchCalls += 1;
+      return resultsResponse();
+    }, new Date("2026-05-08T02:00:00.000Z"));
+
+    const firstResponse = await injectCron(app);
+
+    expect(firstResponse.statusCode).toBe(200);
+    expect(firstResponse.json()).toMatchObject({
+      status: "locked",
+      bashoId: "2026-05",
+      day: -1,
+      japanDate: "2026-05-08",
+      lockedAt: "2026-05-08T02:00:00.000Z",
+    });
+    expect(fetchCalls).toBe(0);
+
+    const repositories = createRepositories(client);
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "locked",
+      currentDay: 0,
+    });
+    expect(await repositories.getFantasyTeam("team-day-zero")).toMatchObject({
+      lockedAt: "2026-05-08T02:00:00.000Z",
+    });
+
+    const secondResponse = await injectCron(app);
+
+    expect(secondResponse.statusCode).toBe(200);
+    expect(secondResponse.json()).toMatchObject({
+      status: "skipped",
+      reason: "outside-basho-window",
+      bashoId: "2026-05",
+    });
+    expect(fetchCalls).toBe(0);
+  });
+
+  it("does not lock picks before the day preceding day zero", async () => {
+    await seedLiveBasho("2026-05", { status: "upcoming", currentDay: 0 });
+    let fetchCalls = 0;
+    app = createApp(async () => {
+      fetchCalls += 1;
+      return resultsResponse();
+    }, new Date("2026-05-07T02:00:00.000Z"));
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "skipped",
+      reason: "outside-basho-window",
+      bashoId: "2026-05",
+    });
+    expect(fetchCalls).toBe(0);
+    expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
+      status: "upcoming",
+    });
+  });
+
+  it("catches up an upcoming basho on day zero", async () => {
+    await seedLiveBasho("2026-05", {
+      status: "upcoming",
+      currentDay: 0,
+      withTeam: true,
+    });
+    let fetchCalls = 0;
+    app = createApp(async () => {
+      fetchCalls += 1;
+      return resultsResponse();
+    }, new Date("2026-05-09T02:00:00.000Z"));
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "locked",
+      bashoId: "2026-05",
+      day: 0,
+      japanDate: "2026-05-09",
+    });
+    expect(fetchCalls).toBe(0);
+    expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
+      status: "locked",
     });
   });
 
@@ -116,8 +209,91 @@ describe("scheduled result import route", () => {
     });
   });
 
+  it("backfills every missed day for a locked basho", async () => {
+    await seedLiveBasho("2026-05", { status: "locked", currentDay: 0 });
+    const requestedDays: number[] = [];
+    app = createApp(async (url) => {
+      const day = Number(String(url).split("/").at(-1));
+      requestedDays.push(day);
+      return resultsResponse(day);
+    }, new Date("2026-05-12T02:00:00.000Z"));
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "imported",
+      bashoId: "2026-05",
+      day: 3,
+      importedDays: [1, 2, 3],
+    });
+    expect(requestedDays).toEqual([1, 2, 3]);
+
+    const repositories = createRepositories(client);
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 3,
+    });
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toHaveLength(
+      3,
+    );
+  });
+
+  it("backfills days missing from stored results", async () => {
+    await seedLiveBasho("2026-05", {
+      status: "active",
+      currentDay: 3,
+      importedDays: [1, 2, 3],
+    });
+    const requestedDays: number[] = [];
+    app = createApp(async (url) => {
+      const day = Number(String(url).split("/").at(-1));
+      requestedDays.push(day);
+      return resultsResponse(day);
+    }, new Date("2026-05-16T02:00:00.000Z"));
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "imported",
+      bashoId: "2026-05",
+      day: 7,
+      importedDays: [4, 5, 6, 7],
+    });
+    expect(requestedDays).toEqual([4, 5, 6, 7]);
+    expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 7,
+    });
+  });
+
+  it("does not treat banzuke currentDay as imported results progress", async () => {
+    await seedLiveBasho("2026-05", { status: "active", currentDay: 3 });
+    const requestedDays: number[] = [];
+    app = createApp(async (url) => {
+      const day = Number(String(url).split("/").at(-1));
+      requestedDays.push(day);
+      return resultsResponse(day);
+    }, new Date("2026-05-12T02:00:00.000Z"));
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "imported",
+      day: 3,
+      importedDays: [1, 2, 3],
+    });
+    expect(requestedDays).toEqual([1, 2, 3]);
+  });
+
   it("imports day one for an upcoming basho created by an early banzuke import", async () => {
-    await seedLiveBasho("2026-05", { status: "upcoming", currentDay: 0 });
+    await seedLiveBasho("2026-05", {
+      status: "upcoming",
+      currentDay: 0,
+      withTeam: true,
+    });
     app = createApp(
       async () => resultsResponse(1),
       new Date("2026-05-10T02:00:00.000Z"),
@@ -135,10 +311,16 @@ describe("scheduled result import route", () => {
       status: "active",
       currentDay: 1,
     });
+    expect(
+      await createRepositories(client).getFantasyTeam("team-day-zero"),
+    ).toMatchObject({ lockedAt: "2026-05-10T02:00:00.000Z" });
   });
 
   it("completes the basho atomically with its day 15 results", async () => {
-    await seedLiveBasho("2026-05", { currentDay: 14 });
+    await seedLiveBasho("2026-05", {
+      currentDay: 14,
+      importedDays: Array.from({ length: 14 }, (_value, index) => index + 1),
+    });
     app = createApp(
       async () => resultsResponse(15),
       new Date("2026-05-24T02:00:00.000Z"),
@@ -158,6 +340,33 @@ describe("scheduled result import route", () => {
         },
       },
     });
+    expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
+      status: "complete",
+      currentDay: 15,
+    });
+  });
+
+  it("retries a missing final day after the basho end date", async () => {
+    await seedLiveBasho("2026-05", {
+      currentDay: 14,
+      importedDays: Array.from({ length: 14 }, (_value, index) => index + 1),
+    });
+    const requestedDays: number[] = [];
+    app = createApp(async (url) => {
+      const day = Number(String(url).split("/").at(-1));
+      requestedDays.push(day);
+      return resultsResponse(day);
+    }, new Date("2026-05-25T02:00:00.000Z"));
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "imported",
+      day: 15,
+      importedDays: [15],
+    });
+    expect(requestedDays).toEqual([15]);
     expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
       status: "complete",
       currentDay: 15,
@@ -256,6 +465,8 @@ async function seedLiveBasho(
   options: {
     status?: "active" | "locked" | "upcoming";
     currentDay?: number;
+    importedDays?: number[];
+    withTeam?: boolean;
   } = {},
 ) {
   const repositories = createRepositories(client);
@@ -278,6 +489,15 @@ async function seedLiveBasho(
     shikona: "Kotozakura",
     heya: "Sadogatake",
   });
+  for (const day of options.importedDays ?? []) {
+    await repositories.upsertBoutResult({
+      id: `${bashoId}-${day}-stored-result`,
+      bashoId,
+      day,
+      winnerRikishiId: "onosato",
+      loserRikishiId: "kotozakura",
+    });
+  }
   await repositories.upsertBanzukeEntry({
     id: `${bashoId}-onosato`,
     bashoId,
@@ -292,6 +512,21 @@ async function seedLiveBasho(
     rank: "Ozeki",
     rankOrder: 2,
   });
+
+  if (options.withTeam === true) {
+    await repositories.insertFantasyTeamWithPicksIfBashoUpcoming(
+      {
+        id: "team-day-zero",
+        bashoId,
+        displayName: "Day Zero Team",
+        createdAt: "2026-05-01T12:00:00.000Z",
+      },
+      [
+        { teamId: "team-day-zero", rikishiId: "onosato" },
+        { teamId: "team-day-zero", rikishiId: "kotozakura" },
+      ],
+    );
+  }
 }
 
 function resultsResponse(day = 3) {

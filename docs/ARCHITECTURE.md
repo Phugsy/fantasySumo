@@ -24,7 +24,8 @@ The active app is split into:
 - a React client built by Vite;
 - a Fastify API compiled by TypeScript;
 - a shared framework-free domain package with MVP types, pick validation, scoring, and leaderboard calculation;
-- a Drizzle data package with local SQLite and production Postgres adapters;
+- a Drizzle data package with local SQLite and a production Neon Postgres
+  adapter;
 - root pnpm scripts for dev, build, test, lint, and formatting.
 
 ## Front end
@@ -74,6 +75,8 @@ Current routes:
   - Fetches current Makuuchi banzuke data from the Japan Sumo Association `indexAjax` endpoint.
   - Maps source payloads into local `Basho`, `Rikishi`, and `BanzukeEntry` records.
   - Replaces stale banzuke rows for the imported basho without deleting rikishi, teams, or picks.
+  - Preserves the most advanced stored basho lifecycle state so a reimport
+    cannot reopen picks after locking.
   - Supports `?dryRun=true`.
 - `POST /api/admin/basho/:bashoId/import-results`
   - Fetches one day of Makuuchi results from Sumo API by default.
@@ -95,14 +98,21 @@ Current routes:
   - Applies all deterministic demo results and marks the demo basho complete.
 - `GET /api/cron/import-results`
   - Requires Vercel's `Authorization: Bearer <CRON_SECRET>` header.
-  - Selects the single date-eligible non-demo basho, including an upcoming or
-    locked day-one basho, and derives its day from the current calendar date in
-    `Asia/Tokyo`.
+  - On the evening before day 0, locks the single eligible non-demo upcoming
+    basho and its existing teams without contacting the results source.
+  - Catches up the same lock on day 0 if the earlier invocation was missed.
+  - On days 1-15, selects the single date-eligible basho, derives its day from
+    the current calendar date in `Asia/Tokyo`, and sequentially imports every
+    day missing from stored bout results through that day, while refreshing the
+    current day on every run.
+  - Keeps locked or active bashos eligible after their end date until the final
+    day's results complete them.
   - Reuses the source adapter and transactional result import service used by
     the manual admin route.
   - Moves an upcoming or locked basho to active with day 1 and completes it
     with day 15.
-  - Returns structured imported/skipped status and logs success or failure.
+  - Returns structured locked/imported/skipped status and logs success or
+    failure.
 
 Current limitations:
 
@@ -137,13 +147,16 @@ The data package entry point is `packages/db/src/index.ts`.
 Current behaviour:
 
 - Uses SQLite through `better-sqlite3` for local development.
-- Uses Postgres through `postgres` and Drizzle's `postgres-js` driver for production deployment.
+- Uses Neon Postgres through `postgres` and Drizzle's `postgres-js` driver for
+  production deployment.
 - Defines SQLite and Postgres MVP schemas with Drizzle table definitions.
 - Includes SQLite migration SQL in `packages/db/drizzle` and Postgres migration SQL in `packages/db/drizzle-pg`.
 - Uses `DATABASE_URL` to select the adapter: `file:` and `:memory:` use SQLite; `postgres:` and `postgresql:` use Postgres.
 - Exposes an async repository contract so API/domain workflows do not depend on a concrete database driver.
 - Provides repository functions for reading and writing basho, rikishi, banzuke entries, fantasy teams, fantasy picks, and bout results.
-- Provides transactional upsert helpers for banzuke and bout result imports.
+- Provides transactional upsert helpers for banzuke and bout result imports;
+  banzuke writes preserve the furthest stored lifecycle state inside the
+  transaction so concurrent refreshes cannot reopen picks.
 - Provides sample seed data for one basho, four rikishi, two fantasy teams, picks, and bout results.
 - Provides deterministic demo seed data for one pickable basho, eight rikishi, four fantasy teams, picks, and a 15-day bout result fixture.
 - Provides demo progression API routes and commands that reset to day 0, start/lock picks, advance one day at a time, and complete the basho.
@@ -322,7 +335,13 @@ POST   /api/admin/basho/:bashoId/import-results
 
 Admin endpoints can be protected later. For early local development, they can remain local-only but should be clearly marked as unsafe for production.
 
-`POST /api/basho/:bashoId/teams` is allowed only while the basho status is `upcoming`. The API rejects team creation for `locked`, `active`, and `complete` basho with `409 picks-locked`; the UI mirrors that state but is not the source of enforcement.
+`POST /api/basho/:bashoId/teams` is allowed only while the persisted basho
+status is `upcoming`. The API rejects team creation for `locked`, `active`, and
+`complete` bashos with `409 picks-locked`. Basho read endpoints expose the same
+persisted status, keeping the UI and API aligned and allowing an administrator
+to lock picks early when needed. Team creation rechecks the status while
+holding the basho row in the same transaction as the team insert, so it
+serializes with the scheduled lock update.
 
 Lifecycle meanings:
 

@@ -4,6 +4,7 @@ import type {
   BoutResult,
   Rikishi,
 } from "@fantasy-sumo/domain";
+import { preserveBashoLifecycleProgress } from "@fantasy-sumo/domain";
 import type { Repositories } from "@fantasy-sumo/db";
 import type {
   BanzukeImportCommand,
@@ -35,11 +36,12 @@ export async function importBanzuke(
   }
 
   const summary = createEmptySummary();
-  summary.basho = summarizeOne(
-    await repositories.getBasho(command.basho.id),
+  const existingBasho = await repositories.getBasho(command.basho.id);
+  const nextBasho = preserveBashoLifecycleProgress(
+    existingBasho,
     command.basho,
-    isEqualBasho,
   );
+  summary.basho = summarizeOne(existingBasho, nextBasho, isEqualBasho);
   summary.rikishi = summarizeMany(
     await repositories.listRikishi(),
     command.rikishi,
@@ -54,7 +56,7 @@ export async function importBanzuke(
 
   if (options.dryRun !== true) {
     await repositories.applyBanzukeImport({
-      basho: command.basho,
+      basho: nextBasho,
       rikishi: command.rikishi,
       banzukeEntries: command.banzukeEntries,
     });

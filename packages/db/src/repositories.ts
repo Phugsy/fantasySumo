@@ -7,6 +7,7 @@ import type {
   FantasyTeam,
   Rikishi,
 } from "@fantasy-sumo/domain";
+import { preserveBashoLifecycleProgress } from "@fantasy-sumo/domain";
 import type {
   AppDatabase,
   PostgresDatabase,
@@ -47,13 +48,17 @@ export interface Repositories {
   listBanzukeEntriesForBasho: (bashoId: Basho["id"]) => Promise<BanzukeEntry[]>;
 
   insertFantasyTeam: (entry: FantasyTeam) => Promise<void>;
-  insertFantasyTeamWithPicks: (
+  insertFantasyTeamWithPicksIfBashoUpcoming: (
     team: FantasyTeam,
     picks: readonly FantasyPick[],
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   getFantasyTeam: (id: FantasyTeam["id"]) => Promise<FantasyTeam | undefined>;
   listFantasyTeamsForBasho: (bashoId: Basho["id"]) => Promise<FantasyTeam[]>;
   lockFantasyTeamsForBasho: (
+    bashoId: Basho["id"],
+    lockedAt: NonNullable<FantasyTeam["lockedAt"]>,
+  ) => Promise<void>;
+  lockBashoAndFantasyTeams: (
     bashoId: Basho["id"],
     lockedAt: NonNullable<FantasyTeam["lockedAt"]>,
   ) => Promise<void>;
@@ -163,8 +168,18 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
     insertFantasyTeam: async (entry) => {
       db.insert(sqlite.fantasyTeams).values(toFantasyTeamRow(entry)).run();
     },
-    insertFantasyTeamWithPicks: async (team, picks) => {
+    insertFantasyTeamWithPicksIfBashoUpcoming: async (team, picks) =>
       db.transaction((transaction) => {
+        const basho = transaction
+          .select({ status: sqlite.basho.status })
+          .from(sqlite.basho)
+          .where(eq(sqlite.basho.id, team.bashoId))
+          .get();
+
+        if (basho?.status !== "upcoming") {
+          return false;
+        }
+
         transaction
           .insert(sqlite.fantasyTeams)
           .values(toFantasyTeamRow(team))
@@ -176,8 +191,9 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
             .values(toFantasyPickRow(pick))
             .run();
         }
-      });
-    },
+
+        return true;
+      }),
     getFantasyTeam: async (id) => {
       const row = db
         .select()
@@ -205,6 +221,30 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
           ),
         )
         .run();
+    },
+    lockBashoAndFantasyTeams: async (bashoId, lockedAt) => {
+      db.transaction((transaction) => {
+        transaction
+          .update(sqlite.basho)
+          .set({ status: "locked" })
+          .where(
+            and(
+              eq(sqlite.basho.id, bashoId),
+              eq(sqlite.basho.status, "upcoming"),
+            ),
+          )
+          .run();
+        transaction
+          .update(sqlite.fantasyTeams)
+          .set({ lockedAt })
+          .where(
+            and(
+              eq(sqlite.fantasyTeams.bashoId, bashoId),
+              isNull(sqlite.fantasyTeams.lockedAt),
+            ),
+          )
+          .run();
+      });
     },
 
     insertFantasyPick: async (entry) => {
@@ -254,12 +294,22 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
     },
     applyBanzukeImport: async (importData) => {
       db.transaction((transaction) => {
+        const existingBasho = transaction
+          .select()
+          .from(sqlite.basho)
+          .where(eq(sqlite.basho.id, importData.basho.id))
+          .get();
+        const nextBasho = preserveBashoLifecycleProgress(
+          existingBasho === undefined ? undefined : toBasho(existingBasho),
+          importData.basho,
+        );
+
         transaction
           .insert(sqlite.basho)
-          .values(toBashoRow(importData.basho))
+          .values(toBashoRow(nextBasho))
           .onConflictDoUpdate({
             target: sqlite.basho.id,
-            set: toBashoRow(importData.basho),
+            set: toBashoRow(nextBasho),
           })
           .run();
 
@@ -428,8 +478,20 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
     insertFantasyTeam: async (entry) => {
       await db.insert(pg.fantasyTeams).values(toFantasyTeamRow(entry));
     },
-    insertFantasyTeamWithPicks: async (team, picks) => {
-      await db.transaction(async (transaction) => {
+    insertFantasyTeamWithPicksIfBashoUpcoming: async (team, picks) =>
+      db.transaction(async (transaction) => {
+        const basho = (
+          await transaction
+            .select({ status: pg.basho.status })
+            .from(pg.basho)
+            .where(eq(pg.basho.id, team.bashoId))
+            .for("update")
+        ).at(0);
+
+        if (basho?.status !== "upcoming") {
+          return false;
+        }
+
         await transaction
           .insert(pg.fantasyTeams)
           .values(toFantasyTeamRow(team));
@@ -439,8 +501,9 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
             .insert(pg.fantasyPicks)
             .values(toFantasyPickRow(pick));
         }
-      });
-    },
+
+        return true;
+      }),
     getFantasyTeam: async (id) => {
       const row = (
         await db
@@ -469,6 +532,25 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
             isNull(pg.fantasyTeams.lockedAt),
           ),
         );
+    },
+    lockBashoAndFantasyTeams: async (bashoId, lockedAt) => {
+      await db.transaction(async (transaction) => {
+        await transaction
+          .update(pg.basho)
+          .set({ status: "locked" })
+          .where(
+            and(eq(pg.basho.id, bashoId), eq(pg.basho.status, "upcoming")),
+          );
+        await transaction
+          .update(pg.fantasyTeams)
+          .set({ lockedAt })
+          .where(
+            and(
+              eq(pg.fantasyTeams.bashoId, bashoId),
+              isNull(pg.fantasyTeams.lockedAt),
+            ),
+          );
+      });
     },
 
     insertFantasyPick: async (entry) => {
@@ -518,12 +600,24 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
     },
     applyBanzukeImport: async (importData) => {
       await db.transaction(async (transaction) => {
+        const existingBasho = (
+          await transaction
+            .select()
+            .from(pg.basho)
+            .where(eq(pg.basho.id, importData.basho.id))
+            .for("update")
+        ).at(0);
+        const nextBasho = preserveBashoLifecycleProgress(
+          existingBasho === undefined ? undefined : toBasho(existingBasho),
+          importData.basho,
+        );
+
         await transaction
           .insert(pg.basho)
-          .values(toBashoRow(importData.basho))
+          .values(toBashoRow(nextBasho))
           .onConflictDoUpdate({
             target: pg.basho.id,
-            set: toBashoRow(importData.basho),
+            set: toBashoRow(nextBasho),
           });
 
         for (const entry of importData.rikishi) {

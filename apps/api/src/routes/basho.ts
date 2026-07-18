@@ -167,7 +167,25 @@ export function registerBashoRoutes(
       createdAt: context.now().toISOString(),
     };
 
-    await context.repositories.insertFantasyTeamWithPicks(team, picks);
+    const inserted =
+      await context.repositories.insertFantasyTeamWithPicksIfBashoUpcoming(
+        team,
+        picks,
+      );
+
+    if (!inserted) {
+      const currentBasho = await context.repositories.getBasho(basho.id);
+
+      return reply.code(409).send({
+        error: "picks-locked",
+        message:
+          (currentBasho === undefined
+            ? undefined
+            : getPickLockMessage(currentBasho)) ??
+          "Fantasy team picks are locked for this basho.",
+        bashoStatus: currentBasho?.status ?? "locked",
+      });
+    }
 
     return reply.code(201).send({
       team,

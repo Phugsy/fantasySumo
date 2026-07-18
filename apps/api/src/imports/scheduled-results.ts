@@ -3,8 +3,8 @@ import { DEMO_BASHO_ID, type Repositories } from "@fantasy-sumo/db";
 import { fetchSumoApiResultsImport } from "./adapters.js";
 import { importBoutResults } from "./service.js";
 import type { ImportResult, SourceFetch } from "./types.js";
+import { formatJapanDate } from "../time.js";
 
-const JAPAN_TIME_ZONE = "Asia/Tokyo";
 const MILLISECONDS_PER_DAY = 86_400_000;
 
 export type ScheduledResultsImportResult =
@@ -15,9 +15,17 @@ export type ScheduledResultsImportResult =
       japanDate: string;
     }
   | {
+      status: "locked";
+      bashoId: string;
+      day: -1 | 0;
+      japanDate: string;
+      lockedAt: string;
+    }
+  | {
       status: "imported";
       bashoId: string;
       day: number;
+      importedDays: number[];
       japanDate: string;
       import: ImportResult;
     };
@@ -31,10 +39,8 @@ export async function runScheduledResultsImport(
   sourceFetch: SourceFetch,
   options: ScheduledResultsImportOptions = {},
 ): Promise<ScheduledResultsImportResult> {
-  const japanDate = formatDateInTimeZone(
-    (options.now ?? (() => new Date()))(),
-    JAPAN_TIME_ZONE,
-  );
+  const now = (options.now ?? (() => new Date()))();
+  const japanDate = formatJapanDate(now);
   const scheduledBashos = (await repositories.listBashos()).filter(
     (basho) =>
       (basho.status === "upcoming" ||
@@ -45,7 +51,7 @@ export async function runScheduledResultsImport(
   const eligibleBashos = scheduledBashos.flatMap((basho) => {
     const day = resolveBashoDay(basho, japanDate);
 
-    if (day === undefined || (basho.status !== "active" && day !== 1)) {
+    if (day === undefined || !isEligibleForScheduledUpdate(basho, day)) {
       return [];
     }
 
@@ -71,7 +77,7 @@ export async function runScheduledResultsImport(
 
   if (eligibleBashos.length > 1) {
     throw new Error(
-      `Scheduled results import found multiple eligible live bashos: ${eligibleBashos
+      `Scheduled basho update found multiple eligible live bashos: ${eligibleBashos
         .map(({ basho }) => basho.id)
         .join(", ")}.`,
     );
@@ -79,19 +85,67 @@ export async function runScheduledResultsImport(
 
   const { basho, day } = eligibleBashos[0]!;
 
-  const command = await fetchSumoApiResultsImport(sourceFetch, {
-    bashoId: basho.id,
-    day,
-  });
-  const importResult = await importBoutResults(repositories, command);
+  if (day === -1 || day === 0) {
+    const lockedAt = now.toISOString();
+
+    await repositories.lockBashoAndFantasyTeams(basho.id, lockedAt);
+
+    return {
+      status: "locked",
+      bashoId: basho.id,
+      day,
+      japanDate,
+      lockedAt,
+    };
+  }
+
+  if (basho.status === "upcoming") {
+    await repositories.lockBashoAndFantasyTeams(basho.id, now.toISOString());
+  }
+
+  const storedResultDays = new Set(
+    (await repositories.listBoutResultsForBasho(basho.id)).map(
+      (result) => result.day,
+    ),
+  );
+  const importedDays = Array.from(
+    { length: day },
+    (_value, index) => index + 1,
+  ).filter(
+    (importDay) => importDay === day || !storedResultDays.has(importDay),
+  );
+  let importResult: ImportResult | undefined;
+
+  for (const importDay of importedDays) {
+    const command = await fetchSumoApiResultsImport(sourceFetch, {
+      bashoId: basho.id,
+      day: importDay,
+    });
+    importResult = await importBoutResults(repositories, command);
+  }
+
+  if (importResult === undefined) {
+    throw new Error(
+      `Scheduled basho update resolved no import days for ${basho.id}.`,
+    );
+  }
 
   return {
     status: "imported",
     bashoId: basho.id,
     day,
+    importedDays,
     japanDate,
     import: importResult,
   };
+}
+
+function isEligibleForScheduledUpdate(basho: Basho, day: number) {
+  if (day === -1 || day === 0) {
+    return basho.status === "upcoming";
+  }
+
+  return day >= 1;
 }
 
 function resolveBashoDay(basho: Basho, japanDate: string) {
@@ -103,10 +157,17 @@ function resolveBashoDay(basho: Basho, japanDate: string) {
     currentDate === undefined ||
     startDate === undefined ||
     endDate === undefined ||
-    currentDate < startDate ||
-    currentDate > endDate
+    currentDate < startDate - 2 * MILLISECONDS_PER_DAY
   ) {
     return undefined;
+  }
+
+  const finalDay = Math.floor((endDate - startDate) / MILLISECONDS_PER_DAY) + 1;
+
+  if (currentDate > endDate) {
+    return basho.status === "locked" || basho.status === "active"
+      ? finalDay
+      : undefined;
   }
 
   return Math.floor((currentDate - startDate) / MILLISECONDS_PER_DAY) + 1;
@@ -120,18 +181,4 @@ function parseDateOnly(value: string) {
   const parsed = Date.parse(`${value}T00:00:00.000Z`);
 
   return Number.isNaN(parsed) ? undefined : parsed;
-}
-
-function formatDateInTimeZone(date: Date, timeZone: string) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone,
-    year: "numeric",
-  }).formatToParts(date);
-  const values = Object.fromEntries(
-    parts.map((part) => [part.type, part.value]),
-  );
-
-  return `${values.year}-${values.month}-${values.day}`;
 }

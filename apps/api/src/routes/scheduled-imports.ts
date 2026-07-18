@@ -39,17 +39,20 @@ export function registerScheduledImportRoutes(
       request.log.info(
         {
           bashoId: result.bashoId,
-          day: result.status === "imported" ? result.day : undefined,
+          day: result.status === "skipped" ? undefined : result.day,
           japanDate: result.japanDate,
+          importedDays:
+            result.status === "imported" ? result.importedDays : undefined,
+          lockedAt: result.status === "locked" ? result.lockedAt : undefined,
           reason: result.status === "skipped" ? result.reason : undefined,
           status: result.status,
         },
-        "Scheduled results import finished.",
+        "Scheduled basho update finished.",
       );
 
       return result;
     } catch (error) {
-      request.log.error({ err: error }, "Scheduled results import failed.");
+      request.log.error({ err: error }, "Scheduled basho update failed.");
 
       return reply.code(500).send({
         status: "failed",
