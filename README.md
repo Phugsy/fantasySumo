@@ -38,7 +38,7 @@ It is close to a local playable loop, but still needs a friendlier admin UI befo
 Start here:
 
 - `AGENTS.md` - guidance for AI coding agents working on the repo.
-- `skills/fantasy-sumo-issue-loop/SKILL.md` - repo-local issue-to-draft-PR loop for agents. Invoke it with a prompt like: "Use the Fantasy Sumo issue loop on #44."
+- `skills/fantasy-sumo-issue-loop/SKILL.md` - repo-local issue-to-PR loop for agents. Invoke it with a prompt like: "Use the Fantasy Sumo issue loop on #44."
 - `docs/PROJECT_BRIEF.md` - product intent and MVP definition.
 - `docs/ARCHITECTURE.md` - current architecture and suggested future boundaries.
 - `docs/adr/0001-rebuild-architecture.md` - accepted rebuild architecture decision.

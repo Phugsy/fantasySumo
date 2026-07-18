@@ -43,6 +43,7 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 - Keep basho lifecycle and pick-locking rules in the domain/API layer; UI state should mirror those rules, not replace API enforcement.
 - Keep data import logic separate from scoring logic.
 - Once an E2E harness exists, use it to validate completion for changes that affect the browser game loop.
+- Run relevant E2E before the initial handoff for browser-game-loop changes. When meaningful UI or interaction risk remains, add an agent-browser visual pass when available; it supplements rather than replaces E2E.
 
 ## Review guidelines
 
@@ -70,6 +71,7 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 9. Prefer the Makefile command layer for common workflows: `make test`, `make lint`, `make build`, and `make check`.
 10. Keep PRs focused on the next MVP slice; do not rebuild the full product in one change.
 11. Before calling a non-trivial code change ready, use `skills/fantasy-sumo-pr-review-loop/SKILL.md` to run a dedicated review against the base branch.
+12. Open completed, validated PRs ready for review so the automatic Codex GitHub review runs. Use draft PRs only for explicitly requested checkpoints or work that is incomplete, blocked, or missing required validation.
 
 For issue-to-PR work, use the repo-local process in `skills/fantasy-sumo-issue-loop/SKILL.md`. It can be invoked with a prompt such as: "Use the Fantasy Sumo issue loop on #44."
 

@@ -17,6 +17,8 @@ Keep review fixes focused, independently checked, and traceable to their GitHub 
 
 1. Identify the base branch and confirm the worktree contains only intended changes.
 2. Run the relevant focused tests and `make check` before review. On this macOS workspace, use `make check PNPM=/opt/homebrew/bin/pnpm` when the fallback pnpm cannot find `node`.
+   - When the change affects the browser game loop, run the relevant Playwright coverage or `make e2e` before the initial handoff. Do not defer this until PR feedback arrives.
+   - When the change materially affects UI layout, interaction, responsive behaviour, or a state that assertions may not represent well, also run an agent-browser visual pass when that tooling is available. Treat visual inspection as a supplement to E2E, never a replacement.
 3. Select every applicable review target:
    - review committed branch changes with **Review against a base branch**;
    - review staged, unstaged, and untracked changes with **Review uncommitted changes**;
@@ -40,7 +42,7 @@ Keep review fixes focused, independently checked, and traceable to their GitHub 
    - **Non-blocking:** advisory, style-only, duplicate, outdated, or already-fixed comments.
 4. Explain the actionable scope before editing unless the calling prompt explicitly authorizes all safe findings.
 5. Keep every edit traceable to a selected thread. Add focused regression coverage at the seam the reviewer identified.
-6. Run focused checks, `make check` (using the Homebrew pnpm override above when needed), and `make e2e` when the change affects the browser game loop.
+6. Run focused checks, `make check` (using the Homebrew pnpm override above when needed), and `make e2e` when the change affects the browser game loop. Add an agent-browser visual pass when the UI risk warrants it and the tooling is available.
 
 ## Publishing an Authorized Fix
 
