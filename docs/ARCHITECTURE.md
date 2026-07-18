@@ -103,7 +103,10 @@ Current routes:
   - Catches up the same lock on day 0 if the earlier invocation was missed.
   - On days 1-15, selects the single date-eligible basho, derives its day from
     the current calendar date in `Asia/Tokyo`, and sequentially imports every
-    missing day after stored `currentDay` through that day.
+    day missing from stored bout results through that day, while refreshing the
+    current day on every run.
+  - Keeps locked or active bashos eligible after their end date until the final
+    day's results complete them.
   - Reuses the source adapter and transactional result import service used by
     the manual admin route.
   - Moves an upcoming or locked basho to active with day 1 and completes it
@@ -151,7 +154,9 @@ Current behaviour:
 - Uses `DATABASE_URL` to select the adapter: `file:` and `:memory:` use SQLite; `postgres:` and `postgresql:` use Postgres.
 - Exposes an async repository contract so API/domain workflows do not depend on a concrete database driver.
 - Provides repository functions for reading and writing basho, rikishi, banzuke entries, fantasy teams, fantasy picks, and bout results.
-- Provides transactional upsert helpers for banzuke and bout result imports.
+- Provides transactional upsert helpers for banzuke and bout result imports;
+  banzuke writes preserve the furthest stored lifecycle state inside the
+  transaction so concurrent refreshes cannot reopen picks.
 - Provides sample seed data for one basho, four rikishi, two fantasy teams, picks, and bout results.
 - Provides deterministic demo seed data for one pickable basho, eight rikishi, four fantasy teams, picks, and a 15-day bout result fixture.
 - Provides demo progression API routes and commands that reset to day 0, start/lock picks, advance one day at a time, and complete the basho.

@@ -98,9 +98,11 @@ On each authenticated invocation, the route calculates the current date in
 2. on day 0, it applies that same lock as a catch-up if the earlier invocation
    was missed;
 3. on days 1-15, it derives the basho day and sequentially runs the
-   source-backed, transactional result import for every day after stored
-   `currentDay` through the derived day;
-4. it skips without contacting the results source outside that window;
+   source-backed, transactional result import for every day absent from stored
+   bout results through the derived day, including a refresh of the current
+   day;
+4. after the end date, it keeps a locked or active basho eligible for final-day
+   recovery until day 15 completes it;
 5. it fails without mutation when more than one basho is eligible.
 
 Rerunning after a successful lock is a safe no-op. Team creation and basho
@@ -112,15 +114,16 @@ so it serializes with the cron's basho update. The deterministic demo basho is
 exempt from the production cron; its protected controls remain the source of
 progression.
 
-Banzuke reimports preserve the most advanced stored basho lifecycle state, so
-running a refresh after this job cannot regress `locked` back to `upcoming`.
+Banzuke reimports preserve the most advanced stored basho lifecycle state
+inside the database transaction, so even a concurrent refresh cannot regress
+`locked` back to `upcoming`.
 
-Re-running the route on the same Japan calendar day reimports that day when no
-days are missing. A delayed run backfills from the day after stored
-`currentDay`; a locked basho therefore recovers from day 1, while an active
-basho resumes from its last successful day. Each day commits independently, so
-if a later source request fails, the next invocation resumes after the earlier
-successful days. The importer replaces only each day's stable result IDs, so
+Re-running the route on the same Japan calendar day always refreshes that day.
+A delayed run backfills every earlier day absent from stored bout results;
+`currentDay` remains useful lifecycle/calendar metadata but is not treated as a
+results cursor. Each day commits independently, so if a later source request
+fails, the next invocation sees the earlier stored days and resumes with the
+remaining gaps. The importer replaces only each day's stable result IDs, so
 retries correct or skip existing rows without duplicating scores, teams, or
 picks. The response and Vercel function logs include the status, basho ID,
 derived day, imported days, Japan date, and skip reason when applicable.

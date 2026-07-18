@@ -280,10 +280,13 @@ For the first local MVP, a failed import can return a structured API error and l
 7. Add a protected scheduled production trigger that locks the eligible basho
    on the evening before day 0 without fetching results, then derives the
    current day in Japan time and reuses the result import service on days 1-15.
-   Allow day-0 lock catch-up, then import every day after stored `currentDay`
-   through the calculated day so missed invocations recover in order. Move
-   upcoming or locked bashos to active with day 1 and complete the basho with
-   day 15. Keep deterministic demo bashos outside this path.
+   Allow day-0 lock catch-up, then import every day absent from stored bout
+   results through the calculated day so banzuke calendar progress cannot hide
+   missed result imports. Keep locked or active bashos eligible for final-day
+   recovery after the end date. Move upcoming or locked bashos to active with
+   day 1 and complete the basho with day 15. Keep deterministic demo bashos
+   outside this path. Preserve lifecycle progress inside transactional banzuke
+   writes so a concurrent refresh cannot regress a scheduled lock.
 8. Add fallback source support:
    - Sumo API banzuke as backup if JSA banzuke fails;
    - JSA results adapter if a stable machine-readable result endpoint is confirmed;

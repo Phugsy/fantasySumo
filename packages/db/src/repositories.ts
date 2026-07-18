@@ -7,6 +7,7 @@ import type {
   FantasyTeam,
   Rikishi,
 } from "@fantasy-sumo/domain";
+import { preserveBashoLifecycleProgress } from "@fantasy-sumo/domain";
 import type {
   AppDatabase,
   PostgresDatabase,
@@ -293,12 +294,22 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
     },
     applyBanzukeImport: async (importData) => {
       db.transaction((transaction) => {
+        const existingBasho = transaction
+          .select()
+          .from(sqlite.basho)
+          .where(eq(sqlite.basho.id, importData.basho.id))
+          .get();
+        const nextBasho = preserveBashoLifecycleProgress(
+          existingBasho === undefined ? undefined : toBasho(existingBasho),
+          importData.basho,
+        );
+
         transaction
           .insert(sqlite.basho)
-          .values(toBashoRow(importData.basho))
+          .values(toBashoRow(nextBasho))
           .onConflictDoUpdate({
             target: sqlite.basho.id,
-            set: toBashoRow(importData.basho),
+            set: toBashoRow(nextBasho),
           })
           .run();
 
@@ -589,12 +600,24 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
     },
     applyBanzukeImport: async (importData) => {
       await db.transaction(async (transaction) => {
+        const existingBasho = (
+          await transaction
+            .select()
+            .from(pg.basho)
+            .where(eq(pg.basho.id, importData.basho.id))
+            .for("update")
+        ).at(0);
+        const nextBasho = preserveBashoLifecycleProgress(
+          existingBasho === undefined ? undefined : toBasho(existingBasho),
+          importData.basho,
+        );
+
         await transaction
           .insert(pg.basho)
-          .values(toBashoRow(importData.basho))
+          .values(toBashoRow(nextBasho))
           .onConflictDoUpdate({
             target: pg.basho.id,
-            set: toBashoRow(importData.basho),
+            set: toBashoRow(nextBasho),
           });
 
         for (const entry of importData.rikishi) {

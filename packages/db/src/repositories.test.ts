@@ -166,6 +166,32 @@ describe("repositories", () => {
     ).toEqual([]);
   });
 
+  it("does not regress lifecycle state inside a banzuke import transaction", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
+
+    await repositories.lockBashoAndFantasyTeams(
+      sampleBasho.id,
+      "2026-05-08T02:00:00.000Z",
+    );
+    await repositories.applyBanzukeImport({
+      basho: {
+        ...sampleBasho,
+        name: "Refreshed May Basho",
+        status: "upcoming",
+        currentDay: 3,
+      },
+      rikishi: [],
+      banzukeEntries: [],
+    });
+
+    expect(await repositories.getBasho(sampleBasho.id)).toMatchObject({
+      name: "Refreshed May Basho",
+      status: "locked",
+      currentDay: 3,
+    });
+  });
+
   it("loads deterministic demo data for local demos and E2E fixtures", async () => {
     await seedDemoDatabase(createRepositories(client));
     const repositories = createRepositories(client);

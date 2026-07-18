@@ -47,7 +47,7 @@ describe("scheduled result import route", () => {
   });
 
   it("imports the Japan-calendar basho day and safely reruns that same day", async () => {
-    await seedLiveBasho("2026-05");
+    await seedLiveBasho("2026-05", { importedDays: [1, 2] });
     let requestedUrl = "";
     app = createApp(async (url) => {
       requestedUrl = String(url);
@@ -87,7 +87,7 @@ describe("scheduled result import route", () => {
 
     const repositories = createRepositories(client);
     expect(await repositories.listBoutResultsForBasho("2026-05")).toHaveLength(
-      1,
+      3,
     );
     expect(await repositories.getBasho("2026-05")).toMatchObject({
       status: "active",
@@ -239,8 +239,12 @@ describe("scheduled result import route", () => {
     );
   });
 
-  it("backfills from the day after the last active update", async () => {
-    await seedLiveBasho("2026-05", { status: "active", currentDay: 3 });
+  it("backfills days missing from stored results", async () => {
+    await seedLiveBasho("2026-05", {
+      status: "active",
+      currentDay: 3,
+      importedDays: [1, 2, 3],
+    });
     const requestedDays: number[] = [];
     app = createApp(async (url) => {
       const day = Number(String(url).split("/").at(-1));
@@ -262,6 +266,26 @@ describe("scheduled result import route", () => {
       status: "active",
       currentDay: 7,
     });
+  });
+
+  it("does not treat banzuke currentDay as imported results progress", async () => {
+    await seedLiveBasho("2026-05", { status: "active", currentDay: 3 });
+    const requestedDays: number[] = [];
+    app = createApp(async (url) => {
+      const day = Number(String(url).split("/").at(-1));
+      requestedDays.push(day);
+      return resultsResponse(day);
+    }, new Date("2026-05-12T02:00:00.000Z"));
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "imported",
+      day: 3,
+      importedDays: [1, 2, 3],
+    });
+    expect(requestedDays).toEqual([1, 2, 3]);
   });
 
   it("imports day one for an upcoming basho created by an early banzuke import", async () => {
@@ -293,7 +317,10 @@ describe("scheduled result import route", () => {
   });
 
   it("completes the basho atomically with its day 15 results", async () => {
-    await seedLiveBasho("2026-05", { currentDay: 14 });
+    await seedLiveBasho("2026-05", {
+      currentDay: 14,
+      importedDays: Array.from({ length: 14 }, (_value, index) => index + 1),
+    });
     app = createApp(
       async () => resultsResponse(15),
       new Date("2026-05-24T02:00:00.000Z"),
@@ -313,6 +340,33 @@ describe("scheduled result import route", () => {
         },
       },
     });
+    expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
+      status: "complete",
+      currentDay: 15,
+    });
+  });
+
+  it("retries a missing final day after the basho end date", async () => {
+    await seedLiveBasho("2026-05", {
+      currentDay: 14,
+      importedDays: Array.from({ length: 14 }, (_value, index) => index + 1),
+    });
+    const requestedDays: number[] = [];
+    app = createApp(async (url) => {
+      const day = Number(String(url).split("/").at(-1));
+      requestedDays.push(day);
+      return resultsResponse(day);
+    }, new Date("2026-05-25T02:00:00.000Z"));
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "imported",
+      day: 15,
+      importedDays: [15],
+    });
+    expect(requestedDays).toEqual([15]);
     expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
       status: "complete",
       currentDay: 15,
@@ -411,6 +465,7 @@ async function seedLiveBasho(
   options: {
     status?: "active" | "locked" | "upcoming";
     currentDay?: number;
+    importedDays?: number[];
     withTeam?: boolean;
   } = {},
 ) {
@@ -434,6 +489,15 @@ async function seedLiveBasho(
     shikona: "Kotozakura",
     heya: "Sadogatake",
   });
+  for (const day of options.importedDays ?? []) {
+    await repositories.upsertBoutResult({
+      id: `${bashoId}-${day}-stored-result`,
+      bashoId,
+      day,
+      winnerRikishiId: "onosato",
+      loserRikishiId: "kotozakura",
+    });
+  }
   await repositories.upsertBanzukeEntry({
     id: `${bashoId}-onosato`,
     bashoId,

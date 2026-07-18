@@ -207,9 +207,11 @@ Production deployments expose one Vercel Cron-only path. `GET
 /api/cron/import-results` locks the single eligible upcoming basho without
 contacting the results source on the evening before day 0, then derives and
 imports every missing basho day through the current day on days 1-15. Day 0
-provides a safe lock catch-up, and a later run resumes result imports from the
-day after `currentDay`. Result imports reuse the manual trigger's transactional
-service. See `docs/DEPLOYMENT.md` for schedule and authentication details.
+provides a safe lock catch-up, and a later run derives missing days from stored
+bout results rather than banzuke calendar progress. Locked or active bashos can
+retry a missing final day after the end date. Result imports reuse the manual
+trigger's transactional service. See `docs/DEPLOYMENT.md` for schedule and
+authentication details.
 
 ## Makefile commands
 

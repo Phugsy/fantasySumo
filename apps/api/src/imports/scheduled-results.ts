@@ -103,10 +103,16 @@ export async function runScheduledResultsImport(
     await repositories.lockBashoAndFantasyTeams(basho.id, now.toISOString());
   }
 
-  const firstImportDay = Math.min((basho.currentDay ?? 0) + 1, day);
+  const storedResultDays = new Set(
+    (await repositories.listBoutResultsForBasho(basho.id)).map(
+      (result) => result.day,
+    ),
+  );
   const importedDays = Array.from(
-    { length: day - firstImportDay + 1 },
-    (_value, index) => firstImportDay + index,
+    { length: day },
+    (_value, index) => index + 1,
+  ).filter(
+    (importDay) => importDay === day || !storedResultDays.has(importDay),
   );
   let importResult: ImportResult | undefined;
 
@@ -151,10 +157,17 @@ function resolveBashoDay(basho: Basho, japanDate: string) {
     currentDate === undefined ||
     startDate === undefined ||
     endDate === undefined ||
-    currentDate < startDate - 2 * MILLISECONDS_PER_DAY ||
-    currentDate > endDate
+    currentDate < startDate - 2 * MILLISECONDS_PER_DAY
   ) {
     return undefined;
+  }
+
+  const finalDay = Math.floor((endDate - startDate) / MILLISECONDS_PER_DAY) + 1;
+
+  if (currentDate > endDate) {
+    return basho.status === "locked" || basho.status === "active"
+      ? finalDay
+      : undefined;
   }
 
   return Math.floor((currentDate - startDate) / MILLISECONDS_PER_DAY) + 1;

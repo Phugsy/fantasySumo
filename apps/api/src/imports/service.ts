@@ -4,6 +4,7 @@ import type {
   BoutResult,
   Rikishi,
 } from "@fantasy-sumo/domain";
+import { preserveBashoLifecycleProgress } from "@fantasy-sumo/domain";
 import type { Repositories } from "@fantasy-sumo/db";
 import type {
   BanzukeImportCommand,
@@ -36,7 +37,10 @@ export async function importBanzuke(
 
   const summary = createEmptySummary();
   const existingBasho = await repositories.getBasho(command.basho.id);
-  const nextBasho = preserveBashoProgress(existingBasho, command.basho);
+  const nextBasho = preserveBashoLifecycleProgress(
+    existingBasho,
+    command.basho,
+  );
   summary.basho = summarizeOne(existingBasho, nextBasho, isEqualBasho);
   summary.rikishi = summarizeMany(
     await repositories.listRikishi(),
@@ -62,38 +66,6 @@ export async function importBanzuke(
     dryRun: options.dryRun === true,
     source: command.source,
     summary,
-  };
-}
-
-function preserveBashoProgress(
-  existingBasho: Basho | undefined,
-  importedBasho: Basho,
-): Basho {
-  if (existingBasho === undefined) {
-    return importedBasho;
-  }
-
-  const lifecycleOrder = {
-    upcoming: 0,
-    locked: 1,
-    active: 2,
-    complete: 3,
-  } as const;
-  const existingDay = existingBasho.currentDay;
-  const importedDay = importedBasho.currentDay;
-  const currentDay =
-    existingDay === undefined && importedDay === undefined
-      ? undefined
-      : Math.max(existingDay ?? 0, importedDay ?? 0);
-
-  return {
-    ...importedBasho,
-    status:
-      lifecycleOrder[existingBasho.status] >
-      lifecycleOrder[importedBasho.status]
-        ? existingBasho.status
-        : importedBasho.status,
-    ...(currentDay === undefined ? {} : { currentDay }),
   };
 }
 
