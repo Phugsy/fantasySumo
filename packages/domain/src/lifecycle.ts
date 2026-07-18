@@ -27,6 +27,7 @@ export function preserveBashoLifecycleProgress(
 
   return {
     ...importedBasho,
+    isDemo: existingBasho.isDemo,
     status:
       lifecycleOrder[existingBasho.status] >
       lifecycleOrder[importedBasho.status]

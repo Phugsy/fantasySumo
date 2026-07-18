@@ -1,9 +1,9 @@
 import { calculateLeaderboard, type Basho } from "@fantasy-sumo/domain";
-import { demoBasho, demoBoutResults } from "./demo-seed-data.js";
+import { DEMO_BASHO_ID } from "./demo-constants.js";
+import { demoBoutResults } from "./demo-seed-data.js";
 import type { Repositories } from "./repositories.js";
 import { seedDemoDatabase } from "./seed.js";
 
-export const DEMO_BASHO_ID = demoBasho.id;
 export const DEMO_FINAL_DAY = Math.max(
   ...demoBoutResults.map((result) => result.day),
 );
@@ -110,9 +110,9 @@ export async function completeDemoBasho(
 async function requireDemoBasho(repositories: Repositories): Promise<Basho> {
   const basho = await repositories.getBasho(DEMO_BASHO_ID);
 
-  if (basho === undefined) {
+  if (basho === undefined || !basho.isDemo) {
     throw new Error(
-      `Demo basho ${DEMO_BASHO_ID} was not found. Run the demo reset command first.`,
+      `Demo basho ${DEMO_BASHO_ID} was not found or is not marked as demo data. Run the demo reset command first.`,
     );
   }
 

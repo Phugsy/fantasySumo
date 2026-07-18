@@ -22,6 +22,7 @@ const banzukeCommand: BanzukeImportCommand = {
   source: "test",
   basho: {
     id: "2026-05",
+    isDemo: false,
     name: "May 2026",
     startDate: "2026-05-10",
     endDate: "2026-05-24",

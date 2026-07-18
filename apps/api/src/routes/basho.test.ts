@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   createRepositories,
   createDatabaseClient,
+  demoBasho,
   runMigrations,
   seedDatabase,
   sampleBasho,
@@ -54,13 +55,14 @@ describe("basho routes", () => {
 
   it("prefers a locked current basho over a later upcoming basho", async () => {
     const repositories = createRepositories(client);
-    repositories.upsertBasho({
+    await repositories.upsertBasho({
       ...sampleBasho,
       status: "locked",
       currentDay: 1,
     });
-    repositories.insertBasho({
+    await repositories.insertBasho({
       id: "2026-07",
+      isDemo: false,
       name: "July 2026 Future Basho",
       startDate: "2026-07-12",
       endDate: "2026-07-26",
@@ -78,6 +80,67 @@ describe("basho routes", () => {
       id: "2026-05",
       status: "locked",
       currentDay: 1,
+    });
+  });
+
+  it("prefers a live basho over an active demo basho", async () => {
+    const repositories = createRepositories(client);
+    await repositories.insertBasho({
+      ...demoBasho,
+      status: "active",
+      currentDay: 3,
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/basho/current",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      id: sampleBasho.id,
+      isDemo: false,
+    });
+  });
+
+  it("returns the flagged demo basho only when demo mode is explicit", async () => {
+    const repositories = createRepositories(client);
+    await repositories.insertBasho({
+      ...demoBasho,
+      status: "active",
+      currentDay: 3,
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/basho/current?mode=demo",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      id: demoBasho.id,
+      isDemo: true,
+      status: "active",
+      currentDay: 3,
+    });
+  });
+
+  it("does not treat a live fixed-ID collision as the demo basho", async () => {
+    const repositories = createRepositories(client);
+    await repositories.insertBasho({
+      ...demoBasho,
+      isDemo: false,
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/basho/current?mode=demo",
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({
+      error: "not-found",
+      message: "The demo basho is not available.",
     });
   });
 

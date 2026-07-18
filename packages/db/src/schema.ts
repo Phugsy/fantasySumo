@@ -7,6 +7,7 @@ import {
 
 export const basho = sqliteTable("basho", {
   id: text("id").primaryKey(),
+  isDemo: integer("is_demo", { mode: "boolean" }).notNull().default(false),
   name: text("name").notNull(),
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),

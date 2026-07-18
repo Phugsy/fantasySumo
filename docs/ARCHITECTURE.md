@@ -159,6 +159,12 @@ Current behaviour:
   transaction so concurrent refreshes cannot reopen picks.
 - Provides sample seed data for one basho, four rikishi, two fantasy teams, picks, and bout results.
 - Provides deterministic demo seed data for one pickable basho, eight rikishi, four fantasy teams, picks, and a 15-day bout result fixture.
+- Classifies bashos explicitly with `isDemo`. The fixed demo reset transaction
+  requires both the known demo ID and `isDemo: true`, replaces only that
+  basho's dependent data, and preserves live bashos and shared rikishi metadata.
+- Keeps normal current-basho selection live-first. Local demo mode explicitly
+  requests the fixed flagged demo with `VITE_BASHO_MODE=demo`, so mixed live and
+  demo data cannot silently change which environment the browser displays.
 - Provides demo progression API routes and commands that reset to day 0, start/lock picks, advance one day at a time, and complete the basho.
 - Stores basho lifecycle status and current day progress.
 
@@ -177,7 +183,14 @@ pnpm import:results -- --basho 2026-05 --day 1
 pnpm --filter @fantasy-sumo/db db:generate
 ```
 
-`pnpm db:seed:demo` is the preferred fixture reset for local demos, browser smoke checks, and the future Playwright E2E harness. It deliberately replaces the configured SQLite database contents with fake deterministic data while using the same database schema, repositories, API routes, UI, and domain scoring logic as the regular app. It starts with the demo basho in `upcoming`, `currentDay: 0`, and no applied results; use `pnpm demo:start`, `pnpm demo:advance-day`, and `pnpm demo:complete` to exercise the lifecycle.
+`pnpm db:seed:demo` is the preferred fixture reset for local demos, browser
+smoke checks, and the Playwright E2E harness. It replaces only the fixed demo
+basho with fake deterministic data while using the same database schema,
+repositories, API routes, UI, and domain scoring logic as the regular app. It
+starts with the demo basho in `upcoming`, `currentDay: 0`, and no applied
+results; use `pnpm demo:start`, `pnpm demo:advance-day`, and
+`pnpm demo:complete` to exercise the lifecycle. Whole-database reset remains a
+local/test-only helper used by the separate sample seed command.
 
 Current limitations:
 

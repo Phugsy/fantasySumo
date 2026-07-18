@@ -5,6 +5,7 @@ import type { Basho } from "../types";
 
 const basho: Basho = {
   id: "2026-05",
+  isDemo: false,
   name: "May 2026 Sample Basho",
   startDate: "2026-05-10",
   endDate: "2026-05-24",

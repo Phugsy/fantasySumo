@@ -9,6 +9,7 @@ import type {
 
 export const sampleBasho: Basho = {
   id: "2026-05",
+  isDemo: false,
   name: "May 2026 Sample Basho",
   startDate: "2026-05-10",
   endDate: "2026-05-24",

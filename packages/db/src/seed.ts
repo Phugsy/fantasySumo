@@ -24,7 +24,7 @@ import {
 } from "./seed-data.js";
 
 export async function seedDatabase(repositories: Repositories): Promise<void> {
-  await replaceSeedData(repositories, {
+  await replaceAllSeedData(repositories, {
     basho: sampleBasho,
     rikishi: sampleRikishi,
     banzukeEntries: sampleBanzukeEntries,
@@ -37,7 +37,7 @@ export async function seedDatabase(repositories: Repositories): Promise<void> {
 export async function seedDemoDatabase(
   repositories: Repositories,
 ): Promise<void> {
-  await replaceSeedData(repositories, {
+  await repositories.replaceDemoBashoData({
     basho: demoBasho,
     rikishi: demoRikishi,
     banzukeEntries: demoBanzukeEntries,
@@ -47,11 +47,11 @@ export async function seedDemoDatabase(
   });
 }
 
-async function replaceSeedData(
+async function replaceAllSeedData(
   repositories: Repositories,
   seedData: SeedData,
 ): Promise<void> {
-  await repositories.resetData();
+  await repositories.resetAllDataForLocalFixtures();
 
   await repositories.applyBanzukeImport({
     basho: seedData.basho,
