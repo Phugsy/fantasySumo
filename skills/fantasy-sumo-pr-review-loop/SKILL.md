@@ -49,7 +49,7 @@ Keep review fixes focused, independently checked, and traceable to their GitHub 
 Only publish when the user or scheduled-task prompt explicitly authorizes GitHub writes.
 
 1. Confirm the branch and cleanly separate unrelated local changes.
-2. Verify Git identity is `Phugsy <263059804+Phugsy@users.noreply.github.com>`; stop on a mismatch.
+2. Verify Git identity is `Phugsy <263059804+Phugsy@users.noreply.github.com>` and `/opt/homebrew/bin/gh api user --jq .login` returns `Phugsy`; stop if either identity mismatches or the authenticated GitHub actor cannot be verified.
 3. Commit one coherent review batch and push the PR branch.
 4. Reply to each addressed top-level review thread with the commit hash, concise rationale, and validation evidence.
 5. Resolve only threads fully addressed by that commit.
@@ -61,7 +61,7 @@ Never merge, close the PR, delete branches, force-push, or broaden the PR. Leave
 
 Run in a dedicated worktree. On each invocation:
 
-1. Find open Fantasy Sumo PRs authored from `codex/*` branches, or use the explicit PR supplied by the task.
+1. Require the scheduled task to supply exactly one explicit PR number. Never discover or scan other open PRs in scheduled mode; stop and request a corrected task if the PR number is missing or ambiguous.
 2. Fetch the PR remote branch, check it out cleanly in the worktree, and record its remote head SHA. Stop if the worktree is dirty or the branch cannot fast-forward to that SHA.
 3. If no unresolved actionable P1/P2 feedback exists, make no changes and report a clean poll.
 4. Address at most one coherent safe batch per PR and validate it as above.
