@@ -5,7 +5,7 @@ ifneq ($(PNPM_DIR),)
 export PATH := $(PNPM_DIR):$(PATH)
 endif
 
-.PHONY: help install dev demo dev-client dev-server build test lint format format-check check e2e e2e-ui e2e-install db-migrate db-seed db-seed-demo demo-reset demo-start demo-advance-day demo-complete import-banzuke import-results clean
+.PHONY: help install dev demo dev-client dev-server build test lint format format-check check deployment-verify e2e e2e-ui e2e-install db-migrate db-seed db-seed-demo demo-reset demo-start demo-advance-day demo-complete import-banzuke import-results clean
 
 help: ## Show available make targets.
 	@awk 'BEGIN {FS = ":.*## "; printf "Fantasy Sumo development commands:\n\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -45,10 +45,14 @@ format-check: ## Check Prettier formatting.
 	$(PNPM) format:check
 
 check: ## Run the main pre-PR validation suite.
+	$(PNPM) deployment:verify
 	$(PNPM) lint
 	$(PNPM) format:check
 	$(PNPM) test
 	$(PNPM) build
+
+deployment-verify: ## Verify deployment workflow migration and release safety gates.
+	$(PNPM) deployment:verify
 
 e2e: ## Run Playwright E2E tests against deterministic demo data.
 	$(PNPM) e2e

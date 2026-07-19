@@ -1,0 +1,165 @@
+name: Deploy Preview
+
+on:
+  pull_request:
+    branches:
+      - master
+    types:
+      - opened
+      - reopened
+      - synchronize
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit SHA or ref to deploy to preview
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+      branch: ${{ steps.commit.outputs.branch }}
+    steps:
+      - name: Check out requested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.ref }}
+          fetch-depth: 0
+
+      - name: Record immutable commit
+        id: commit
+        env:
+          PREVIEW_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || '' }}
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "branch=$PREVIEW_BRANCH" >> "$GITHUB_OUTPUT"
+
+  validate:
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out resolved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run main validation
+        run: make check
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      - name: Run browser E2E
+        run: make e2e
+
+  deploy:
+    needs:
+      - resolve
+      - validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: fantasy-sumo-preview-database
+      cancel-in-progress: false
+    environment:
+      name: preview
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      DEPLOY_SHA: ${{ needs.resolve.outputs.sha }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Check out tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Pull Vercel preview configuration
+        env:
+          PREVIEW_BRANCH: ${{ needs.resolve.outputs.branch }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          pull_args=(pull --yes --environment=preview --token="$VERCEL_TOKEN")
+          if [[ -n "$PREVIEW_BRANCH" ]]; then
+            pull_args+=(--git-branch="$PREVIEW_BRANCH")
+          fi
+          pnpm dlx vercel@56.3.2 "${pull_args[@]}"
+
+      - name: Build prepared preview deployment
+        run: pnpm dlx vercel@56.3.2 build
+
+      - name: Apply preview database migrations
+        id: migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          pnpm db:migrate
+          echo "result=success" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy tested preview build
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          deployment_url=$(pnpm dlx vercel@56.3.2 deploy --prebuilt --token="$VERCEL_TOKEN" --meta githubCommitSha="$DEPLOY_SHA" | tail -n 1)
+          case "$deployment_url" in
+            https://*) ;;
+            *) echo "Vercel returned an invalid deployment URL" >&2; exit 1 ;;
+          esac
+          echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke-test preview deployment
+        id: smoke
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+        run: node scripts/smoke-deployment.mjs "$DEPLOYMENT_URL"
+
+      - name: Write preview deployment summary
+        if: always()
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+          MIGRATION_RESULT: ${{ steps.migrate.outcome }}
+          SMOKE_RESULT: ${{ steps.smoke.outcome }}
+        run: |
+          echo "## Preview deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Environment: preview" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit SHA: \`$DEPLOY_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Migration result: ${MIGRATION_RESULT:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deployment URL: ${DEPLOYMENT_URL:-not-created}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Smoke-test result: ${SMOKE_RESULT:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$MIGRATION_RESULT" == "success" && "$SMOKE_RESULT" != "success" ]]; then
+            echo "- Recovery: the database may already be ahead; fix forward or redeploy code compatible with the advanced schema. Do not run down migrations automatically." >> "$GITHUB_STEP_SUMMARY"
+          fi

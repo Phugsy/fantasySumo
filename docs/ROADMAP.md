@@ -61,7 +61,7 @@ Goal: make it robust enough to share more widely.
 
 - [ ] Add proper authentication.
 - [ ] Add production database and migrations.
-- [ ] Add deployment pipeline.
+- [x] Add migration-gated preview and production deployment pipelines.
 - [ ] Add monitoring/logging.
 - [ ] Protect admin endpoints.
 - [ ] Add backup/restore plan.

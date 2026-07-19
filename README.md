@@ -167,7 +167,12 @@ Useful checks:
 
 ```bash
 make check
+make deployment-verify
 ```
+
+`make deployment-verify` checks that the preview and production workflows
+retain their environment, concurrency, migration-before-deploy, exact-SHA,
+smoke-test, and reporting gates. `make check` includes this contract check.
 
 By default, the database package writes local SQLite data to `packages/db/data/fantasy-sumo.sqlite` when run through the pnpm scripts. Override this with `DATABASE_URL` using a `file:` SQLite URL, for example:
 
@@ -246,6 +251,7 @@ Common targets:
 - `make lint` - run ESLint.
 - `make build` - build all packages/apps.
 - `make check` - run lint, format check, tests, and build before a PR.
+- `make deployment-verify` - verify the deployment workflow safety contract.
 - `make e2e` - run Playwright against deterministic local demo data.
 - `make e2e-ui` - open the Playwright UI runner.
 - `make e2e-install` - install the Chromium browser used by the E2E suite.
@@ -257,6 +263,12 @@ Common targets:
 The local database uses a file path only and does not require credentials. Keep future secrets out of source control.
 
 For Vercel deployment prep and the managed Postgres production path, see `docs/DEPLOYMENT.md`.
+
+Preview and production releases run through GitHub Actions. Each environment
+applies Postgres migrations before Vercel receives the tested build, and a
+failed migration blocks deployment. Schema-changing PRs must remain compatible
+with the currently running application: expand and adopt first, then remove old
+schema in a later release.
 
 ## Recommended next steps
 
