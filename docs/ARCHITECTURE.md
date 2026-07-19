@@ -154,6 +154,10 @@ Current behaviour:
   production deployment.
 - Defines SQLite and Postgres MVP schemas with Drizzle table definitions.
 - Includes SQLite migration SQL in `packages/db/drizzle` and Postgres migration SQL in `packages/db/drizzle-pg`.
+- Preserves the production-applied `owner_user_id` compatibility column and
+  unique index in the Postgres schema and migration history. The paused auth
+  feature does not currently read or write this nullable field. Retaining it
+  avoids rewriting deployed history or applying a destructive rollback.
 - Uses `DATABASE_URL` to select the adapter: `file:` and `:memory:` use SQLite; `postgres:` and `postgresql:` use Postgres.
 - Exposes an async repository contract so API/domain workflows do not depend on a concrete database driver.
 - Provides repository functions for reading and writing basho, rikishi, banzuke entries, fantasy teams, fantasy picks, and bout results.
