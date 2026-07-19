@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
@@ -44,6 +44,42 @@ describe("demo flag migration", () => {
 });
 
 describe("Postgres migration ledger", () => {
+  it("preserves the deployed production migration identities and order", () => {
+    const migrationsFolder = join(packageRoot, "drizzle-pg");
+    const migrationFiles = readdirSync(migrationsFolder)
+      .filter((file) => file.endsWith(".sql"))
+      .sort();
+
+    expect(migrationFiles).toEqual([
+      "0000_initial.sql",
+      "0001_team_owner_user.sql",
+      "0002_basho_demo_flag.sql",
+    ]);
+    const initialMigration = readFileSync(
+      join(migrationsFolder, "0000_initial.sql"),
+      "utf8",
+    );
+    const ownerMigration = readFileSync(
+      join(migrationsFolder, "0001_team_owner_user.sql"),
+      "utf8",
+    );
+    const demoMigration = readFileSync(
+      join(migrationsFolder, "0002_basho_demo_flag.sql"),
+      "utf8",
+    );
+
+    expect(getMigrationChecksum(initialMigration)).toBe(
+      "355dc080c83437a8a07343062a0d60be1513c3c2c03f0602aaff4fc3963d2ad8",
+    );
+    expect(getMigrationChecksum(ownerMigration)).toBe(
+      "c16e0d8c8951cc4f8b1e0e2fd961a07934249f8d81416ec7a8fa8853a66f1c76",
+    );
+    expect(getMigrationChecksum(demoMigration)).toBe(
+      "c71762adeff7df2b1d4e9f92dfc4773291fb9b33ee25518b22aac7edd0d6ea42",
+    );
+    expect(demoMigration).toContain("ADD COLUMN IF NOT EXISTS");
+  });
+
   it("uses stable content checksums and detects changed SQL", () => {
     const checksum = getMigrationChecksum("SELECT 1;\n");
 

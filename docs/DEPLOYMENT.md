@@ -160,6 +160,17 @@ historical SQL cannot be inferred from the current checkout. SQL line endings
 are normalized before hashing so LF and CRLF checkouts of the same migration
 produce the same checksum.
 
+Production applied `0001_team_owner_user.sql` before its auth feature rollout
+was paused until after the current tournament. The nullable `owner_user_id`
+column and its unique `(basho_id, owner_user_id)` index are intentionally
+retained as backward-compatible groundwork: current application code does not
+read or write the field, and no authentication setup is required until the
+feature resumes. That immutable production history remains canonical, so the
+demo classification change follows it as `0002_basho_demo_flag.sql`. That
+migration tolerates the demo column already existing in an environment that
+applied the superseded demo migration identity.
+Do not delete the ownership ledger row or reuse its filename for different SQL.
+
 ### Legacy checksum investigation
 
 If migration stops because an existing ledger row has no checksum, do not copy
