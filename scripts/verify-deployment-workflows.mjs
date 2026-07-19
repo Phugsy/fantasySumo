@@ -2,8 +2,12 @@ import { readFileSync } from "node:fs";
 
 const previewPath = ".github/workflows/deploy-preview.yml";
 const productionPath = ".github/workflows/deploy-production.yml";
+const smokePath = "scripts/smoke-deployment.mjs";
+const vercelPath = "vercel.json";
 const preview = readFileSync(previewPath, "utf8");
 const production = readFileSync(productionPath, "utf8");
+const smoke = readFileSync(smokePath, "utf8");
+const vercelConfig = JSON.parse(readFileSync(vercelPath, "utf8"));
 
 function requireText(source, file, description, pattern) {
   if (!pattern.test(source)) {
@@ -103,8 +107,14 @@ for (const [source, file, environment, concurrencyGroup] of [
   requireText(
     deployJob,
     file,
+    "run the hosted migration under production database rules",
+    /DATABASE_URL: \$\{\{ secrets\.DATABASE_URL \}\}\s*\n\s*NODE_ENV: production/,
+  );
+  requireText(
+    deployJob,
+    file,
     "run post-deployment smoke tests",
-    /node scripts\/smoke-deployment\.mjs/,
+    /smoke-deployment\.mjs/,
   );
   requireText(
     deployJob,
@@ -133,6 +143,12 @@ requireText(
   /head\.repo\.full_name == github\.repository/,
 );
 requireText(
+  preview,
+  previewPath,
+  "reject a stale pull request head before migration and deployment",
+  /gh api "repos\/\$GITHUB_REPOSITORY\/pulls\/\$PR_NUMBER" --jq \.head\.sha/,
+);
+requireText(
   production,
   productionPath,
   "support manually approved releases",
@@ -156,5 +172,29 @@ requireText(
   "restrict releases to commits from master",
   /merge-base --is-ancestor.*origin\/master/,
 );
+requireText(
+  production,
+  productionPath,
+  "load smoke tooling from the workflow revision",
+  /ref: \$\{\{ github\.workflow_sha \}\}/,
+);
+requireText(
+  production,
+  productionPath,
+  "run smoke tooling independently of the selected release SHA",
+  /node \.workflow-tools\/scripts\/smoke-deployment\.mjs/,
+);
+requireText(
+  smoke,
+  smokePath,
+  "exercise a database-backed API route",
+  /\/api\/basho\/current/,
+);
+
+if (vercelConfig.git?.deploymentEnabled !== false) {
+  throw new Error(
+    `${vercelPath} must disable automatic Git deployments so they cannot bypass migration-gated GitHub Actions.`,
+  );
+}
 
 console.log("Deployment workflow safety contract passed.");

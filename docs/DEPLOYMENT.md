@@ -15,7 +15,10 @@ The root `vercel.json` is the deployment contract:
 {
   "buildCommand": "pnpm build",
   "installCommand": "pnpm install --frozen-lockfile",
-  "outputDirectory": "apps/web/dist"
+  "outputDirectory": "apps/web/dist",
+  "git": {
+    "deploymentEnabled": false
+  }
 }
 ```
 
@@ -29,18 +32,31 @@ Hosted deployments are owned by GitHub Actions:
   commits and can also be dispatched for a specific ref. It resolves the ref to
   an immutable SHA, runs `make check` and `make e2e`, enters the `preview`
   environment, builds with Vercel CLI, migrates the preview database, deploys
-  that same build, and smoke-tests `/` plus `/api/health`.
+  that same build, and smoke-tests `/`, `/api/health`, and the database-backed
+  `/api/basho/current` route.
 - `.github/workflows/deploy-production.yml` runs for a published GitHub Release
   or a manual dispatch with an exact SHA. It rejects commits outside `master`,
   validates the resolved SHA, waits at the protected `production` environment,
   prepares the production build, migrates, deploys that same SHA, and runs the
   same smoke tests.
 
+The workflows remain separate because their trust boundaries and release
+inputs differ: preview accepts same-repository PR heads and manual refs, while
+production accepts only exact `master` ancestors behind the protected
+`Production` environment. Keeping those policies explicit is more valuable
+than sharing the comparatively small setup/deploy sequence.
+
 The deploy jobs use constant, environment-specific concurrency groups. Only one
 preview migration/deployment and one production migration/deployment can run at
 a time. Validation jobs may overlap because they do not touch a shared hosted
 database. `cancel-in-progress` is disabled so an in-flight migration or release
 is never interrupted by a newer run.
+
+After preview validation and build preparation, the deploy job checks that a
+pull-request run still targets the current PR head before touching the shared
+database. This rejects an older run from the same PR without constraining the
+order in which different PRs are reviewed or merged. Manual preview dispatches
+remain explicit operator actions and are not subject to the PR-head check.
 
 Migration is a normal failing workflow step before `vercel deploy --prebuilt`.
 GitHub will therefore skip deployment when `pnpm db:migrate` fails. Each run's
@@ -60,6 +76,15 @@ Configure each environment independently with:
 | `VERCEL_ORG_ID`     | Environment variable | The Vercel owner/team ID                              |
 | `VERCEL_PROJECT_ID` | Environment variable | The Vercel project ID                                 |
 
+`VERCEL_TOKEN` is a Vercel API token used only by the Vercel CLI running in
+GitHub Actions. Create a least-privilege token for the owning Vercel account or
+team, then store its value as an Actions environment secret named
+`VERCEL_TOKEN` in both `Preview` and `Production`. It is not a Vercel runtime
+environment variable and it is not the short-lived `VERCEL_OIDC_TOKEN` exposed
+to deployed functions. `DATABASE_URL` is also an Actions environment secret;
+the matching URL must separately exist in the corresponding Vercel runtime
+environment.
+
 The preview and production `DATABASE_URL` values must be different and must
 match the database used by the corresponding Vercel runtime environment. Do not
 put either URL in repository-level variables, workflow YAML, or PR comments.
@@ -68,12 +93,12 @@ required reviewer, and prevent self-review when another maintainer is
 available. The workflow's environment reference is the approval gate; its
 secrets are unavailable until GitHub grants that approval.
 
-After the Actions path is configured and proven, disable Vercel's automatic Git
-deployments for this project (or disconnect its Git deployment integration).
-Leaving Git-triggered deployments enabled creates a second path that can publish
-code without the blocking GitHub migration job. Keep the Vercel project itself
-and its separate preview/production runtime variables; only Actions should
-initiate releases.
+The committed `git.deploymentEnabled: false` setting disables Vercel's automatic
+Git deployments while retaining the connected project for CLI deployments.
+Without it, the Vercel Git integration creates a second deployment for every
+push and can publish code before GitHub's blocking migration job. Keep the
+Vercel project itself and its separate preview/production runtime variables;
+only Actions should initiate releases.
 
 Before enabling pull-request deployment, run the preview workflow manually for
 a known commit and confirm the workflow summary points at the preview Neon
@@ -107,6 +132,12 @@ The database package now treats persistence as an adapter boundary:
 - API code depends on the async `Repositories` contract, not a concrete database driver.
 
 Keep SQLite locally until there is a concrete reason to standardise development on local Postgres. It keeps the demo and contributor setup simple, but it does mean local smoke tests are not a perfect production proof. Any deploy-bound database change should also be validated against a real Postgres database before release.
+
+The Postgres migration ledger records each filename and a SHA-256 checksum of
+its SQL. Identical reruns are skipped; if two branches reuse a filename for
+different SQL, the runner fails before applying that file. Existing
+filename-only ledger rows receive a checksum the first time the upgraded runner
+sees them, after which content collisions are detected deterministically.
 
 ### Schema compatibility rule
 
@@ -250,7 +281,9 @@ curl "https://<deployment>/api/cron/import-results" \
    above, including a production required reviewer.
 5. Manually dispatch a preview deployment and verify its migration, deployment,
    URL, and smoke-test summary.
-6. Disable any Vercel Git deployment path that could bypass GitHub Actions.
+6. Verify Vercel skips automatic Git deployments because
+   `git.deploymentEnabled` is `false`; only the GitHub Actions CLI path should
+   create a deployment.
 7. Seed or import the initial basho and banzuke data through an explicit operator
    action.
 8. Dispatch the production workflow for an exact reviewed `master` SHA and

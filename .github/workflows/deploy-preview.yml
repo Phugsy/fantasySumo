@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   resolve:
@@ -121,10 +122,24 @@ jobs:
       - name: Build prepared preview deployment
         run: pnpm dlx vercel@56.3.2 build
 
+      - name: Require current pull request head
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_SHA: ${{ needs.resolve.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          current_sha=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)
+          if [[ "$current_sha" != "$EXPECTED_SHA" ]]; then
+            echo "Refusing to deploy stale commit $EXPECTED_SHA; pull request head is $current_sha." >&2
+            exit 1
+          fi
+
       - name: Apply preview database migrations
         id: migrate
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_ENV: production
         run: |
           pnpm db:migrate
           echo "result=success" >> "$GITHUB_OUTPUT"

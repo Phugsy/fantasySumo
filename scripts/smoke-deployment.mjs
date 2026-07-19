@@ -56,3 +56,27 @@ await waitFor("API health", async () => {
     throw new Error("GET /api/health returned an unexpected payload");
   }
 });
+
+await waitFor("API database", async () => {
+  const response = await fetch(new URL("/api/basho/current", baseUrl), {
+    redirect: "follow",
+    signal: AbortSignal.timeout(requestTimeoutMs),
+  });
+
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`GET /api/basho/current returned HTTP ${response.status}`);
+  }
+
+  const payload = await response.json();
+
+  if (response.status === 404) {
+    if (payload.error !== "not-found") {
+      throw new Error("GET /api/basho/current returned an unexpected payload");
+    }
+    return;
+  }
+
+  if (typeof payload.id !== "string" || typeof payload.name !== "string") {
+    throw new Error("GET /api/basho/current returned an unexpected payload");
+  }
+});

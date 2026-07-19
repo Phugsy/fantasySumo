@@ -44,8 +44,7 @@ format: ## Format files with Prettier.
 format-check: ## Check Prettier formatting.
 	$(PNPM) format:check
 
-check: ## Run the main pre-PR validation suite.
-	$(PNPM) deployment:verify
+check: deployment-verify ## Run the main pre-PR validation suite.
 	$(PNPM) lint
 	$(PNPM) format:check
 	$(PNPM) test

@@ -172,7 +172,8 @@ make deployment-verify
 
 `make deployment-verify` checks that the preview and production workflows
 retain their environment, concurrency, migration-before-deploy, exact-SHA,
-smoke-test, and reporting gates. `make check` includes this contract check.
+database-backed smoke-test, stale-preview, Vercel Git-disable, and reporting
+gates. `make check` includes this contract check.
 
 By default, the database package writes local SQLite data to `packages/db/data/fantasy-sumo.sqlite` when run through the pnpm scripts. Override this with `DATABASE_URL` using a `file:` SQLite URL, for example:
 

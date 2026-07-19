@@ -212,7 +212,9 @@ deploys, and smoke-tests that same SHA.
 
 The migration ledger and transactional Postgres runner remain in
 `packages/db`; the workflows only invoke the existing `pnpm db:migrate`
-boundary. Because a migration advances the database before new code is live,
+boundary. Ledger rows include a content checksum so identical filenames with
+different SQL fail closed instead of silently skipping a branch's migration.
+Because a migration advances the database before new code is live,
 deploy-bound schema changes must use expand/contract compatibility across
 releases. Recovery is a forward migration or an application rollback that is
 compatible with the advanced schema, never an automatic down migration.

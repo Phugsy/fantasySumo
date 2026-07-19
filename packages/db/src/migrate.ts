@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,24 +26,54 @@ async function runPostgresMigrations(
   await database.sql`
     CREATE TABLE IF NOT EXISTS "__fantasy_sumo_migrations" (
       "id" text PRIMARY KEY NOT NULL,
+      "checksum" text,
       "applied_at" text NOT NULL
     )
   `;
 
-  const appliedRows = await database.sql<{ id: string }[]>`
-    SELECT "id" FROM "__fantasy_sumo_migrations"
+  await database.sql`
+    ALTER TABLE "__fantasy_sumo_migrations"
+    ADD COLUMN IF NOT EXISTS "checksum" text
   `;
-  const applied = new Set(appliedRows.map((row) => row.id));
+
+  const appliedRows = await database.sql<
+    { id: string; checksum: string | null }[]
+  >`
+    SELECT "id", "checksum" FROM "__fantasy_sumo_migrations"
+  `;
+  const applied = new Map(
+    appliedRows.map((row) => [row.id, row.checksum] as const),
+  );
   const migrationFiles = readdirSync(migrationsFolder)
     .filter((file) => file.endsWith(".sql"))
     .sort();
 
   for (const file of migrationFiles) {
+    const migrationSql = readFileSync(join(migrationsFolder, file), "utf8");
+    const checksum = getMigrationChecksum(migrationSql);
+
     if (applied.has(file)) {
+      const state = resolveAppliedMigration(file, checksum, applied.get(file)!);
+
+      if (state === "backfill") {
+        const updatedRows = await database.sql<{ checksum: string }[]>`
+          UPDATE "__fantasy_sumo_migrations"
+          SET "checksum" = ${checksum}
+          WHERE "id" = ${file} AND "checksum" IS NULL
+          RETURNING "checksum"
+        `;
+
+        if (updatedRows.length === 0) {
+          const currentRows = await database.sql<{ checksum: string | null }[]>`
+            SELECT "checksum" FROM "__fantasy_sumo_migrations"
+            WHERE "id" = ${file}
+          `;
+          resolveAppliedMigration(file, checksum, currentRows[0]?.checksum);
+        }
+      }
+
       continue;
     }
-
-    const migrationSql = readFileSync(join(migrationsFolder, file), "utf8");
 
     await database.sql.begin(async (transaction) => {
       for (const statement of splitSqlStatements(migrationSql)) {
@@ -50,11 +81,33 @@ async function runPostgresMigrations(
       }
 
       await transaction`
-        INSERT INTO "__fantasy_sumo_migrations" ("id", "applied_at")
-        VALUES (${file}, ${new Date().toISOString()})
+        INSERT INTO "__fantasy_sumo_migrations" ("id", "checksum", "applied_at")
+        VALUES (${file}, ${checksum}, ${new Date().toISOString()})
       `;
     });
   }
+}
+
+export function getMigrationChecksum(migrationSql: string): string {
+  return createHash("sha256").update(migrationSql).digest("hex");
+}
+
+export function resolveAppliedMigration(
+  file: string,
+  expectedChecksum: string,
+  appliedChecksum: string | null | undefined,
+): "applied" | "backfill" {
+  if (appliedChecksum === null) {
+    return "backfill";
+  }
+
+  if (appliedChecksum === expectedChecksum) {
+    return "applied";
+  }
+
+  throw new Error(
+    `Migration checksum mismatch for "${file}". The database recorded different SQL under the same migration filename.`,
+  );
 }
 
 function splitSqlStatements(migrationSql: string): string[] {
