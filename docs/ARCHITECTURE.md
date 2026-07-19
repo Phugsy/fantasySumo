@@ -27,6 +27,9 @@ The active app is split into:
 - a Drizzle data package with local SQLite and a production Neon Postgres
   adapter;
 - root pnpm scripts for dev, build, test, lint, and formatting.
+- GitHub Actions deployment workflows that validate an immutable commit, apply
+  environment-scoped Postgres migrations, deploy the prepared Vercel build only
+  after migration success, and smoke-test the resulting URL.
 
 ## Front end
 
@@ -196,6 +199,25 @@ Current limitations:
 
 - No banzuke/results import UI yet.
 - No hosted production database has been provisioned in the repo.
+
+## Release boundary
+
+`.github/workflows/deploy-preview.yml` and
+`.github/workflows/deploy-production.yml` own hosted release ordering. They
+serialize each shared `Preview` and `Production` database environment
+independently and keep migrations
+out of serverless startup. The production workflow accepts an exact commit from
+`master` or the commit behind a published GitHub Release, then builds, migrates,
+deploys, and smoke-tests that same SHA.
+
+The migration ledger and transactional Postgres runner remain in
+`packages/db`; the workflows only invoke the existing `pnpm db:migrate`
+boundary. Ledger rows include a content checksum so identical filenames with
+different SQL fail closed instead of silently skipping a branch's migration.
+Because a migration advances the database before new code is live,
+deploy-bound schema changes must use expand/contract compatibility across
+releases. Recovery is a forward migration or an application rollback that is
+compatible with the advanced schema, never an automatic down migration.
 
 The accepted MVP import direction is documented in [Data Import Strategy](DATA_IMPORT_STRATEGY.md). Prefer automated source-backed imports first, with manual triggers, dry runs, and JSON fixtures available for testing and emergency fallback.
 

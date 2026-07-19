@@ -1,0 +1,187 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Exact commit SHA from master to release
+        required: true
+        type: string
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - name: Check out release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.sha }}
+          fetch-depth: 0
+
+      - name: Require a commit from master
+        id: commit
+        env:
+          RELEASE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.sha || '' }}
+        run: |
+          if [[ -n "$RELEASE_SHA" && ! "$RELEASE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "Manual production releases require a full 40-character commit SHA." >&2
+            exit 1
+          fi
+          deploy_sha=$(git rev-parse HEAD)
+          if [[ -n "$RELEASE_SHA" && "${deploy_sha,,}" != "${RELEASE_SHA,,}" ]]; then
+            echo "Checked-out commit does not match the requested release SHA." >&2
+            exit 1
+          fi
+          git fetch origin master
+          git merge-base --is-ancestor "$deploy_sha" origin/master
+          echo "sha=$deploy_sha" >> "$GITHUB_OUTPUT"
+
+  validate:
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out resolved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run main validation
+        run: make check
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      - name: Run browser E2E
+        run: make e2e
+
+  deploy:
+    needs:
+      - resolve
+      - validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: fantasy-sumo-production-database
+      cancel-in-progress: false
+    environment:
+      name: Production
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      DEPLOY_SHA: ${{ needs.resolve.outputs.sha }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Check out tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - name: Check out workflow smoke tooling
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .workflow-tools
+          sparse-checkout: scripts/smoke-deployment.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Pull Vercel production configuration
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: pnpm dlx vercel@56.3.2 pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build prepared production deployment
+        run: pnpm dlx vercel@56.3.2 build --prod
+
+      - name: Require latest published production release
+        if: github.event_name == 'release'
+        env:
+          EXPECTED_RELEASE_ID: ${{ github.event.release.id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest_release_id=$(
+            gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" |
+              jq -r '[.[][] | select(.draft == false and .prerelease == false)] | max_by(.published_at) | .id'
+          )
+          if [[ "$latest_release_id" != "$EXPECTED_RELEASE_ID" ]]; then
+            echo "Refusing to deploy release $EXPECTED_RELEASE_ID; the latest production release is $latest_release_id." >&2
+            exit 1
+          fi
+
+      - name: Apply production database migrations
+        id: migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_ENV: production
+        run: |
+          pnpm db:migrate
+          echo "result=success" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy tested production build
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          deployment_url=$(pnpm dlx vercel@56.3.2 deploy --prebuilt --prod --token="$VERCEL_TOKEN" --meta githubCommitSha="$DEPLOY_SHA" | tail -n 1)
+          case "$deployment_url" in
+            https://*) ;;
+            *) echo "Vercel returned an invalid deployment URL" >&2; exit 1 ;;
+          esac
+          echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke-test production deployment
+        id: smoke
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: node .workflow-tools/scripts/smoke-deployment.mjs "$DEPLOYMENT_URL"
+
+      - name: Write production deployment summary
+        if: always()
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+          MIGRATION_RESULT: ${{ steps.migrate.outcome }}
+          SMOKE_RESULT: ${{ steps.smoke.outcome }}
+        run: |
+          echo "## Production deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Environment: production" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit SHA: \`$DEPLOY_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Migration result: ${MIGRATION_RESULT:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deployment URL: ${DEPLOYMENT_URL:-not-created}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Smoke-test result: ${SMOKE_RESULT:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$MIGRATION_RESULT" == "success" && "$SMOKE_RESULT" != "success" ]]; then
+            echo "- Recovery: the database may already be ahead; fix forward or redeploy code compatible with the advanced schema. Do not run down migrations automatically." >> "$GITHUB_STEP_SUMMARY"
+          fi

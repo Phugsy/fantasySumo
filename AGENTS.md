@@ -38,6 +38,9 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 - Do not introduce paid services, hosted infrastructure, or external APIs without documenting the trade-off.
 - Do not commit secrets or local credentials.
 - Replace hard-coded credentials before any real deployment work.
+- Keep deploy-bound database changes backward-compatible with the currently
+  running application. Use expand/contract changes across separate releases;
+  never rely on an automatic down migration during recovery.
 - Prefer explicit domain names: `Basho`, `Rikishi`, `Banzuke`, `FantasyTeam`, `Pick`, `Bout`, `Result`, `Leaderboard`.
 - Keep scoring logic isolated and well-tested.
 - Keep basho lifecycle and pick-locking rules in the domain/API layer; UI state should mirror those rules, not replace API enforcement.
@@ -69,9 +72,12 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 7. Read `docs/E2E_TESTING.md` before adding browser end-to-end tests.
 8. Use `make db-seed-demo` or `make demo` when a deterministic browser-flow fixture is useful, especially for future E2E validation. These commands reset the configured local SQLite data.
 9. Prefer the Makefile command layer for common workflows: `make test`, `make lint`, `make build`, and `make check`.
-10. Keep PRs focused on the next MVP slice; do not rebuild the full product in one change.
-11. Before calling a non-trivial code change ready, use `skills/fantasy-sumo-pr-review-loop/SKILL.md` to run a dedicated review against the base branch.
-12. Open completed, validated PRs ready for review so the automatic Codex GitHub review runs. Use draft PRs only for explicitly requested checkpoints or work that is incomplete, blocked, or missing required validation.
+10. Treat the preview and production GitHub deployment workflows as the only
+    release path. Do not enable a Vercel Git deployment that can bypass their
+    blocking migration step.
+11. Keep PRs focused on the next MVP slice; do not rebuild the full product in one change.
+12. Before calling a non-trivial code change ready, use `skills/fantasy-sumo-pr-review-loop/SKILL.md` to run a dedicated review against the base branch.
+13. Open completed, validated PRs ready for review so the automatic Codex GitHub review runs. Use draft PRs only for explicitly requested checkpoints or work that is incomplete, blocked, or missing required validation.
 
 For issue-to-PR work, use the repo-local process in `skills/fantasy-sumo-issue-loop/SKILL.md`. It can be invoked with a prompt such as: "Use the Fantasy Sumo issue loop on #44."
 

@@ -15,11 +15,115 @@ The root `vercel.json` is the deployment contract:
 {
   "buildCommand": "pnpm build",
   "installCommand": "pnpm install --frozen-lockfile",
-  "outputDirectory": "apps/web/dist"
+  "outputDirectory": "apps/web/dist",
+  "git": {
+    "deploymentEnabled": false
+  }
 }
 ```
 
 Create or reconfigure the Vercel project with the repository root as its root directory. A project rooted at `apps/web` will ignore the root `vercel.json` and deploy only the Vite app, not the `/api` serverless function.
+
+## Automated release path
+
+Hosted deployments are owned by GitHub Actions:
+
+- `.github/workflows/deploy-preview.yml` runs for same-repository pull request
+  commits and can also be dispatched for a specific ref. It resolves the ref to
+  an immutable SHA, runs `make check` and `make e2e`, enters the `preview`
+  environment, builds with Vercel CLI, migrates the preview database, deploys
+  that same build, and smoke-tests `/`, `/api/health`, and the database-backed
+  `/api/basho/current` route.
+- `.github/workflows/deploy-production.yml` runs for a published, non-prerelease
+  GitHub Release or a manual dispatch with an exact SHA. It rejects commits
+  outside `master`, validates the resolved SHA, waits at the protected
+  `production` environment, prepares the production build, migrates, deploys
+  that same SHA, and runs the same smoke tests.
+
+The workflows remain separate because their trust boundaries and release
+inputs differ: preview accepts same-repository PR heads and manual refs, while
+production accepts only exact `master` ancestors behind the protected
+`Production` environment. Keeping those policies explicit is more valuable
+than sharing the comparatively small setup/deploy sequence.
+
+The deploy jobs use constant, environment-specific concurrency groups. Only one
+preview migration/deployment and one production migration/deployment can run at
+a time. Validation jobs may overlap because they do not touch a shared hosted
+database. `cancel-in-progress` is disabled so an in-flight migration or release
+is never interrupted by a newer run.
+
+Immediately before an automatic release can migrate production, the deploy job
+also verifies that its GitHub Release is still the latest published full
+release. This prevents an older validation run from replacing a newer release.
+Explicit manual dispatches remain exempt so an operator can intentionally
+deploy an older compatible `master` SHA for recovery.
+
+After preview validation and build preparation, the deploy job checks that a
+pull-request run still targets the current PR head before touching the shared
+database. This rejects an older run from the same PR without constraining the
+order in which different PRs are reviewed or merged. Manual preview dispatches
+remain explicit operator actions and are not subject to the PR-head check.
+
+Migration is a normal failing workflow step before `vercel deploy --prebuilt`.
+GitHub will therefore skip deployment when `pnpm db:migrate` fails. Each run's
+summary records the environment, immutable commit SHA, migration result,
+deployment URL, smoke-test result, and the recovery warning when the database
+may have advanced before a later failure.
+
+Both deployment workflows load the smoke-test script from the workflow
+revision rather than the selected application SHA. This keeps post-deployment
+verification available when an operator intentionally selects an older preview
+or production commit that predates the smoke tooling.
+
+### One-time GitHub and Vercel setup
+
+Use the existing GitHub environments named exactly `Preview` and `Production`.
+Configure each environment independently with:
+
+| Name                              | Kind                 | Requirement                                               |
+| --------------------------------- | -------------------- | --------------------------------------------------------- |
+| `DATABASE_URL`                    | Environment secret   | The Neon URL for only that environment                    |
+| `VERCEL_TOKEN`                    | Environment secret   | A least-privilege token allowed to deploy the project     |
+| `VERCEL_AUTOMATION_BYPASS_SECRET` | Environment secret   | The Vercel Deployment Protection automation bypass secret |
+| `VERCEL_ORG_ID`                   | Environment variable | The Vercel owner/team ID                                  |
+| `VERCEL_PROJECT_ID`               | Environment variable | The Vercel project ID                                     |
+
+`VERCEL_TOKEN` is a Vercel API token used only by the Vercel CLI running in
+GitHub Actions. Create a least-privilege token for the owning Vercel account or
+team, then store its value as an Actions environment secret named
+`VERCEL_TOKEN` in both `Preview` and `Production`. It is not a Vercel runtime
+environment variable and it is not the short-lived `VERCEL_OIDC_TOKEN` exposed
+to deployed functions. `DATABASE_URL` is also an Actions environment secret;
+the matching URL must separately exist in the corresponding Vercel runtime
+environment.
+
+`VERCEL_AUTOMATION_BYPASS_SECRET` is generated in the Vercel project's
+Deployment Protection settings, but its value belongs in the matching GitHub
+Actions environments. The workflow exposes it only to the smoke-test step,
+which sends it in the `x-vercel-protection-bypass` request header. This lets CI
+verify the protected deployment without disabling Deployment Protection or
+adding the secret to the deployed application's runtime environment.
+
+The preview and production `DATABASE_URL` values must be different and must
+match the database used by the corresponding Vercel runtime environment. Do not
+put either URL in repository-level variables, workflow YAML, or PR comments.
+Restrict the `production` environment to `master` and release tags, add a
+required reviewer, and prevent self-review when another maintainer is
+available. The workflow's environment reference is the approval gate; its
+secrets are unavailable until GitHub grants that approval.
+
+The committed `git.deploymentEnabled: false` setting disables Vercel's automatic
+Git deployments while retaining the connected project for CLI deployments.
+Without it, the Vercel Git integration creates a second deployment for every
+push and can publish code before GitHub's blocking migration job. Keep the
+Vercel project itself and its separate preview/production runtime variables;
+only Actions should initiate releases.
+
+Before enabling pull-request deployment, run the preview workflow manually for
+a known commit and confirm the workflow summary points at the preview Neon
+database and a Vercel preview URL. Then publish a release or manually dispatch
+the production workflow with the full SHA that passed review. Never type a
+branch name into the production SHA input.
 
 ## Required Vercel environment variables
 
@@ -47,6 +151,56 @@ The database package now treats persistence as an adapter boundary:
 - API code depends on the async `Repositories` contract, not a concrete database driver.
 
 Keep SQLite locally until there is a concrete reason to standardise development on local Postgres. It keeps the demo and contributor setup simple, but it does mean local smoke tests are not a perfect production proof. Any deploy-bound database change should also be validated against a real Postgres database before release.
+
+The Postgres migration ledger records each filename and a SHA-256 checksum of
+its SQL. Identical reruns are skipped; if two branches reuse a filename for
+different SQL, the runner fails before applying that file. Existing
+filename-only ledger rows with a missing checksum fail closed because their
+historical SQL cannot be inferred from the current checkout. SQL line endings
+are normalized before hashing so LF and CRLF checkouts of the same migration
+produce the same checksum.
+
+### Legacy checksum investigation
+
+If migration stops because an existing ledger row has no checksum, do not copy
+the reported hash into the database immediately. The row proves only that its
+filename was previously marked as applied; it does not prove which SQL content
+ran.
+
+1. Take or verify a backup of the affected database.
+2. Check out the exact trusted application revision and inspect the reported
+   migration file.
+3. Compare every schema and data effect of that SQL with the database. If the
+   result cannot be verified, leave the checksum empty and repair the schema
+   with an explicit forward migration or restore a known-good database.
+4. Only after verification, record the checksum printed by the migration error
+   using the database console:
+
+   ```sql
+   UPDATE "__fantasy_sumo_migrations"
+   SET "checksum" = '<verified checksum from the migration error>'
+   WHERE "id" = '<verified migration filename>'
+     AND "checksum" IS NULL;
+   ```
+
+5. Confirm exactly one intended row changed, then rerun the same blocked
+   workflow SHA.
+
+### Schema compatibility rule
+
+Migrations run while the previous deployment may still be serving traffic.
+Every deploy-bound schema change must therefore be compatible with both the old
+and new application versions:
+
+1. Expand: add nullable columns, tables, or indexes without removing or changing
+   data the current application needs.
+2. Adopt: deploy code that writes/reads the expanded schema and backfill data in
+   an explicit, observable operation where required.
+3. Contract: remove old schema only in a later release after no deployed code or
+   recovery target depends on it.
+
+PRs with schema changes must call out this sequence and exercise the migration
+against preview Postgres. The workflows never run down migrations.
 
 ## Admin endpoints
 
@@ -167,10 +321,48 @@ curl "https://<deployment>/api/cron/import-results" \
 
 ## First deployment checklist
 
-1. Create the managed Neon Postgres database.
+1. Create separate preview and production Neon Postgres databases.
 2. Add the Vercel project from the GitHub repo root.
-3. Configure the environment variables above for preview and production.
-4. Run migrations against the managed database with the production `DATABASE_URL`.
-5. Seed or import the initial basho and banzuke data.
-6. Smoke-test health, current basho, team creation, import dry-runs, result imports, and leaderboard updates.
-7. Document the database backup and restore process from the chosen provider.
+3. Configure the Vercel runtime variables for preview and production.
+4. Configure and protect the matching GitHub environments and secrets described
+   above, including a production required reviewer.
+5. Manually dispatch a preview deployment and verify its migration, deployment,
+   URL, and smoke-test summary.
+6. Verify Vercel skips automatic Git deployments because
+   `git.deploymentEnabled` is `false`; only the GitHub Actions CLI path should
+   create a deployment.
+7. Seed or import the initial basho and banzuke data through an explicit operator
+   action.
+8. Dispatch the production workflow for an exact reviewed `master` SHA and
+   approve the environment gate.
+9. Smoke-test current basho, team creation, import dry-runs, result imports, and
+   leaderboard updates beyond the automated health check.
+10. Document and test the database backup and restore process from Neon.
+
+## Emergency migration and recovery
+
+The automated workflows are the normal release path. Use a manual migration
+only to recover a blocked workflow or repair an environment under explicit
+operator control:
+
+1. Confirm the intended environment and exact application SHA in the failed
+   workflow. Take or verify a recent database backup before any high-risk fix.
+2. Export only that environment's Neon URL in a clean shell. Do not paste it into
+   an issue, PR, command transcript, or committed file.
+3. Check out the exact release SHA and install with
+   `pnpm install --frozen-lockfile`.
+4. Run `DATABASE_URL="<environment Neon URL>" pnpm db:migrate` once. The existing
+   ledger and transactional Postgres runner make a successful retry idempotent.
+5. Re-run the failed GitHub workflow for the same SHA. Do not deploy another SHA
+   merely to get past the gate.
+
+If migration fails, stop: production deployment has not occurred. Inspect the
+transaction error, correct the migration with a forward-compatible migration,
+and rerun. Never automatically apply a down migration.
+
+If deployment or smoke testing fails after migration succeeds, assume the
+database may already be advanced. Prefer a forward fix. If service must be
+restored immediately, redeploy a previous application SHA only after confirming
+that it is compatible with the advanced schema. Record the migration result,
+deployed SHA, failed URL/check, and operator action in the release or incident
+notes.

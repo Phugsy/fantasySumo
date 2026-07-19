@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
+import { getMigrationChecksum, resolveAppliedMigration } from "./migrate.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -39,5 +40,34 @@ describe("demo flag migration", () => {
     ]);
 
     database.close();
+  });
+});
+
+describe("Postgres migration ledger", () => {
+  it("uses stable content checksums and detects changed SQL", () => {
+    const checksum = getMigrationChecksum("SELECT 1;\n");
+
+    expect(checksum).toBe(getMigrationChecksum("SELECT 1;\n"));
+    expect(checksum).toBe(getMigrationChecksum("SELECT 1;\r\n"));
+    expect(checksum).toBe(getMigrationChecksum("SELECT 1;\r"));
+    expect(checksum).not.toBe(getMigrationChecksum("SELECT 2;\n"));
+    expect(
+      resolveAppliedMigration("0002_example.sql", checksum, checksum),
+    ).toBe("applied");
+    expect(() =>
+      resolveAppliedMigration("0002_example.sql", checksum, null),
+    ).toThrow(
+      `Migration checksum is missing for "0002_example.sql". The database cannot verify which SQL was applied. Inspect the schema, then explicitly record trusted checksum "${checksum}" before retrying.`,
+    );
+    expect(() =>
+      resolveAppliedMigration("0002_example.sql", checksum, undefined),
+    ).toThrow(
+      `Migration checksum is missing for "0002_example.sql". The database cannot verify which SQL was applied. Inspect the schema, then explicitly record trusted checksum "${checksum}" before retrying.`,
+    );
+    expect(() =>
+      resolveAppliedMigration("0002_example.sql", checksum, "other-checksum"),
+    ).toThrow(
+      'Migration checksum mismatch for "0002_example.sql". The database recorded different SQL under the same migration filename.',
+    );
   });
 });
