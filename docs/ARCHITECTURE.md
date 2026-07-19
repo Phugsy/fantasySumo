@@ -204,7 +204,8 @@ Current limitations:
 
 `.github/workflows/deploy-preview.yml` and
 `.github/workflows/deploy-production.yml` own hosted release ordering. They
-serialize each shared database environment independently and keep migrations
+serialize each shared `Preview` and `Production` database environment
+independently and keep migrations
 out of serverless startup. The production workflow accepts an exact commit from
 `master` or the commit behind a published GitHub Release, then builds, migrates,
 deploys, and smoke-tests that same SHA.

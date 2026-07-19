@@ -83,7 +83,7 @@ jobs:
       group: fantasy-sumo-preview-database
       cancel-in-progress: false
     environment:
-      name: preview
+      name: Preview
       url: ${{ steps.deploy.outputs.url }}
     env:
       DEPLOY_SHA: ${{ needs.resolve.outputs.sha }}

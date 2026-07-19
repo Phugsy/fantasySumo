@@ -85,7 +85,7 @@ jobs:
       group: fantasy-sumo-production-database
       cancel-in-progress: false
     environment:
-      name: production
+      name: Production
       url: ${{ steps.deploy.outputs.url }}
     env:
       DEPLOY_SHA: ${{ needs.resolve.outputs.sha }}

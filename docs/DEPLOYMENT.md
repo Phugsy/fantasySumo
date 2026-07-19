@@ -50,7 +50,7 @@ may have advanced before a later failure.
 
 ### One-time GitHub and Vercel setup
 
-Create two GitHub environments named exactly `preview` and `production`.
+Use the existing GitHub environments named exactly `Preview` and `Production`.
 Configure each environment independently with:
 
 | Name                | Kind                 | Requirement                                           |

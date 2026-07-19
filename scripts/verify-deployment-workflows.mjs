@@ -43,11 +43,11 @@ function getJob(source, file, jobName) {
 }
 
 for (const [source, file, environment, concurrencyGroup] of [
-  [preview, previewPath, "preview", "fantasy-sumo-preview-database"],
+  [preview, previewPath, "Preview", "fantasy-sumo-preview-database"],
   [
     production,
     productionPath,
-    "production",
+    "Production",
     "fantasy-sumo-production-database",
   ],
 ]) {
@@ -115,14 +115,14 @@ for (const [source, file, environment, concurrencyGroup] of [
   requireOrder(
     deployJob,
     file,
-    `Apply ${environment} database migrations`,
-    `Deploy tested ${environment} build`,
+    `Apply ${environment.toLowerCase()} database migrations`,
+    `Deploy tested ${environment.toLowerCase()} build`,
   );
   requireOrder(
     deployJob,
     file,
-    `Deploy tested ${environment} build`,
-    `Smoke-test ${environment} deployment`,
+    `Deploy tested ${environment.toLowerCase()} build`,
+    `Smoke-test ${environment.toLowerCase()} deployment`,
   );
 }
 
