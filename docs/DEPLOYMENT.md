@@ -70,6 +70,11 @@ summary records the environment, immutable commit SHA, migration result,
 deployment URL, smoke-test result, and the recovery warning when the database
 may have advanced before a later failure.
 
+Both deployment workflows load the smoke-test script from the workflow
+revision rather than the selected application SHA. This keeps post-deployment
+verification available when an operator intentionally selects an older preview
+or production commit that predates the smoke tooling.
+
 ### One-time GitHub and Vercel setup
 
 Use the existing GitHub environments named exactly `Preview` and `Production`.

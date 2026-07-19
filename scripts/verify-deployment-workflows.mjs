@@ -126,6 +126,18 @@ for (const [source, file, environment, concurrencyGroup] of [
   requireText(
     deployJob,
     file,
+    "load smoke tooling from the workflow revision",
+    /ref: \$\{\{ github\.workflow_sha \}\}/,
+  );
+  requireText(
+    deployJob,
+    file,
+    "run smoke tooling independently of the selected deployment SHA",
+    /node \.workflow-tools\/scripts\/smoke-deployment\.mjs/,
+  );
+  requireText(
+    deployJob,
+    file,
     "provide the Vercel protection bypass secret only to deployment smoke tests",
     /Smoke-test [^\n]+ deployment[\s\S]*?VERCEL_AUTOMATION_BYPASS_SECRET: \$\{\{ secrets\.VERCEL_AUTOMATION_BYPASS_SECRET \}\}[\s\S]*?smoke-deployment\.mjs/,
   );
@@ -211,18 +223,6 @@ requireText(
   productionPath,
   "restrict releases to commits from master",
   /merge-base --is-ancestor.*origin\/master/,
-);
-requireText(
-  production,
-  productionPath,
-  "load smoke tooling from the workflow revision",
-  /ref: \$\{\{ github\.workflow_sha \}\}/,
-);
-requireText(
-  production,
-  productionPath,
-  "run smoke tooling independently of the selected release SHA",
-  /node \.workflow-tools\/scripts\/smoke-deployment\.mjs/,
 );
 requireText(
   smoke,

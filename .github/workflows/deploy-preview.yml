@@ -96,6 +96,14 @@ jobs:
         with:
           ref: ${{ needs.resolve.outputs.sha }}
 
+      - name: Check out workflow smoke tooling
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .workflow-tools
+          sparse-checkout: scripts/smoke-deployment.mjs
+          sparse-checkout-cone-mode: false
+
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
 
@@ -161,7 +169,7 @@ jobs:
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: node scripts/smoke-deployment.mjs "$DEPLOYMENT_URL"
+        run: node .workflow-tools/scripts/smoke-deployment.mjs "$DEPLOYMENT_URL"
 
       - name: Write preview deployment summary
         if: always()
