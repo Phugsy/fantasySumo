@@ -126,6 +126,9 @@ jobs:
       - name: Build prepared production deployment
         run: pnpm dlx vercel@56.3.2 build --prod
 
+      - name: Type-check Vercel function entrypoint
+        run: pnpm exec tsc -p tsconfig.json
+
       - name: Require latest published production release
         if: github.event_name == 'release'
         env:
