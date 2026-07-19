@@ -69,12 +69,13 @@ may have advanced before a later failure.
 Use the existing GitHub environments named exactly `Preview` and `Production`.
 Configure each environment independently with:
 
-| Name                | Kind                 | Requirement                                           |
-| ------------------- | -------------------- | ----------------------------------------------------- |
-| `DATABASE_URL`      | Environment secret   | The Neon URL for only that environment                |
-| `VERCEL_TOKEN`      | Environment secret   | A least-privilege token allowed to deploy the project |
-| `VERCEL_ORG_ID`     | Environment variable | The Vercel owner/team ID                              |
-| `VERCEL_PROJECT_ID` | Environment variable | The Vercel project ID                                 |
+| Name                              | Kind                 | Requirement                                               |
+| --------------------------------- | -------------------- | --------------------------------------------------------- |
+| `DATABASE_URL`                    | Environment secret   | The Neon URL for only that environment                    |
+| `VERCEL_TOKEN`                    | Environment secret   | A least-privilege token allowed to deploy the project     |
+| `VERCEL_AUTOMATION_BYPASS_SECRET` | Environment secret   | The Vercel Deployment Protection automation bypass secret |
+| `VERCEL_ORG_ID`                   | Environment variable | The Vercel owner/team ID                                  |
+| `VERCEL_PROJECT_ID`               | Environment variable | The Vercel project ID                                     |
 
 `VERCEL_TOKEN` is a Vercel API token used only by the Vercel CLI running in
 GitHub Actions. Create a least-privilege token for the owning Vercel account or
@@ -84,6 +85,13 @@ environment variable and it is not the short-lived `VERCEL_OIDC_TOKEN` exposed
 to deployed functions. `DATABASE_URL` is also an Actions environment secret;
 the matching URL must separately exist in the corresponding Vercel runtime
 environment.
+
+`VERCEL_AUTOMATION_BYPASS_SECRET` is generated in the Vercel project's
+Deployment Protection settings, but its value belongs in the matching GitHub
+Actions environments. The workflow exposes it only to the smoke-test step,
+which sends it in the `x-vercel-protection-bypass` request header. This lets CI
+verify the protected deployment without disabling Deployment Protection or
+adding the secret to the deployed application's runtime environment.
 
 The preview and production `DATABASE_URL` values must be different and must
 match the database used by the corresponding Vercel runtime environment. Do not

@@ -21,6 +21,13 @@ function forbidText(source, file, description, pattern) {
   }
 }
 
+function requireOccurrenceCount(source, file, description, text, count) {
+  const actualCount = source.split(text).length - 1;
+  if (actualCount !== count) {
+    throw new Error(`${file} must ${description}.`);
+  }
+}
+
 function requireOrder(source, file, before, after) {
   const beforeIndex = source.indexOf(before);
   const afterIndex = source.indexOf(after);
@@ -119,6 +126,19 @@ for (const [source, file, environment, concurrencyGroup] of [
   requireText(
     deployJob,
     file,
+    "provide the Vercel protection bypass secret only to deployment smoke tests",
+    /Smoke-test [^\n]+ deployment[\s\S]*?VERCEL_AUTOMATION_BYPASS_SECRET: \$\{\{ secrets\.VERCEL_AUTOMATION_BYPASS_SECRET \}\}[\s\S]*?smoke-deployment\.mjs/,
+  );
+  requireOccurrenceCount(
+    deployJob,
+    file,
+    "expose the Vercel protection bypass secret exactly once",
+    "secrets.VERCEL_AUTOMATION_BYPASS_SECRET",
+    1,
+  );
+  requireText(
+    deployJob,
+    file,
     "publish an observable workflow summary",
     /GITHUB_STEP_SUMMARY/,
   );
@@ -189,6 +209,12 @@ requireText(
   smokePath,
   "exercise a database-backed API route",
   /\/api\/basho\/current/,
+);
+requireText(
+  smoke,
+  smokePath,
+  "send the Vercel automation protection bypass header",
+  /"x-vercel-protection-bypass": protectionBypassSecret/,
 );
 
 if (vercelConfig.git?.deploymentEnabled !== false) {

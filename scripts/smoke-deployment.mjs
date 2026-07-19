@@ -5,9 +5,20 @@ if (deploymentUrl === undefined) {
 }
 
 const baseUrl = new URL(deploymentUrl);
+const protectionBypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+
+if (!protectionBypassSecret) {
+  throw new Error(
+    "VERCEL_AUTOMATION_BYPASS_SECRET is required for deployment smoke tests",
+  );
+}
+
 const attempts = 6;
 const retryDelayMs = 5_000;
 const requestTimeoutMs = 15_000;
+const requestHeaders = {
+  "x-vercel-protection-bypass": protectionBypassSecret,
+};
 
 async function waitFor(checkName, check) {
   let lastError;
@@ -34,6 +45,7 @@ async function waitFor(checkName, check) {
 
 await waitFor("Web", async () => {
   const response = await fetch(baseUrl, {
+    headers: requestHeaders,
     redirect: "follow",
     signal: AbortSignal.timeout(requestTimeoutMs),
   });
@@ -44,6 +56,7 @@ await waitFor("Web", async () => {
 
 await waitFor("API health", async () => {
   const response = await fetch(new URL("/api/health", baseUrl), {
+    headers: requestHeaders,
     redirect: "follow",
     signal: AbortSignal.timeout(requestTimeoutMs),
   });
@@ -59,6 +72,7 @@ await waitFor("API health", async () => {
 
 await waitFor("API database", async () => {
   const response = await fetch(new URL("/api/basho/current", baseUrl), {
+    headers: requestHeaders,
     redirect: "follow",
     signal: AbortSignal.timeout(requestTimeoutMs),
   });
