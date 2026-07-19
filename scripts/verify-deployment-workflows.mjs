@@ -3,10 +3,12 @@ import { readFileSync } from "node:fs";
 const previewPath = ".github/workflows/deploy-preview.yml";
 const productionPath = ".github/workflows/deploy-production.yml";
 const smokePath = "scripts/smoke-deployment.mjs";
+const tsconfigPath = "tsconfig.json";
 const vercelPath = "vercel.json";
 const preview = readFileSync(previewPath, "utf8");
 const production = readFileSync(productionPath, "utf8");
 const smoke = readFileSync(smokePath, "utf8");
+const tsconfig = JSON.parse(readFileSync(tsconfigPath, "utf8"));
 const vercelConfig = JSON.parse(readFileSync(vercelPath, "utf8"));
 
 function requireText(source, file, description, pattern) {
@@ -99,6 +101,12 @@ for (const [source, file, environment, concurrencyGroup] of [
     /DATABASE_URL: \$\{\{ secrets\.DATABASE_URL \}\}/,
   );
   requireText(deployJob, file, "pin the Vercel CLI", /vercel@56\.3\.2/);
+  requireText(
+    deployJob,
+    file,
+    "type-check the Vercel function entrypoint",
+    /Type-check Vercel function entrypoint\s*\n\s*run: pnpm exec tsc -p tsconfig\.json/,
+  );
   forbidText(
     deployJobPreamble,
     file,
@@ -153,6 +161,18 @@ for (const [source, file, environment, concurrencyGroup] of [
     file,
     "publish an observable workflow summary",
     /GITHUB_STEP_SUMMARY/,
+  );
+  requireOrder(
+    deployJob,
+    file,
+    `Build prepared ${environment.toLowerCase()} deployment`,
+    "Type-check Vercel function entrypoint",
+  );
+  requireOrder(
+    deployJob,
+    file,
+    "Type-check Vercel function entrypoint",
+    `Apply ${environment.toLowerCase()} database migrations`,
   );
   requireOrder(
     deployJob,
@@ -240,6 +260,20 @@ requireText(
 if (vercelConfig.git?.deploymentEnabled !== false) {
   throw new Error(
     `${vercelPath} must disable automatic Git deployments so they cannot bypass migration-gated GitHub Actions.`,
+  );
+}
+
+if (
+  tsconfig.extends !== "./tsconfig.base.json" ||
+  !tsconfig.compilerOptions?.lib?.includes("ES2022") ||
+  !tsconfig.compilerOptions?.typeRoots?.includes(
+    "./apps/api/node_modules/@types",
+  ) ||
+  !tsconfig.compilerOptions?.types?.includes("node") ||
+  !tsconfig.include?.includes("api/**/*.ts")
+) {
+  throw new Error(
+    `${tsconfigPath} must apply the shared ES2022 and Node.js TypeScript configuration to the Vercel function entrypoint.`,
   );
 }
 

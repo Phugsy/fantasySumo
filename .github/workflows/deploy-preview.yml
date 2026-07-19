@@ -130,6 +130,9 @@ jobs:
       - name: Build prepared preview deployment
         run: pnpm dlx vercel@56.3.2 build
 
+      - name: Type-check Vercel function entrypoint
+        run: pnpm exec tsc -p tsconfig.json
+
       - name: Require current pull request head
         if: github.event_name == 'pull_request'
         env:
