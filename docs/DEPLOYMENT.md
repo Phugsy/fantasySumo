@@ -155,10 +155,36 @@ Keep SQLite locally until there is a concrete reason to standardise development 
 The Postgres migration ledger records each filename and a SHA-256 checksum of
 its SQL. Identical reruns are skipped; if two branches reuse a filename for
 different SQL, the runner fails before applying that file. Existing
-filename-only ledger rows receive a checksum the first time the upgraded runner
-sees them, after which content collisions are detected deterministically. SQL
-line endings are normalized before hashing so LF and CRLF checkouts of the same
-migration produce the same checksum.
+filename-only ledger rows with a missing checksum fail closed because their
+historical SQL cannot be inferred from the current checkout. SQL line endings
+are normalized before hashing so LF and CRLF checkouts of the same migration
+produce the same checksum.
+
+### Legacy checksum investigation
+
+If migration stops because an existing ledger row has no checksum, do not copy
+the reported hash into the database immediately. The row proves only that its
+filename was previously marked as applied; it does not prove which SQL content
+ran.
+
+1. Take or verify a backup of the affected database.
+2. Check out the exact trusted application revision and inspect the reported
+   migration file.
+3. Compare every schema and data effect of that SQL with the database. If the
+   result cannot be verified, leave the checksum empty and repair the schema
+   with an explicit forward migration or restore a known-good database.
+4. Only after verification, record the checksum printed by the migration error
+   using the database console:
+
+   ```sql
+   UPDATE "__fantasy_sumo_migrations"
+   SET "checksum" = '<verified checksum from the migration error>'
+   WHERE "id" = '<verified migration filename>'
+     AND "checksum" IS NULL;
+   ```
+
+5. Confirm exactly one intended row changed, then rerun the same blocked
+   workflow SHA.
 
 ### Schema compatibility rule
 

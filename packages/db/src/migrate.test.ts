@@ -54,8 +54,15 @@ describe("Postgres migration ledger", () => {
     expect(
       resolveAppliedMigration("0002_example.sql", checksum, checksum),
     ).toBe("applied");
-    expect(resolveAppliedMigration("0002_example.sql", checksum, null)).toBe(
-      "backfill",
+    expect(() =>
+      resolveAppliedMigration("0002_example.sql", checksum, null),
+    ).toThrow(
+      `Migration checksum is missing for "0002_example.sql". The database cannot verify which SQL was applied. Inspect the schema, then explicitly record trusted checksum "${checksum}" before retrying.`,
+    );
+    expect(() =>
+      resolveAppliedMigration("0002_example.sql", checksum, undefined),
+    ).toThrow(
+      `Migration checksum is missing for "0002_example.sql". The database cannot verify which SQL was applied. Inspect the schema, then explicitly record trusted checksum "${checksum}" before retrying.`,
     );
     expect(() =>
       resolveAppliedMigration("0002_example.sql", checksum, "other-checksum"),

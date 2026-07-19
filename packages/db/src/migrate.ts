@@ -53,25 +53,7 @@ async function runPostgresMigrations(
     const checksum = getMigrationChecksum(migrationSql);
 
     if (applied.has(file)) {
-      const state = resolveAppliedMigration(file, checksum, applied.get(file)!);
-
-      if (state === "backfill") {
-        const updatedRows = await database.sql<{ checksum: string }[]>`
-          UPDATE "__fantasy_sumo_migrations"
-          SET "checksum" = ${checksum}
-          WHERE "id" = ${file} AND "checksum" IS NULL
-          RETURNING "checksum"
-        `;
-
-        if (updatedRows.length === 0) {
-          const currentRows = await database.sql<{ checksum: string | null }[]>`
-            SELECT "checksum" FROM "__fantasy_sumo_migrations"
-            WHERE "id" = ${file}
-          `;
-          resolveAppliedMigration(file, checksum, currentRows[0]?.checksum);
-        }
-      }
-
+      resolveAppliedMigration(file, checksum, applied.get(file));
       continue;
     }
 
@@ -97,9 +79,11 @@ export function resolveAppliedMigration(
   file: string,
   expectedChecksum: string,
   appliedChecksum: string | null | undefined,
-): "applied" | "backfill" {
-  if (appliedChecksum === null) {
-    return "backfill";
+): "applied" {
+  if (appliedChecksum == null) {
+    throw new Error(
+      `Migration checksum is missing for "${file}". The database cannot verify which SQL was applied. Inspect the schema, then explicitly record trusted checksum "${expectedChecksum}" before retrying.`,
+    );
   }
 
   if (appliedChecksum === expectedChecksum) {
