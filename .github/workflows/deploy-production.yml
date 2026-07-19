@@ -16,6 +16,7 @@ permissions:
 
 jobs:
   resolve:
+    if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false
     runs-on: ubuntu-latest
     outputs:
       sha: ${{ steps.commit.outputs.sha }}
@@ -124,6 +125,21 @@ jobs:
 
       - name: Build prepared production deployment
         run: pnpm dlx vercel@56.3.2 build --prod
+
+      - name: Require latest published production release
+        if: github.event_name == 'release'
+        env:
+          EXPECTED_RELEASE_ID: ${{ github.event.release.id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest_release_id=$(
+            gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" |
+              jq -r '[.[][] | select(.draft == false and .prerelease == false)] | max_by(.published_at) | .id'
+          )
+          if [[ "$latest_release_id" != "$EXPECTED_RELEASE_ID" ]]; then
+            echo "Refusing to deploy release $EXPECTED_RELEASE_ID; the latest production release is $latest_release_id." >&2
+            exit 1
+          fi
 
       - name: Apply production database migrations
         id: migrate

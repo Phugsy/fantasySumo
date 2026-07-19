@@ -89,7 +89,8 @@ async function runPostgresMigrations(
 }
 
 export function getMigrationChecksum(migrationSql: string): string {
-  return createHash("sha256").update(migrationSql).digest("hex");
+  const normalizedSql = migrationSql.replace(/\r\n?/g, "\n");
+  return createHash("sha256").update(normalizedSql).digest("hex");
 }
 
 export function resolveAppliedMigration(

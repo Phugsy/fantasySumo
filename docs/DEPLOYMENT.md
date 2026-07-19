@@ -34,11 +34,11 @@ Hosted deployments are owned by GitHub Actions:
   environment, builds with Vercel CLI, migrates the preview database, deploys
   that same build, and smoke-tests `/`, `/api/health`, and the database-backed
   `/api/basho/current` route.
-- `.github/workflows/deploy-production.yml` runs for a published GitHub Release
-  or a manual dispatch with an exact SHA. It rejects commits outside `master`,
-  validates the resolved SHA, waits at the protected `production` environment,
-  prepares the production build, migrates, deploys that same SHA, and runs the
-  same smoke tests.
+- `.github/workflows/deploy-production.yml` runs for a published, non-prerelease
+  GitHub Release or a manual dispatch with an exact SHA. It rejects commits
+  outside `master`, validates the resolved SHA, waits at the protected
+  `production` environment, prepares the production build, migrates, deploys
+  that same SHA, and runs the same smoke tests.
 
 The workflows remain separate because their trust boundaries and release
 inputs differ: preview accepts same-repository PR heads and manual refs, while
@@ -51,6 +51,12 @@ preview migration/deployment and one production migration/deployment can run at
 a time. Validation jobs may overlap because they do not touch a shared hosted
 database. `cancel-in-progress` is disabled so an in-flight migration or release
 is never interrupted by a newer run.
+
+Immediately before an automatic release can migrate production, the deploy job
+also verifies that its GitHub Release is still the latest published full
+release. This prevents an older validation run from replacing a newer release.
+Explicit manual dispatches remain exempt so an operator can intentionally
+deploy an older compatible `master` SHA for recovery.
 
 After preview validation and build preparation, the deploy job checks that a
 pull-request run still targets the current PR head before touching the shared
@@ -145,7 +151,9 @@ The Postgres migration ledger records each filename and a SHA-256 checksum of
 its SQL. Identical reruns are skipped; if two branches reuse a filename for
 different SQL, the runner fails before applying that file. Existing
 filename-only ledger rows receive a checksum the first time the upgraded runner
-sees them, after which content collisions are detected deterministically.
+sees them, after which content collisions are detected deterministically. SQL
+line endings are normalized before hashing so LF and CRLF checkouts of the same
+migration produce the same checksum.
 
 ### Schema compatibility rule
 

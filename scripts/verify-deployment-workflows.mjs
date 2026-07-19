@@ -180,6 +180,26 @@ requireText(
   "support published GitHub Releases",
   /release:/,
 );
+const productionResolveJob = getJob(production, productionPath, "resolve");
+const productionDeployJob = getJob(production, productionPath, "deploy");
+requireText(
+  productionResolveJob,
+  productionPath,
+  "exclude prereleases from the production release path",
+  /if: github\.event_name == 'workflow_dispatch' \|\| github\.event\.release\.prerelease == false/,
+);
+requireText(
+  productionDeployJob,
+  productionPath,
+  "reject stale automatic release runs without blocking manual rollback dispatches",
+  /Require latest published production release\s*\n\s*if: github\.event_name == 'release'[\s\S]*?github\.event\.release\.id[\s\S]*?releases\?per_page=100[\s\S]*?prerelease == false[\s\S]*?max_by\(\.published_at\)/,
+);
+requireOrder(
+  productionDeployJob,
+  productionPath,
+  "Require latest published production release",
+  "Apply production database migrations",
+);
 requireText(
   production,
   productionPath,

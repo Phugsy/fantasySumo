@@ -48,6 +48,8 @@ describe("Postgres migration ledger", () => {
     const checksum = getMigrationChecksum("SELECT 1;\n");
 
     expect(checksum).toBe(getMigrationChecksum("SELECT 1;\n"));
+    expect(checksum).toBe(getMigrationChecksum("SELECT 1;\r\n"));
+    expect(checksum).toBe(getMigrationChecksum("SELECT 1;\r"));
     expect(checksum).not.toBe(getMigrationChecksum("SELECT 2;\n"));
     expect(
       resolveAppliedMigration("0002_example.sql", checksum, checksum),
