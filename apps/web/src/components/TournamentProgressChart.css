@@ -84,9 +84,14 @@
 }
 
 .series-swatch {
-  width: 18px;
-  height: 4px;
-  border-radius: 999px;
+  flex: none;
+  width: 28px;
+  height: 6px;
+  overflow: visible;
+}
+
+.series-swatch line {
+  stroke-linecap: round;
 }
 
 .progress-chart-filters .show-all-teams {

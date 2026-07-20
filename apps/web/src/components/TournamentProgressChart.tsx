@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { LeaderboardEntry } from "../types";
 import "./TournamentProgressChart.css";
 
@@ -32,12 +32,19 @@ export function TournamentProgressChart({
   const [selectedPoint, setSelectedPoint] = useState<SelectedPoint | null>(
     null,
   );
+  const pointRefs = useRef<Map<string, SVGGElement>>(new Map());
   const scoredEntries = useMemo(
     () => leaderboard.filter((entry) => entry.scoreHistory.length > 0),
     [leaderboard],
   );
   const visibleEntries = scoredEntries.filter(
     (entry) => !hiddenTeamIds.has(entry.teamId),
+  );
+  const visiblePoints = visibleEntries.flatMap((entry) =>
+    entry.scoreHistory.map((history) => ({
+      day: history.day,
+      teamId: entry.teamId,
+    })),
   );
   const scoredDays = useMemo(
     () =>
@@ -98,6 +105,31 @@ export function TournamentProgressChart({
     });
   }
 
+  function movePointSelection(
+    currentPoint: SelectedPoint,
+    key: "ArrowDown" | "ArrowLeft" | "ArrowRight" | "ArrowUp" | "End" | "Home",
+  ) {
+    const currentIndex = visiblePoints.findIndex(
+      (point) =>
+        point.teamId === currentPoint.teamId && point.day === currentPoint.day,
+    );
+    if (currentIndex === -1 || visiblePoints.length === 0) {
+      return;
+    }
+
+    const nextIndex =
+      key === "Home"
+        ? 0
+        : key === "End"
+          ? visiblePoints.length - 1
+          : key === "ArrowLeft" || key === "ArrowUp"
+            ? (currentIndex - 1 + visiblePoints.length) % visiblePoints.length
+            : (currentIndex + 1) % visiblePoints.length;
+    const nextPoint = visiblePoints[nextIndex]!;
+    setSelectedPoint(nextPoint);
+    pointRefs.current.get(getPointKey(nextPoint))?.focus();
+  }
+
   return (
     <section className="progress-chart" aria-labelledby="progress-title">
       <div className="progress-chart-heading">
@@ -116,6 +148,7 @@ export function TournamentProgressChart({
         {scoredEntries.map((entry, index) => {
           const isVisible = !hiddenTeamIds.has(entry.teamId);
           const style = seriesStyles[index % seriesStyles.length]!;
+          const teamLabel = formatTeamLabel(entry);
 
           return (
             <button
@@ -123,8 +156,8 @@ export function TournamentProgressChart({
               aria-pressed={isVisible}
               aria-label={
                 entry.teamId === currentTeamId
-                  ? `${entry.displayName}, your team`
-                  : entry.displayName
+                  ? `${teamLabel}, your team`
+                  : teamLabel
               }
               className={
                 entry.teamId === currentTeamId ? "current-team" : undefined
@@ -132,14 +165,23 @@ export function TournamentProgressChart({
               key={entry.teamId}
               onClick={() => toggleTeam(entry.teamId)}
             >
-              <span
+              <svg
                 className="series-swatch"
-                style={{
-                  backgroundColor: style.color,
-                  opacity: isVisible ? 1 : 0.3,
-                }}
-              />
-              {entry.displayName}
+                viewBox="0 0 28 6"
+                aria-hidden="true"
+              >
+                <line
+                  x1="1"
+                  x2="27"
+                  y1="3"
+                  y2="3"
+                  stroke={style.color}
+                  strokeDasharray={style.dash}
+                  strokeOpacity={isVisible ? 1 : 0.3}
+                  strokeWidth="3"
+                />
+              </svg>
+              {teamLabel}
               {entry.teamId === currentTeamId && <small>Your team</small>}
             </button>
           );
@@ -178,8 +220,8 @@ export function TournamentProgressChart({
               <desc id="progress-svg-description">
                 {visibleEntries.length} team
                 {visibleEntries.length === 1 ? "" : "s"} shown through day{" "}
-                {latestDay}. Use the focusable points for exact daily and
-                cumulative scores.
+                {latestDay}. Tab into the selected point, then use the arrow
+                keys for exact daily and cumulative scores.
               </desc>
 
               {yTicks.map((tick) => {
@@ -283,15 +325,27 @@ export function TournamentProgressChart({
                       const isActive =
                         activePoint?.teamId === entry.teamId &&
                         activePoint.day === history.day;
-                      const label = `${entry.displayName}, day ${history.day}: ${formatSignedScore(history.dailyScore)} that day, ${history.cumulativeScore} cumulative points`;
+                      const point = {
+                        teamId: entry.teamId,
+                        day: history.day,
+                      };
+                      const label = `${formatTeamLabel(entry)}, day ${history.day}: ${formatSignedScore(history.dailyScore)} that day, ${history.cumulativeScore} cumulative points`;
 
                       return (
                         <g
                           className="chart-point-target"
                           key={history.day}
                           role="button"
-                          tabIndex={0}
+                          tabIndex={isActive ? 0 : -1}
                           aria-label={label}
+                          ref={(element) => {
+                            const key = getPointKey(point);
+                            if (element === null) {
+                              pointRefs.current.delete(key);
+                            } else {
+                              pointRefs.current.set(key, element);
+                            }
+                          }}
                           onClick={() =>
                             setSelectedPoint({
                               teamId: entry.teamId,
@@ -307,10 +361,17 @@ export function TournamentProgressChart({
                           onKeyDown={(event) => {
                             if (event.key === "Enter" || event.key === " ") {
                               event.preventDefault();
-                              setSelectedPoint({
-                                teamId: entry.teamId,
-                                day: history.day,
-                              });
+                              setSelectedPoint(point);
+                            } else if (
+                              event.key === "ArrowDown" ||
+                              event.key === "ArrowLeft" ||
+                              event.key === "ArrowRight" ||
+                              event.key === "ArrowUp" ||
+                              event.key === "End" ||
+                              event.key === "Home"
+                            ) {
+                              event.preventDefault();
+                              movePointSelection(point, event.key);
                             }
                           }}
                           onMouseEnter={() =>
@@ -346,7 +407,7 @@ export function TournamentProgressChart({
 
           {activeEntry !== undefined && activeHistory !== undefined && (
             <p className="progress-chart-detail" aria-live="polite">
-              <strong>{activeEntry.displayName}</strong>
+              <strong>{formatTeamLabel(activeEntry)}</strong>
               {activeEntry.teamId === currentTeamId && <span>Your team</span>}
               <span className="progress-chart-day">
                 Day {activeHistory.day}
@@ -400,7 +461,7 @@ function ScoreHistoryTable({
           <tbody>
             {entries.map((entry) => (
               <tr key={entry.teamId}>
-                <th scope="row">{entry.displayName}</th>
+                <th scope="row">{formatTeamLabel(entry)}</th>
                 {scoredDays.map((day) => {
                   const history = entry.scoreHistory.find(
                     (candidate) => candidate.day === day,
@@ -420,6 +481,14 @@ function ScoreHistoryTable({
       </div>
     </details>
   );
+}
+
+function formatTeamLabel(entry: LeaderboardEntry): string {
+  return `#${entry.rank} ${entry.displayName}`;
+}
+
+function getPointKey(point: SelectedPoint): string {
+  return `${point.teamId}:${point.day}`;
 }
 
 function resolveSelectedPoint(

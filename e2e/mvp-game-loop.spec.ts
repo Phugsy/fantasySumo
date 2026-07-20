@@ -163,22 +163,22 @@ test("advances the demo basho and refreshes scored leaderboard state", async ({
   ).toBe(true);
 
   const chartPoint = page.getByRole("button", {
-    name: /Dohyo Dreamers, day 2: \+1 that day, 2 cumulative points/,
+    name: /#1 Dohyo Dreamers, day 2: \+1 that day, 2 cumulative points/,
   });
   await chartPoint.focus();
   await expect(page.locator(".progress-chart-detail")).toContainText(
-    "Dohyo DreamersDay 2+1 that day2 cumulative pts",
+    "#1 Dohyo DreamersDay 2+1 that day2 cumulative pts",
   );
   await expect(page.locator(".progress-chart-daily-score-badge")).toHaveText(
     "+1",
   );
 
   const tachiaiFilter = page.getByRole("button", {
-    name: "Tachiai Titans",
+    name: "#3 Tachiai Titans",
     exact: true,
   });
   const yushoFilter = page.getByRole("button", {
-    name: "Yusho Hunters",
+    name: "#4 Yusho Hunters",
     exact: true,
   });
   await tachiaiFilter.click();
@@ -188,11 +188,11 @@ test("advances the demo basho and refreshes scored leaderboard state", async ({
 
   await page
     .getByRole("button", {
-      name: "Salt Circle, day 1: +1 that day, 1 cumulative points",
+      name: "#2 Salt Circle, day 1: +1 that day, 1 cumulative points",
     })
     .click();
   await expect(page.locator(".progress-chart-detail")).toContainText(
-    "Salt CircleDay 1+1 that day1 cumulative pts",
+    "#2 Salt CircleDay 1+1 that day1 cumulative pts",
   );
 
   await page.getByRole("button", { name: "Show all" }).click();

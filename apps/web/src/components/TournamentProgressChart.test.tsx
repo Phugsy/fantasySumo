@@ -13,6 +13,7 @@ const leaderboard: LeaderboardEntry[] = [
     teamId: "team-west",
     displayName: "West Side",
     dailyScores: [1, 0],
+    rank: 2,
   }),
 ];
 
@@ -35,15 +36,15 @@ describe("TournamentProgressChart", () => {
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "West Side, your team" }),
+      screen.getByRole("button", { name: "#2 West Side, your team" }),
     ).toHaveAttribute("aria-pressed", "true");
 
     const westDayOne = screen.getByRole("button", {
-      name: "West Side, day 1: +1 that day, 1 cumulative points",
+      name: "#2 West Side, day 1: +1 that day, 1 cumulative points",
     });
     fireEvent.focus(westDayOne);
 
-    const detail = screen.getByText("West Side", {
+    const detail = screen.getByText("#2 West Side", {
       selector: ".progress-chart-detail strong",
     }).parentElement;
     expect(detail).not.toBeNull();
@@ -61,14 +62,18 @@ describe("TournamentProgressChart", () => {
   it("filters overlapping teams and restores every series", () => {
     render(<TournamentProgressChart leaderboard={leaderboard} />);
 
-    const eastFilter = screen.getByRole("button", { name: "East Side" });
-    const westFilter = screen.getByRole("button", { name: "West Side" });
+    const eastFilter = screen.getByRole("button", { name: "#1 East Side" });
+    const westFilter = screen.getByRole("button", { name: "#2 West Side" });
+    expect(westFilter.querySelector(".series-swatch line")).toHaveAttribute(
+      "stroke-dasharray",
+      "10 5",
+    );
     fireEvent.click(eastFilter);
 
     expect(eastFilter).toHaveAttribute("aria-pressed", "false");
     expect(
       screen.queryByRole("button", {
-        name: "East Side, day 1: +1 that day, 1 cumulative points",
+        name: "#1 East Side, day 1: +1 that day, 1 cumulative points",
       }),
     ).not.toBeInTheDocument();
 
@@ -94,9 +99,60 @@ describe("TournamentProgressChart", () => {
       within(table).getByRole("columnheader", { name: "Day 1" }),
     ).toBeInTheDocument();
     expect(
-      within(table).getByRole("rowheader", { name: "East Side" }),
+      within(table).getByRole("rowheader", { name: "#1 East Side" }),
     ).toBeInTheDocument();
     expect(within(table).getByText("+1 / 2")).toBeInTheDocument();
+  });
+
+  it("uses ranks to disambiguate duplicate team names", () => {
+    render(
+      <TournamentProgressChart
+        leaderboard={leaderboard.map((entry) => ({
+          ...entry,
+          displayName: "Shared Stable",
+        }))}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "#1 Shared Stable" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "#2 Shared Stable" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "#2 Shared Stable, day 1: +1 that day, 1 cumulative points",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("View score history table"));
+    expect(
+      screen.getByRole("rowheader", { name: "#1 Shared Stable" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("rowheader", { name: "#2 Shared Stable" }),
+    ).toBeInTheDocument();
+  });
+
+  it("uses one tab stop and arrow keys to navigate chart points", () => {
+    render(<TournamentProgressChart leaderboard={leaderboard} />);
+
+    const eastDayTwo = screen.getByRole("button", {
+      name: "#1 East Side, day 2: +1 that day, 2 cumulative points",
+    });
+    const westDayOne = screen.getByRole("button", {
+      name: "#2 West Side, day 1: +1 that day, 1 cumulative points",
+    });
+
+    expect(eastDayTwo).toHaveAttribute("tabindex", "0");
+    expect(westDayOne).toHaveAttribute("tabindex", "-1");
+
+    fireEvent.keyDown(eastDayTwo, { key: "ArrowRight" });
+
+    expect(westDayOne).toHaveFocus();
+    expect(eastDayTwo).toHaveAttribute("tabindex", "-1");
+    expect(westDayOne).toHaveAttribute("tabindex", "0");
   });
 
   it("shows empty and single-day guidance", () => {
@@ -136,10 +192,12 @@ describe("TournamentProgressChart", () => {
 function createEntry({
   dailyScores,
   displayName,
+  rank = 1,
   teamId,
 }: {
   dailyScores: number[];
   displayName: string;
+  rank?: number;
   teamId: string;
 }): LeaderboardEntry {
   let cumulativeScore = 0;
@@ -154,7 +212,7 @@ function createEntry({
   });
 
   return {
-    rank: 1,
+    rank,
     teamId,
     displayName,
     score: cumulativeScore,
