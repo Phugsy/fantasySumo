@@ -120,16 +120,34 @@ test("advances the demo basho and refreshes scored leaderboard state", async ({
     headers: demoAdminHeaders,
   });
   await expect(advanceResponse).toBeOK();
+  const secondAdvanceResponse = await request.post(
+    "/api/admin/demo/advance-day",
+    {
+      headers: demoAdminHeaders,
+    },
+  );
+  await expect(secondAdvanceResponse).toBeOK();
 
   await page.goto("/");
   await page.getByRole("button", { name: "Leaderboard" }).click();
 
-  await expect(page.getByText("Demo May Basho - Day 1 of 15")).toBeVisible();
+  await expect(page.getByText("Demo May Basho - Day 2 of 15")).toBeVisible();
   await expect(page.getByText("Status: Scoring in progress")).toBeVisible();
   await expect(
-    page.getByRole("button", { name: /Dohyo Dreamers.*1 pts/ }),
+    page.getByRole("button", { name: /Dohyo Dreamers.*Day 2.*2 pts/ }),
   ).toBeVisible();
-  await expect(page.getByText(/1 win/).first()).toBeVisible();
+  await expect(
+    page.getByLabel("Recent form: day 1 +1, day 2 +1").first(),
+  ).toBeVisible();
+
+  const history = page.getByRole("region", {
+    name: "Day-by-day score history",
+  });
+  await expect(history).toBeVisible();
+  await expect(history.getByText("Day 2", { exact: true })).toBeVisible();
+  await expect(history.getByText("+1 today · 2 total")).toBeVisible();
+  await expect(history.getByText("Win").first()).toBeVisible();
+  await expect(history.getByText("Loss").first()).toBeVisible();
 });
 
 test("prevents incomplete and overfull team submissions", async ({ page }) => {

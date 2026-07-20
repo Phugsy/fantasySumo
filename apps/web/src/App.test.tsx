@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import type { LeaderboardEntry } from "./types";
 
 const currentBasho = {
   id: "2026-05",
@@ -37,12 +38,36 @@ const rankedRikishi = [
   },
 ];
 
-const leaderboard = [
+const leaderboard: LeaderboardEntry[] = [
   {
     rank: 1,
     teamId: "team-east",
     displayName: "East Side",
     score: 2,
+    latestDayScore: {
+      day: 2,
+      score: 1,
+    },
+    scoreHistory: [
+      {
+        day: 1,
+        dailyScore: 1,
+        cumulativeScore: 1,
+        rikishiScores: [
+          { rikishiId: "onosato", outcome: "win", score: 1 },
+          { rikishiId: "kirishima", outcome: "loss", score: 0 },
+        ],
+      },
+      {
+        day: 2,
+        dailyScore: 1,
+        cumulativeScore: 2,
+        rikishiScores: [
+          { rikishiId: "onosato", outcome: "no-result", score: 0 },
+          { rikishiId: "kirishima", outcome: "win", score: 1 },
+        ],
+      },
+    ],
     rikishiScores: [
       {
         rikishiId: "onosato",
@@ -61,6 +86,30 @@ const leaderboard = [
     teamId: "team-west",
     displayName: "West Side",
     score: 1,
+    latestDayScore: {
+      day: 2,
+      score: 0,
+    },
+    scoreHistory: [
+      {
+        day: 1,
+        dailyScore: 1,
+        cumulativeScore: 1,
+        rikishiScores: [
+          { rikishiId: "kotozakura", outcome: "win", score: 1 },
+          { rikishiId: "hoshoryu", outcome: "loss", score: 0 },
+        ],
+      },
+      {
+        day: 2,
+        dailyScore: 0,
+        cumulativeScore: 1,
+        rikishiScores: [
+          { rikishiId: "kotozakura", outcome: "no-result", score: 0 },
+          { rikishiId: "hoshoryu", outcome: "loss", score: 0 },
+        ],
+      },
+    ],
     rikishiScores: [
       {
         rikishiId: "kotozakura",
@@ -79,6 +128,7 @@ const leaderboard = [
     teamId: "team-tie",
     displayName: "Tie Side",
     score: 1,
+    scoreHistory: [],
     rikishiScores: [],
   },
 ];
@@ -117,7 +167,7 @@ describe("App", () => {
     expect(screen.getByText("East Side")).toBeInTheDocument();
     expect(screen.getByText("2 pts")).toBeInTheDocument();
     expect(screen.getAllByText("Tied on score")).toHaveLength(2);
-    expect(screen.getByText("Onosato")).toBeInTheDocument();
+    expect(screen.getAllByText("Onosato")).toHaveLength(3);
     expect(screen.getAllByText("1 win")).toHaveLength(2);
   });
 
@@ -453,6 +503,7 @@ function mockStaleInitialLeaderboardFetch(
             teamId: "team-east-stand",
             displayName: "East Stand Heroes",
             score: 4,
+            scoreHistory: [],
             rikishiScores: [
               {
                 rikishiId: "onosato",

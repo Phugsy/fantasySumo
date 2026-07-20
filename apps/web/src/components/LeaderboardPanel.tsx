@@ -86,20 +86,24 @@ export function LeaderboardPanel({
             {getEmptyScoringMessage(basho)}
           </div>
           {renderLeaderboardList({
+            currentDay: basho.currentDay,
             expandedTeamId,
             leaderboard,
             onToggleTeam,
             rikishiById,
             tiedScoreCounts,
+            totalDays,
           })}
         </>
       ) : (
         renderLeaderboardList({
+          currentDay: basho.currentDay,
           expandedTeamId,
           leaderboard,
           onToggleTeam,
           rikishiById,
           tiedScoreCounts,
+          totalDays,
         })
       )}
     </section>
@@ -107,17 +111,21 @@ export function LeaderboardPanel({
 }
 
 function renderLeaderboardList({
+  currentDay,
   expandedTeamId,
   leaderboard,
   onToggleTeam,
   rikishiById,
   tiedScoreCounts,
+  totalDays,
 }: {
+  currentDay?: number;
   expandedTeamId: string | null;
   leaderboard: LeaderboardEntry[];
   onToggleTeam: (teamId: string) => void;
   rikishiById: Map<string, RankedRikishi>;
   tiedScoreCounts: Map<number, number>;
+  totalDays?: number;
 }) {
   return (
     <ol className="leaderboard-list">
@@ -137,16 +145,26 @@ function renderLeaderboardList({
               <span className="leaderboard-team">
                 <strong>{entry.displayName}</strong>
                 {isTied && <small>Tied on score</small>}
+                <RecentForm scoreHistory={entry.scoreHistory} />
               </span>
-              <span className="leaderboard-score">{entry.score} pts</span>
+              <span className="leaderboard-score">
+                {entry.latestDayScore !== undefined && (
+                  <small>
+                    Day {entry.latestDayScore.day}{" "}
+                    {formatSignedScore(entry.latestDayScore.score)}
+                  </small>
+                )}
+                <strong>{entry.score} pts</strong>
+              </span>
             </button>
 
             {isExpanded && (
               <div className="score-breakdown">
+                <h3>Tournament totals</h3>
                 {entry.rikishiScores.length === 0 ? (
                   <p>No picks recorded for this team.</p>
                 ) : (
-                  <ul>
+                  <ul className="score-totals-list">
                     {entry.rikishiScores.map((score) => {
                       const pickedRikishi = rikishiById.get(score.rikishiId);
 
@@ -169,6 +187,12 @@ function renderLeaderboardList({
                     })}
                   </ul>
                 )}
+                <ScoreHistory
+                  currentDay={currentDay}
+                  rikishiById={rikishiById}
+                  scoreHistory={entry.scoreHistory}
+                  totalDays={totalDays}
+                />
               </div>
             )}
           </li>
@@ -176,6 +200,165 @@ function renderLeaderboardList({
       })}
     </ol>
   );
+}
+
+function RecentForm({
+  scoreHistory,
+}: {
+  scoreHistory: LeaderboardEntry["scoreHistory"];
+}) {
+  const recentDays = scoreHistory.slice(-5);
+
+  if (recentDays.length === 0) {
+    return null;
+  }
+
+  return (
+    <span
+      className="recent-form"
+      aria-label={`Recent form: ${recentDays
+        .map(
+          (entry) => `day ${entry.day} ${formatSignedScore(entry.dailyScore)}`,
+        )
+        .join(", ")}`}
+    >
+      {recentDays.map((entry) => (
+        <span className="form-day" key={entry.day} aria-hidden="true">
+          <small>D{entry.day}</small>
+          <strong>{formatSignedScore(entry.dailyScore)}</strong>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function ScoreHistory({
+  currentDay,
+  rikishiById,
+  scoreHistory,
+  totalDays,
+}: {
+  currentDay?: number;
+  rikishiById: Map<string, RankedRikishi>;
+  scoreHistory: LeaderboardEntry["scoreHistory"];
+  totalDays?: number;
+}) {
+  const unscoredCopy = getUnscoredDaysCopy(
+    scoreHistory.map((entry) => entry.day),
+    currentDay,
+    totalDays,
+  );
+
+  return (
+    <section className="score-history" aria-label="Day-by-day score history">
+      <h3>Day-by-day score</h3>
+      {scoreHistory.length === 0 ? (
+        <p>No scored days yet.</p>
+      ) : (
+        <ol>
+          {[...scoreHistory].reverse().map((day) => (
+            <li className="score-day" key={day.day}>
+              <div className="score-day-heading">
+                <strong>Day {day.day}</strong>
+                <span>
+                  {formatSignedScore(day.dailyScore)} today ·{" "}
+                  {day.cumulativeScore} total
+                </span>
+              </div>
+              <ul>
+                {day.rikishiScores.map((score) => (
+                  <li key={score.rikishiId}>
+                    <span>
+                      {rikishiById.get(score.rikishiId)?.shikona ??
+                        score.rikishiId}
+                    </span>
+                    <span>{formatOutcome(score.outcome)}</span>
+                    <strong>{formatSignedScore(score.score)}</strong>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ol>
+      )}
+      {unscoredCopy.map((copy) => (
+        <p className="unscored-days" key={copy}>
+          {copy}
+        </p>
+      ))}
+    </section>
+  );
+}
+
+function getUnscoredDaysCopy(
+  scoredDays: number[],
+  currentDay = 0,
+  totalDays?: number,
+): string[] {
+  const scoredDaySet = new Set(scoredDays);
+  const latestScoredDay = scoredDays.reduce(
+    (latestDay, day) => Math.max(latestDay, day),
+    0,
+  );
+  const progressDay = Math.max(currentDay, latestScoredDay);
+  const missingCurrentDays = Array.from(
+    { length: progressDay },
+    (_, index) => index + 1,
+  ).filter((day) => !scoredDaySet.has(day));
+  const copy: string[] = [];
+
+  if (missingCurrentDays.length > 0) {
+    copy.push(
+      `${formatDayRange(missingCurrentDays)} ${missingCurrentDays.length === 1 ? "is" : "are"} awaiting results.`,
+    );
+  }
+
+  if (totalDays !== undefined && progressDay < totalDays) {
+    const futureDays = Array.from(
+      { length: totalDays - progressDay },
+      (_, index) => progressDay + index + 1,
+    );
+    copy.push(
+      `${formatDayRange(futureDays)} ${futureDays.length === 1 ? "is" : "are"} not scored yet.`,
+    );
+  }
+
+  return copy;
+}
+
+function formatDayRange(days: number[]): string {
+  if (days.length === 1) {
+    return `Day ${days[0]}`;
+  }
+
+  const isContinuous = days.every(
+    (day, index) => index === 0 || day === days[index - 1]! + 1,
+  );
+
+  if (isContinuous) {
+    return `Days ${days[0]}–${days.at(-1)}`;
+  }
+
+  return `Days ${days.join(", ")}`;
+}
+
+function formatSignedScore(score: number): string {
+  return score > 0 ? `+${score}` : `${score}`;
+}
+
+function formatOutcome(
+  outcome: LeaderboardEntry["scoreHistory"][number]["rikishiScores"][number]["outcome"],
+): string {
+  switch (outcome) {
+    case "win":
+      return "Win";
+    case "loss":
+      return "Loss";
+    case "absent":
+      return "Absent";
+    case "no-result":
+      return "No result";
+  }
 }
 
 function formatBashoHeadline(basho: Basho, totalDays?: number): string {

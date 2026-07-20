@@ -397,6 +397,32 @@ describe("basho routes", () => {
         rank: 2,
       },
     ]);
+    expect(response.json().leaderboard[0]).toMatchObject({
+      latestDayScore: {
+        day: 2,
+        score: 1,
+      },
+      scoreHistory: [
+        {
+          day: 1,
+          dailyScore: 1,
+          cumulativeScore: 1,
+          rikishiScores: [
+            { rikishiId: "kirishima", outcome: "loss", score: 0 },
+            { rikishiId: "onosato", outcome: "win", score: 1 },
+          ],
+        },
+        {
+          day: 2,
+          dailyScore: 1,
+          cumulativeScore: 2,
+          rikishiScores: [
+            { rikishiId: "kirishima", outcome: "win", score: 1 },
+            { rikishiId: "onosato", outcome: "no-result", score: 0 },
+          ],
+        },
+      ],
+    });
   });
 
   it("returns clear 404 errors for unknown basho and teams", async () => {
