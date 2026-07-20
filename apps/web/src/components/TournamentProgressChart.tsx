@@ -348,9 +348,14 @@ export function TournamentProgressChart({
             <p className="progress-chart-detail" aria-live="polite">
               <strong>{activeEntry.displayName}</strong>
               {activeEntry.teamId === currentTeamId && <span>Your team</span>}
-              <span>Day {activeHistory.day}</span>
-              <span>
-                {formatSignedScore(activeHistory.dailyScore)} that day
+              <span className="progress-chart-day">
+                Day {activeHistory.day}
+              </span>
+              <span className="progress-chart-daily-score">
+                <span className="progress-chart-daily-score-badge">
+                  {formatSignedScore(activeHistory.dailyScore)}
+                </span>{" "}
+                that day
               </span>
               <span>{activeHistory.cumulativeScore} cumulative pts</span>
             </p>

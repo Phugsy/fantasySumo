@@ -49,7 +49,12 @@ describe("TournamentProgressChart", () => {
     expect(detail).not.toBeNull();
     expect(within(detail!).getByText("Your team")).toBeInTheDocument();
     expect(within(detail!).getByText("Day 1")).toBeInTheDocument();
-    expect(within(detail!).getByText("+1 that day")).toBeInTheDocument();
+    expect(detail).toHaveTextContent("+1 that day");
+    expect(
+      within(detail!).getByText("+1", {
+        selector: ".progress-chart-daily-score-badge",
+      }),
+    ).toBeInTheDocument();
     expect(within(detail!).getByText("1 cumulative pts")).toBeInTheDocument();
   });
 

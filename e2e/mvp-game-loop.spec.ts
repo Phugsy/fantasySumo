@@ -169,6 +169,9 @@ test("advances the demo basho and refreshes scored leaderboard state", async ({
   await expect(page.locator(".progress-chart-detail")).toContainText(
     "Dohyo DreamersDay 2+1 that day2 cumulative pts",
   );
+  await expect(page.locator(".progress-chart-daily-score-badge")).toHaveText(
+    "+1",
+  );
 
   const tachiaiFilter = page.getByRole("button", {
     name: "Tachiai Titans",

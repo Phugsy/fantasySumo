@@ -189,9 +189,29 @@
   color: var(--muted);
 }
 
-.progress-chart-detail span:first-of-type {
+.progress-chart-detail .progress-chart-day {
   color: var(--vermilion-dark);
   font-weight: 900;
+}
+
+.progress-chart-daily-score {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.progress-chart-detail .progress-chart-daily-score-badge {
+  display: inline-flex;
+  min-width: 26px;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--vermilion);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 900;
+  line-height: 1.25;
 }
 
 .progress-chart-note,
