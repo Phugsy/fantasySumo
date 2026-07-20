@@ -43,6 +43,9 @@ describe("TournamentProgressChart", () => {
       name: "#2 West Side, day 1: +1 that day, 1 cumulative points",
     });
     fireEvent.focus(westDayOne);
+    expect(
+      westDayOne.querySelector(".chart-point-focus-ring"),
+    ).toBeInTheDocument();
 
     const detail = screen.getByText("#2 West Side", {
       selector: ".progress-chart-detail strong",
@@ -53,7 +56,7 @@ describe("TournamentProgressChart", () => {
     expect(detail).toHaveTextContent("+1 that day");
     expect(
       within(detail!).getByText("+1", {
-        selector: ".progress-chart-daily-score-badge",
+        selector: ".daily-score-badge",
       }),
     ).toBeInTheDocument();
     expect(within(detail!).getByText("1 cumulative pts")).toBeInTheDocument();
@@ -66,7 +69,7 @@ describe("TournamentProgressChart", () => {
     const westFilter = screen.getByRole("button", { name: "#2 West Side" });
     expect(westFilter.querySelector(".series-swatch line")).toHaveAttribute(
       "stroke-dasharray",
-      "10 5",
+      "3 4",
     );
     fireEvent.click(eastFilter);
 
@@ -153,6 +156,37 @@ describe("TournamentProgressChart", () => {
     expect(westDayOne).toHaveFocus();
     expect(eastDayTwo).toHaveAttribute("tabindex", "-1");
     expect(westDayOne).toHaveAttribute("tabindex", "0");
+  });
+
+  it("keeps series styles distinct after the color palette repeats", () => {
+    const sevenTeams = Array.from({ length: 7 }, (_, index) =>
+      createEntry({
+        teamId: `team-${index + 1}`,
+        displayName: `Stable ${index + 1}`,
+        dailyScores: [1, 1],
+        rank: index + 1,
+      }),
+    );
+    const { container } = render(
+      <TournamentProgressChart leaderboard={sevenTeams} />,
+    );
+    const swatches = Array.from(
+      container.querySelectorAll<SVGLineElement>(".series-swatch line"),
+    );
+    const signatures = swatches.map(
+      (swatch) =>
+        `${swatch.getAttribute("stroke")}|${swatch.getAttribute("stroke-dasharray") ?? "solid"}`,
+    );
+
+    expect(swatches).toHaveLength(7);
+    expect(new Set(signatures).size).toBe(7);
+    expect(swatches[0]).toHaveAttribute(
+      "stroke",
+      swatches[6]?.getAttribute("stroke"),
+    );
+    expect(swatches[0]?.getAttribute("stroke-dasharray")).not.toBe(
+      swatches[6]?.getAttribute("stroke-dasharray"),
+    );
   });
 
   it("shows empty and single-day guidance", () => {

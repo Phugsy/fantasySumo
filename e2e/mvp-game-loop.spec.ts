@@ -133,9 +133,11 @@ test("advances the demo basho and refreshes scored leaderboard state", async ({
 
   await expect(page.getByText("Demo May Basho - Day 2 of 15")).toBeVisible();
   await expect(page.getByText("Status: Scoring in progress")).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: /Dohyo Dreamers.*Day 2.*2 pts/ }),
-  ).toBeVisible();
+  const leadingTeamRow = page.getByRole("button", {
+    name: /Dohyo Dreamers.*Day 2.*2 pts/,
+  });
+  await expect(leadingTeamRow).toBeVisible();
+  await expect(leadingTeamRow.locator(".daily-score-badge")).toHaveText("+1");
   await expect(
     page.getByLabel("Recent form: day 1 +1, day 2 +1").first(),
   ).toBeVisible();
@@ -165,13 +167,19 @@ test("advances the demo basho and refreshes scored leaderboard state", async ({
   const chartPoint = page.getByRole("button", {
     name: /#1 Dohyo Dreamers, day 2: \+1 that day, 2 cumulative points/,
   });
-  await chartPoint.focus();
+  await page.locator(".progress-chart-scroll").focus();
+  await page.keyboard.press("Tab");
+  await expect(chartPoint).toBeFocused();
+  await expect(chartPoint.locator(".chart-point-focus-ring")).toHaveCSS(
+    "stroke",
+    "rgb(43, 118, 138)",
+  );
   await expect(page.locator(".progress-chart-detail")).toContainText(
     "#1 Dohyo DreamersDay 2+1 that day2 cumulative pts",
   );
-  await expect(page.locator(".progress-chart-daily-score-badge")).toHaveText(
-    "+1",
-  );
+  await expect(
+    page.locator(".progress-chart-detail .daily-score-badge"),
+  ).toHaveText("+1");
 
   const tachiaiFilter = page.getByRole("button", {
     name: "#3 Tachiai Titans",

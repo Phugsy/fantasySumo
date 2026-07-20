@@ -100,7 +100,18 @@ describe("LeaderboardPanel", () => {
     expect(screen.getByText("Onosato")).toBeInTheDocument();
     expect(screen.getByText("Kirishima")).toBeInTheDocument();
     expect(screen.getAllByText("1 win")).toHaveLength(2);
-    expect(screen.getByText("Day 4 +1")).toBeInTheDocument();
+    const leaderboardList =
+      document.querySelector<HTMLElement>(".leaderboard-list");
+    expect(leaderboardList).not.toBeNull();
+    const leaderboardSummary = within(leaderboardList!).getByRole("button", {
+      name: /East Side/,
+    });
+    expect(within(leaderboardSummary).getByText("Day 4")).toBeInTheDocument();
+    expect(
+      within(leaderboardSummary).getByText("+1", {
+        selector: ".daily-score-badge",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText(/Recent form: day 3 \+1/)).toBeInTheDocument();
     expect(
       screen.getByLabelText(
@@ -110,12 +121,10 @@ describe("LeaderboardPanel", () => {
     expect(
       screen.queryByRole("region", { name: "Day-by-day score history" }),
     ).not.toBeInTheDocument();
-    const leaderboardList = document.querySelector(".leaderboard-list");
     const progressChart = screen.getByRole("region", {
       name: "Score progress",
     });
 
-    expect(leaderboardList).not.toBeNull();
     expect(
       leaderboardList!.compareDocumentPosition(progressChart) &
         Node.DOCUMENT_POSITION_FOLLOWING,

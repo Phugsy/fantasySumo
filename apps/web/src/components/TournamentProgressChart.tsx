@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type { LeaderboardEntry } from "../types";
+import { DailyScoreBadge } from "./DailyScoreBadge";
 import "./TournamentProgressChart.css";
 
 interface TournamentProgressChartProps {
@@ -15,13 +16,13 @@ type SelectedPoint = {
 const chartWidth = 800;
 const chartHeight = 340;
 const chartPadding = { top: 32, right: 28, bottom: 48, left: 52 };
-const seriesStyles = [
-  { color: "#a84032", dash: undefined },
-  { color: "#183247", dash: "10 5" },
-  { color: "#2f6f5e", dash: "3 4" },
-  { color: "#8b5b16", dash: "14 5 3 5" },
-  { color: "#654c8a", dash: "7 4" },
-  { color: "#26758a", dash: "2 4" },
+const seriesColors = [
+  "#a84032",
+  "#183247",
+  "#2f6f5e",
+  "#8b5b16",
+  "#654c8a",
+  "#26758a",
 ] as const;
 
 export function TournamentProgressChart({
@@ -147,7 +148,7 @@ export function TournamentProgressChart({
       <div className="progress-chart-filters" aria-label="Teams shown on chart">
         {scoredEntries.map((entry, index) => {
           const isVisible = !hiddenTeamIds.has(entry.teamId);
-          const style = seriesStyles[index % seriesStyles.length]!;
+          const style = getSeriesStyle(index);
           const teamLabel = formatTeamLabel(entry);
 
           return (
@@ -296,8 +297,7 @@ export function TournamentProgressChart({
                 const originalIndex = scoredEntries.findIndex(
                   (candidate) => candidate.teamId === entry.teamId,
                 );
-                const style =
-                  seriesStyles[originalIndex % seriesStyles.length]!;
+                const style = getSeriesStyle(originalIndex);
                 const isCurrentTeam = entry.teamId === currentTeamId;
                 const points = entry.scoreHistory
                   .map(
@@ -388,6 +388,12 @@ export function TournamentProgressChart({
                             r={16}
                           />
                           <circle
+                            className="chart-point-focus-ring"
+                            cx={dayToX(history.day, latestDay)}
+                            cy={scoreToY(history.cumulativeScore, maximumScore)}
+                            r={isCurrentTeam ? 12 : 11}
+                          />
+                          <circle
                             className={
                               isActive ? "chart-point active" : "chart-point"
                             }
@@ -413,10 +419,7 @@ export function TournamentProgressChart({
                 Day {activeHistory.day}
               </span>
               <span className="progress-chart-daily-score">
-                <span className="progress-chart-daily-score-badge">
-                  {formatSignedScore(activeHistory.dailyScore)}
-                </span>{" "}
-                that day
+                <DailyScoreBadge score={activeHistory.dailyScore} /> that day
               </span>
               <span>{activeHistory.cumulativeScore} cumulative pts</span>
             </p>
@@ -485,6 +488,16 @@ function ScoreHistoryTable({
 
 function formatTeamLabel(entry: LeaderboardEntry): string {
   return `#${entry.rank} ${entry.displayName}`;
+}
+
+function getSeriesStyle(index: number): {
+  color: (typeof seriesColors)[number];
+  dash: string | undefined;
+} {
+  return {
+    color: seriesColors[index % seriesColors.length]!,
+    dash: index === 0 ? undefined : `${2 + (index % 5)} ${3 + index}`,
+  };
 }
 
 function getPointKey(point: SelectedPoint): string {
