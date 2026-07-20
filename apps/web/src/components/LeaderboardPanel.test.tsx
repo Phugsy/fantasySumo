@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { LeaderboardPanel } from "./LeaderboardPanel";
 import type { Basho, LeaderboardEntry, RankedRikishi } from "../types";
@@ -96,11 +96,22 @@ describe("LeaderboardPanel", () => {
       screen.getByText("Demo May Basho - Day 4 of 15"),
     ).toBeInTheDocument();
     expect(screen.getByText("Status: Scoring in progress")).toBeInTheDocument();
-    expect(screen.getByText("East Side")).toBeInTheDocument();
+    expect(screen.getAllByText("East Side").length).toBeGreaterThan(0);
     expect(screen.getByText("Onosato")).toBeInTheDocument();
     expect(screen.getByText("Kirishima")).toBeInTheDocument();
     expect(screen.getAllByText("1 win")).toHaveLength(2);
-    expect(screen.getByText("Day 4 +1")).toBeInTheDocument();
+    const leaderboardList =
+      document.querySelector<HTMLElement>(".leaderboard-list");
+    expect(leaderboardList).not.toBeNull();
+    const leaderboardSummary = within(leaderboardList!).getByRole("button", {
+      name: /East Side/,
+    });
+    expect(within(leaderboardSummary).getByText("Day 4")).toBeInTheDocument();
+    expect(
+      within(leaderboardSummary).getByText("+1", {
+        selector: ".daily-score-badge",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText(/Recent form: day 3 \+1/)).toBeInTheDocument();
     expect(
       screen.getByLabelText(
@@ -110,6 +121,14 @@ describe("LeaderboardPanel", () => {
     expect(
       screen.queryByRole("region", { name: "Day-by-day score history" }),
     ).not.toBeInTheDocument();
+    const progressChart = screen.getByRole("region", {
+      name: "Score progress",
+    });
+
+    expect(
+      leaderboardList!.compareDocumentPosition(progressChart) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /Onosato/ }));
 
@@ -137,7 +156,11 @@ describe("LeaderboardPanel", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /East Side/ }));
+    fireEvent.click(
+      within(screen.getByRole("list")).getByRole("button", {
+        name: /East Side/,
+      }),
+    );
 
     expect(onToggleTeam).toHaveBeenCalledWith("team-east");
   });

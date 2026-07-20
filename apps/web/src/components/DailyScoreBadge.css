@@ -1,0 +1,13 @@
+.daily-score-badge {
+  display: inline-flex;
+  min-width: 26px;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--vermilion);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 900;
+  line-height: 1.25;
+}

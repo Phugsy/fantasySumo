@@ -133,14 +133,83 @@ test("advances the demo basho and refreshes scored leaderboard state", async ({
 
   await expect(page.getByText("Demo May Basho - Day 2 of 15")).toBeVisible();
   await expect(page.getByText("Status: Scoring in progress")).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: /Dohyo Dreamers.*Day 2.*2 pts/ }),
-  ).toBeVisible();
+  const leadingTeamRow = page.getByRole("button", {
+    name: /Dohyo Dreamers.*Day 2.*2 pts/,
+  });
+  await expect(leadingTeamRow).toBeVisible();
+  await expect(leadingTeamRow.locator(".daily-score-badge")).toHaveText("+1");
   await expect(
     page.getByLabel("Recent form: day 1 +1, day 2 +1").first(),
   ).toBeVisible();
   await expect(
     page.getByLabel("Recent results for Wakatakakage: day 1 Win, day 2 Loss"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: /^Cumulative fantasy score progress/ }),
+  ).toBeVisible();
+  await expect(page.getByText("Latest: Day 2")).toBeVisible();
+  expect(
+    await page.evaluate(() => {
+      const leaderboardList = document.querySelector(".leaderboard-list");
+      const progressChart = document.querySelector(".progress-chart");
+
+      return (
+        leaderboardList !== null &&
+        progressChart !== null &&
+        Boolean(
+          leaderboardList.compareDocumentPosition(progressChart) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+        )
+      );
+    }),
+  ).toBe(true);
+
+  const chartPoint = page.getByRole("button", {
+    name: /#1 Dohyo Dreamers, day 2: \+1 that day, 2 cumulative points/,
+  });
+  await page.locator(".progress-chart-scroll").focus();
+  await page.keyboard.press("Tab");
+  await expect(chartPoint).toBeFocused();
+  await expect(chartPoint.locator(".chart-point-focus-ring")).toHaveCSS(
+    "stroke",
+    "rgb(43, 118, 138)",
+  );
+  await expect(page.locator(".progress-chart-detail")).toContainText(
+    "#1 Dohyo DreamersDay 2+1 that day2 cumulative pts",
+  );
+  await expect(
+    page.locator(".progress-chart-detail .daily-score-badge"),
+  ).toHaveText("+1");
+
+  const tachiaiFilter = page.getByRole("button", {
+    name: "#3 Tachiai Titans",
+    exact: true,
+  });
+  const yushoFilter = page.getByRole("button", {
+    name: "#4 Yusho Hunters",
+    exact: true,
+  });
+  await tachiaiFilter.click();
+  await expect(tachiaiFilter).toHaveAttribute("aria-pressed", "false");
+  await yushoFilter.click();
+  await expect(yushoFilter).toHaveAttribute("aria-pressed", "false");
+
+  await page
+    .getByRole("button", {
+      name: "#2 Salt Circle, day 1: +1 that day, 1 cumulative points",
+    })
+    .click();
+  await expect(page.locator(".progress-chart-detail")).toContainText(
+    "#2 Salt CircleDay 1+1 that day1 cumulative pts",
+  );
+
+  await page.getByRole("button", { name: "Show all" }).click();
+  await expect(tachiaiFilter).toHaveAttribute("aria-pressed", "true");
+  await expect(yushoFilter).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByText("View score history table").click();
+  await expect(
+    page.getByRole("table", { name: "Daily and cumulative fantasy points" }),
   ).toBeVisible();
   await expect(
     page.getByRole("region", { name: "Day-by-day score history" }),
@@ -205,6 +274,14 @@ test("keeps navigation, ranks, and core views usable on the emulated device", as
   await page.getByRole("button", { name: "Leaderboard" }).click();
   await expect(
     page.getByRole("heading", { name: "Follow the leaderboard" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Score progress" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "No scored days yet. Progress will appear after the first results.",
+    ),
   ).toBeVisible();
   expect(
     await page.evaluate(

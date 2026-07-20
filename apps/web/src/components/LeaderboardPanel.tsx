@@ -7,6 +7,8 @@ import type {
   RankedRikishi,
 } from "../types";
 import { getBashoLifecycleLabel } from "../lifecycle";
+import { DailyScoreBadge } from "./DailyScoreBadge";
+import { TournamentProgressChart } from "./TournamentProgressChart";
 import "./LeaderboardPanel.css";
 
 interface LeaderboardPanelProps {
@@ -92,15 +94,25 @@ export function LeaderboardPanel({
             rikishiById,
             tiedScoreCounts,
           })}
+          <TournamentProgressChart
+            currentTeamId={createdTeam?.team.id}
+            leaderboard={leaderboard}
+          />
         </>
       ) : (
-        renderLeaderboardList({
-          expandedTeamId,
-          leaderboard,
-          onToggleTeam,
-          rikishiById,
-          tiedScoreCounts,
-        })
+        <>
+          {renderLeaderboardList({
+            expandedTeamId,
+            leaderboard,
+            onToggleTeam,
+            rikishiById,
+            tiedScoreCounts,
+          })}
+          <TournamentProgressChart
+            currentTeamId={createdTeam?.team.id}
+            leaderboard={leaderboard}
+          />
+        </>
       )}
     </section>
   );
@@ -141,9 +153,9 @@ function renderLeaderboardList({
               </span>
               <span className="leaderboard-score">
                 {entry.latestDayScore !== undefined && (
-                  <small>
-                    Day {entry.latestDayScore.day}{" "}
-                    {formatSignedScore(entry.latestDayScore.score)}
+                  <small className="leaderboard-latest-day">
+                    <span>Day {entry.latestDayScore.day}</span>
+                    <DailyScoreBadge score={entry.latestDayScore.score} />
                   </small>
                 )}
                 <strong>{entry.score} pts</strong>

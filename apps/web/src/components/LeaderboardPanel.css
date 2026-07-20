@@ -126,6 +126,13 @@
   font-weight: 800;
 }
 
+.leaderboard-score .leaderboard-latest-day {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 .leaderboard-score strong {
   color: var(--indigo);
   font-size: 1.05rem;
