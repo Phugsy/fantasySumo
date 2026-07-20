@@ -10,9 +10,12 @@ export type {
   PickValidationErrorCode,
   PickValidationOptions,
   Rikishi,
+  RikishiDayOutcome,
+  RikishiDayScore,
   RikishiScore,
   ScoringOptions,
   TeamScore,
+  TeamScoreHistoryEntry,
 } from "./types.js";
 export {
   canEditFantasyPicks,
@@ -27,6 +30,7 @@ export {
 export {
   calculateRikishiScore,
   calculateTeamScore,
+  calculateTeamScoreHistory,
   countPickedRikishiWins,
 } from "./scoring.js";
 export { validateFantasyPicks } from "./validation.js";

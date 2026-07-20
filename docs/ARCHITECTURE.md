@@ -41,7 +41,9 @@ Current behaviour:
 - Fetches leaderboard standings from the Fastify API.
 - Lets a player select and deselect rikishi up to the API-configured team size.
 - Captures a display/team name and submits the team to the API.
-- Shows ordered team standings with expandable picked-rikishi score breakdowns.
+- Shows ordered team standings with the latest daily score, compact five-day
+  team form, and expandable picked-rikishi tournament totals. Each rikishi row
+  shows up to five recent outcomes and expands to the full result history.
 - Shows loading, empty, success, and API error states.
 - Has Vitest coverage through React Testing Library.
 
@@ -74,6 +76,11 @@ Current routes:
   - Returns a fantasy team and its picks.
 - `GET /api/basho/:bashoId/leaderboard`
   - Returns leaderboard entries calculated with the domain scoring module.
+  - Includes the latest scored day's points and chronological daily/cumulative
+    history for each team.
+  - Each day records every pick's `win`, `loss`, `absent`, or `no-result`
+    outcome and fantasy-point contribution. Days without stored results are
+    omitted rather than presented as scored.
 - `POST /api/admin/import-banzuke`
   - Fetches current Makuuchi banzuke data from the Japan Sumo Association `indexAjax` endpoint.
   - Maps source payloads into local `Basho`, `Rikishi`, and `BanzukeEntry` records.
@@ -133,6 +140,9 @@ Current behaviour:
 - Scores a rikishi as one point per win.
 - Scores a team as the sum of all wins by the team's picked rikishi.
 - Supports optional day-bounded scoring with `throughDay` so callers can calculate standings after a specific basho day without relying on an implicit "latest" result.
+- Derives chronological team score history from stored bout results, including
+  daily and cumulative totals plus per-pick outcomes, for reuse by the
+  leaderboard and future progress visualisations.
 - Calculates a leaderboard ordered by score descending.
 - Allows tied team scores and orders ties deterministically by display name, then team id.
 - Validates duplicate picks and exact team size when a team size is supplied.

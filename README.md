@@ -10,7 +10,7 @@ The current codebase has been reset onto the clean rebuild foundation described 
 
 At present, the app has the first local playable foundations:
 
-- A Vite + React front end for creating a fantasy team from seeded basho data and viewing leaderboard standings.
+- A Vite + React front end for creating a fantasy team from seeded basho data and viewing leaderboard standings with recent team scores and expandable rikishi result history.
 - A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.
 - A shared TypeScript domain package with MVP types, lifecycle rules, validation, scoring, and leaderboard logic.
 - A swappable Drizzle database package with local SQLite, production Postgres, repositories, migrations, sample seed data, and deterministic demo data.
@@ -162,6 +162,12 @@ serializes with the production lock update so an in-flight submission cannot
 slip through the transition.
 The protected daily cron normally persists the lock and stamps existing teams
 on the evening before day 0, where day 0 is the calendar day before the basho.
+
+Leaderboard entries include the latest scored day's points and chronological
+score history. Each history entry contains the daily score, cumulative score,
+and the win, loss, absence, or missing-result contribution for every pick. The
+history includes only days with stored results, so missing imports and future
+days are not presented as scored.
 
 Useful checks:
 
