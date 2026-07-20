@@ -167,7 +167,12 @@ describe("App", () => {
     expect(screen.getByText("East Side")).toBeInTheDocument();
     expect(screen.getByText("2 pts")).toBeInTheDocument();
     expect(screen.getAllByText("Tied on score")).toHaveLength(2);
-    expect(screen.getAllByText("Onosato")).toHaveLength(3);
+    expect(screen.getByText("Onosato")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(
+        "Recent results for Onosato: day 1 Win, day 2 No result",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("1 win")).toHaveLength(2);
   });
 

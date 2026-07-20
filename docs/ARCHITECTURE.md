@@ -42,8 +42,8 @@ Current behaviour:
 - Lets a player select and deselect rikishi up to the API-configured team size.
 - Captures a display/team name and submits the team to the API.
 - Shows ordered team standings with the latest daily score, compact five-day
-  form, and expandable picked-rikishi tournament totals and day-by-day score
-  breakdowns.
+  team form, and expandable picked-rikishi tournament totals. Each rikishi row
+  shows up to five recent outcomes and expands to the full result history.
 - Shows loading, empty, success, and API error states.
 - Has Vitest coverage through React Testing Library.
 

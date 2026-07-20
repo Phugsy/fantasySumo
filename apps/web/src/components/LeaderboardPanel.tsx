@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useId, useMemo, useState } from "react";
 import type {
   Basho,
   CreatedTeamResponse,
@@ -86,24 +86,20 @@ export function LeaderboardPanel({
             {getEmptyScoringMessage(basho)}
           </div>
           {renderLeaderboardList({
-            currentDay: basho.currentDay,
             expandedTeamId,
             leaderboard,
             onToggleTeam,
             rikishiById,
             tiedScoreCounts,
-            totalDays,
           })}
         </>
       ) : (
         renderLeaderboardList({
-          currentDay: basho.currentDay,
           expandedTeamId,
           leaderboard,
           onToggleTeam,
           rikishiById,
           tiedScoreCounts,
-          totalDays,
         })
       )}
     </section>
@@ -111,21 +107,17 @@ export function LeaderboardPanel({
 }
 
 function renderLeaderboardList({
-  currentDay,
   expandedTeamId,
   leaderboard,
   onToggleTeam,
   rikishiById,
   tiedScoreCounts,
-  totalDays,
 }: {
-  currentDay?: number;
   expandedTeamId: string | null;
   leaderboard: LeaderboardEntry[];
   onToggleTeam: (teamId: string) => void;
   rikishiById: Map<string, RankedRikishi>;
   tiedScoreCounts: Map<number, number>;
-  totalDays?: number;
 }) {
   return (
     <ol className="leaderboard-list">
@@ -165,34 +157,19 @@ function renderLeaderboardList({
                   <p>No picks recorded for this team.</p>
                 ) : (
                   <ul className="score-totals-list">
-                    {entry.rikishiScores.map((score) => {
-                      const pickedRikishi = rikishiById.get(score.rikishiId);
-
-                      return (
-                        <li key={score.rikishiId}>
-                          <span>
-                            <strong>
-                              {pickedRikishi?.shikona ?? score.rikishiId}
-                            </strong>
-                            <small>
-                              {pickedRikishi?.rank ?? "Unranked pick"}
-                            </small>
-                          </span>
-                          <span>
-                            {score.wins} win{score.wins === 1 ? "" : "s"}
-                          </span>
-                          <span>{score.score} pts</span>
-                        </li>
-                      );
-                    })}
+                    {entry.rikishiScores.map((score) => (
+                      <RikishiScoreRow
+                        key={score.rikishiId}
+                        pickedRikishi={rikishiById.get(score.rikishiId)}
+                        results={getRikishiResults(
+                          entry.scoreHistory,
+                          score.rikishiId,
+                        )}
+                        score={score}
+                      />
+                    ))}
                   </ul>
                 )}
-                <ScoreHistory
-                  currentDay={currentDay}
-                  rikishiById={rikishiById}
-                  scoreHistory={entry.scoreHistory}
-                  totalDays={totalDays}
-                />
               </div>
             )}
           </li>
@@ -200,6 +177,127 @@ function renderLeaderboardList({
       })}
     </ol>
   );
+}
+
+type RikishiResult = {
+  day: number;
+  outcome: LeaderboardEntry["scoreHistory"][number]["rikishiScores"][number]["outcome"];
+  score: number;
+};
+
+function RikishiScoreRow({
+  pickedRikishi,
+  results,
+  score,
+}: {
+  pickedRikishi?: RankedRikishi;
+  results: RikishiResult[];
+  score: LeaderboardEntry["rikishiScores"][number];
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const historyId = useId();
+  const shikona = pickedRikishi?.shikona ?? score.rikishiId;
+
+  return (
+    <li className="rikishi-score">
+      <button
+        type="button"
+        className="rikishi-score-summary"
+        onClick={() => setIsExpanded((current) => !current)}
+        aria-controls={historyId}
+        aria-expanded={isExpanded}
+      >
+        <span className="rikishi-identity">
+          <strong>{shikona}</strong>
+          <small>{pickedRikishi?.rank ?? "Unranked pick"}</small>
+        </span>
+        <RecentRikishiResults results={results} shikona={shikona} />
+        <span className="rikishi-wins">
+          {score.wins} win{score.wins === 1 ? "" : "s"}
+        </span>
+        <span className="rikishi-points">{score.score} pts</span>
+      </button>
+      {isExpanded && (
+        <section
+          className="rikishi-result-history"
+          id={historyId}
+          aria-label={`${shikona} result history`}
+        >
+          <h4>{shikona} results</h4>
+          {results.length === 0 ? (
+            <p>No results recorded yet.</p>
+          ) : (
+            <ol>
+              {results.map((result) => (
+                <li
+                  key={result.day}
+                  aria-label={`Day ${result.day}: ${formatOutcome(result.outcome)}, ${formatPoints(result.score)}`}
+                >
+                  <small>Day {result.day}</small>
+                  <ResultTile outcome={result.outcome} />
+                  <strong>{formatSignedScore(result.score)}</strong>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      )}
+    </li>
+  );
+}
+
+function RecentRikishiResults({
+  results,
+  shikona,
+}: {
+  results: RikishiResult[];
+  shikona: string;
+}) {
+  const recentResults = results.slice(-5);
+
+  if (recentResults.length === 0) {
+    return <span className="recent-rikishi-results" />;
+  }
+
+  return (
+    <span
+      className="recent-rikishi-results"
+      aria-label={`Recent results for ${shikona}: ${recentResults
+        .map((result) => `day ${result.day} ${formatOutcome(result.outcome)}`)
+        .join(", ")}`}
+    >
+      {recentResults.map((result) => (
+        <ResultTile key={result.day} outcome={result.outcome} />
+      ))}
+    </span>
+  );
+}
+
+function ResultTile({ outcome }: { outcome: RikishiResult["outcome"] }) {
+  return (
+    <span
+      className={`result-tile result-${outcome}`}
+      aria-hidden="true"
+      title={formatOutcome(outcome)}
+    >
+      {formatOutcomeInitial(outcome)}
+    </span>
+  );
+}
+
+function getRikishiResults(
+  scoreHistory: LeaderboardEntry["scoreHistory"],
+  rikishiId: string,
+): RikishiResult[] {
+  return scoreHistory.flatMap((day) => {
+    const result = day.rikishiScores.find(
+      (candidate) => candidate.rikishiId === rikishiId,
+    );
+
+    return result === undefined
+      ? []
+      : [{ day: day.day, outcome: result.outcome, score: result.score }];
+  });
 }
 
 function RecentForm({
@@ -232,118 +330,12 @@ function RecentForm({
   );
 }
 
-function ScoreHistory({
-  currentDay,
-  rikishiById,
-  scoreHistory,
-  totalDays,
-}: {
-  currentDay?: number;
-  rikishiById: Map<string, RankedRikishi>;
-  scoreHistory: LeaderboardEntry["scoreHistory"];
-  totalDays?: number;
-}) {
-  const unscoredCopy = getUnscoredDaysCopy(
-    scoreHistory.map((entry) => entry.day),
-    currentDay,
-    totalDays,
-  );
-
-  return (
-    <section className="score-history" aria-label="Day-by-day score history">
-      <h3>Day-by-day score</h3>
-      {scoreHistory.length === 0 ? (
-        <p>No scored days yet.</p>
-      ) : (
-        <ol>
-          {[...scoreHistory].reverse().map((day) => (
-            <li className="score-day" key={day.day}>
-              <div className="score-day-heading">
-                <strong>Day {day.day}</strong>
-                <span>
-                  {formatSignedScore(day.dailyScore)} today ·{" "}
-                  {day.cumulativeScore} total
-                </span>
-              </div>
-              <ul>
-                {day.rikishiScores.map((score) => (
-                  <li key={score.rikishiId}>
-                    <span>
-                      {rikishiById.get(score.rikishiId)?.shikona ??
-                        score.rikishiId}
-                    </span>
-                    <span>{formatOutcome(score.outcome)}</span>
-                    <strong>{formatSignedScore(score.score)}</strong>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ol>
-      )}
-      {unscoredCopy.map((copy) => (
-        <p className="unscored-days" key={copy}>
-          {copy}
-        </p>
-      ))}
-    </section>
-  );
-}
-
-function getUnscoredDaysCopy(
-  scoredDays: number[],
-  currentDay = 0,
-  totalDays?: number,
-): string[] {
-  const scoredDaySet = new Set(scoredDays);
-  const latestScoredDay = scoredDays.reduce(
-    (latestDay, day) => Math.max(latestDay, day),
-    0,
-  );
-  const progressDay = Math.max(currentDay, latestScoredDay);
-  const missingCurrentDays = Array.from(
-    { length: progressDay },
-    (_, index) => index + 1,
-  ).filter((day) => !scoredDaySet.has(day));
-  const copy: string[] = [];
-
-  if (missingCurrentDays.length > 0) {
-    copy.push(
-      `${formatDayRange(missingCurrentDays)} ${missingCurrentDays.length === 1 ? "is" : "are"} awaiting results.`,
-    );
-  }
-
-  if (totalDays !== undefined && progressDay < totalDays) {
-    const futureDays = Array.from(
-      { length: totalDays - progressDay },
-      (_, index) => progressDay + index + 1,
-    );
-    copy.push(
-      `${formatDayRange(futureDays)} ${futureDays.length === 1 ? "is" : "are"} not scored yet.`,
-    );
-  }
-
-  return copy;
-}
-
-function formatDayRange(days: number[]): string {
-  if (days.length === 1) {
-    return `Day ${days[0]}`;
-  }
-
-  const isContinuous = days.every(
-    (day, index) => index === 0 || day === days[index - 1]! + 1,
-  );
-
-  if (isContinuous) {
-    return `Days ${days[0]}–${days.at(-1)}`;
-  }
-
-  return `Days ${days.join(", ")}`;
-}
-
 function formatSignedScore(score: number): string {
   return score > 0 ? `+${score}` : `${score}`;
+}
+
+function formatPoints(score: number): string {
+  return `${formatSignedScore(score)} point${Math.abs(score) === 1 ? "" : "s"}`;
 }
 
 function formatOutcome(
@@ -358,6 +350,19 @@ function formatOutcome(
       return "Absent";
     case "no-result":
       return "No result";
+  }
+}
+
+function formatOutcomeInitial(outcome: RikishiResult["outcome"]): string {
+  switch (outcome) {
+    case "win":
+      return "W";
+    case "loss":
+      return "L";
+    case "absent":
+      return "A";
+    case "no-result":
+      return "–";
   }
 }
 

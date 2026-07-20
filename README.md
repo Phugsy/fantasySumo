@@ -10,7 +10,7 @@ The current codebase has been reset onto the clean rebuild foundation described 
 
 At present, the app has the first local playable foundations:
 
-- A Vite + React front end for creating a fantasy team from seeded basho data and viewing leaderboard standings with recent form and day-by-day score history.
+- A Vite + React front end for creating a fantasy team from seeded basho data and viewing leaderboard standings with recent team scores and expandable rikishi result history.
 - A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.
 - A shared TypeScript domain package with MVP types, lifecycle rules, validation, scoring, and leaderboard logic.
 - A swappable Drizzle database package with local SQLite, production Postgres, repositories, migrations, sample seed data, and deterministic demo data.

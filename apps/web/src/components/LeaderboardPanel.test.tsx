@@ -97,23 +97,27 @@ describe("LeaderboardPanel", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Status: Scoring in progress")).toBeInTheDocument();
     expect(screen.getByText("East Side")).toBeInTheDocument();
-    expect(screen.getAllByText("Onosato")).toHaveLength(3);
-    expect(screen.getAllByText("Kirishima")).toHaveLength(3);
+    expect(screen.getByText("Onosato")).toBeInTheDocument();
+    expect(screen.getByText("Kirishima")).toBeInTheDocument();
     expect(screen.getAllByText("1 win")).toHaveLength(2);
     expect(screen.getByText("Day 4 +1")).toBeInTheDocument();
     expect(screen.getByLabelText(/Recent form: day 3 \+1/)).toBeInTheDocument();
     expect(
-      screen.getByRole("region", { name: "Day-by-day score history" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("+1 today · 2 total")).toBeInTheDocument();
-    expect(screen.getAllByText("Win")).toHaveLength(2);
-    expect(screen.getAllByText("Loss")).toHaveLength(2);
-    expect(
-      screen.getByText("Days 1–2 are awaiting results."),
+      screen.getByLabelText(
+        "Recent results for Onosato: day 3 Win, day 4 Loss",
+      ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Days 5–15 are not scored yet."),
+      screen.queryByRole("region", { name: "Day-by-day score history" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Onosato/ }));
+
+    expect(
+      screen.getByRole("region", { name: "Onosato result history" }),
     ).toBeInTheDocument();
+    expect(screen.getByLabelText("Day 3: Win, +1 point")).toBeInTheDocument();
+    expect(screen.getByLabelText("Day 4: Loss, 0 points")).toBeInTheDocument();
   });
 
   it("requests expansion changes when a team row is clicked", () => {
@@ -214,26 +218,29 @@ describe("LeaderboardPanel", () => {
     expect(screen.getByText("Status: Final scores")).toBeInTheDocument();
   });
 
-  it("identifies missing current days separately from future days", () => {
+  it("limits compact team and rikishi form to the five latest results", () => {
+    const sixDays = Array.from({ length: 6 }, (_, index) => ({
+      day: index + 1,
+      dailyScore: 1,
+      cumulativeScore: index + 1,
+      rikishiScores: [
+        { rikishiId: "onosato", outcome: "win" as const, score: 1 },
+        { rikishiId: "kirishima", outcome: "loss" as const, score: 0 },
+      ],
+    }));
+
     render(
       <LeaderboardPanel
-        basho={{ ...basho, currentDay: 3 }}
+        basho={{ ...basho, currentDay: 6 }}
         createdTeam={null}
         errorMessage={null}
         expandedTeamId="team-east"
         leaderboard={[
           {
             ...leaderboard[0]!,
-            latestDayScore: { day: 1, score: 1 },
-            score: 1,
-            scoreHistory: [
-              {
-                day: 1,
-                dailyScore: 1,
-                cumulativeScore: 1,
-                rikishiScores: [],
-              },
-            ],
+            latestDayScore: { day: 6, score: 1 },
+            score: 6,
+            scoreHistory: sixDays,
           },
         ]}
         loadState="ready"
@@ -244,10 +251,19 @@ describe("LeaderboardPanel", () => {
     );
 
     expect(
-      screen.getByText("Days 2–3 are awaiting results."),
+      screen.getByLabelText(
+        "Recent form: day 2 +1, day 3 +1, day 4 +1, day 5 +1, day 6 +1",
+      ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Days 4–15 are not scored yet."),
+      screen.getByLabelText(
+        "Recent results for Onosato: day 2 Win, day 3 Win, day 4 Win, day 5 Win, day 6 Win",
+      ),
     ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Onosato/ }));
+
+    expect(screen.getByLabelText("Day 1: Win, +1 point")).toBeInTheDocument();
+    expect(screen.getByLabelText("Day 6: Win, +1 point")).toBeInTheDocument();
   });
 });

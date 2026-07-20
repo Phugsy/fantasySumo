@@ -53,7 +53,7 @@ test("shows completed demo leaderboard entries in score order", async ({
   await page.goto("/");
   await page.getByRole("button", { name: "Leaderboard" }).click();
 
-  const leaderboardRows = page.getByRole("button").filter({ hasText: /pts/ });
+  const leaderboardRows = page.locator(".leaderboard-summary");
   await expect(leaderboardRows).toHaveCount(4);
 
   const rowTexts = await leaderboardRows.allTextContents();
@@ -139,15 +139,23 @@ test("advances the demo basho and refreshes scored leaderboard state", async ({
   await expect(
     page.getByLabel("Recent form: day 1 +1, day 2 +1").first(),
   ).toBeVisible();
+  await expect(
+    page.getByLabel("Recent results for Wakatakakage: day 1 Win, day 2 Loss"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Day-by-day score history" }),
+  ).toHaveCount(0);
+
+  await page
+    .getByRole("button", { name: /Wakatakakage.*1 win.*1 pts/ })
+    .click();
 
   const history = page.getByRole("region", {
-    name: "Day-by-day score history",
+    name: "Wakatakakage result history",
   });
   await expect(history).toBeVisible();
-  await expect(history.getByText("Day 2", { exact: true })).toBeVisible();
-  await expect(history.getByText("+1 today · 2 total")).toBeVisible();
-  await expect(history.getByText("Win").first()).toBeVisible();
-  await expect(history.getByText("Loss").first()).toBeVisible();
+  await expect(history.getByLabel("Day 1: Win, +1 point")).toBeVisible();
+  await expect(history.getByLabel("Day 2: Loss, 0 points")).toBeVisible();
 });
 
 test("prevents incomplete and overfull team submissions", async ({ page }) => {
