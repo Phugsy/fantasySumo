@@ -44,6 +44,8 @@ Current behaviour:
 - Shows ordered team standings with the latest daily score, compact five-day
   team form, and expandable picked-rikishi tournament totals. Each rikishi row
   shows up to five recent outcomes and expands to the full result history.
+- Charts cumulative team scores across scored days with team filters,
+  inspectable points, and an accessible exact-value table.
 - Shows loading, empty, success, and API error states.
 - Has Vitest coverage through React Testing Library.
 

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { LeaderboardPanel } from "./LeaderboardPanel";
 import type { Basho, LeaderboardEntry, RankedRikishi } from "../types";
@@ -96,7 +96,7 @@ describe("LeaderboardPanel", () => {
       screen.getByText("Demo May Basho - Day 4 of 15"),
     ).toBeInTheDocument();
     expect(screen.getByText("Status: Scoring in progress")).toBeInTheDocument();
-    expect(screen.getByText("East Side")).toBeInTheDocument();
+    expect(screen.getAllByText("East Side").length).toBeGreaterThan(0);
     expect(screen.getByText("Onosato")).toBeInTheDocument();
     expect(screen.getByText("Kirishima")).toBeInTheDocument();
     expect(screen.getAllByText("1 win")).toHaveLength(2);
@@ -137,7 +137,11 @@ describe("LeaderboardPanel", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /East Side/ }));
+    fireEvent.click(
+      within(screen.getByRole("list")).getByRole("button", {
+        name: /East Side/,
+      }),
+    );
 
     expect(onToggleTeam).toHaveBeenCalledWith("team-east");
   });

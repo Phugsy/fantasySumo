@@ -164,7 +164,7 @@ describe("App", () => {
     expect(
       screen.getByRole("heading", { name: "Leaderboard" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("East Side")).toBeInTheDocument();
+    expect(screen.getAllByText("East Side").length).toBeGreaterThan(0);
     expect(screen.getByText("2 pts")).toBeInTheDocument();
     expect(screen.getAllByText("Tied on score")).toHaveLength(2);
     expect(screen.getByText("Onosato")).toBeInTheDocument();

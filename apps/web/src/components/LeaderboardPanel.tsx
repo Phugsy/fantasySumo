@@ -7,6 +7,7 @@ import type {
   RankedRikishi,
 } from "../types";
 import { getBashoLifecycleLabel } from "../lifecycle";
+import { TournamentProgressChart } from "./TournamentProgressChart";
 import "./LeaderboardPanel.css";
 
 interface LeaderboardPanelProps {
@@ -82,6 +83,10 @@ export function LeaderboardPanel({
         </div>
       ) : isPreScoringLeaderboard(basho, leaderboard) ? (
         <>
+          <TournamentProgressChart
+            currentTeamId={createdTeam?.team.id}
+            leaderboard={leaderboard}
+          />
           <div className="state-panel leaderboard-empty">
             {getEmptyScoringMessage(basho)}
           </div>
@@ -94,13 +99,19 @@ export function LeaderboardPanel({
           })}
         </>
       ) : (
-        renderLeaderboardList({
-          expandedTeamId,
-          leaderboard,
-          onToggleTeam,
-          rikishiById,
-          tiedScoreCounts,
-        })
+        <>
+          <TournamentProgressChart
+            currentTeamId={createdTeam?.team.id}
+            leaderboard={leaderboard}
+          />
+          {renderLeaderboardList({
+            expandedTeamId,
+            leaderboard,
+            onToggleTeam,
+            rikishiById,
+            tiedScoreCounts,
+          })}
+        </>
       )}
     </section>
   );

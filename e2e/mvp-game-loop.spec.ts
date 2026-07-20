@@ -143,6 +143,49 @@ test("advances the demo basho and refreshes scored leaderboard state", async ({
     page.getByLabel("Recent results for Wakatakakage: day 1 Win, day 2 Loss"),
   ).toBeVisible();
   await expect(
+    page.getByRole("group", { name: /^Cumulative fantasy score progress/ }),
+  ).toBeVisible();
+  await expect(page.getByText("Latest: Day 2")).toBeVisible();
+
+  const chartPoint = page.getByRole("button", {
+    name: /Dohyo Dreamers, day 2: \+1 that day, 2 cumulative points/,
+  });
+  await chartPoint.focus();
+  await expect(page.locator(".progress-chart-detail")).toContainText(
+    "Dohyo DreamersDay 2+1 that day2 cumulative pts",
+  );
+
+  const tachiaiFilter = page.getByRole("button", {
+    name: "Tachiai Titans",
+    exact: true,
+  });
+  const yushoFilter = page.getByRole("button", {
+    name: "Yusho Hunters",
+    exact: true,
+  });
+  await tachiaiFilter.click();
+  await expect(tachiaiFilter).toHaveAttribute("aria-pressed", "false");
+  await yushoFilter.click();
+  await expect(yushoFilter).toHaveAttribute("aria-pressed", "false");
+
+  await page
+    .getByRole("button", {
+      name: "Salt Circle, day 1: +1 that day, 1 cumulative points",
+    })
+    .click();
+  await expect(page.locator(".progress-chart-detail")).toContainText(
+    "Salt CircleDay 1+1 that day1 cumulative pts",
+  );
+
+  await page.getByRole("button", { name: "Show all" }).click();
+  await expect(tachiaiFilter).toHaveAttribute("aria-pressed", "true");
+  await expect(yushoFilter).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByText("View score history table").click();
+  await expect(
+    page.getByRole("table", { name: "Daily and cumulative fantasy points" }),
+  ).toBeVisible();
+  await expect(
     page.getByRole("region", { name: "Day-by-day score history" }),
   ).toHaveCount(0);
 
@@ -205,6 +248,14 @@ test("keeps navigation, ranks, and core views usable on the emulated device", as
   await page.getByRole("button", { name: "Leaderboard" }).click();
   await expect(
     page.getByRole("heading", { name: "Follow the leaderboard" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Score progress" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "No scored days yet. Progress will appear after the first results.",
+    ),
   ).toBeVisible();
   expect(
     await page.evaluate(
