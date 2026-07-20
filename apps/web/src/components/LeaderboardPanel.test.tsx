@@ -110,6 +110,16 @@ describe("LeaderboardPanel", () => {
     expect(
       screen.queryByRole("region", { name: "Day-by-day score history" }),
     ).not.toBeInTheDocument();
+    const leaderboardList = document.querySelector(".leaderboard-list");
+    const progressChart = screen.getByRole("region", {
+      name: "Score progress",
+    });
+
+    expect(leaderboardList).not.toBeNull();
+    expect(
+      leaderboardList!.compareDocumentPosition(progressChart) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /Onosato/ }));
 

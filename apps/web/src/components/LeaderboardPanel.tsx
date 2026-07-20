@@ -83,10 +83,6 @@ export function LeaderboardPanel({
         </div>
       ) : isPreScoringLeaderboard(basho, leaderboard) ? (
         <>
-          <TournamentProgressChart
-            currentTeamId={createdTeam?.team.id}
-            leaderboard={leaderboard}
-          />
           <div className="state-panel leaderboard-empty">
             {getEmptyScoringMessage(basho)}
           </div>
@@ -97,13 +93,13 @@ export function LeaderboardPanel({
             rikishiById,
             tiedScoreCounts,
           })}
-        </>
-      ) : (
-        <>
           <TournamentProgressChart
             currentTeamId={createdTeam?.team.id}
             leaderboard={leaderboard}
           />
+        </>
+      ) : (
+        <>
           {renderLeaderboardList({
             expandedTeamId,
             leaderboard,
@@ -111,6 +107,10 @@ export function LeaderboardPanel({
             rikishiById,
             tiedScoreCounts,
           })}
+          <TournamentProgressChart
+            currentTeamId={createdTeam?.team.id}
+            leaderboard={leaderboard}
+          />
         </>
       )}
     </section>

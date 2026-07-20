@@ -146,6 +146,21 @@ test("advances the demo basho and refreshes scored leaderboard state", async ({
     page.getByRole("group", { name: /^Cumulative fantasy score progress/ }),
   ).toBeVisible();
   await expect(page.getByText("Latest: Day 2")).toBeVisible();
+  expect(
+    await page.evaluate(() => {
+      const leaderboardList = document.querySelector(".leaderboard-list");
+      const progressChart = document.querySelector(".progress-chart");
+
+      return (
+        leaderboardList !== null &&
+        progressChart !== null &&
+        Boolean(
+          leaderboardList.compareDocumentPosition(progressChart) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+        )
+      );
+    }),
+  ).toBe(true);
 
   const chartPoint = page.getByRole("button", {
     name: /Dohyo Dreamers, day 2: \+1 that day, 2 cumulative points/,
