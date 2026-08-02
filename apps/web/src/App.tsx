@@ -290,7 +290,7 @@ export function App() {
       teamSize: currentBasho.teamSize,
     });
     setRikishi(bashoRikishi.rikishi);
-    applyMyTeam(myTeam, setDisplayName, setSelectedIds);
+    applyMyTeam(myTeam, bashoRikishi.rikishi, setDisplayName, setSelectedIds);
     setActiveView(myTeam === null ? "selection" : "leaderboard");
     setLoadState(bashoRikishi.rikishi.length === 0 ? "empty" : "ready");
 
@@ -564,6 +564,7 @@ function mergeLeaderboardBasho(
 
 function applyMyTeam(
   myTeam: TeamResponse | null,
+  availableRikishi: readonly { id: string }[],
   setDisplayName: (displayName: string) => void,
   setSelectedIds: (selectedIds: string[]) => void,
 ) {
@@ -574,7 +575,14 @@ function applyMyTeam(
   }
 
   setDisplayName(myTeam.team.displayName);
-  setSelectedIds(myTeam.picks.map((pick) => pick.rikishiId));
+  const availableRikishiIds = new Set(
+    availableRikishi.map((rikishi) => rikishi.id),
+  );
+  setSelectedIds(
+    myTeam.picks
+      .map((pick) => pick.rikishiId)
+      .filter((rikishiId) => availableRikishiIds.has(rikishiId)),
+  );
 }
 
 async function fetchMyTeamOrNull(

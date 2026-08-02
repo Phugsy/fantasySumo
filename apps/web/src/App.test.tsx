@@ -329,6 +329,37 @@ describe("App", () => {
     expect(screen.getByText("Existing Champions")).toBeInTheDocument();
   });
 
+  it("drops saved picks that are no longer on the current banzuke", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/basho/2026-05/my-team") {
+          return jsonResponse({
+            team: {
+              id: "team-existing",
+              displayName: "Existing Champions",
+            },
+            picks: [{ rikishiId: "onosato" }, { rikishiId: "removed-rikishi" }],
+          });
+        }
+
+        return mockExistingTeamAfterLoginFetch(input, init);
+      }),
+    );
+    render(<App />);
+
+    await signInThroughAccountPanel();
+    await screen.findByRole("heading", { name: "Leaderboard" });
+    fireEvent.click(screen.getByRole("button", { name: "My stable" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Selection" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("1 of 2 selected")).toBeInTheDocument();
+    expect(screen.getByText("Pick slot")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Hoshoryu/ })).toBeEnabled();
+  });
+
   it("ignores a stale anonymous load that finishes after authenticated picks", async () => {
     const initialCurrentBashoRequest = createDeferred<Response>();
     let currentBashoRequestCount = 0;
