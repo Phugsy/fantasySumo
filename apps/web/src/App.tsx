@@ -461,7 +461,7 @@ export function App() {
                 createdTeam={createdTeam}
                 displayName={displayName}
                 errorMessage={errorMessage}
-                isLocked={!canEditPicks}
+                isLocked={!canEditPicks || sessionState === "submitting"}
                 lockMessage={pickLockMessage}
                 onDisplayNameChange={(nextDisplayName) => {
                   setDisplayName(nextDisplayName);

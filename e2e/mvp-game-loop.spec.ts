@@ -114,6 +114,33 @@ test("blocks team submission while sign-out is in flight", async ({ page }) => {
   await expect(page.getByText("Departing Stable submitted.")).toHaveCount(0);
 });
 
+test("blocks draft editing while sign-in is in flight", async ({ page }) => {
+  let releaseSignIn: () => void = () => undefined;
+  const signInMayContinue = new Promise<void>((resolve) => {
+    releaseSignIn = resolve;
+  });
+
+  await page.route("**/api/session", async (route) => {
+    if (route.request().method() === "POST") {
+      await signInMayContinue;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Email").fill("e2e-player@example.com");
+  await page.getByLabel("Display name").fill("E2E Player");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(page.getByLabel("Team name")).toBeDisabled();
+  await expect(page.getByRole("button", { name: /Onosato/ })).toBeDisabled();
+  releaseSignIn();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(page.getByLabel("Team name")).toBeEnabled();
+  await expect(page.getByRole("button", { name: /Onosato/ })).toBeEnabled();
+});
+
 test("preserves an anonymous team draft through sign-in", async ({ page }) => {
   let hideHoshoryu = false;
   await page.route("**/api/basho/*/rikishi*", async (route) => {
