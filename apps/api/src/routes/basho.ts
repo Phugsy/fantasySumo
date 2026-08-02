@@ -329,15 +329,27 @@ export function registerBashoRoutes(
       basho.id,
     );
 
+    const leaderboard = calculateLeaderboard(
+      await context.repositories.listFantasyTeamsForBasho(basho.id),
+      await context.repositories.listFantasyPicksForBasho(basho.id),
+      boutResults,
+    );
+
     return {
       basho,
       bashoId: basho.id,
       totalDays: getBashoTotalDays(basho),
-      leaderboard: calculateLeaderboard(
-        await context.repositories.listFantasyTeamsForBasho(basho.id),
-        await context.repositories.listFantasyPicksForBasho(basho.id),
-        boutResults,
-      ),
+      leaderboard:
+        basho.status === "upcoming"
+          ? leaderboard.map((entry) => ({
+              ...entry,
+              rikishiScores: [],
+              scoreHistory: entry.scoreHistory.map((history) => ({
+                ...history,
+                rikishiScores: [],
+              })),
+            }))
+          : leaderboard,
     };
   });
 }

@@ -188,6 +188,9 @@ export function App() {
 
   async function submitAccount(intent: "sign-in" | "sign-up") {
     let bashoReloadStarted = false;
+    const preserveAnonymousDraft =
+      sessionUser === null &&
+      (displayName.trim().length > 0 || selectedIds.length > 0);
 
     setSessionState("submitting");
     setSessionErrorMessage(null);
@@ -211,7 +214,7 @@ export function App() {
       setAccountPassword("");
 
       bashoReloadStarted = true;
-      await loadBashoData(session, () => true);
+      await loadBashoData(session, () => true, preserveAnonymousDraft);
     } catch (error) {
       if (bashoReloadStarted) {
         setLoadState("error");
@@ -259,6 +262,7 @@ export function App() {
   async function loadBashoData(
     session: SessionResponse,
     isCurrent: () => boolean,
+    preserveDraftWhenTeamMissing = false,
   ) {
     bashoRequestIdRef.current += 1;
     const bashoRequestId = bashoRequestIdRef.current;
@@ -296,7 +300,13 @@ export function App() {
       teamSize: currentBasho.teamSize,
     });
     setRikishi(bashoRikishi.rikishi);
-    applyMyTeam(myTeam, bashoRikishi.rikishi, setDisplayName, setSelectedIds);
+    applyMyTeam(
+      myTeam,
+      bashoRikishi.rikishi,
+      preserveDraftWhenTeamMissing,
+      setDisplayName,
+      setSelectedIds,
+    );
     setOwnedTeamId(myTeam?.team.id ?? null);
     setActiveView(myTeam === null ? "selection" : "leaderboard");
     setLoadState(bashoRikishi.rikishi.length === 0 ? "empty" : "ready");
@@ -576,12 +586,15 @@ function mergeLeaderboardBasho(
 function applyMyTeam(
   myTeam: TeamResponse | null,
   availableRikishi: readonly { id: string }[],
+  preserveDraftWhenTeamMissing: boolean,
   setDisplayName: (displayName: string) => void,
   setSelectedIds: (selectedIds: string[]) => void,
 ) {
   if (myTeam === null) {
-    setDisplayName("");
-    setSelectedIds([]);
+    if (!preserveDraftWhenTeamMissing) {
+      setDisplayName("");
+      setSelectedIds([]);
+    }
     return;
   }
 

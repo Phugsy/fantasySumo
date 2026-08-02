@@ -112,6 +112,24 @@ test("blocks team submission while sign-out is in flight", async ({ page }) => {
   await expect(page.getByText("Departing Stable submitted.")).toHaveCount(0);
 });
 
+test("preserves an anonymous team draft through sign-in", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Team name").fill("Draft Stable");
+  await page.getByRole("button", { name: /Onosato/ }).click();
+  await page.getByRole("button", { name: /Hoshoryu/ }).click();
+
+  await signInAsDemoUser(page);
+
+  await expect(page.getByLabel("Team name")).toHaveValue("Draft Stable");
+  await expect(page.getByText("2 of 2 selected")).toBeVisible();
+  await expect(
+    page.locator("button.rikishi-row").filter({ hasText: "Onosato" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Submit team" })).toBeEnabled();
+  await page.getByRole("button", { name: "Submit team" }).click();
+  await expect(page.getByText("Draft Stable submitted.")).toBeVisible();
+});
+
 test("shows completed demo leaderboard entries in score order", async ({
   page,
   request,

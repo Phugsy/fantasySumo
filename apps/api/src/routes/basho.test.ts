@@ -345,6 +345,10 @@ describe("basho routes", () => {
       id: "team-north",
       ownerUserId: expect.stringMatching(/^local-/),
     });
+    expect(response.json().picks).toEqual([
+      expect.objectContaining({ rikishiId: "kotozakura" }),
+      expect.objectContaining({ rikishiId: "onosato" }),
+    ]);
   });
 
   it("rejects invalid team picks", async () => {
@@ -455,7 +459,41 @@ describe("basho routes", () => {
     },
   );
 
-  it("returns a leaderboard ordered by score", async () => {
+  it("keeps pick identities private on an upcoming leaderboard", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/leaderboard",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().basho.status).toBe("upcoming");
+    expect(response.json().leaderboard).not.toHaveLength(0);
+    expect(
+      response
+        .json()
+        .leaderboard.every(
+          (entry: {
+            rikishiScores: unknown[];
+            scoreHistory: Array<{ rikishiScores: unknown[] }>;
+          }) =>
+            entry.rikishiScores.length === 0 &&
+            entry.scoreHistory.every(
+              (history) => history.rikishiScores.length === 0,
+            ),
+        ),
+    ).toBe(true);
+    expect(JSON.stringify(response.json().leaderboard)).not.toContain(
+      "rikishiId",
+    );
+  });
+
+  it("returns a leaderboard ordered by score after picks lock", async () => {
+    const repositories = createRepositories(client);
+    await repositories.updateBasho({
+      ...sampleBasho,
+      status: "active",
+      currentDay: 2,
+    });
     const response = await app.inject({
       method: "GET",
       url: "/api/basho/2026-05/leaderboard",
@@ -466,8 +504,8 @@ describe("basho routes", () => {
       basho: {
         id: "2026-05",
         name: "May 2026 Sample Basho",
-        status: "upcoming",
-        currentDay: 0,
+        status: "active",
+        currentDay: 2,
       },
       bashoId: "2026-05",
       totalDays: 15,
