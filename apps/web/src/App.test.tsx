@@ -329,6 +329,48 @@ describe("App", () => {
     expect(screen.getByText("Existing Champions")).toBeInTheDocument();
   });
 
+  it("ignores a stale anonymous load that finishes after authenticated picks", async () => {
+    const initialCurrentBashoRequest = createDeferred<Response>();
+    let currentBashoRequestCount = 0;
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/basho/current") {
+          currentBashoRequestCount += 1;
+
+          return currentBashoRequestCount === 1
+            ? initialCurrentBashoRequest.promise
+            : jsonResponse(currentBasho);
+        }
+
+        return mockExistingTeamAfterLoginFetch(input, init);
+      }),
+    );
+    render(<App />);
+
+    await signInThroughAccountPanel();
+
+    expect(
+      await screen.findByRole("heading", { name: "Leaderboard" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Existing Champions")).toBeInTheDocument();
+
+    await act(async () => {
+      initialCurrentBashoRequest.resolve(await jsonResponse(currentBasho));
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "Leaderboard" }),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Existing Champions")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: "Selection" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   it("clears the previous user's private picks when another user has no team", async () => {
     vi.stubGlobal("fetch", vi.fn(mockUserSwitchFetch()));
     render(<App />);

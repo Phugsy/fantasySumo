@@ -76,6 +76,7 @@ export function App() {
   const [createdTeam, setCreatedTeam] = useState<CreatedTeamResponse | null>(
     null,
   );
+  const bashoRequestIdRef = useRef(0);
   const leaderboardRequestIdRef = useRef(0);
 
   const selectedRikishi = useMemo(
@@ -253,17 +254,34 @@ export function App() {
     session: SessionResponse,
     isCurrent: () => boolean,
   ) {
+    bashoRequestIdRef.current += 1;
+    const bashoRequestId = bashoRequestIdRef.current;
+    const isCurrentBashoRequest = () =>
+      isCurrent() && bashoRequestIdRef.current === bashoRequestId;
+
     setLoadState("loading");
 
     setErrorMessage(null);
     setLeaderboardErrorMessage(null);
 
-    const currentBasho = await fetchCurrentBasho();
-    const bashoRikishi = await fetchBashoRikishi(currentBasho.id);
-    const myTeam =
-      session.user === null ? null : await fetchMyTeamOrNull(currentBasho.id);
+    let currentBasho: Basho;
+    let bashoRikishi: Awaited<ReturnType<typeof fetchBashoRikishi>>;
+    let myTeam: TeamResponse | null;
 
-    if (!isCurrent()) {
+    try {
+      currentBasho = await fetchCurrentBasho();
+      bashoRikishi = await fetchBashoRikishi(currentBasho.id);
+      myTeam =
+        session.user === null ? null : await fetchMyTeamOrNull(currentBasho.id);
+    } catch (error) {
+      if (!isCurrentBashoRequest()) {
+        return;
+      }
+
+      throw error;
+    }
+
+    if (!isCurrentBashoRequest()) {
       return;
     }
 
@@ -283,7 +301,7 @@ export function App() {
       const leaderboardResponse = await fetchLeaderboard(currentBasho.id);
 
       if (
-        !isCurrent() ||
+        !isCurrentBashoRequest() ||
         !isCurrentLeaderboardRequest(leaderboardRequestIdRef, requestId)
       ) {
         return;
@@ -299,7 +317,7 @@ export function App() {
       setLeaderboardLoadState("ready");
     } catch (error) {
       if (
-        !isCurrent() ||
+        !isCurrentBashoRequest() ||
         !isCurrentLeaderboardRequest(leaderboardRequestIdRef, requestId)
       ) {
         return;
