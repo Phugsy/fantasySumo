@@ -115,18 +115,43 @@ test("blocks team submission while sign-out is in flight", async ({ page }) => {
 });
 
 test("preserves an anonymous team draft through sign-in", async ({ page }) => {
+  let hideHoshoryu = false;
+  await page.route("**/api/basho/*/rikishi*", async (route) => {
+    const response = await route.fetch();
+
+    if (!hideHoshoryu) {
+      await route.fulfill({ response });
+      return;
+    }
+
+    const payload = await response.json();
+    await route.fulfill({
+      response,
+      json: {
+        ...payload,
+        rikishi: payload.rikishi.filter(
+          (rikishi: { id: string }) => rikishi.id !== "hoshoryu",
+        ),
+      },
+    });
+  });
+
   await page.goto("/");
   await page.getByLabel("Team name").fill("Draft Stable");
   await page.getByRole("button", { name: /Onosato/ }).click();
   await page.getByRole("button", { name: /Hoshoryu/ }).click();
 
+  hideHoshoryu = true;
   await signInAsDemoUser(page);
 
   await expect(page.getByLabel("Team name")).toHaveValue("Draft Stable");
-  await expect(page.getByText("2 of 2 selected")).toBeVisible();
+  await expect(page.getByText("1 of 2 selected")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Hoshoryu/ })).toHaveCount(0);
   await expect(
     page.locator("button.rikishi-row").filter({ hasText: "Onosato" }),
   ).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: /Kotozakura/ }).click();
+  await expect(page.getByText("2 of 2 selected")).toBeVisible();
   await expect(page.getByRole("button", { name: "Submit team" })).toBeEnabled();
   await page.getByRole("button", { name: "Submit team" }).click();
   await expect(page.getByText("Draft Stable submitted.")).toBeVisible();

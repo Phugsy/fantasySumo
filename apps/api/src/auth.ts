@@ -235,13 +235,27 @@ function parseCookies(
     return {};
   }
 
-  return Object.fromEntries(
-    cookieHeader
-      .split(";")
-      .map((cookie) => cookie.trim().split("="))
-      .filter((parts): parts is [string, string] => parts.length === 2)
-      .map(([key, value]) => [key, decodeURIComponent(value)]),
-  );
+  const cookies: Record<string, string> = {};
+
+  for (const cookie of cookieHeader.split(";")) {
+    const trimmedCookie = cookie.trim();
+    const separatorIndex = trimmedCookie.indexOf("=");
+
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = trimmedCookie.slice(0, separatorIndex);
+    const value = trimmedCookie.slice(separatorIndex + 1);
+
+    try {
+      cookies[key] = decodeURIComponent(value);
+    } catch {
+      // Ignore malformed cookie values so unrelated cookies cannot break auth.
+    }
+  }
+
+  return cookies;
 }
 
 function serializeCookie(

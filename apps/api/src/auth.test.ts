@@ -116,4 +116,28 @@ describe("auth routes", () => {
       await app.close();
     }
   });
+
+  it("treats malformed cookie values as an anonymous local session", async () => {
+    const app = buildApp({
+      authMode: "local",
+    });
+
+    try {
+      const response = await app.inject({
+        headers: {
+          cookie: "unrelated=%",
+        },
+        method: "GET",
+        url: "/api/session",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        mode: "local",
+        user: null,
+      });
+    } finally {
+      await app.close();
+    }
+  });
 });

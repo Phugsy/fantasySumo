@@ -1,4 +1,9 @@
-import type { FormEvent, MutableRefObject } from "react";
+import type {
+  Dispatch,
+  FormEvent,
+  MutableRefObject,
+  SetStateAction,
+} from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiRequestError,
@@ -590,10 +595,18 @@ function applyMyTeam(
   availableRikishi: readonly { id: string }[],
   preserveDraftWhenTeamMissing: boolean,
   setDisplayName: (displayName: string) => void,
-  setSelectedIds: (selectedIds: string[]) => void,
+  setSelectedIds: Dispatch<SetStateAction<string[]>>,
 ) {
+  const availableRikishiIds = new Set(
+    availableRikishi.map((rikishi) => rikishi.id),
+  );
+
   if (myTeam === null) {
-    if (!preserveDraftWhenTeamMissing) {
+    if (preserveDraftWhenTeamMissing) {
+      setSelectedIds((selectedIds) =>
+        selectedIds.filter((rikishiId) => availableRikishiIds.has(rikishiId)),
+      );
+    } else {
       setDisplayName("");
       setSelectedIds([]);
     }
@@ -601,9 +614,6 @@ function applyMyTeam(
   }
 
   setDisplayName(myTeam.team.displayName);
-  const availableRikishiIds = new Set(
-    availableRikishi.map((rikishi) => rikishi.id),
-  );
   setSelectedIds(
     myTeam.picks
       .map((pick) => pick.rikishiId)
