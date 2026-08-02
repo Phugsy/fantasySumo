@@ -31,7 +31,7 @@ export async function startDemoBasho(
     currentDay: basho.currentDay ?? 0,
   };
 
-  await repositories.lockFantasyTeamsForBasho(basho.id, now().toISOString());
+  await repositories.lockBashoAndFantasyTeams(basho.id, now().toISOString());
   await repositories.updateBasho(nextBasho);
 
   return describeDemoProgression(repositories, nextBasho);
@@ -83,7 +83,7 @@ export async function completeDemoBasho(
   const basho = await requireDemoBasho(repositories);
 
   if (basho.status === "upcoming" || basho.status === "locked") {
-    await repositories.lockFantasyTeamsForBasho(basho.id, now().toISOString());
+    await repositories.lockBashoAndFantasyTeams(basho.id, now().toISOString());
   }
 
   await repositories.deleteBoutResultsForBasho(basho.id);

@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type { LeaderboardEntry } from "./types";
@@ -155,6 +161,274 @@ describe("App", () => {
     expect(screen.getByText("0 of 2 selected")).toBeInTheDocument();
   });
 
+  it("lets an anonymous local user sign in before saving a team", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockAnonymousFetch));
+    render(<App />);
+
+    expect(await screen.findByLabelText("Email")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "player@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Display name"), {
+      target: { value: "New Player" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(await screen.findByText("New Player")).toBeInTheDocument();
+    expect(screen.getByText("player@example.com")).toBeInTheDocument();
+  });
+
+  it("does not expose the team form until private picks finish loading", async () => {
+    const myTeamRequest = createDeferred<Response>();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/basho/2026-05/my-team") {
+          return myTeamRequest.promise;
+        }
+
+        return mockAnonymousFetch(input, init);
+      }),
+    );
+    render(<App />);
+
+    await signInThroughAccountPanel();
+
+    expect(
+      await screen.findByRole("button", { name: "Sign out" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Team name")).not.toBeInTheDocument();
+
+    await act(async () => {
+      myTeamRequest.resolve(
+        await jsonResponse(
+          { message: "You do not have a fantasy team for this basho yet." },
+          { status: 404 },
+        ),
+      );
+    });
+
+    expect(
+      await screen.findByRole("button", { name: "Sign out" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Team name")).toHaveValue("");
+  });
+
+  it("does not treat a private-team server error as an empty team", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/session" && init?.method === "DELETE") {
+          return Promise.resolve(new Response(null, { status: 204 }));
+        }
+
+        if (String(input) === "/api/basho/2026-05/my-team") {
+          return jsonResponse(
+            { message: "Unable to load your fantasy team." },
+            { status: 503 },
+          );
+        }
+
+        return mockAnonymousFetch(input, init);
+      }),
+    );
+    render(<App />);
+
+    await signInThroughAccountPanel();
+
+    expect(
+      await screen.findByText("Unable to load your fantasy team."),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Team name")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sign out" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+
+    expect(await screen.findByLabelText("Team name")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toHaveValue("");
+    expect(screen.getByLabelText("Display name")).toHaveValue("");
+  });
+
+  it("shows public basho data when the session probe is unauthorized", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockUnauthorizedSessionFetch));
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "May 2026 Sample Basho" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Onosato/ })).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+  });
+
+  it("keeps the account panel available when initial basho loading is unauthorized", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockUnauthorizedBashoFetch));
+    render(<App />);
+
+    expect(await screen.findByLabelText("Email")).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+    expect(
+      screen.getByText("Use at least 8 characters and avoid common passwords."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Sign in before loading data."),
+    ).toBeInTheDocument();
+  });
+
+  it("explains raw public API 401 responses as deployment access issues", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockRawUnauthorizedBashoFetch));
+    render(<App />);
+
+    expect(
+      await screen.findByText(
+        "Public basho data is unavailable because this deployment is returning HTTP 401 for anonymous API requests.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("reloads basho data after sign in if startup was unauthorized", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockBashoUnauthorizedUntilLoginFetch()));
+    render(<App />);
+
+    expect(await screen.findByLabelText("Email")).toBeInTheDocument();
+    expect(
+      screen.getByText("Sign in before loading data."),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "player@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Display name"), {
+      target: { value: "New Player" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "May 2026 Sample Basho" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Onosato/ })).toBeInTheDocument();
+  });
+
+  it("shows the leaderboard after sign in when the user already has picks", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockExistingTeamAfterLoginFetch));
+    render(<App />);
+
+    expect(await screen.findByLabelText("Email")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "player@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Display name"), {
+      target: { value: "New Player" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Leaderboard" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Existing Champions")).toBeInTheDocument();
+  });
+
+  it("drops saved picks that are no longer on the current banzuke", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/basho/2026-05/my-team") {
+          return jsonResponse({
+            team: {
+              id: "team-existing",
+              displayName: "Existing Champions",
+            },
+            picks: [{ rikishiId: "onosato" }, { rikishiId: "removed-rikishi" }],
+          });
+        }
+
+        return mockExistingTeamAfterLoginFetch(input, init);
+      }),
+    );
+    render(<App />);
+
+    await signInThroughAccountPanel();
+    await screen.findByRole("heading", { name: "Leaderboard" });
+    fireEvent.click(screen.getByRole("button", { name: "My stable" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Selection" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("1 of 2 selected")).toBeInTheDocument();
+    expect(screen.getByText("Pick slot")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Hoshoryu/ })).toBeEnabled();
+  });
+
+  it("ignores a stale anonymous load that finishes after authenticated picks", async () => {
+    const initialCurrentBashoRequest = createDeferred<Response>();
+    let currentBashoRequestCount = 0;
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/basho/current") {
+          currentBashoRequestCount += 1;
+
+          return currentBashoRequestCount === 1
+            ? initialCurrentBashoRequest.promise
+            : jsonResponse(currentBasho);
+        }
+
+        return mockExistingTeamAfterLoginFetch(input, init);
+      }),
+    );
+    render(<App />);
+
+    await signInThroughAccountPanel();
+
+    expect(
+      await screen.findByRole("heading", { name: "Leaderboard" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Existing Champions")).toBeInTheDocument();
+
+    await act(async () => {
+      initialCurrentBashoRequest.resolve(await jsonResponse(currentBasho));
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "Leaderboard" }),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Existing Champions")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: "Selection" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("clears the previous user's private picks when another user has no team", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockUserSwitchFetch()));
+    render(<App />);
+
+    await signInThroughAccountPanel();
+    expect(
+      await screen.findByRole("heading", { name: "Leaderboard" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Existing Champions")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await screen.findByRole("button", { name: "Sign in" });
+    await signInThroughAccountPanel();
+
+    expect(
+      await screen.findByRole("heading", { name: "Selection" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Team name")).toHaveValue("");
+    expect(screen.getByText("0 of 2 selected")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Onosato/ })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
   it("displays leaderboard standings and team score details", async () => {
     render(<App />);
 
@@ -304,6 +578,7 @@ describe("App", () => {
           displayName: "East Stand Heroes",
           rikishiIds: ["onosato", "kotozakura"],
         }),
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
         },
@@ -399,9 +674,21 @@ describe("App", () => {
 
 function mockSuccessfulFetch(
   input: RequestInfo | URL,
-  basho = currentBasho,
+  maybeBasho: typeof currentBasho | RequestInit = currentBasho,
 ): Promise<Response> {
   const url = String(input);
+  const basho = "id" in maybeBasho ? maybeBasho : currentBasho;
+
+  if (url === "/api/session") {
+    return jsonResponse({
+      mode: "local",
+      user: {
+        id: "local-user",
+        email: "player@example.com",
+        displayName: "New Player",
+      },
+    });
+  }
 
   if (url === "/api/basho/current") {
     return jsonResponse(basho);
@@ -423,6 +710,15 @@ function mockSuccessfulFetch(
     );
   }
 
+  if (url === "/api/basho/2026-05/my-team") {
+    return jsonResponse(
+      {
+        message: "You do not have a fantasy team for this basho yet.",
+      },
+      { status: 404 },
+    );
+  }
+
   if (url === "/api/basho/2026-05/teams") {
     return jsonResponse(
       {
@@ -437,6 +733,279 @@ function mockSuccessfulFetch(
   }
 
   return jsonResponse({ message: "Not found" }, { status: 404 });
+}
+
+function mockAnonymousFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const url = String(input);
+
+  if (url === "/api/session" && init?.method === "POST") {
+    return jsonResponse(
+      {
+        mode: "local",
+        user: {
+          id: "local-user",
+          email: "player@example.com",
+          displayName: "New Player",
+        },
+      },
+      { status: 201 },
+    );
+  }
+
+  if (url === "/api/session") {
+    return jsonResponse({
+      mode: "local",
+      user: null,
+    });
+  }
+
+  return mockSuccessfulFetch(input);
+}
+
+function mockUnauthorizedSessionFetch(
+  input: RequestInfo | URL,
+): Promise<Response> {
+  const url = String(input);
+
+  if (url === "/api/session") {
+    return jsonResponse(
+      {
+        message: "Sign in before loading your session.",
+      },
+      { status: 401 },
+    );
+  }
+
+  return mockSuccessfulFetch(input);
+}
+
+function mockUnauthorizedBashoFetch(
+  input: RequestInfo | URL,
+): Promise<Response> {
+  const url = String(input);
+
+  if (url === "/api/session") {
+    return jsonResponse({
+      mode: "neon",
+      user: null,
+    });
+  }
+
+  if (url === "/api/basho/current") {
+    return jsonResponse(
+      {
+        message: "Sign in before loading data.",
+      },
+      { status: 401 },
+    );
+  }
+
+  return mockSuccessfulFetch(input);
+}
+
+function mockRawUnauthorizedBashoFetch(
+  input: RequestInfo | URL,
+): Promise<Response> {
+  const url = String(input);
+
+  if (url === "/api/session") {
+    return jsonResponse({
+      mode: "neon",
+      user: null,
+    });
+  }
+
+  if (url === "/api/basho/current") {
+    return Promise.resolve(new Response("HTTP 401", { status: 401 }));
+  }
+
+  return mockSuccessfulFetch(input);
+}
+
+function mockBashoUnauthorizedUntilLoginFetch(): (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) => Promise<Response> {
+  let signedIn = false;
+
+  return (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+
+    if (url === "/api/session" && init?.method === "POST") {
+      signedIn = true;
+
+      return jsonResponse(
+        {
+          mode: "local",
+          user: {
+            id: "local-user",
+            email: "player@example.com",
+            displayName: "New Player",
+          },
+        },
+        { status: 201 },
+      );
+    }
+
+    if (url === "/api/session") {
+      return jsonResponse({
+        mode: "local",
+        user: null,
+      });
+    }
+
+    if (url === "/api/basho/current" && !signedIn) {
+      return jsonResponse(
+        {
+          message: "Sign in before loading data.",
+        },
+        { status: 401 },
+      );
+    }
+
+    return mockSuccessfulFetch(input);
+  };
+}
+
+function mockExistingTeamAfterLoginFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const url = String(input);
+
+  if (url === "/api/session" && init?.method === "POST") {
+    return jsonResponse(
+      {
+        mode: "local",
+        user: {
+          id: "local-user",
+          email: "player@example.com",
+          displayName: "New Player",
+        },
+      },
+      { status: 201 },
+    );
+  }
+
+  if (url === "/api/session") {
+    return jsonResponse({
+      mode: "local",
+      user: null,
+    });
+  }
+
+  if (url === "/api/basho/2026-05/my-team") {
+    return jsonResponse({
+      team: {
+        id: "team-existing",
+        displayName: "Existing Champions",
+      },
+      picks: [{ rikishiId: "onosato" }, { rikishiId: "kotozakura" }],
+    });
+  }
+
+  if (url === "/api/basho/2026-05/leaderboard") {
+    return jsonResponse(
+      createLeaderboardResponse({
+        entries: [
+          {
+            rank: 1,
+            teamId: "team-existing",
+            displayName: "Existing Champions",
+            score: 0,
+            scoreHistory: [],
+            rikishiScores: [],
+          },
+        ],
+      }),
+    );
+  }
+
+  return mockSuccessfulFetch(input);
+}
+
+function mockUserSwitchFetch() {
+  let signedInUser = 0;
+
+  return (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = String(input);
+
+    if (url === "/api/session" && init?.method === "POST") {
+      signedInUser += 1;
+
+      return jsonResponse(
+        {
+          mode: "local",
+          user: {
+            id: `local-user-${signedInUser}`,
+            email: `player-${signedInUser}@example.com`,
+            displayName: `Player ${signedInUser}`,
+          },
+        },
+        { status: 201 },
+      );
+    }
+
+    if (url === "/api/session" && init?.method === "DELETE") {
+      return Promise.resolve(new Response(null, { status: 204 }));
+    }
+
+    if (url === "/api/session") {
+      return jsonResponse({ mode: "local", user: null });
+    }
+
+    if (url === "/api/basho/2026-05/my-team" && signedInUser === 1) {
+      return jsonResponse({
+        team: {
+          id: "team-existing",
+          displayName: "Existing Champions",
+        },
+        picks: [{ rikishiId: "onosato" }, { rikishiId: "kotozakura" }],
+      });
+    }
+
+    if (url === "/api/basho/2026-05/my-team") {
+      return jsonResponse(
+        { message: "You do not have a fantasy team for this basho yet." },
+        { status: 404 },
+      );
+    }
+
+    if (url === "/api/basho/2026-05/leaderboard") {
+      return jsonResponse(
+        createLeaderboardResponse({
+          entries:
+            signedInUser === 0
+              ? []
+              : [
+                  {
+                    rank: 1,
+                    teamId: "team-existing",
+                    displayName: "Existing Champions",
+                    score: 0,
+                    scoreHistory: [],
+                    rikishiScores: [],
+                  },
+                ],
+        }),
+      );
+    }
+
+    return mockSuccessfulFetch(input);
+  };
+}
+
+async function signInThroughAccountPanel() {
+  fireEvent.change(await screen.findByLabelText("Email"), {
+    target: { value: "player@example.com" },
+  });
+  fireEvent.change(screen.getByLabelText("Display name"), {
+    target: { value: "New Player" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 }
 
 function mockEmptyLeaderboardFetch(

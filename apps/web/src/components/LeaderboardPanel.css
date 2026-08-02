@@ -41,6 +41,10 @@
   background: #ffffff;
 }
 
+.leaderboard-entry.current-team {
+  border-color: var(--vermilion);
+}
+
 .leaderboard-summary {
   display: grid;
   grid-template-columns: 68px minmax(0, 1fr) auto;

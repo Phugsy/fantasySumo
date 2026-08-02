@@ -8,10 +8,19 @@ import {
 import {
   allowsUnprotectedAdminImports,
   getAdminImportToken,
+  getAuthMode,
   getCronSecret,
   getDemoAdminToken,
+  getNeonAuthAudience,
+  getNeonAuthIssuer,
+  getNeonAuthJwksUrl,
   getTeamSize,
 } from "./config.js";
+import {
+  createAuthService,
+  registerAuthRoutes,
+  type AuthenticatedUser,
+} from "./auth.js";
 import { registerAdminDemoRoutes } from "./routes/admin-demo.js";
 import { registerAdminImportRoutes } from "./routes/admin-imports.js";
 import { registerBashoRoutes } from "./routes/basho.js";
@@ -25,6 +34,11 @@ interface AppOptions {
   teamSize?: number;
   demoAdminToken?: string;
   adminImportToken?: string;
+  authMode?: "local" | "neon";
+  neonAuthAudience?: string;
+  neonAuthIssuer?: string;
+  neonAuthJwksUrl?: string;
+  neonJwtVerifier?: (token: string) => Promise<AuthenticatedUser | undefined>;
   cronSecret?: string;
   allowUnprotectedAdminImports?: boolean;
   allowUnprotectedDemoAdmin?: boolean;
@@ -38,6 +52,13 @@ export function buildApp(options: AppOptions = {}) {
   });
   const db = options.db ?? ownedClient!;
   const repositories = createRepositories(db);
+  const auth = createAuthService({
+    mode: options.authMode ?? getAuthMode(),
+    neonAuthAudience: options.neonAuthAudience ?? getNeonAuthAudience(),
+    neonAuthIssuer: options.neonAuthIssuer ?? getNeonAuthIssuer(),
+    neonAuthJwksUrl: options.neonAuthJwksUrl ?? getNeonAuthJwksUrl(),
+    neonJwtVerifier: options.neonJwtVerifier,
+  });
 
   if (ownedClient !== undefined) {
     app.addHook("onClose", async () => {
@@ -51,7 +72,9 @@ export function buildApp(options: AppOptions = {}) {
     domain: "core-ready",
   }));
 
+  registerAuthRoutes(app, auth);
   registerBashoRoutes(app, {
+    auth,
     repositories,
     now: options.now ?? (() => new Date()),
     teamIdFactory: options.teamIdFactory ?? randomUUID,

@@ -44,16 +44,26 @@ export const banzukeEntries = sqliteTable(
   ],
 );
 
-export const fantasyTeams = sqliteTable("fantasy_teams", {
-  id: text("id").primaryKey(),
-  bashoId: text("basho_id")
-    .notNull()
-    .references(() => basho.id, { onDelete: "cascade" }),
-  displayName: text("display_name").notNull(),
-  ownerName: text("owner_name"),
-  createdAt: text("created_at"),
-  lockedAt: text("locked_at"),
-});
+export const fantasyTeams = sqliteTable(
+  "fantasy_teams",
+  {
+    id: text("id").primaryKey(),
+    bashoId: text("basho_id")
+      .notNull()
+      .references(() => basho.id, { onDelete: "cascade" }),
+    displayName: text("display_name").notNull(),
+    ownerName: text("owner_name"),
+    ownerUserId: text("owner_user_id"),
+    createdAt: text("created_at"),
+    lockedAt: text("locked_at"),
+  },
+  (table) => [
+    uniqueIndex("fantasy_teams_basho_owner_user_idx").on(
+      table.bashoId,
+      table.ownerUserId,
+    ),
+  ],
+);
 
 export const fantasyPicks = sqliteTable(
   "fantasy_picks",

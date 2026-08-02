@@ -132,6 +132,11 @@ Set these in Vercel before exposing the app:
 ```text
 DATABASE_URL=<managed Postgres connection string>
 TEAM_SIZE=2
+AUTH_MODE=neon
+NEON_AUTH_JWKS_URL=<Neon Auth JWKS URL>
+NEON_AUTH_ISSUER=<optional expected JWT issuer>
+NEON_AUTH_AUDIENCE=<optional expected JWT audience>
+VITE_NEON_AUTH_URL=<Neon Auth client URL>
 ADMIN_IMPORT_TOKEN=<long random token>
 CRON_SECRET=<long random token>
 DEMO_ADMIN_TOKEN=<long random token, only if demo admin controls are needed>
@@ -139,10 +144,11 @@ DEMO_ADMIN_TOKEN=<long random token, only if demo admin controls are needed>
 
 `DATABASE_URL` must not be a `file:` or `:memory:` SQLite URL when `NODE_ENV=production`. SQLite is only supported for local development because serverless function storage is ephemeral and cannot be used as production state.
 
-## Production database direction
+## Production database and auth direction
 
 Production uses managed Neon Postgres. Keep the generic `DATABASE_URL` and
-repository adapter boundary so the application remains portable.
+repository adapter boundary so the application remains portable, while Neon
+also supplies the intended production identity provider through Neon Auth.
 
 The database package now treats persistence as an adapter boundary:
 
@@ -150,7 +156,20 @@ The database package now treats persistence as an adapter boundary:
 - `postgres:` and `postgresql:` `DATABASE_URL` values use the Postgres Drizzle adapter.
 - API code depends on the async `Repositories` contract, not a concrete database driver.
 
-Keep SQLite locally until there is a concrete reason to standardise development on local Postgres. It keeps the demo and contributor setup simple, but it does mean local smoke tests are not a perfect production proof. Any deploy-bound database change should also be validated against a real Postgres database before release.
+Keep SQLite locally until there is a concrete reason to standardise development on local Postgres. It keeps the demo and contributor setup simple, but it does mean local smoke tests are not a perfect production proof. Any deploy-bound database change should also be validated against a real Neon Postgres database before release.
+
+Authentication is also behind an app boundary:
+
+- Local development and tests use `AUTH_MODE=local`, which provides a small cookie-based development session through `POST /api/session`.
+- Production uses `AUTH_MODE=neon`. The React app authenticates with Neon Auth, sends the Neon JWT in `Authorization: Bearer <token>`, and the Fastify API verifies it with `NEON_AUTH_JWKS_URL`.
+- The verified JWT `sub` claim is the Neon user id and becomes the stored team `ownerUserId`.
+
+The API rejects `AUTH_MODE=local` when `NODE_ENV=production` so the unsigned
+development session cannot be enabled on a production deployment.
+
+Do not set `AUTH_MODE=neon` without `NEON_AUTH_JWKS_URL`; the API will fail closed and treat requests as unauthenticated.
+
+Neon Auth also requires each deployed app origin to be added as a trusted domain in Neon Console -> Auth -> Configuration -> Domains. Add the exact production and preview origins with protocol and no trailing slash, for example `https://fantasy-sumo.vercel.app`. Wildcard subdomains are not supported, so each Vercel preview domain that needs auth testing must be added explicitly.
 
 The Postgres migration ledger records each filename and a SHA-256 checksum of
 its SQL. Identical reruns are skipped; if two branches reuse a filename for
@@ -162,13 +181,11 @@ produce the same checksum.
 
 Production applied `0001_team_owner_user.sql` before its auth feature rollout
 was paused until after the current tournament. The nullable `owner_user_id`
-column and its unique `(basho_id, owner_user_id)` index are intentionally
-retained as backward-compatible groundwork: current application code does not
-read or write the field, and no authentication setup is required until the
-feature resumes. That immutable production history remains canonical, so the
-demo classification change follows it as `0002_basho_demo_flag.sql`. That
-migration tolerates the demo column already existing in an environment that
-applied the superseded demo migration identity.
+column and its unique `(basho_id, owner_user_id)` index now back the resumed
+authentication feature. That immutable production history remains canonical,
+so the demo classification change follows it as `0002_basho_demo_flag.sql`.
+That migration tolerates the demo column already existing in an environment
+that applied the superseded demo migration identity.
 Do not delete the ownership ledger row or reuse its filename for different SQL.
 
 ### Legacy checksum investigation
@@ -334,7 +351,8 @@ curl "https://<deployment>/api/cron/import-results" \
 
 1. Create separate preview and production Neon Postgres databases.
 2. Add the Vercel project from the GitHub repo root.
-3. Configure the Vercel runtime variables for preview and production.
+3. Configure the Vercel runtime variables for preview and production, including
+   Neon Auth, and add each deployed origin to Neon Auth trusted domains.
 4. Configure and protect the matching GitHub environments and secrets described
    above, including a production required reviewer.
 5. Manually dispatch a preview deployment and verify its migration, deployment,
@@ -346,8 +364,9 @@ curl "https://<deployment>/api/cron/import-results" \
    action.
 8. Dispatch the production workflow for an exact reviewed `master` SHA and
    approve the environment gate.
-9. Smoke-test current basho, team creation, import dry-runs, result imports, and
-   leaderboard updates beyond the automated health check.
+9. Smoke-test Neon sign-in/sign-up, current basho, owned team creation and
+   retrieval, import dry-runs, result imports, and leaderboard updates beyond
+   the automated health check.
 10. Document and test the database backup and restore process from Neon.
 
 ## Emergency migration and recovery

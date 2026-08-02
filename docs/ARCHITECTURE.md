@@ -26,6 +26,7 @@ The active app is split into:
 - a shared framework-free domain package with MVP types, pick validation, scoring, and leaderboard calculation;
 - a Drizzle data package with local SQLite and a production Neon Postgres
   adapter;
+- an API auth boundary with local development sessions and production Neon Auth JWT verification;
 - root pnpm scripts for dev, build, test, lint, and formatting.
 - GitHub Actions deployment workflows that validate an immutable commit, apply
   environment-scoped Postgres migrations, deploy the prepared Vercel build only
@@ -40,7 +41,8 @@ Current behaviour:
 - Fetches the current basho and its ranked rikishi from the Fastify API.
 - Fetches leaderboard standings from the Fastify API.
 - Lets a player select and deselect rikishi up to the API-configured team size.
-- Captures a display/team name and submits the team to the API.
+- Captures a display/team name and submits the team to the API for the signed-in/current user.
+- Provides a local development sign-in panel that establishes the current user session.
 - Shows ordered team standings with the latest daily score, compact five-day
   team form, and expandable picked-rikishi tournament totals. Each rikishi row
   shows up to five recent outcomes and expands to the full result history.
@@ -70,12 +72,17 @@ Current routes:
 - `GET /api/basho/:bashoId/rikishi`
   - Returns a basho and its rikishi with banzuke rank data.
 - `POST /api/basho/:bashoId/teams`
-  - Creates a display-name-based fantasy team for the basho.
-  - Request body: `displayName`, optional `ownerName`, and `rikishiIds`.
+  - Creates or updates the signed-in user's fantasy team for the basho.
+  - Request body: `displayName` and `rikishiIds`.
   - The current team size defaults to 2 rikishi and can be changed with `TEAM_SIZE`.
   - Validates duplicate picks, exact team size, and whether each picked rikishi is on that basho's banzuke.
+  - Enforces one owned team per user per basho and preserves basho pick-locking rules.
+- `GET /api/basho/:bashoId/my-team`
+  - Requires a current user.
+  - Returns the current user's fantasy team and picks for the basho.
 - `GET /api/basho/:bashoId/teams/:teamId`
   - Returns a fantasy team and its picks.
+  - Owned teams can only be viewed by their owner; legacy unowned seed/demo teams remain readable.
 - `GET /api/basho/:bashoId/leaderboard`
   - Returns leaderboard entries calculated with the domain scoring module.
   - Includes the latest scored day's points and chronological daily/cumulative
@@ -83,6 +90,12 @@ Current routes:
   - Each day records every pick's `win`, `loss`, `absent`, or `no-result`
     outcome and fantasy-point contribution. Days without stored results are
     omitted rather than presented as scored.
+- `GET /api/session`
+  - Returns the current authenticated user or `null`.
+- `POST /api/session`
+  - In local auth mode only, establishes a development session from email and display name.
+- `DELETE /api/session`
+  - Clears the local development session cookie.
 - `POST /api/admin/import-banzuke`
   - Fetches current Makuuchi banzuke data from the Japan Sumo Association `indexAjax` endpoint.
   - Maps source payloads into local `Basho`, `Rikishi`, and `BanzukeEntry` records.
@@ -128,7 +141,7 @@ Current routes:
 
 Current limitations:
 
-- No auth.
+- Auth remains intentionally small. Local development uses a cookie-based development session, while production identity comes from Neon Auth JWTs verified by the API auth boundary.
 - No dedicated API client package.
 - No admin UI yet.
 
@@ -166,16 +179,18 @@ Current behaviour:
   production deployment.
 - Defines SQLite and Postgres MVP schemas with Drizzle table definitions.
 - Includes SQLite migration SQL in `packages/db/drizzle` and Postgres migration SQL in `packages/db/drizzle-pg`.
-- Preserves the production-applied `owner_user_id` compatibility column and
-  unique index in the Postgres schema and migration history. The paused auth
-  feature does not currently read or write this nullable field. Retaining it
-  avoids rewriting deployed history or applying a destructive rollback.
+- Uses the production-applied canonical `0001_team_owner_user.sql` migration
+  for the nullable `owner_user_id` column and its per-basho unique index;
+  the auth boundary now reads and writes this provider-neutral ownership key.
 - Uses `DATABASE_URL` to select the adapter: `file:` and `:memory:` use SQLite; `postgres:` and `postgresql:` use Postgres.
 - Exposes an async repository contract so API/domain workflows do not depend on a concrete database driver.
 - Provides repository functions for reading and writing basho, rikishi, banzuke entries, fantasy teams, fantasy picks, and bout results.
+- Stores optional `ownerUserId` on fantasy teams so authenticated ownership can be enforced without coupling the database package to Neon Auth implementation details.
 - Provides transactional upsert helpers for banzuke and bout result imports;
   banzuke writes preserve the furthest stored lifecycle state inside the
   transaction so concurrent refreshes cannot reopen picks.
+- Saves owned teams and replacement picks atomically while rechecking the
+  persisted basho status and upserting on the per-basho owner key.
 - Provides sample seed data for one basho, four rikishi, two fantasy teams, picks, and bout results.
 - Provides deterministic demo seed data for one pickable basho, eight rikishi, four fantasy teams, picks, and a 15-day bout result fixture.
 - Classifies bashos explicitly with `isDemo`. The fixed demo reset transaction

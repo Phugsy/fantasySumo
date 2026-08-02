@@ -1,4 +1,9 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
 
 const demoAdminToken =
   process.env.DEMO_ADMIN_TOKEN ?? "playwright-demo-admin-token";
@@ -27,6 +32,7 @@ test("creates a fantasy team and shows it on the leaderboard", async ({
   page,
 }) => {
   await page.goto("/");
+  await signInAsDemoUser(page);
 
   await page.getByLabel("Team name").fill("Codex Stable");
   await page.getByRole("button", { name: /Onosato/ }).click();
@@ -39,6 +45,143 @@ test("creates a fantasy team and shows it on the leaderboard", async ({
   await expect(
     page.getByRole("button", { name: /Codex Stable.*0 pts/ }),
   ).toBeVisible();
+
+  await page.reload();
+
+  await expect(
+    page.getByRole("heading", { name: "Leaderboard", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Codex Stable.*0 pts/ }),
+  ).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByText("Your team", { exact: true })).toBeVisible();
+});
+
+test("blocks sign-out while a team save is in flight", async ({ page }) => {
+  let releaseSave: () => void = () => undefined;
+  const saveMayContinue = new Promise<void>((resolve) => {
+    releaseSave = resolve;
+  });
+
+  await page.route("**/api/basho/demo-2026-05/teams", async (route) => {
+    await saveMayContinue;
+    await route.continue();
+  });
+
+  await page.goto("/");
+  await signInAsDemoUser(page);
+  await page.getByLabel("Team name").fill("Patient Stable");
+  await page.getByRole("button", { name: /Onosato/ }).click();
+  await page.getByRole("button", { name: /Hoshoryu/ }).click();
+  await page.getByRole("button", { name: "Submit team" }).click();
+
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeDisabled();
+  releaseSave();
+  await expect(page.getByText("Patient Stable submitted.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeEnabled();
+});
+
+test("blocks team submission while sign-out is in flight", async ({ page }) => {
+  let releaseSignOut: () => void = () => undefined;
+  const signOutMayContinue = new Promise<void>((resolve) => {
+    releaseSignOut = resolve;
+  });
+
+  await page.route("**/api/session", async (route) => {
+    if (route.request().method() === "DELETE") {
+      await signOutMayContinue;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto("/");
+  await signInAsDemoUser(page);
+  await page.getByLabel("Team name").fill("Departing Stable");
+  await page.getByRole("button", { name: /Onosato/ }).click();
+  await page.getByRole("button", { name: /Hoshoryu/ }).click();
+  await expect(page.getByRole("button", { name: "Submit team" })).toBeEnabled();
+
+  await page.getByRole("button", { name: "Sign out" }).click();
+
+  await expect(
+    page.getByRole("button", { name: "Submit team" }),
+  ).toBeDisabled();
+  releaseSignOut();
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByLabel("Email")).toHaveValue("");
+  await expect(page.getByLabel("Display name")).toHaveValue("");
+  await expect(page.getByText("Departing Stable submitted.")).toHaveCount(0);
+});
+
+test("blocks draft editing while sign-in is in flight", async ({ page }) => {
+  let releaseSignIn: () => void = () => undefined;
+  const signInMayContinue = new Promise<void>((resolve) => {
+    releaseSignIn = resolve;
+  });
+
+  await page.route("**/api/session", async (route) => {
+    if (route.request().method() === "POST") {
+      await signInMayContinue;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Email").fill("e2e-player@example.com");
+  await page.getByLabel("Display name").fill("E2E Player");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(page.getByLabel("Team name")).toBeDisabled();
+  await expect(page.getByRole("button", { name: /Onosato/ })).toBeDisabled();
+  releaseSignIn();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(page.getByLabel("Team name")).toBeEnabled();
+  await expect(page.getByRole("button", { name: /Onosato/ })).toBeEnabled();
+});
+
+test("preserves an anonymous team draft through sign-in", async ({ page }) => {
+  let hideHoshoryu = false;
+  await page.route("**/api/basho/*/rikishi*", async (route) => {
+    const response = await route.fetch();
+
+    if (!hideHoshoryu) {
+      await route.fulfill({ response });
+      return;
+    }
+
+    const payload = await response.json();
+    await route.fulfill({
+      response,
+      json: {
+        ...payload,
+        rikishi: payload.rikishi.filter(
+          (rikishi: { id: string }) => rikishi.id !== "hoshoryu",
+        ),
+      },
+    });
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Team name").fill("Draft Stable");
+  await page.getByRole("button", { name: /Onosato/ }).click();
+  await page.getByRole("button", { name: /Hoshoryu/ }).click();
+
+  hideHoshoryu = true;
+  await signInAsDemoUser(page);
+
+  await expect(page.getByLabel("Team name")).toHaveValue("Draft Stable");
+  await expect(page.getByText("1 of 2 selected")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Hoshoryu/ })).toHaveCount(0);
+  await expect(
+    page.locator("button.rikishi-row").filter({ hasText: "Onosato" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: /Kotozakura/ }).click();
+  await expect(page.getByText("2 of 2 selected")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Submit team" })).toBeEnabled();
+  await page.getByRole("button", { name: "Submit team" }).click();
+  await expect(page.getByText("Draft Stable submitted.")).toBeVisible();
 });
 
 test("shows completed demo leaderboard entries in score order", async ({
@@ -73,6 +216,7 @@ test("locks team selection after the demo basho starts", async ({
   page,
   request,
 }) => {
+  await signInRequest(request);
   const unauthorizedResponse = await request.post("/api/admin/demo/start");
   expect(unauthorizedResponse.status()).toBe(401);
 
@@ -229,6 +373,7 @@ test("advances the demo basho and refreshes scored leaderboard state", async ({
 
 test("prevents incomplete and overfull team submissions", async ({ page }) => {
   await page.goto("/");
+  await signInAsDemoUser(page);
 
   const submitButton = page.getByRole("button", { name: "Submit team" });
   await expect(submitButton).toBeDisabled();
@@ -293,6 +438,24 @@ test("keeps navigation, ranks, and core views usable on the emulated device", as
 async function resetDemo(request: APIRequestContext) {
   const response = await request.post("/api/admin/demo/reset", {
     headers: demoAdminHeaders,
+  });
+
+  await expect(response).toBeOK();
+}
+
+async function signInAsDemoUser(page: Page) {
+  await page.getByLabel("Email").fill("e2e-player@example.com");
+  await page.getByLabel("Display name").fill("E2E Player");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+}
+
+async function signInRequest(request: APIRequestContext) {
+  const response = await request.post("/api/session", {
+    data: {
+      email: "e2e-player@example.com",
+      displayName: "E2E Player",
+    },
   });
 
   await expect(response).toBeOK();

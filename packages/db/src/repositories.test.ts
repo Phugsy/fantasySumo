@@ -108,6 +108,140 @@ describe("repositories", () => {
     ).toContain("team-north");
   });
 
+  it("writes and replaces one owned fantasy team for a basho", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
+
+    await repositories.saveOwnedFantasyTeamWithPicksIfBashoUpcoming(
+      {
+        id: "team-owned",
+        bashoId: sampleBasho.id,
+        displayName: "North Side",
+        ownerName: "New Player",
+        ownerUserId: "user-new-player",
+        createdAt: "2026-05-02T10:00:00.000Z",
+      },
+      [
+        {
+          teamId: "team-owned",
+          rikishiId: "onosato",
+        },
+        {
+          teamId: "team-owned",
+          rikishiId: "kirishima",
+        },
+      ],
+    );
+
+    expect(
+      await repositories.getFantasyTeamForOwner(
+        sampleBasho.id,
+        "user-new-player",
+      ),
+    ).toMatchObject({
+      id: "team-owned",
+      ownerUserId: "user-new-player",
+    });
+
+    const updatedTeam =
+      await repositories.saveOwnedFantasyTeamWithPicksIfBashoUpcoming(
+        {
+          id: "team-racing-request",
+          bashoId: sampleBasho.id,
+          displayName: "North Side Updated",
+          ownerName: "New Player",
+          ownerUserId: "user-new-player",
+          createdAt: "2026-05-02T10:00:00.000Z",
+        },
+        [
+          {
+            teamId: "team-racing-request",
+            rikishiId: "kotozakura",
+          },
+          {
+            teamId: "team-racing-request",
+            rikishiId: "hoshoryu",
+          },
+        ],
+      );
+
+    expect(updatedTeam).toMatchObject({
+      id: "team-owned",
+      displayName: "North Side Updated",
+    });
+    expect(
+      await repositories.getFantasyTeam("team-racing-request"),
+    ).toBeUndefined();
+
+    expect(
+      await repositories.getFantasyTeamForOwner(
+        sampleBasho.id,
+        "user-new-player",
+      ),
+    ).toMatchObject({
+      id: "team-owned",
+      displayName: "North Side Updated",
+    });
+    expect(await repositories.listFantasyPicksForTeam("team-owned")).toEqual([
+      {
+        id: "team-owned-hoshoryu",
+        teamId: "team-owned",
+        rikishiId: "hoshoryu",
+      },
+      {
+        id: "team-owned-kotozakura",
+        teamId: "team-owned",
+        rikishiId: "kotozakura",
+      },
+    ]);
+  });
+
+  it("does not replace an owned team after that team has been locked", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
+    const ownedTeam = {
+      id: "team-owned-locked",
+      bashoId: sampleBasho.id,
+      displayName: "Locked Stable",
+      ownerUserId: "user-locked",
+      createdAt: "2026-05-02T10:00:00.000Z",
+    };
+
+    await repositories.saveOwnedFantasyTeamWithPicksIfBashoUpcoming(ownedTeam, [
+      { teamId: ownedTeam.id, rikishiId: "onosato" },
+      { teamId: ownedTeam.id, rikishiId: "kirishima" },
+    ]);
+    await repositories.lockFantasyTeamsForBasho(
+      sampleBasho.id,
+      "2026-05-08T02:00:00.000Z",
+    );
+
+    expect((await repositories.getBasho(sampleBasho.id))?.status).toBe(
+      "upcoming",
+    );
+    await expect(
+      repositories.saveOwnedFantasyTeamWithPicksIfBashoUpcoming(
+        {
+          ...ownedTeam,
+          displayName: "Replacement Stable",
+        },
+        [
+          { teamId: ownedTeam.id, rikishiId: "kotozakura" },
+          { teamId: ownedTeam.id, rikishiId: "hoshoryu" },
+        ],
+      ),
+    ).resolves.toBeUndefined();
+    expect(await repositories.getFantasyTeam(ownedTeam.id)).toMatchObject({
+      displayName: "Locked Stable",
+      lockedAt: "2026-05-08T02:00:00.000Z",
+    });
+    expect(
+      (await repositories.listFantasyPicksForTeam(ownedTeam.id)).map(
+        (pick) => pick.rikishiId,
+      ),
+    ).toEqual(["kirishima", "onosato"]);
+  });
+
   it("rolls back team creation when a pick insert fails", async () => {
     await seedDatabase(createRepositories(client));
     const repositories = createRepositories(client);

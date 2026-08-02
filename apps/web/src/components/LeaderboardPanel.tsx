@@ -14,6 +14,7 @@ import "./LeaderboardPanel.css";
 interface LeaderboardPanelProps {
   basho: Basho;
   createdTeam: CreatedTeamResponse | null;
+  currentTeamId?: string | null;
   errorMessage: string | null;
   expandedTeamId: string | null;
   leaderboard: LeaderboardEntry[];
@@ -26,6 +27,7 @@ interface LeaderboardPanelProps {
 export function LeaderboardPanel({
   basho,
   createdTeam,
+  currentTeamId,
   errorMessage,
   expandedTeamId,
   leaderboard,
@@ -88,6 +90,7 @@ export function LeaderboardPanel({
             {getEmptyScoringMessage(basho)}
           </div>
           {renderLeaderboardList({
+            currentTeamId,
             expandedTeamId,
             leaderboard,
             onToggleTeam,
@@ -95,13 +98,14 @@ export function LeaderboardPanel({
             tiedScoreCounts,
           })}
           <TournamentProgressChart
-            currentTeamId={createdTeam?.team.id}
+            currentTeamId={currentTeamId ?? undefined}
             leaderboard={leaderboard}
           />
         </>
       ) : (
         <>
           {renderLeaderboardList({
+            currentTeamId,
             expandedTeamId,
             leaderboard,
             onToggleTeam,
@@ -109,7 +113,7 @@ export function LeaderboardPanel({
             tiedScoreCounts,
           })}
           <TournamentProgressChart
-            currentTeamId={createdTeam?.team.id}
+            currentTeamId={currentTeamId ?? undefined}
             leaderboard={leaderboard}
           />
         </>
@@ -119,12 +123,14 @@ export function LeaderboardPanel({
 }
 
 function renderLeaderboardList({
+  currentTeamId,
   expandedTeamId,
   leaderboard,
   onToggleTeam,
   rikishiById,
   tiedScoreCounts,
 }: {
+  currentTeamId?: string | null;
   expandedTeamId: string | null;
   leaderboard: LeaderboardEntry[];
   onToggleTeam: (teamId: string) => void;
@@ -136,9 +142,17 @@ function renderLeaderboardList({
       {leaderboard.map((entry) => {
         const isTied = (tiedScoreCounts.get(entry.score) ?? 0) > 1;
         const isExpanded = expandedTeamId === entry.teamId;
+        const isCurrentTeam = currentTeamId === entry.teamId;
 
         return (
-          <li className="leaderboard-entry" key={entry.teamId}>
+          <li
+            className={
+              isCurrentTeam
+                ? "leaderboard-entry current-team"
+                : "leaderboard-entry"
+            }
+            key={entry.teamId}
+          >
             <button
               type="button"
               className="leaderboard-summary"
@@ -148,6 +162,7 @@ function renderLeaderboardList({
               <span className="leaderboard-rank">#{entry.rank}</span>
               <span className="leaderboard-team">
                 <strong>{entry.displayName}</strong>
+                {isCurrentTeam && <small>Your team</small>}
                 {isTied && <small>Tied on score</small>}
                 <RecentForm scoreHistory={entry.scoreHistory} />
               </span>

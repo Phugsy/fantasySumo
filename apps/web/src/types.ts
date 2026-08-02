@@ -26,10 +26,24 @@ export interface CreatedTeamResponse {
   team: {
     id: string;
     displayName: string;
+    ownerUserId?: string;
   };
   picks: Array<{
     rikishiId: string;
   }>;
+}
+
+export type TeamResponse = CreatedTeamResponse;
+
+export interface SessionUser {
+  id: string;
+  email?: string;
+  displayName?: string;
+}
+
+export interface SessionResponse {
+  user: SessionUser | null;
+  mode: "local" | "neon";
 }
 
 export interface LeaderboardResponse {

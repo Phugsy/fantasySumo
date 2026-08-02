@@ -1,10 +1,18 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { allowsUnprotectedAdminImports } from "./config.js";
+import {
+  allowsUnprotectedAdminImports,
+  getAuthMode,
+  getNeonAuthJwksUrl,
+} from "./config.js";
 
 const originalNodeEnv = process.env.NODE_ENV;
+const originalAuthMode = process.env.AUTH_MODE;
+const originalNeonAuthJwksUrl = process.env.NEON_AUTH_JWKS_URL;
 
 afterEach(() => {
   process.env.NODE_ENV = originalNodeEnv;
+  process.env.AUTH_MODE = originalAuthMode;
+  process.env.NEON_AUTH_JWKS_URL = originalNeonAuthJwksUrl;
 });
 
 describe("API config", () => {
@@ -30,5 +38,34 @@ describe("API config", () => {
     process.env.NODE_ENV = "test";
 
     expect(allowsUnprotectedAdminImports()).toBe(true);
+  });
+
+  it("uses local auth in development and Neon auth in production by default", () => {
+    process.env.AUTH_MODE = "";
+    process.env.NODE_ENV = "development";
+
+    expect(getAuthMode()).toBe("local");
+
+    process.env.NODE_ENV = "production";
+
+    expect(getAuthMode()).toBe("neon");
+  });
+
+  it("rejects insecure local auth in production", () => {
+    process.env.AUTH_MODE = "local";
+    process.env.NODE_ENV = "production";
+
+    expect(() => getAuthMode()).toThrow(
+      "AUTH_MODE=local is not allowed in production.",
+    );
+  });
+
+  it("reads Neon Auth JWKS URL from the environment", () => {
+    process.env.NEON_AUTH_JWKS_URL =
+      "https://auth.example.test/.well-known/jwks.json";
+
+    expect(getNeonAuthJwksUrl()).toBe(
+      "https://auth.example.test/.well-known/jwks.json",
+    );
   });
 });

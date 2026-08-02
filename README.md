@@ -15,6 +15,7 @@ At present, the app has the first local playable foundations:
 - A shared TypeScript domain package with MVP types, lifecycle rules, validation, scoring, and leaderboard logic.
 - A swappable Drizzle database package with local SQLite, production Postgres, repositories, migrations, sample seed data, and deterministic demo data.
 - Automated source-backed import commands and local admin endpoints for current banzuke and daily results.
+- A minimal current-user/session boundary for local development and production auth integration.
 - Vitest, ESLint, and Prettier wired through pnpm scripts.
 
 It is close to a local playable loop, but still needs a friendlier admin UI before it is useful during a real basho.
@@ -192,6 +193,12 @@ Use a `postgres:` or `postgresql:` `DATABASE_URL` for managed production persist
 The local team size defaults to `2`. Override it for the API with `TEAM_SIZE`.
 Set `DEMO_ADMIN_TOKEN` to enable protected demo admin API controls.
 Set `CRON_SECRET` in production to authenticate Vercel's scheduled basho job.
+
+## Auth and team ownership
+
+Fantasy team creation now requires a current user. Local development uses `AUTH_MODE=local`, which exposes a simple development-only session flow through `POST /api/session` and an in-app sign-in panel. This keeps SQLite demos and tests self-contained.
+
+Production uses Neon Auth as the identity source. The web app signs users in with `VITE_NEON_AUTH_URL`, sends the Neon JWT to the API, and the API verifies that token in `AUTH_MODE=neon` with `NEON_AUTH_JWKS_URL`. The API stores team ownership as `ownerUserId`, enforces one team per user per basho, and keeps the leaderboard public by team/display name.
 
 ## Data import
 
