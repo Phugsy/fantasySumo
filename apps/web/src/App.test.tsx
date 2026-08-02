@@ -249,6 +249,8 @@ describe("App", () => {
 
     expect(await screen.findByLabelText("Team name")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toHaveValue("");
+    expect(screen.getByLabelText("Display name")).toHaveValue("");
   });
 
   it("shows public basho data when the session probe is unauthorized", async () => {

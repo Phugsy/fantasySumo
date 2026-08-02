@@ -238,6 +238,8 @@ export function App() {
         await clearSession();
       }
       setSessionUser(null);
+      setAccountEmail("");
+      setAccountDisplayName("");
       setCreatedTeam(null);
       setOwnedTeamId(null);
       setDisplayName("");

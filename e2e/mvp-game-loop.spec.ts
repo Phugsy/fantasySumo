@@ -109,6 +109,8 @@ test("blocks team submission while sign-out is in flight", async ({ page }) => {
   ).toBeDisabled();
   releaseSignOut();
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByLabel("Email")).toHaveValue("");
+  await expect(page.getByLabel("Display name")).toHaveValue("");
   await expect(page.getByText("Departing Stable submitted.")).toHaveCount(0);
 });
 
