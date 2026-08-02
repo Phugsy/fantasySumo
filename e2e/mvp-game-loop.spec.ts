@@ -81,6 +81,37 @@ test("blocks sign-out while a team save is in flight", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Sign out" })).toBeEnabled();
 });
 
+test("blocks team submission while sign-out is in flight", async ({ page }) => {
+  let releaseSignOut: () => void = () => undefined;
+  const signOutMayContinue = new Promise<void>((resolve) => {
+    releaseSignOut = resolve;
+  });
+
+  await page.route("**/api/session", async (route) => {
+    if (route.request().method() === "DELETE") {
+      await signOutMayContinue;
+    }
+
+    await route.continue();
+  });
+
+  await page.goto("/");
+  await signInAsDemoUser(page);
+  await page.getByLabel("Team name").fill("Departing Stable");
+  await page.getByRole("button", { name: /Onosato/ }).click();
+  await page.getByRole("button", { name: /Hoshoryu/ }).click();
+  await expect(page.getByRole("button", { name: "Submit team" })).toBeEnabled();
+
+  await page.getByRole("button", { name: "Sign out" }).click();
+
+  await expect(
+    page.getByRole("button", { name: "Submit team" }),
+  ).toBeDisabled();
+  releaseSignOut();
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByText("Departing Stable submitted.")).toHaveCount(0);
+});
+
 test("shows completed demo leaderboard entries in score order", async ({
   page,
   request,

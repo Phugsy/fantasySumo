@@ -288,6 +288,21 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
           return undefined;
         }
 
+        const existingTeam = transaction
+          .select({ lockedAt: sqlite.fantasyTeams.lockedAt })
+          .from(sqlite.fantasyTeams)
+          .where(
+            and(
+              eq(sqlite.fantasyTeams.bashoId, team.bashoId),
+              eq(sqlite.fantasyTeams.ownerUserId, team.ownerUserId),
+            ),
+          )
+          .get();
+
+        if (existingTeam !== undefined && existingTeam.lockedAt !== null) {
+          return undefined;
+        }
+
         const savedTeam = transaction
           .insert(sqlite.fantasyTeams)
           .values(toFantasyTeamRow(team))
@@ -709,6 +724,23 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
         ).at(0);
 
         if (basho?.status !== "upcoming") {
+          return undefined;
+        }
+
+        const existingTeam = (
+          await transaction
+            .select({ lockedAt: pg.fantasyTeams.lockedAt })
+            .from(pg.fantasyTeams)
+            .where(
+              and(
+                eq(pg.fantasyTeams.bashoId, team.bashoId),
+                eq(pg.fantasyTeams.ownerUserId, team.ownerUserId),
+              ),
+            )
+            .for("update")
+        ).at(0);
+
+        if (existingTeam !== undefined && existingTeam.lockedAt !== null) {
           return undefined;
         }
 

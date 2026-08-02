@@ -196,6 +196,52 @@ describe("repositories", () => {
     ]);
   });
 
+  it("does not replace an owned team after that team has been locked", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
+    const ownedTeam = {
+      id: "team-owned-locked",
+      bashoId: sampleBasho.id,
+      displayName: "Locked Stable",
+      ownerUserId: "user-locked",
+      createdAt: "2026-05-02T10:00:00.000Z",
+    };
+
+    await repositories.saveOwnedFantasyTeamWithPicksIfBashoUpcoming(ownedTeam, [
+      { teamId: ownedTeam.id, rikishiId: "onosato" },
+      { teamId: ownedTeam.id, rikishiId: "kirishima" },
+    ]);
+    await repositories.lockFantasyTeamsForBasho(
+      sampleBasho.id,
+      "2026-05-08T02:00:00.000Z",
+    );
+
+    expect((await repositories.getBasho(sampleBasho.id))?.status).toBe(
+      "upcoming",
+    );
+    await expect(
+      repositories.saveOwnedFantasyTeamWithPicksIfBashoUpcoming(
+        {
+          ...ownedTeam,
+          displayName: "Replacement Stable",
+        },
+        [
+          { teamId: ownedTeam.id, rikishiId: "kotozakura" },
+          { teamId: ownedTeam.id, rikishiId: "hoshoryu" },
+        ],
+      ),
+    ).resolves.toBeUndefined();
+    expect(await repositories.getFantasyTeam(ownedTeam.id)).toMatchObject({
+      displayName: "Locked Stable",
+      lockedAt: "2026-05-08T02:00:00.000Z",
+    });
+    expect(
+      (await repositories.listFantasyPicksForTeam(ownedTeam.id)).map(
+        (pick) => pick.rikishiId,
+      ),
+    ).toEqual(["kirishima", "onosato"]);
+  });
+
   it("rolls back team creation when a pick insert fails", async () => {
     await seedDatabase(createRepositories(client));
     const repositories = createRepositories(client);

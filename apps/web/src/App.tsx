@@ -93,6 +93,7 @@ export function App() {
     basho === null ? undefined : getPickLockMessage(basho);
   const canSubmit =
     loadState === "ready" &&
+    sessionState === "ready" &&
     sessionUser !== null &&
     canEditPicks &&
     submitState === "idle" &&
