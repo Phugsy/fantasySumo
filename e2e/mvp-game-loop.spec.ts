@@ -45,6 +45,40 @@ test("creates a fantasy team and shows it on the leaderboard", async ({
   await expect(
     page.getByRole("button", { name: /Codex Stable.*0 pts/ }),
   ).toBeVisible();
+
+  await page.reload();
+
+  await expect(
+    page.getByRole("heading", { name: "Leaderboard", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Codex Stable.*0 pts/ }),
+  ).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByText("Your team", { exact: true })).toBeVisible();
+});
+
+test("blocks sign-out while a team save is in flight", async ({ page }) => {
+  let releaseSave: () => void = () => undefined;
+  const saveMayContinue = new Promise<void>((resolve) => {
+    releaseSave = resolve;
+  });
+
+  await page.route("**/api/basho/demo-2026-05/teams", async (route) => {
+    await saveMayContinue;
+    await route.continue();
+  });
+
+  await page.goto("/");
+  await signInAsDemoUser(page);
+  await page.getByLabel("Team name").fill("Patient Stable");
+  await page.getByRole("button", { name: /Onosato/ }).click();
+  await page.getByRole("button", { name: /Hoshoryu/ }).click();
+  await page.getByRole("button", { name: "Submit team" }).click();
+
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeDisabled();
+  releaseSave();
+  await expect(page.getByText("Patient Stable submitted.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeEnabled();
 });
 
 test("shows completed demo leaderboard entries in score order", async ({

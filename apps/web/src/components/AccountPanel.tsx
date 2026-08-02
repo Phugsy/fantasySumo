@@ -14,6 +14,7 @@ interface AccountPanelProps {
   onSignUp: () => void;
   password: string;
   sessionState: "loading" | "ready" | "submitting";
+  signOutDisabled?: boolean;
   user: SessionUser | null;
   userDisplayName: string;
 }
@@ -30,6 +31,7 @@ export function AccountPanel({
   onSignUp,
   password,
   sessionState,
+  signOutDisabled = false,
   user,
   userDisplayName,
 }: AccountPanelProps) {
@@ -160,7 +162,7 @@ export function AccountPanel({
             {user.email !== undefined && <span>{user.email}</span>}
           </div>
           <button
-            disabled={sessionState === "submitting"}
+            disabled={sessionState === "submitting" || signOutDisabled}
             type="button"
             onClick={onSignOut}
           >

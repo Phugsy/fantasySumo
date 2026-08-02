@@ -76,6 +76,7 @@ export function App() {
   const [createdTeam, setCreatedTeam] = useState<CreatedTeamResponse | null>(
     null,
   );
+  const [ownedTeamId, setOwnedTeamId] = useState<string | null>(null);
   const bashoRequestIdRef = useRef(0);
   const leaderboardRequestIdRef = useRef(0);
 
@@ -137,6 +138,7 @@ export function App() {
       });
 
       setCreatedTeam(response);
+      setOwnedTeamId(response.team.id);
 
       const requestId = nextLeaderboardRequestId(leaderboardRequestIdRef);
       setLeaderboardLoadState("loading");
@@ -153,7 +155,9 @@ export function App() {
         );
         setLeaderboardTotalDays(leaderboardResponse.totalDays);
         setLeaderboard(leaderboardResponse.leaderboard);
-        setExpandedTeamId(getExpandedTeamId(leaderboardResponse, response));
+        setExpandedTeamId(
+          getExpandedTeamId(leaderboardResponse, response.team.id),
+        );
         setLeaderboardLoadState("ready");
         setActiveView("leaderboard");
       } catch (error) {
@@ -231,6 +235,7 @@ export function App() {
       }
       setSessionUser(null);
       setCreatedTeam(null);
+      setOwnedTeamId(null);
       setDisplayName("");
       setSelectedIds([]);
       setActiveView("selection");
@@ -291,6 +296,7 @@ export function App() {
     });
     setRikishi(bashoRikishi.rikishi);
     applyMyTeam(myTeam, bashoRikishi.rikishi, setDisplayName, setSelectedIds);
+    setOwnedTeamId(myTeam?.team.id ?? null);
     setActiveView(myTeam === null ? "selection" : "leaderboard");
     setLoadState(bashoRikishi.rikishi.length === 0 ? "empty" : "ready");
 
@@ -312,7 +318,9 @@ export function App() {
       );
       setLeaderboardTotalDays(leaderboardResponse.totalDays);
       setLeaderboard(leaderboardResponse.leaderboard);
-      setExpandedTeamId(leaderboardResponse.leaderboard[0]?.teamId ?? null);
+      setExpandedTeamId(
+        getExpandedTeamId(leaderboardResponse, myTeam?.team.id ?? null),
+      );
       setLeaderboardErrorMessage(null);
       setLeaderboardLoadState("ready");
     } catch (error) {
@@ -408,6 +416,7 @@ export function App() {
           onSignUp={handleSignUp}
           password={accountPassword}
           sessionState={sessionState}
+          signOutDisabled={submitState === "submitting"}
           user={sessionUser}
           userDisplayName={accountDisplayName}
         />
@@ -454,6 +463,7 @@ export function App() {
               <LeaderboardPanel
                 basho={basho}
                 createdTeam={createdTeam}
+                currentTeamId={ownedTeamId}
                 errorMessage={leaderboardErrorMessage}
                 expandedTeamId={expandedTeamId}
                 leaderboard={leaderboard}
@@ -601,14 +611,14 @@ async function fetchMyTeamOrNull(
 
 function getExpandedTeamId(
   leaderboardResponse: LeaderboardResponse,
-  createdTeam: CreatedTeamResponse,
+  preferredTeamId: string | null,
 ): string | null {
-  const createdTeamIsRanked = leaderboardResponse.leaderboard.some(
-    (entry) => entry.teamId === createdTeam.team.id,
+  const preferredTeamIsRanked = leaderboardResponse.leaderboard.some(
+    (entry) => entry.teamId === preferredTeamId,
   );
 
-  if (createdTeamIsRanked) {
-    return createdTeam.team.id;
+  if (preferredTeamIsRanked) {
+    return preferredTeamId;
   }
 
   return leaderboardResponse.leaderboard[0]?.teamId ?? null;
