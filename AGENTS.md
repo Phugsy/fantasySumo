@@ -38,11 +38,22 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 - Do not introduce paid services, hosted infrastructure, or external APIs without documenting the trade-off.
 - Do not commit secrets or local credentials.
 - Replace hard-coded credentials before any real deployment work.
+- Keep deploy-bound database changes backward-compatible with the currently
+  running application. Use expand/contract changes across separate releases;
+  never rely on an automatic down migration during recovery.
 - Prefer explicit domain names: `Basho`, `Rikishi`, `Banzuke`, `FantasyTeam`, `Pick`, `Bout`, `Result`, `Leaderboard`.
 - Keep scoring logic isolated and well-tested.
 - Keep basho lifecycle and pick-locking rules in the domain/API layer; UI state should mirror those rules, not replace API enforcement.
 - Keep data import logic separate from scoring logic.
 - Once an E2E harness exists, use it to validate completion for changes that affect the browser game loop.
+- Run relevant E2E before the initial handoff for browser-game-loop changes. When meaningful UI or interaction risk remains, add an agent-browser visual pass when available; it supplements rather than replaces E2E.
+
+## Review guidelines
+
+- Prioritize correctness, security, data integrity, basho lifecycle enforcement, transactional races, missed-cron recovery, deployment authentication, and SQLite/Postgres parity.
+- Require focused regression coverage when a change affects scoring, imports, pick locking, persistence, or production scheduling.
+- Treat unsupported product expansion, style-only preferences, and cleanup unrelated to the PR as non-blocking follow-up work.
+- Flag any path that can reopen picks, lose or duplicate results, partially commit imports, expose protected admin actions, or behave differently on Neon Postgres.
 
 ## Legacy hazards to handle carefully
 
@@ -61,9 +72,18 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 7. Read `docs/E2E_TESTING.md` before adding browser end-to-end tests.
 8. Use `make db-seed-demo` or `make demo` when a deterministic browser-flow fixture is useful, especially for future E2E validation. These commands reset the configured local SQLite data.
 9. Prefer the Makefile command layer for common workflows: `make test`, `make lint`, `make build`, and `make check`.
-10. Keep PRs focused on the next MVP slice; do not rebuild the full product in one change.
+10. Treat the preview and production GitHub deployment workflows as the only
+    release path. Do not enable a Vercel Git deployment that can bypass their
+    blocking migration step.
+11. Keep PRs focused on the next MVP slice; do not rebuild the full product in one change.
+12. Before calling a non-trivial code change ready, use `skills/fantasy-sumo-pr-review-loop/SKILL.md` to run a dedicated review against the base branch.
+13. Open completed, validated PRs ready for review so the automatic Codex GitHub review runs. Use draft PRs only for explicitly requested checkpoints or work that is incomplete, blocked, or missing required validation.
 
 For issue-to-PR work, use the repo-local process in `skills/fantasy-sumo-issue-loop/SKILL.md`. It can be invoked with a prompt such as: "Use the Fantasy Sumo issue loop on #44."
+
+For pre-handoff review, PR comment follow-up, or scheduled PR babysitting, use `skills/fantasy-sumo-pr-review-loop/SKILL.md`.
+
+After opening a `codex/*` pull request, start a PR-scoped scheduled babysitter when Codex automations are available. Run it in an isolated worktree, limit automatic fixes to the safe scope in the review-loop skill, and stop it when the PR is merged or closed. Never auto-merge.
 
 ## Definition of done for future changes
 
@@ -75,3 +95,5 @@ A change is ready when:
 - It includes tests for scoring/data rules where practical.
 - It runs relevant E2E coverage when browser game-loop behaviour changes and an E2E harness exists.
 - It updates docs if it changes product rules, architecture, setup, or data assumptions.
+- It has passed a dedicated review against the base branch, with accepted findings fixed and revalidated.
+- It has no unresolved actionable P1/P2 review threads; ambiguous or higher-risk findings are explicitly handed back to the user.

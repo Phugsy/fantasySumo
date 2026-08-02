@@ -26,6 +26,12 @@ export function getAdminImportToken(): string | undefined {
   return token === undefined || token.length === 0 ? undefined : token;
 }
 
+export function getCronSecret(): string | undefined {
+  const secret = process.env.CRON_SECRET?.trim();
+
+  return secret === undefined || secret.length === 0 ? undefined : secret;
+}
+
 export function allowsUnprotectedAdminImports(): boolean {
   const nodeEnv = process.env.NODE_ENV?.trim();
 
@@ -34,12 +40,15 @@ export function allowsUnprotectedAdminImports(): boolean {
 
 export function getAuthMode(): AuthMode {
   const configuredMode = process.env.AUTH_MODE?.trim();
+  const nodeEnv = process.env.NODE_ENV?.trim();
+
+  if (nodeEnv === "production" && configuredMode === "local") {
+    throw new Error("AUTH_MODE=local is not allowed in production.");
+  }
 
   if (AUTH_MODES.some((mode) => mode === configuredMode)) {
     return configuredMode as AuthMode;
   }
-
-  const nodeEnv = process.env.NODE_ENV?.trim();
 
   return nodeEnv === "development" || nodeEnv === "test" ? "local" : "neon";
 }

@@ -6,9 +6,11 @@ import type {
   FantasyTeam,
   Rikishi,
 } from "@fantasy-sumo/domain";
+import { DEMO_BASHO_ID } from "./demo-constants.js";
 
 export const demoBasho: Basho = {
-  id: "demo-2026-05",
+  id: DEMO_BASHO_ID,
+  isDemo: true,
   name: "Demo May Basho",
   startDate: "2026-05-10",
   endDate: "2026-05-24",

@@ -51,6 +51,15 @@ describe("API config", () => {
     expect(getAuthMode()).toBe("neon");
   });
 
+  it("rejects insecure local auth in production", () => {
+    process.env.AUTH_MODE = "local";
+    process.env.NODE_ENV = "production";
+
+    expect(() => getAuthMode()).toThrow(
+      "AUTH_MODE=local is not allowed in production.",
+    );
+  });
+
   it("reads Neon Auth JWKS URL from the environment", () => {
     process.env.NEON_AUTH_JWKS_URL =
       "https://auth.example.test/.well-known/jwks.json";

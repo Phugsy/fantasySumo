@@ -62,7 +62,8 @@ These should be decided before implementing the full MVP:
    - Bonus for kinboshi/upsets?
    - Bonus for kachi-koshi?
    - Penalty for absent/withdrawn rikishi?
-4. Timing: when do picks lock?
+4. Timing beyond the MVP day-before cutoff: should leagues support a custom
+   earlier lock time?
 5. Leagues: global leaderboard only, or private friend leagues?
 6. Auth: no auth, magic link, OAuth, or simple username for early MVP?
 7. Data source: official sumo.or.jp endpoints, manual CSV import, or another maintained API?
@@ -89,4 +90,8 @@ The MVP lifecycle is:
 - `active`: results are being applied day by day.
 - `complete`: final scores are available.
 
-Fantasy teams and picks can be created only while the basho is `upcoming`.
+Fantasy teams and picks can be created only while the persisted basho status is
+`upcoming`. Moving the basho to `locked` closes picks immediately, including
+when an administrator chooses to lock earlier than the scheduled transition.
+The final status check and team insert must be one database transaction so a
+concurrent lifecycle update cannot admit a team after locking.

@@ -81,6 +81,7 @@ export function mapJsaBanzukePayload(
     source: "jsa-banzuke",
     basho: {
       id: bashoId,
+      isDemo: false,
       name: formatJsaBashoName(payload),
       startDate,
       endDate,
@@ -130,10 +131,18 @@ export function mapSumoApiTorikumiPayload(
   payload: SumoApiTorikumiPayload,
   options: { bashoId: string; day: number },
 ): BoutResultsImportCommand {
+  const rows = payload.torikumi ?? [];
+
   return {
     source: "sumo-api-results",
     bashoId: options.bashoId,
-    results: (payload.torikumi ?? []).map((row, index) => {
+    rikishi: uniqueRikishi(
+      rows.flatMap((row) => [
+        toSourceRikishi(requiredString(row.eastShikona, "eastShikona")),
+        toSourceRikishi(requiredString(row.westShikona, "westShikona")),
+      ]),
+    ),
+    results: rows.map((row, index) => {
       const matchNo = row.matchNo ?? index + 1;
       const eastId = row.eastId;
       const westId = row.westId;
@@ -160,6 +169,23 @@ export function mapSumoApiTorikumiPayload(
       };
     }),
   };
+}
+
+function toSourceRikishi(shikona: string) {
+  return {
+    id: toLocalRikishiId(shikona),
+    shikona,
+  };
+}
+
+function uniqueRikishi(rikishi: ReturnType<typeof toSourceRikishi>[]) {
+  const byId = new Map<string, ReturnType<typeof toSourceRikishi>>();
+
+  for (const entry of rikishi) {
+    byId.set(entry.id, entry);
+  }
+
+  return [...byId.values()];
 }
 
 async function fetchJson<T>(fetchFn: SourceFetch, url: string): Promise<T> {

@@ -2,6 +2,7 @@ export type BashoStatus = "upcoming" | "locked" | "active" | "complete";
 
 export interface Basho {
   id: string;
+  isDemo: boolean;
   name: string;
   startDate: string;
   endDate: string;
@@ -56,6 +57,21 @@ export interface RikishiScore {
   score: number;
 }
 
+export type RikishiDayOutcome = "win" | "loss" | "absent" | "no-result";
+
+export interface RikishiDayScore {
+  rikishiId: Rikishi["id"];
+  outcome: RikishiDayOutcome;
+  score: number;
+}
+
+export interface TeamScoreHistoryEntry {
+  day: BoutResult["day"];
+  dailyScore: number;
+  cumulativeScore: number;
+  rikishiScores: RikishiDayScore[];
+}
+
 export interface ScoringOptions {
   throughDay?: BoutResult["day"];
 }
@@ -69,6 +85,11 @@ export interface TeamScore {
 
 export interface LeaderboardEntry extends TeamScore {
   rank: number;
+  latestDayScore?: {
+    day: BoutResult["day"];
+    score: number;
+  };
+  scoreHistory: TeamScoreHistoryEntry[];
 }
 
 export type PickValidationErrorCode = "duplicate-pick" | "invalid-team-size";

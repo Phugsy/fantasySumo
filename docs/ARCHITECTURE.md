@@ -24,9 +24,13 @@ The active app is split into:
 - a React client built by Vite;
 - a Fastify API compiled by TypeScript;
 - a shared framework-free domain package with MVP types, pick validation, scoring, and leaderboard calculation;
-- a Drizzle data package with local SQLite and production Postgres adapters;
+- a Drizzle data package with local SQLite and a production Neon Postgres
+  adapter;
 - an API auth boundary with local development sessions and production Neon Auth JWT verification;
 - root pnpm scripts for dev, build, test, lint, and formatting.
+- GitHub Actions deployment workflows that validate an immutable commit, apply
+  environment-scoped Postgres migrations, deploy the prepared Vercel build only
+  after migration success, and smoke-test the resulting URL.
 
 ## Front end
 
@@ -39,7 +43,11 @@ Current behaviour:
 - Lets a player select and deselect rikishi up to the API-configured team size.
 - Captures a display/team name and submits the team to the API for the signed-in/current user.
 - Provides a local development sign-in panel that establishes the current user session.
-- Shows ordered team standings with expandable picked-rikishi score breakdowns.
+- Shows ordered team standings with the latest daily score, compact five-day
+  team form, and expandable picked-rikishi tournament totals. Each rikishi row
+  shows up to five recent outcomes and expands to the full result history.
+- Charts cumulative team scores across scored days with team filters,
+  inspectable points, and an accessible exact-value table.
 - Shows loading, empty, success, and API error states.
 - Has Vitest coverage through React Testing Library.
 
@@ -77,6 +85,11 @@ Current routes:
   - Owned teams can only be viewed by their owner; legacy unowned seed/demo teams remain readable.
 - `GET /api/basho/:bashoId/leaderboard`
   - Returns leaderboard entries calculated with the domain scoring module.
+  - Includes the latest scored day's points and chronological daily/cumulative
+    history for each team.
+  - Each day records every pick's `win`, `loss`, `absent`, or `no-result`
+    outcome and fantasy-point contribution. Days without stored results are
+    omitted rather than presented as scored.
 - `GET /api/session`
   - Returns the current authenticated user or `null`.
 - `POST /api/session`
@@ -87,6 +100,8 @@ Current routes:
   - Fetches current Makuuchi banzuke data from the Japan Sumo Association `indexAjax` endpoint.
   - Maps source payloads into local `Basho`, `Rikishi`, and `BanzukeEntry` records.
   - Replaces stale banzuke rows for the imported basho without deleting rikishi, teams, or picks.
+  - Preserves the most advanced stored basho lifecycle state so a reimport
+    cannot reopen picks after locking.
   - Supports `?dryRun=true`.
 - `POST /api/admin/basho/:bashoId/import-results`
   - Fetches one day of Makuuchi results from Sumo API by default.
@@ -106,13 +121,29 @@ Current routes:
 - `POST /api/admin/demo/complete`
   - Requires `DEMO_ADMIN_TOKEN`.
   - Applies all deterministic demo results and marks the demo basho complete.
+- `GET /api/cron/import-results`
+  - Requires Vercel's `Authorization: Bearer <CRON_SECRET>` header.
+  - On the evening before day 0, locks the single eligible non-demo upcoming
+    basho and its existing teams without contacting the results source.
+  - Catches up the same lock on day 0 if the earlier invocation was missed.
+  - On days 1-15, selects the single date-eligible basho, derives its day from
+    the current calendar date in `Asia/Tokyo`, and sequentially imports every
+    day missing from stored bout results through that day, while refreshing the
+    current day on every run.
+  - Keeps locked or active bashos eligible after their end date until the final
+    day's results complete them.
+  - Reuses the source adapter and transactional result import service used by
+    the manual admin route.
+  - Moves an upcoming or locked basho to active with day 1 and completes it
+    with day 15.
+  - Returns structured locked/imported/skipped status and logs success or
+    failure.
 
 Current limitations:
 
 - Auth remains intentionally small. Local development uses a cookie-based development session, while production identity comes from Neon Auth JWTs verified by the API auth boundary.
 - No dedicated API client package.
-- Admin import endpoints are local-only and unprotected.
-- No scheduled import job yet.
+- No admin UI yet.
 
 ## Domain package
 
@@ -124,6 +155,9 @@ Current behaviour:
 - Scores a rikishi as one point per win.
 - Scores a team as the sum of all wins by the team's picked rikishi.
 - Supports optional day-bounded scoring with `throughDay` so callers can calculate standings after a specific basho day without relying on an implicit "latest" result.
+- Derives chronological team score history from stored bout results, including
+  daily and cumulative totals plus per-pick outcomes, for reuse by the
+  leaderboard and future progress visualisations.
 - Calculates a leaderboard ordered by score descending.
 - Allows tied team scores and orders ties deterministically by display name, then team id.
 - Validates duplicate picks and exact team size when a team size is supplied.
@@ -141,16 +175,30 @@ The data package entry point is `packages/db/src/index.ts`.
 Current behaviour:
 
 - Uses SQLite through `better-sqlite3` for local development.
-- Uses Postgres through `postgres` and Drizzle's `postgres-js` driver for production deployment.
+- Uses Neon Postgres through `postgres` and Drizzle's `postgres-js` driver for
+  production deployment.
 - Defines SQLite and Postgres MVP schemas with Drizzle table definitions.
 - Includes SQLite migration SQL in `packages/db/drizzle` and Postgres migration SQL in `packages/db/drizzle-pg`.
+- Uses the production-applied canonical `0001_team_owner_user.sql` migration
+  for the nullable `owner_user_id` column and its per-basho unique index;
+  the auth boundary now reads and writes this provider-neutral ownership key.
 - Uses `DATABASE_URL` to select the adapter: `file:` and `:memory:` use SQLite; `postgres:` and `postgresql:` use Postgres.
 - Exposes an async repository contract so API/domain workflows do not depend on a concrete database driver.
 - Provides repository functions for reading and writing basho, rikishi, banzuke entries, fantasy teams, fantasy picks, and bout results.
 - Stores optional `ownerUserId` on fantasy teams so authenticated ownership can be enforced without coupling the database package to Neon Auth implementation details.
-- Provides transactional upsert helpers for banzuke and bout result imports.
+- Provides transactional upsert helpers for banzuke and bout result imports;
+  banzuke writes preserve the furthest stored lifecycle state inside the
+  transaction so concurrent refreshes cannot reopen picks.
+- Saves owned teams and replacement picks atomically while rechecking the
+  persisted basho status and upserting on the per-basho owner key.
 - Provides sample seed data for one basho, four rikishi, two fantasy teams, picks, and bout results.
 - Provides deterministic demo seed data for one pickable basho, eight rikishi, four fantasy teams, picks, and a 15-day bout result fixture.
+- Classifies bashos explicitly with `isDemo`. The fixed demo reset transaction
+  requires both the known demo ID and `isDemo: true`, replaces only that
+  basho's dependent data, and preserves live bashos and shared rikishi metadata.
+- Keeps normal current-basho selection live-first. Local demo mode explicitly
+  requests the fixed flagged demo with `VITE_BASHO_MODE=demo`, so mixed live and
+  demo data cannot silently change which environment the browser displays.
 - Provides demo progression API routes and commands that reset to day 0, start/lock picks, advance one day at a time, and complete the basho.
 - Stores basho lifecycle status and current day progress.
 
@@ -169,12 +217,38 @@ pnpm import:results -- --basho 2026-05 --day 1
 pnpm --filter @fantasy-sumo/db db:generate
 ```
 
-`pnpm db:seed:demo` is the preferred fixture reset for local demos, browser smoke checks, and the future Playwright E2E harness. It deliberately replaces the configured SQLite database contents with fake deterministic data while using the same database schema, repositories, API routes, UI, and domain scoring logic as the regular app. It starts with the demo basho in `upcoming`, `currentDay: 0`, and no applied results; use `pnpm demo:start`, `pnpm demo:advance-day`, and `pnpm demo:complete` to exercise the lifecycle.
+`pnpm db:seed:demo` is the preferred fixture reset for local demos, browser
+smoke checks, and the Playwright E2E harness. It replaces only the fixed demo
+basho with fake deterministic data while using the same database schema,
+repositories, API routes, UI, and domain scoring logic as the regular app. It
+starts with the demo basho in `upcoming`, `currentDay: 0`, and no applied
+results; use `pnpm demo:start`, `pnpm demo:advance-day`, and
+`pnpm demo:complete` to exercise the lifecycle. Whole-database reset remains a
+local/test-only helper used by the separate sample seed command.
 
 Current limitations:
 
 - No banzuke/results import UI yet.
 - No hosted production database has been provisioned in the repo.
+
+## Release boundary
+
+`.github/workflows/deploy-preview.yml` and
+`.github/workflows/deploy-production.yml` own hosted release ordering. They
+serialize each shared `Preview` and `Production` database environment
+independently and keep migrations
+out of serverless startup. The production workflow accepts an exact commit from
+`master` or the commit behind a published GitHub Release, then builds, migrates,
+deploys, and smoke-tests that same SHA.
+
+The migration ledger and transactional Postgres runner remain in
+`packages/db`; the workflows only invoke the existing `pnpm db:migrate`
+boundary. Ledger rows include a content checksum so identical filenames with
+different SQL fail closed instead of silently skipping a branch's migration.
+Because a migration advances the database before new code is live,
+deploy-bound schema changes must use expand/contract compatibility across
+releases. Recovery is a forward migration or an application rollback that is
+compatible with the advanced schema, never an automatic down migration.
 
 The accepted MVP import direction is documented in [Data Import Strategy](DATA_IMPORT_STRATEGY.md). Prefer automated source-backed imports first, with manual triggers, dry runs, and JSON fixtures available for testing and emergency fallback.
 
@@ -327,7 +401,13 @@ POST   /api/admin/basho/:bashoId/import-results
 
 Admin endpoints can be protected later. For early local development, they can remain local-only but should be clearly marked as unsafe for production.
 
-`POST /api/basho/:bashoId/teams` is allowed only while the basho status is `upcoming`. The API rejects team creation for `locked`, `active`, and `complete` basho with `409 picks-locked`; the UI mirrors that state but is not the source of enforcement.
+`POST /api/basho/:bashoId/teams` is allowed only while the persisted basho
+status is `upcoming`. The API rejects team creation for `locked`, `active`, and
+`complete` bashos with `409 picks-locked`. Basho read endpoints expose the same
+persisted status, keeping the UI and API aligned and allowing an administrator
+to lock picks early when needed. Team creation rechecks the status while
+holding the basho row in the same transaction as the team insert, so it
+serializes with the scheduled lock update.
 
 Lifecycle meanings:
 

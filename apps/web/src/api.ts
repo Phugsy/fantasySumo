@@ -14,6 +14,16 @@ interface ApiErrorBody {
   }>;
 }
 
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
 let authTokenProvider: (() => Promise<string | null>) | null = null;
 
 export function setAuthTokenProvider(
@@ -23,19 +33,30 @@ export function setAuthTokenProvider(
 }
 
 export async function fetchCurrentBasho(): Promise<Basho> {
-  return getJson<Basho>("/api/basho/current");
+  return getJson<Basho>(getCurrentBashoUrl(), false);
+}
+
+export function getCurrentBashoUrl(
+  mode: string | undefined = import.meta.env.VITE_BASHO_MODE,
+): string {
+  return mode === "demo"
+    ? "/api/basho/current?mode=demo"
+    : "/api/basho/current";
 }
 
 export async function fetchBashoRikishi(
   bashoId: string,
 ): Promise<BashoRikishiResponse> {
-  return getJson<BashoRikishiResponse>(`/api/basho/${bashoId}/rikishi`);
+  return getJson<BashoRikishiResponse>(`/api/basho/${bashoId}/rikishi`, false);
 }
 
 export async function fetchLeaderboard(
   bashoId: string,
 ): Promise<LeaderboardResponse> {
-  return getJson<LeaderboardResponse>(`/api/basho/${bashoId}/leaderboard`);
+  return getJson<LeaderboardResponse>(
+    `/api/basho/${bashoId}/leaderboard`,
+    false,
+  );
 }
 
 export async function fetchSession(): Promise<SessionResponse> {
@@ -57,7 +78,7 @@ export async function clearSession(): Promise<void> {
   });
 
   if (!response.ok) {
-    throw new Error(await readApiError(response));
+    throw new ApiRequestError(await readApiError(response), response.status);
   }
 }
 
@@ -75,14 +96,14 @@ export async function createFantasyTeam(
   return postJson<CreatedTeamResponse>(`/api/basho/${bashoId}/teams`, body);
 }
 
-async function getJson<T>(url: string): Promise<T> {
+async function getJson<T>(url: string, includeAuth = true): Promise<T> {
   const response = await fetch(url, {
     credentials: "same-origin",
-    headers: await getAuthHeaders(),
+    headers: includeAuth ? await getAuthHeaders() : {},
   });
 
   if (!response.ok) {
-    throw new Error(await readApiError(response));
+    throw new ApiRequestError(await readApiError(response), response.status);
   }
 
   return response.json() as Promise<T>;
@@ -100,7 +121,7 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(await readApiError(response));
+    throw new ApiRequestError(await readApiError(response), response.status);
   }
 
   return response.json() as Promise<T>;

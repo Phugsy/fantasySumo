@@ -5,7 +5,7 @@ ifneq ($(PNPM_DIR),)
 export PATH := $(PNPM_DIR):$(PATH)
 endif
 
-.PHONY: help install dev demo dev-client dev-server build test lint format format-check check db-migrate db-seed db-seed-demo demo-reset demo-start demo-advance-day demo-complete import-banzuke import-results clean
+.PHONY: help install dev demo dev-client dev-server build test lint format format-check check deployment-verify e2e e2e-ui e2e-install db-migrate db-seed db-seed-demo demo-reset demo-start demo-advance-day demo-complete import-banzuke import-results clean
 
 help: ## Show available make targets.
 	@awk 'BEGIN {FS = ":.*## "; printf "Fantasy Sumo development commands:\n\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -19,7 +19,7 @@ dev: ## Start the API and Vite web app together.
 demo: ## Reset demo data and start the API and Vite web app.
 	$(PNPM) db:migrate
 	$(PNPM) db:seed:demo
-	$(PNPM) dev
+	VITE_BASHO_MODE=demo $(PNPM) dev
 
 dev-client: ## Start only the Vite web client.
 	$(PNPM) --filter @fantasy-sumo/domain build
@@ -44,11 +44,23 @@ format: ## Format files with Prettier.
 format-check: ## Check Prettier formatting.
 	$(PNPM) format:check
 
-check: ## Run the main pre-PR validation suite.
+check: deployment-verify ## Run the main pre-PR validation suite.
 	$(PNPM) lint
 	$(PNPM) format:check
 	$(PNPM) test
 	$(PNPM) build
+
+deployment-verify: ## Verify deployment workflow migration and release safety gates.
+	$(PNPM) deployment:verify
+
+e2e: ## Run Playwright E2E tests against deterministic demo data.
+	$(PNPM) e2e
+
+e2e-ui: ## Open the Playwright UI runner.
+	$(PNPM) e2e:ui
+
+e2e-install: ## Install the Chromium and WebKit browsers used by Playwright.
+	$(PNPM) e2e:install
 
 db-migrate: ## Apply local database migrations.
 	$(PNPM) db:migrate

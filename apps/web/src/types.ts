@@ -1,5 +1,6 @@
 export interface Basho {
   id: string;
+  isDemo: boolean;
   name: string;
   startDate: string;
   endDate: string;
@@ -58,12 +59,28 @@ export interface LeaderboardEntry {
   displayName: string;
   score: number;
   rikishiScores: RikishiScore[];
+  latestDayScore?: {
+    day: number;
+    score: number;
+  };
+  scoreHistory: TeamScoreHistoryEntry[];
 }
 
 export interface RikishiScore {
   rikishiId: string;
   wins: number;
   score: number;
+}
+
+export interface TeamScoreHistoryEntry {
+  day: number;
+  dailyScore: number;
+  cumulativeScore: number;
+  rikishiScores: Array<{
+    rikishiId: string;
+    outcome: "win" | "loss" | "absent" | "no-result";
+    score: number;
+  }>;
 }
 
 export type LoadState = "loading" | "ready" | "empty" | "error";

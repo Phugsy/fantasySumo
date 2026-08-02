@@ -9,6 +9,7 @@ import {
   allowsUnprotectedAdminImports,
   getAdminImportToken,
   getAuthMode,
+  getCronSecret,
   getDemoAdminToken,
   getNeonAuthAudience,
   getNeonAuthIssuer,
@@ -23,6 +24,7 @@ import {
 import { registerAdminDemoRoutes } from "./routes/admin-demo.js";
 import { registerAdminImportRoutes } from "./routes/admin-imports.js";
 import { registerBashoRoutes } from "./routes/basho.js";
+import { registerScheduledImportRoutes } from "./routes/scheduled-imports.js";
 
 interface AppOptions {
   db?: AppDatabase;
@@ -37,6 +39,7 @@ interface AppOptions {
   neonAuthIssuer?: string;
   neonAuthJwksUrl?: string;
   neonJwtVerifier?: (token: string) => Promise<AuthenticatedUser | undefined>;
+  cronSecret?: string;
   allowUnprotectedAdminImports?: boolean;
   allowUnprotectedDemoAdmin?: boolean;
 }
@@ -90,6 +93,11 @@ export function buildApp(options: AppOptions = {}) {
     repositories,
     now: options.now ?? (() => new Date()),
   });
-
+  registerScheduledImportRoutes(app, {
+    cronSecret: options.cronSecret ?? getCronSecret(),
+    now: options.now ?? (() => new Date()),
+    repositories,
+    sourceFetch: options.sourceFetch ?? fetch,
+  });
   return app;
 }

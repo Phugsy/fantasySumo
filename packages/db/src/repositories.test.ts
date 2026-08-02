@@ -112,7 +112,7 @@ describe("repositories", () => {
     await seedDatabase(createRepositories(client));
     const repositories = createRepositories(client);
 
-    await repositories.saveFantasyTeamWithPicks(
+    await repositories.saveOwnedFantasyTeamWithPicksIfBashoUpcoming(
       {
         id: "team-owned",
         bashoId: sampleBasho.id,
@@ -143,26 +143,35 @@ describe("repositories", () => {
       ownerUserId: "user-new-player",
     });
 
-    await repositories.saveFantasyTeamWithPicks(
-      {
-        id: "team-owned",
-        bashoId: sampleBasho.id,
-        displayName: "North Side Updated",
-        ownerName: "New Player",
-        ownerUserId: "user-new-player",
-        createdAt: "2026-05-02T10:00:00.000Z",
-      },
-      [
+    const updatedTeam =
+      await repositories.saveOwnedFantasyTeamWithPicksIfBashoUpcoming(
         {
-          teamId: "team-owned",
-          rikishiId: "kotozakura",
+          id: "team-racing-request",
+          bashoId: sampleBasho.id,
+          displayName: "North Side Updated",
+          ownerName: "New Player",
+          ownerUserId: "user-new-player",
+          createdAt: "2026-05-02T10:00:00.000Z",
         },
-        {
-          teamId: "team-owned",
-          rikishiId: "hoshoryu",
-        },
-      ],
-    );
+        [
+          {
+            teamId: "team-racing-request",
+            rikishiId: "kotozakura",
+          },
+          {
+            teamId: "team-racing-request",
+            rikishiId: "hoshoryu",
+          },
+        ],
+      );
+
+    expect(updatedTeam).toMatchObject({
+      id: "team-owned",
+      displayName: "North Side Updated",
+    });
+    expect(
+      await repositories.getFantasyTeam("team-racing-request"),
+    ).toBeUndefined();
 
     expect(
       await repositories.getFantasyTeamForOwner(
@@ -192,7 +201,7 @@ describe("repositories", () => {
     const repositories = createRepositories(client);
 
     await expect(
-      repositories.insertFantasyTeamWithPicks(
+      repositories.insertFantasyTeamWithPicksIfBashoUpcoming(
         {
           id: "team-rollback",
           bashoId: sampleBasho.id,
@@ -215,6 +224,60 @@ describe("repositories", () => {
     expect(await repositories.listFantasyPicksForTeam("team-rollback")).toEqual(
       [],
     );
+  });
+
+  it("checks the basho status inside guarded team creation", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
+
+    await repositories.updateBasho({ ...sampleBasho, status: "locked" });
+
+    const inserted =
+      await repositories.insertFantasyTeamWithPicksIfBashoUpcoming(
+        {
+          id: "team-after-lock",
+          bashoId: sampleBasho.id,
+          displayName: "After Lock",
+        },
+        [
+          { teamId: "team-after-lock", rikishiId: "onosato" },
+          { teamId: "team-after-lock", rikishiId: "kotozakura" },
+        ],
+      );
+
+    expect(inserted).toBe(false);
+    expect(
+      await repositories.getFantasyTeam("team-after-lock"),
+    ).toBeUndefined();
+    expect(
+      await repositories.listFantasyPicksForTeam("team-after-lock"),
+    ).toEqual([]);
+  });
+
+  it("does not regress lifecycle state inside a banzuke import transaction", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
+
+    await repositories.lockBashoAndFantasyTeams(
+      sampleBasho.id,
+      "2026-05-08T02:00:00.000Z",
+    );
+    await repositories.applyBanzukeImport({
+      basho: {
+        ...sampleBasho,
+        name: "Refreshed May Basho",
+        status: "upcoming",
+        currentDay: 3,
+      },
+      rikishi: [],
+      banzukeEntries: [],
+    });
+
+    expect(await repositories.getBasho(sampleBasho.id)).toMatchObject({
+      name: "Refreshed May Basho",
+      status: "locked",
+      currentDay: 3,
+    });
   });
 
   it("loads deterministic demo data for local demos and E2E fixtures", async () => {
@@ -267,6 +330,75 @@ describe("repositories", () => {
         score: 0,
       },
     ]);
+  });
+
+  it("resets demo data without changing live basho data or shared rikishi", async () => {
+    const repositories = createRepositories(client);
+    await seedDatabase(repositories);
+    await repositories.upsertRikishi({
+      id: "onosato",
+      shikona: "Onosato",
+      heya: "Live Metadata Stable",
+    });
+
+    await seedDemoDatabase(repositories);
+    await completeDemoBasho(repositories);
+    await resetDemoProgression(repositories);
+
+    expect(await repositories.getBasho(sampleBasho.id)).toEqual(sampleBasho);
+    expect(
+      await repositories.listBanzukeEntriesForBasho(sampleBasho.id),
+    ).toHaveLength(4);
+    expect(await repositories.listFantasyTeamsForBasho(sampleBasho.id)).toEqual(
+      sampleFantasyTeams,
+    );
+    expect(
+      await repositories.listFantasyPicksForBasho(sampleBasho.id),
+    ).toHaveLength(4);
+    expect(
+      await repositories.listBoutResultsForBasho(sampleBasho.id),
+    ).toHaveLength(3);
+    expect(
+      (await repositories.listRikishi()).find(
+        (rikishi) => rikishi.id === "onosato",
+      ),
+    ).toMatchObject({ heya: "Live Metadata Stable" });
+    expect(await repositories.getBasho(demoBasho.id)).toEqual(demoBasho);
+  });
+
+  it("fails closed when the demo id belongs to a live basho", async () => {
+    const repositories = createRepositories(client);
+    const collidingLiveBasho = {
+      ...demoBasho,
+      isDemo: false,
+      name: "Live Basho With Colliding ID",
+    };
+    await repositories.insertBasho(collidingLiveBasho);
+
+    await expect(seedDemoDatabase(repositories)).rejects.toThrow(
+      `Refusing to replace live basho ${demoBasho.id} with demo data.`,
+    );
+
+    expect(await repositories.getBasho(demoBasho.id)).toEqual(
+      collidingLiveBasho,
+    );
+  });
+
+  it("rejects resets for any other demo basho id", async () => {
+    const repositories = createRepositories(client);
+
+    await expect(
+      repositories.replaceDemoBashoData({
+        basho: { ...demoBasho, id: "demo-other" },
+        rikishi: [],
+        banzukeEntries: [],
+        fantasyTeams: [],
+        fantasyPicks: [],
+        boutResults: [],
+      }),
+    ).rejects.toThrow(
+      `Demo reset may only replace the fixed basho ${demoBasho.id}.`,
+    );
   });
 
   it("resets demo progression to a deterministic pre-basho state", async () => {

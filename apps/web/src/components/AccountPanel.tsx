@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import type { SessionResponse, SessionUser } from "../types";
+import "./AccountPanel.css";
 
 interface AccountPanelProps {
   email: string;
@@ -158,7 +159,11 @@ export function AccountPanel({
             <strong>{user.displayName ?? user.email ?? "Signed in"}</strong>
             {user.email !== undefined && <span>{user.email}</span>}
           </div>
-          <button type="button" onClick={onSignOut}>
+          <button
+            disabled={sessionState === "submitting"}
+            type="button"
+            onClick={onSignOut}
+          >
             Sign out
           </button>
         </div>

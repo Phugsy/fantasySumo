@@ -1,4 +1,4 @@
-import { calculateTeamScore } from "./scoring.js";
+import { calculateTeamScore, calculateTeamScoreHistory } from "./scoring.js";
 import type {
   BoutResult,
   FantasyPick,
@@ -15,7 +15,29 @@ export function calculateLeaderboard(
   options: ScoringOptions = {},
 ): LeaderboardEntry[] {
   const sortedScores = teams
-    .map((team) => calculateTeamScore(team, picks, boutResults, options))
+    .map((team) => {
+      const teamScore = calculateTeamScore(team, picks, boutResults, options);
+      const scoreHistory = calculateTeamScoreHistory(
+        team,
+        picks,
+        boutResults,
+        options,
+      );
+      const latestHistory = scoreHistory.at(-1);
+
+      return {
+        ...teamScore,
+        ...(latestHistory === undefined
+          ? {}
+          : {
+              latestDayScore: {
+                day: latestHistory.day,
+                score: latestHistory.dailyScore,
+              },
+            }),
+        scoreHistory,
+      };
+    })
     .sort(compareLeaderboardEntries);
 
   return sortedScores.map((entry, index) => ({

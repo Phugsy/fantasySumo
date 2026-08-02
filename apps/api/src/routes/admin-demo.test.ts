@@ -2,11 +2,14 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEMO_FINAL_DAY,
   createDatabaseClient,
+  createRepositories,
   runMigrations,
+  seedDatabase,
+  sampleBasho,
   type DatabaseClient,
 } from "@fantasy-sumo/db";
 import { buildApp } from "../app.js";
@@ -33,16 +36,52 @@ afterEach(async () => {
 });
 
 describe("admin demo routes", () => {
-  it("rejects demo progression requests without the configured token", async () => {
-    const response = await app.inject({
+  it("rejects demo progression requests with missing or invalid tokens", async () => {
+    const missingTokenResponse = await app.inject({
       method: "POST",
       url: "/api/admin/demo/reset",
     });
 
-    expect(response.statusCode).toBe(401);
-    expect(response.json()).toMatchObject({
+    expect(missingTokenResponse.statusCode).toBe(401);
+    expect(missingTokenResponse.json()).toMatchObject({
       error: "demo-admin-unauthorized",
     });
+
+    const invalidTokenResponse = await app.inject({
+      headers: {
+        "x-demo-admin-token": "wrong-token",
+      },
+      method: "POST",
+      url: "/api/admin/demo/reset",
+    });
+
+    expect(invalidTokenResponse.statusCode).toBe(401);
+    expect(invalidTokenResponse.json()).toMatchObject({
+      error: "demo-admin-unauthorized",
+    });
+  });
+
+  it("hides demo progression routes when no token is configured", async () => {
+    vi.stubEnv("DEMO_ADMIN_TOKEN", "");
+    const disabledApp = buildApp({
+      db: client,
+      now: () => new Date("2026-05-10T00:00:00.000Z"),
+    });
+
+    try {
+      const response = await disabledApp.inject({
+        method: "POST",
+        url: "/api/admin/demo/reset",
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({
+        error: "demo-admin-disabled",
+      });
+    } finally {
+      await disabledApp.close();
+      vi.unstubAllEnvs();
+    }
   });
 
   it("resets, starts, advances, and completes demo progression", async () => {
@@ -127,6 +166,29 @@ describe("admin demo routes", () => {
         }),
       ]),
     );
+  });
+
+  it("preserves live basho data when the demo reset endpoint runs", async () => {
+    const repositories = createRepositories(client);
+    await seedDatabase(repositories);
+
+    const response = await app.inject({
+      headers: demoAdminHeaders,
+      method: "POST",
+      url: "/api/admin/demo/reset",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(await repositories.getBasho(sampleBasho.id)).toEqual(sampleBasho);
+    expect(
+      await repositories.listFantasyTeamsForBasho(sampleBasho.id),
+    ).not.toHaveLength(0);
+    expect(
+      await repositories.listFantasyPicksForBasho(sampleBasho.id),
+    ).not.toHaveLength(0);
+    expect(
+      await repositories.listBoutResultsForBasho(sampleBasho.id),
+    ).not.toHaveLength(0);
   });
 });
 

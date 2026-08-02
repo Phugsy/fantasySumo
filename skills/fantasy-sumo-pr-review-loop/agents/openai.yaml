@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fantasy Sumo PR Review Loop"
+  short_description: "Review and safely address Fantasy Sumo PR feedback"
+  default_prompt: "Use $fantasy-sumo-pr-review-loop to review the current PR and safely address actionable feedback."

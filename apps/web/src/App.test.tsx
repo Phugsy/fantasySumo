@@ -1,9 +1,17 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import type { LeaderboardEntry } from "./types";
 
 const currentBasho = {
   id: "2026-05",
+  isDemo: false,
   name: "May 2026 Sample Basho",
   startDate: "2026-05-10",
   endDate: "2026-05-24",
@@ -36,12 +44,36 @@ const rankedRikishi = [
   },
 ];
 
-const leaderboard = [
+const leaderboard: LeaderboardEntry[] = [
   {
     rank: 1,
     teamId: "team-east",
     displayName: "East Side",
     score: 2,
+    latestDayScore: {
+      day: 2,
+      score: 1,
+    },
+    scoreHistory: [
+      {
+        day: 1,
+        dailyScore: 1,
+        cumulativeScore: 1,
+        rikishiScores: [
+          { rikishiId: "onosato", outcome: "win", score: 1 },
+          { rikishiId: "kirishima", outcome: "loss", score: 0 },
+        ],
+      },
+      {
+        day: 2,
+        dailyScore: 1,
+        cumulativeScore: 2,
+        rikishiScores: [
+          { rikishiId: "onosato", outcome: "no-result", score: 0 },
+          { rikishiId: "kirishima", outcome: "win", score: 1 },
+        ],
+      },
+    ],
     rikishiScores: [
       {
         rikishiId: "onosato",
@@ -60,6 +92,30 @@ const leaderboard = [
     teamId: "team-west",
     displayName: "West Side",
     score: 1,
+    latestDayScore: {
+      day: 2,
+      score: 0,
+    },
+    scoreHistory: [
+      {
+        day: 1,
+        dailyScore: 1,
+        cumulativeScore: 1,
+        rikishiScores: [
+          { rikishiId: "kotozakura", outcome: "win", score: 1 },
+          { rikishiId: "hoshoryu", outcome: "loss", score: 0 },
+        ],
+      },
+      {
+        day: 2,
+        dailyScore: 0,
+        cumulativeScore: 1,
+        rikishiScores: [
+          { rikishiId: "kotozakura", outcome: "no-result", score: 0 },
+          { rikishiId: "hoshoryu", outcome: "loss", score: 0 },
+        ],
+      },
+    ],
     rikishiScores: [
       {
         rikishiId: "kotozakura",
@@ -78,6 +134,7 @@ const leaderboard = [
     teamId: "team-tie",
     displayName: "Tie Side",
     score: 1,
+    scoreHistory: [],
     rikishiScores: [],
   },
 ];
@@ -119,6 +176,79 @@ describe("App", () => {
 
     expect(await screen.findByText("New Player")).toBeInTheDocument();
     expect(screen.getByText("player@example.com")).toBeInTheDocument();
+  });
+
+  it("does not expose the team form until private picks finish loading", async () => {
+    const myTeamRequest = createDeferred<Response>();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/basho/2026-05/my-team") {
+          return myTeamRequest.promise;
+        }
+
+        return mockAnonymousFetch(input, init);
+      }),
+    );
+    render(<App />);
+
+    await signInThroughAccountPanel();
+
+    expect(
+      await screen.findByRole("button", { name: "Sign out" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Team name")).not.toBeInTheDocument();
+
+    await act(async () => {
+      myTeamRequest.resolve(
+        await jsonResponse(
+          { message: "You do not have a fantasy team for this basho yet." },
+          { status: 404 },
+        ),
+      );
+    });
+
+    expect(
+      await screen.findByRole("button", { name: "Sign out" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Team name")).toHaveValue("");
+  });
+
+  it("does not treat a private-team server error as an empty team", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/session" && init?.method === "DELETE") {
+          return Promise.resolve(new Response(null, { status: 204 }));
+        }
+
+        if (String(input) === "/api/basho/2026-05/my-team") {
+          return jsonResponse(
+            { message: "Unable to load your fantasy team." },
+            { status: 503 },
+          );
+        }
+
+        return mockAnonymousFetch(input, init);
+      }),
+    );
+    render(<App />);
+
+    await signInThroughAccountPanel();
+
+    expect(
+      await screen.findByText("Unable to load your fantasy team."),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Team name")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sign out" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+
+    expect(await screen.findByLabelText("Team name")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
   });
 
   it("shows public basho data when the session probe is unauthorized", async () => {
@@ -199,6 +329,31 @@ describe("App", () => {
     expect(screen.getByText("Existing Champions")).toBeInTheDocument();
   });
 
+  it("clears the previous user's private picks when another user has no team", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockUserSwitchFetch()));
+    render(<App />);
+
+    await signInThroughAccountPanel();
+    expect(
+      await screen.findByRole("heading", { name: "Leaderboard" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Existing Champions")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await screen.findByRole("button", { name: "Sign in" });
+    await signInThroughAccountPanel();
+
+    expect(
+      await screen.findByRole("heading", { name: "Selection" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Team name")).toHaveValue("");
+    expect(screen.getByText("0 of 2 selected")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Onosato/ })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
   it("displays leaderboard standings and team score details", async () => {
     render(<App />);
 
@@ -208,10 +363,15 @@ describe("App", () => {
     expect(
       screen.getByRole("heading", { name: "Leaderboard" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("East Side")).toBeInTheDocument();
+    expect(screen.getAllByText("East Side").length).toBeGreaterThan(0);
     expect(screen.getByText("2 pts")).toBeInTheDocument();
     expect(screen.getAllByText("Tied on score")).toHaveLength(2);
     expect(screen.getByText("Onosato")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(
+        "Recent results for Onosato: day 1 Win, day 2 No result",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("1 win")).toHaveLength(2);
   });
 
@@ -681,6 +841,7 @@ function mockExistingTeamAfterLoginFetch(
             teamId: "team-existing",
             displayName: "Existing Champions",
             score: 0,
+            scoreHistory: [],
             rikishiScores: [],
           },
         ],
@@ -689,6 +850,87 @@ function mockExistingTeamAfterLoginFetch(
   }
 
   return mockSuccessfulFetch(input);
+}
+
+function mockUserSwitchFetch() {
+  let signedInUser = 0;
+
+  return (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = String(input);
+
+    if (url === "/api/session" && init?.method === "POST") {
+      signedInUser += 1;
+
+      return jsonResponse(
+        {
+          mode: "local",
+          user: {
+            id: `local-user-${signedInUser}`,
+            email: `player-${signedInUser}@example.com`,
+            displayName: `Player ${signedInUser}`,
+          },
+        },
+        { status: 201 },
+      );
+    }
+
+    if (url === "/api/session" && init?.method === "DELETE") {
+      return Promise.resolve(new Response(null, { status: 204 }));
+    }
+
+    if (url === "/api/session") {
+      return jsonResponse({ mode: "local", user: null });
+    }
+
+    if (url === "/api/basho/2026-05/my-team" && signedInUser === 1) {
+      return jsonResponse({
+        team: {
+          id: "team-existing",
+          displayName: "Existing Champions",
+        },
+        picks: [{ rikishiId: "onosato" }, { rikishiId: "kotozakura" }],
+      });
+    }
+
+    if (url === "/api/basho/2026-05/my-team") {
+      return jsonResponse(
+        { message: "You do not have a fantasy team for this basho yet." },
+        { status: 404 },
+      );
+    }
+
+    if (url === "/api/basho/2026-05/leaderboard") {
+      return jsonResponse(
+        createLeaderboardResponse({
+          entries:
+            signedInUser === 0
+              ? []
+              : [
+                  {
+                    rank: 1,
+                    teamId: "team-existing",
+                    displayName: "Existing Champions",
+                    score: 0,
+                    scoreHistory: [],
+                    rikishiScores: [],
+                  },
+                ],
+        }),
+      );
+    }
+
+    return mockSuccessfulFetch(input);
+  };
+}
+
+async function signInThroughAccountPanel() {
+  fireEvent.change(await screen.findByLabelText("Email"), {
+    target: { value: "player@example.com" },
+  });
+  fireEvent.change(screen.getByLabelText("Display name"), {
+    target: { value: "New Player" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 }
 
 function mockEmptyLeaderboardFetch(
@@ -760,6 +1002,7 @@ function mockStaleInitialLeaderboardFetch(
             teamId: "team-east-stand",
             displayName: "East Stand Heroes",
             score: 4,
+            scoreHistory: [],
             rikishiScores: [
               {
                 rikishiId: "onosato",

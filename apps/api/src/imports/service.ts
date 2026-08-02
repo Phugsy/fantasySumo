@@ -4,6 +4,7 @@ import type {
   BoutResult,
   Rikishi,
 } from "@fantasy-sumo/domain";
+import { preserveBashoLifecycleProgress } from "@fantasy-sumo/domain";
 import type { Repositories } from "@fantasy-sumo/db";
 import type {
   BanzukeImportCommand,
@@ -35,11 +36,12 @@ export async function importBanzuke(
   }
 
   const summary = createEmptySummary();
-  summary.basho = summarizeOne(
-    await repositories.getBasho(command.basho.id),
+  const existingBasho = await repositories.getBasho(command.basho.id);
+  const nextBasho = preserveBashoLifecycleProgress(
+    existingBasho,
     command.basho,
-    isEqualBasho,
   );
+  summary.basho = summarizeOne(existingBasho, nextBasho, isEqualBasho);
   summary.rikishi = summarizeMany(
     await repositories.listRikishi(),
     command.rikishi,
@@ -54,7 +56,7 @@ export async function importBanzuke(
 
   if (options.dryRun !== true) {
     await repositories.applyBanzukeImport({
-      basho: command.basho,
+      basho: nextBasho,
       rikishi: command.rikishi,
       banzukeEntries: command.banzukeEntries,
     });
@@ -82,6 +84,13 @@ export async function importBoutResults(
 
   const summary = createEmptySummary();
   const existingBasho = await repositories.getBasho(command.bashoId);
+  const existingRikishi = await repositories.listRikishi();
+  const existingRikishiIds = new Set(
+    existingRikishi.map((rikishi) => rikishi.id),
+  );
+  const missingSourceRikishi = (command.rikishi ?? []).filter(
+    (rikishi) => !existingRikishiIds.has(rikishi.id),
+  );
   const nextBasho =
     existingBasho === undefined
       ? undefined
@@ -99,15 +108,18 @@ export async function importBoutResults(
     isEqualBoutResult,
     { countDeleted: true },
   );
+  summary.rikishi = summarizeMany(
+    existingRikishi,
+    missingSourceRikishi,
+    isEqualRikishi,
+  );
 
   if (options.dryRun !== true) {
-    if (nextBasho !== undefined) {
-      await repositories.upsertBasho(nextBasho);
-    }
-
     await repositories.applyBoutResultsImport({
+      ...(nextBasho === undefined ? {} : { basho: nextBasho }),
       bashoId: command.bashoId,
       day: command.results[0]!.day,
+      rikishi: missingSourceRikishi,
       results: command.results,
     });
   }
@@ -181,6 +193,12 @@ async function validateBoutResultsImport(
   const rikishiIds = new Set(
     (await repositories.listRikishi()).map((rikishi) => rikishi.id),
   );
+  const importedRikishiIds = new Set(
+    (command.rikishi ?? []).map((rikishi) => rikishi.id),
+  );
+  for (const rikishiId of importedRikishiIds) {
+    rikishiIds.add(rikishiId);
+  }
   const banzukeRikishiIds = new Set(
     (await repositories.listBanzukeEntriesForBasho(command.bashoId)).map(
       (entry) => entry.rikishiId,
@@ -231,6 +249,10 @@ async function validateBoutResultsImport(
       });
     }
 
+    const hasBanzukeRikishi =
+      banzukeRikishiIds.has(result.winnerRikishiId) ||
+      banzukeRikishiIds.has(result.loserRikishiId);
+
     for (const field of ["winnerRikishiId", "loserRikishiId"] as const) {
       const rikishiId = result[field];
 
@@ -239,14 +261,25 @@ async function validateBoutResultsImport(
           path: `results.${index}.${field}`,
           message: `Rikishi ${rikishiId} does not exist.`,
         });
-      } else if (!banzukeRikishiIds.has(rikishiId)) {
+      } else if (
+        !banzukeRikishiIds.has(rikishiId) &&
+        !importedRikishiIds.has(rikishiId)
+      ) {
         // Results must belong to rikishi on this basho's banzuke, not just
-        // any known rikishi from another tournament.
+        // any known rikishi from another tournament. Source-provided rikishi
+        // are allowed for cross-division bouts against the target banzuke.
         issues.push({
           path: `results.${index}.${field}`,
           message: `Rikishi ${rikishiId} is not on the basho banzuke.`,
         });
       }
+    }
+
+    if (!hasBanzukeRikishi) {
+      issues.push({
+        path: `results.${index}`,
+        message: "At least one rikishi must be on the basho banzuke.",
+      });
     }
 
     if (resultIds.has(result.id)) {
@@ -289,7 +322,8 @@ function advanceBashoForResults(
 
   return {
     ...basho,
-    status: basho.status === "complete" ? "complete" : "active",
+    status:
+      basho.status === "complete" || importedDay === 15 ? "complete" : "active",
     currentDay: Math.max(basho.currentDay ?? 0, importedDay),
   };
 }
@@ -350,6 +384,7 @@ function summarizeMany<T extends { id: string }>(
 function isEqualBasho(left: Basho, right: Basho) {
   return (
     left.id === right.id &&
+    left.isDemo === right.isDemo &&
     left.name === right.name &&
     left.startDate === right.startDate &&
     left.endDate === right.endDate &&

@@ -30,6 +30,7 @@ export interface BanzukeImportCommand {
 
 export interface BoutResultsImportCommand {
   bashoId: Basho["id"];
+  rikishi?: Rikishi[];
   results: BoutResult[];
   source: string;
 }

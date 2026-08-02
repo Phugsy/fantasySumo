@@ -1,0 +1,30 @@
+.page-header {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  padding: 6px 0 26px;
+}
+
+.page-header > .eyebrow {
+  padding-top: 7px;
+}
+
+.lede {
+  max-width: 670px;
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+@media (max-width: 640px) {
+  .page-header {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding-bottom: 22px;
+  }
+
+  .page-header > .eyebrow {
+    padding-top: 0;
+  }
+}

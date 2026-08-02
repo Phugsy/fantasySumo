@@ -8,6 +8,7 @@ import {
 
 export const basho = pgTable("basho", {
   id: text("id").primaryKey(),
+  isDemo: boolean("is_demo").notNull().default(false),
   name: text("name").notNull(),
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),

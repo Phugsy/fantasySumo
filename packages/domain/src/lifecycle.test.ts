@@ -4,10 +4,12 @@ import {
   canEditFantasyPicks,
   getBashoLifecycleLabel,
   getPickLockMessage,
+  preserveBashoLifecycleProgress,
 } from "./lifecycle.js";
 
 const baseBasho: Basho = {
   id: "2026-05",
+  isDemo: false,
   name: "May 2026 Basho",
   startDate: "2026-05-10",
   endDate: "2026-05-24",
@@ -24,6 +26,33 @@ describe("basho lifecycle", () => {
     expect(canEditFantasyPicks({ ...baseBasho, status: "complete" })).toBe(
       false,
     );
+  });
+
+  it("preserves the furthest lifecycle and calendar progress", () => {
+    expect(
+      preserveBashoLifecycleProgress(
+        { ...baseBasho, status: "locked", currentDay: 0 },
+        {
+          ...baseBasho,
+          name: "Refreshed May Basho",
+          status: "upcoming",
+          currentDay: 3,
+        },
+      ),
+    ).toMatchObject({
+      name: "Refreshed May Basho",
+      status: "locked",
+      currentDay: 3,
+    });
+  });
+
+  it("does not let an import change whether an existing basho is a demo", () => {
+    expect(
+      preserveBashoLifecycleProgress(
+        { ...baseBasho, isDemo: true },
+        { ...baseBasho, isDemo: false },
+      ).isDemo,
+    ).toBe(true);
   });
 
   it("labels each lifecycle status for user-facing state", () => {

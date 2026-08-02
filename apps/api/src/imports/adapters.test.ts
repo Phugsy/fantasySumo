@@ -129,6 +129,16 @@ describe("source import adapters", () => {
     expect(command).toEqual({
       source: "sumo-api-results",
       bashoId: "2026-05",
+      rikishi: [
+        {
+          id: "onosato",
+          shikona: "Onosato",
+        },
+        {
+          id: "kotozakura",
+          shikona: "Kotozakura",
+        },
+      ],
       results: [
         {
           id: "2026-05-day-1-match-1",

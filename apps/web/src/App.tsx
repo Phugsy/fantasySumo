@@ -1,6 +1,7 @@
 import type { FormEvent, MutableRefObject } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ApiRequestError,
   clearSession,
   createSession,
   createFantasyTeam,
@@ -20,11 +21,11 @@ import {
   signUpWithNeon,
 } from "./authClient";
 import { AccountPanel } from "./components/AccountPanel";
+import { AppHeader } from "./components/AppHeader";
 import { BashoPanel } from "./components/BashoPanel";
 import { LeaderboardPanel } from "./components/LeaderboardPanel";
 import { PageHeader } from "./components/PageHeader";
 import { TeamSelection } from "./components/TeamSelection";
-import { ViewSwitch } from "./components/ViewSwitch";
 import type {
   ActiveView,
   Basho,
@@ -76,54 +77,6 @@ export function App() {
     null,
   );
   const leaderboardRequestIdRef = useRef(0);
-
-  useEffect(() => {
-    let isCurrent = true;
-
-    async function loadInitialPage() {
-      const neonAuthConfigured = isNeonAuthConfigured();
-
-      try {
-        if (neonAuthConfigured) {
-          setAuthTokenProvider(getNeonAccessToken);
-        }
-
-        const session = await loadInitialSession(neonAuthConfigured).catch(
-          () =>
-            ({
-              mode: neonAuthConfigured ? "neon" : "local",
-              user: null,
-            }) satisfies SessionResponse,
-        );
-
-        if (!isCurrent) {
-          return;
-        }
-
-        setAuthMode(session.mode);
-        setSessionUser(session.user);
-        setAccountEmail(session.user?.email ?? "");
-        setAccountDisplayName(session.user?.displayName ?? "");
-        setSessionState("ready");
-
-        await loadBashoData(session, () => isCurrent);
-      } catch (error) {
-        if (!isCurrent) {
-          return;
-        }
-
-        setErrorMessage(getPublicDataErrorMessage(error));
-        setSessionState("ready");
-        setLoadState("error");
-      }
-    }
-
-    void loadInitialPage();
-
-    return () => {
-      isCurrent = false;
-    };
-  }, []);
 
   const selectedRikishi = useMemo(
     () =>
@@ -228,6 +181,8 @@ export function App() {
   }
 
   async function submitAccount(intent: "sign-in" | "sign-up") {
+    let bashoReloadStarted = false;
+
     setSessionState("submitting");
     setSessionErrorMessage(null);
 
@@ -249,8 +204,12 @@ export function App() {
       setSessionUser(session.user);
       setAccountPassword("");
 
+      bashoReloadStarted = true;
       await loadBashoData(session, () => true);
     } catch (error) {
+      if (bashoReloadStarted) {
+        setLoadState("error");
+      }
       setSessionErrorMessage(getErrorMessage(error));
     } finally {
       setSessionState("ready");
@@ -258,6 +217,8 @@ export function App() {
   }
 
   async function handleSignOut() {
+    let bashoReloadStarted = false;
+
     setSessionState("submitting");
     setSessionErrorMessage(null);
 
@@ -269,7 +230,19 @@ export function App() {
       }
       setSessionUser(null);
       setCreatedTeam(null);
+      setDisplayName("");
+      setSelectedIds([]);
+      setActiveView("selection");
+
+      bashoReloadStarted = true;
+      await loadBashoData(
+        { mode: authMode ?? "local", user: null },
+        () => true,
+      );
     } catch (error) {
+      if (bashoReloadStarted) {
+        setLoadState("error");
+      }
       setSessionErrorMessage(getErrorMessage(error));
     } finally {
       setSessionState("ready");
@@ -280,9 +253,7 @@ export function App() {
     session: SessionResponse,
     isCurrent: () => boolean,
   ) {
-    if (basho === null) {
-      setLoadState("loading");
-    }
+    setLoadState("loading");
 
     setErrorMessage(null);
     setLeaderboardErrorMessage(null);
@@ -290,9 +261,7 @@ export function App() {
     const currentBasho = await fetchCurrentBasho();
     const bashoRikishi = await fetchBashoRikishi(currentBasho.id);
     const myTeam =
-      session.user === null
-        ? null
-        : await fetchMyTeam(currentBasho.id).catch(() => null);
+      session.user === null ? null : await fetchMyTeamOrNull(currentBasho.id);
 
     if (!isCurrent()) {
       return;
@@ -343,93 +312,145 @@ export function App() {
     }
   }
 
+  useEffect(() => {
+    let isCurrent = true;
+
+    async function loadInitialPage() {
+      const neonAuthConfigured = isNeonAuthConfigured();
+
+      try {
+        if (neonAuthConfigured) {
+          setAuthTokenProvider(getNeonAccessToken);
+        }
+
+        const session = await loadInitialSession(neonAuthConfigured).catch(
+          () =>
+            ({
+              mode: neonAuthConfigured ? "neon" : "local",
+              user: null,
+            }) satisfies SessionResponse,
+        );
+
+        if (!isCurrent) {
+          return;
+        }
+
+        setAuthMode(session.mode);
+        setSessionUser(session.user);
+        setAccountEmail(session.user?.email ?? "");
+        setAccountDisplayName(session.user?.displayName ?? "");
+        setSessionState("ready");
+
+        await loadBashoData(session, () => isCurrent);
+      } catch (error) {
+        if (!isCurrent) {
+          return;
+        }
+
+        setErrorMessage(getPublicDataErrorMessage(error));
+        setSessionState("ready");
+        setLoadState("error");
+      }
+    }
+
+    void loadInitialPage();
+
+    return () => {
+      isCurrent = false;
+    };
+    // Initial page loading is intentionally one-shot; later session changes
+    // call loadBashoData directly after sign-in.
+  }, []);
+
   return (
-    <main className="app-shell">
-      <PageHeader />
-
-      {loadState === "loading" && (
-        <section className="state-panel" aria-live="polite">
-          Loading the current basho...
-        </section>
-      )}
-
-      <AccountPanel
-        email={accountEmail}
-        errorMessage={sessionErrorMessage}
-        mode={authMode}
-        onDisplayNameChange={setAccountDisplayName}
-        onEmailChange={setAccountEmail}
-        onPasswordChange={setAccountPassword}
-        onSignIn={handleSignIn}
-        onSignOut={handleSignOut}
-        onSignUp={handleSignUp}
-        password={accountPassword}
-        sessionState={sessionState}
-        user={sessionUser}
-        userDisplayName={accountDisplayName}
+    <div className="site-shell">
+      <AppHeader
+        activeView={activeView}
+        disabled={loadState !== "ready" || submitState === "submitting"}
+        onChange={setActiveView}
       />
+      <main className="app-shell">
+        <PageHeader activeView={activeView} />
 
-      {loadState === "error" && (
-        <section className="state-panel error-state" role="alert">
-          {errorMessage ?? "Unable to load basho data."}
-        </section>
-      )}
+        {loadState === "loading" && (
+          <section className="state-panel" aria-live="polite">
+            Loading the current basho...
+          </section>
+        )}
 
-      {loadState === "empty" && (
-        <section className="state-panel">
-          No rikishi are available for the current basho yet.
-        </section>
-      )}
+        <AccountPanel
+          email={accountEmail}
+          errorMessage={sessionErrorMessage}
+          mode={authMode}
+          onDisplayNameChange={setAccountDisplayName}
+          onEmailChange={setAccountEmail}
+          onPasswordChange={setAccountPassword}
+          onSignIn={handleSignIn}
+          onSignOut={handleSignOut}
+          onSignUp={handleSignUp}
+          password={accountPassword}
+          sessionState={sessionState}
+          user={sessionUser}
+          userDisplayName={accountDisplayName}
+        />
 
-      {loadState === "ready" && basho !== null && (
-        <>
-          <BashoPanel basho={basho} selectedCount={selectedIds.length} />
-          <ViewSwitch
-            activeView={activeView}
-            disabled={submitState === "submitting"}
-            onChange={setActiveView}
-          />
+        {loadState === "error" && (
+          <section className="state-panel error-state" role="alert">
+            {errorMessage ?? "Unable to load basho data."}
+          </section>
+        )}
 
-          {activeView === "selection" && (
-            <TeamSelection
-              canSubmit={canSubmit}
-              createdTeam={createdTeam}
-              displayName={displayName}
-              errorMessage={errorMessage}
-              isLocked={!canEditPicks}
-              lockMessage={pickLockMessage}
-              onDisplayNameChange={(nextDisplayName) => {
-                setDisplayName(nextDisplayName);
-                setCreatedTeam(null);
-              }}
-              onSubmit={handleSubmit}
-              onToggleRikishi={toggleRikishi}
-              rikishi={rikishi}
-              selectedIds={selectedIds}
-              selectedRikishi={selectedRikishi}
-              submitState={submitState}
-              teamSize={teamSize}
-            />
-          )}
+        {loadState === "empty" && (
+          <section className="state-panel">
+            No rikishi are available for the current basho yet.
+          </section>
+        )}
 
-          {activeView === "leaderboard" && (
-            <LeaderboardPanel
-              basho={basho}
-              createdTeam={createdTeam}
-              errorMessage={leaderboardErrorMessage}
-              expandedTeamId={expandedTeamId}
-              leaderboard={leaderboard}
-              loadState={leaderboardLoadState}
-              onToggleTeam={(teamId) =>
-                setExpandedTeamId(expandedTeamId === teamId ? null : teamId)
-              }
-              rikishi={rikishi}
-              totalDays={leaderboardTotalDays}
-            />
-          )}
-        </>
-      )}
-    </main>
+        {loadState === "ready" && basho !== null && (
+          <>
+            <BashoPanel basho={basho} selectedCount={selectedIds.length} />
+
+            {activeView === "selection" && (
+              <TeamSelection
+                canSubmit={canSubmit}
+                createdTeam={createdTeam}
+                displayName={displayName}
+                errorMessage={errorMessage}
+                isLocked={!canEditPicks}
+                lockMessage={pickLockMessage}
+                onDisplayNameChange={(nextDisplayName) => {
+                  setDisplayName(nextDisplayName);
+                  setCreatedTeam(null);
+                }}
+                onSubmit={handleSubmit}
+                onToggleRikishi={toggleRikishi}
+                rikishi={rikishi}
+                selectedIds={selectedIds}
+                selectedRikishi={selectedRikishi}
+                submitState={submitState}
+                teamSize={teamSize}
+              />
+            )}
+
+            {activeView === "leaderboard" && (
+              <LeaderboardPanel
+                basho={basho}
+                createdTeam={createdTeam}
+                errorMessage={leaderboardErrorMessage}
+                expandedTeamId={expandedTeamId}
+                leaderboard={leaderboard}
+                loadState={leaderboardLoadState}
+                onToggleTeam={(teamId) =>
+                  setExpandedTeamId(expandedTeamId === teamId ? null : teamId)
+                }
+                rikishi={rikishi}
+                totalDays={leaderboardTotalDays}
+              />
+            )}
+          </>
+        )}
+      </main>
+    </div>
   );
 }
 
@@ -529,11 +550,27 @@ function applyMyTeam(
   setSelectedIds: (selectedIds: string[]) => void,
 ) {
   if (myTeam === null) {
+    setDisplayName("");
+    setSelectedIds([]);
     return;
   }
 
   setDisplayName(myTeam.team.displayName);
   setSelectedIds(myTeam.picks.map((pick) => pick.rikishiId));
+}
+
+async function fetchMyTeamOrNull(
+  bashoId: string,
+): Promise<TeamResponse | null> {
+  try {
+    return await fetchMyTeam(bashoId);
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 function getExpandedTeamId(

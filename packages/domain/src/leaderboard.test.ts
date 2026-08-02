@@ -86,6 +86,24 @@ describe("calculateLeaderboard", () => {
     ]);
   });
 
+  it("includes the latest daily score and full score history", () => {
+    const [leader] = calculateLeaderboard(teams, picks, results);
+
+    expect(leader).toMatchObject({
+      teamId: "team-a",
+      score: 2,
+      latestDayScore: {
+        day: 3,
+        score: 0,
+      },
+      scoreHistory: [
+        { day: 1, dailyScore: 1, cumulativeScore: 1 },
+        { day: 2, dailyScore: 1, cumulativeScore: 2 },
+        { day: 3, dailyScore: 0, cumulativeScore: 2 },
+      ],
+    });
+  });
+
   it("can calculate leaderboard standings through a specific basho day", () => {
     expect(
       calculateLeaderboard(teams, picks, results, {

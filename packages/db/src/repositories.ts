@@ -7,11 +7,13 @@ import type {
   FantasyTeam,
   Rikishi,
 } from "@fantasy-sumo/domain";
+import { preserveBashoLifecycleProgress } from "@fantasy-sumo/domain";
 import type {
   AppDatabase,
   PostgresDatabase,
   SqliteDatabase,
 } from "./client.js";
+import { DEMO_BASHO_ID } from "./demo-constants.js";
 import * as pg from "./schema.pg.js";
 import * as sqlite from "./schema.js";
 
@@ -22,13 +24,23 @@ export interface BanzukeImportData {
 }
 
 export interface BoutResultsImportData {
+  basho?: Basho;
   bashoId: Basho["id"];
   day: BoutResult["day"];
+  rikishi?: readonly Rikishi[];
   results: readonly BoutResult[];
 }
 
+export interface DemoBashoResetData extends BanzukeImportData {
+  fantasyTeams: readonly FantasyTeam[];
+  fantasyPicks: readonly FantasyPick[];
+  boutResults: readonly BoutResult[];
+}
+
 export interface Repositories {
-  resetData: () => Promise<void>;
+  /** Clears every game record. Production and admin paths must never call this. */
+  resetAllDataForLocalFixtures: () => Promise<void>;
+  replaceDemoBashoData: (resetData: DemoBashoResetData) => Promise<void>;
 
   insertBasho: (entry: Basho) => Promise<void>;
   upsertBasho: (entry: Basho) => Promise<void>;
@@ -45,14 +57,14 @@ export interface Repositories {
   listBanzukeEntriesForBasho: (bashoId: Basho["id"]) => Promise<BanzukeEntry[]>;
 
   insertFantasyTeam: (entry: FantasyTeam) => Promise<void>;
-  insertFantasyTeamWithPicks: (
+  insertFantasyTeamWithPicksIfBashoUpcoming: (
     team: FantasyTeam,
     picks: readonly FantasyPick[],
-  ) => Promise<void>;
-  saveFantasyTeamWithPicks: (
-    team: FantasyTeam,
+  ) => Promise<boolean>;
+  saveOwnedFantasyTeamWithPicksIfBashoUpcoming: (
+    team: FantasyTeam & { ownerUserId: string },
     picks: readonly FantasyPick[],
-  ) => Promise<void>;
+  ) => Promise<FantasyTeam | undefined>;
   getFantasyTeam: (id: FantasyTeam["id"]) => Promise<FantasyTeam | undefined>;
   getFantasyTeamForOwner: (
     bashoId: Basho["id"],
@@ -60,6 +72,10 @@ export interface Repositories {
   ) => Promise<FantasyTeam | undefined>;
   listFantasyTeamsForBasho: (bashoId: Basho["id"]) => Promise<FantasyTeam[]>;
   lockFantasyTeamsForBasho: (
+    bashoId: Basho["id"],
+    lockedAt: NonNullable<FantasyTeam["lockedAt"]>,
+  ) => Promise<void>;
+  lockBashoAndFantasyTeams: (
     bashoId: Basho["id"],
     lockedAt: NonNullable<FantasyTeam["lockedAt"]>,
   ) => Promise<void>;
@@ -88,13 +104,78 @@ export function createRepositories(database: AppDatabase): Repositories {
 
 function createSqliteRepositories(db: SqliteDatabase): Repositories {
   const repositories: Repositories = {
-    resetData: async () => {
+    resetAllDataForLocalFixtures: async () => {
       db.delete(sqlite.fantasyPicks).run();
       db.delete(sqlite.fantasyTeams).run();
       db.delete(sqlite.boutResults).run();
       db.delete(sqlite.banzukeEntries).run();
       db.delete(sqlite.rikishi).run();
       db.delete(sqlite.basho).run();
+    },
+    replaceDemoBashoData: async (resetData) => {
+      assertDemoBashoResetData(resetData);
+
+      db.transaction((transaction) => {
+        const existingBasho = transaction
+          .select({ isDemo: sqlite.basho.isDemo })
+          .from(sqlite.basho)
+          .where(eq(sqlite.basho.id, resetData.basho.id))
+          .get();
+
+        if (existingBasho !== undefined && !existingBasho.isDemo) {
+          throw new Error(
+            `Refusing to replace live basho ${resetData.basho.id} with demo data.`,
+          );
+        }
+
+        transaction
+          .delete(sqlite.basho)
+          .where(
+            and(
+              eq(sqlite.basho.id, resetData.basho.id),
+              eq(sqlite.basho.isDemo, true),
+            ),
+          )
+          .run();
+
+        for (const entry of resetData.rikishi) {
+          transaction
+            .insert(sqlite.rikishi)
+            .values(toRikishiRow(entry))
+            .onConflictDoNothing({ target: sqlite.rikishi.id })
+            .run();
+        }
+
+        transaction
+          .insert(sqlite.basho)
+          .values(toBashoRow(resetData.basho))
+          .run();
+
+        for (const entry of resetData.banzukeEntries) {
+          transaction.insert(sqlite.banzukeEntries).values(entry).run();
+        }
+
+        for (const entry of resetData.fantasyTeams) {
+          transaction
+            .insert(sqlite.fantasyTeams)
+            .values(toFantasyTeamRow(entry))
+            .run();
+        }
+
+        for (const entry of resetData.fantasyPicks) {
+          transaction
+            .insert(sqlite.fantasyPicks)
+            .values(toFantasyPickRow(entry))
+            .run();
+        }
+
+        for (const entry of resetData.boutResults) {
+          transaction
+            .insert(sqlite.boutResults)
+            .values(toBoutResultRow(entry))
+            .run();
+        }
+      });
     },
     insertBasho: async (entry) => {
       db.insert(sqlite.basho).values(toBashoRow(entry)).run();
@@ -169,8 +250,18 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
     insertFantasyTeam: async (entry) => {
       db.insert(sqlite.fantasyTeams).values(toFantasyTeamRow(entry)).run();
     },
-    insertFantasyTeamWithPicks: async (team, picks) => {
+    insertFantasyTeamWithPicksIfBashoUpcoming: async (team, picks) =>
       db.transaction((transaction) => {
+        const basho = transaction
+          .select({ status: sqlite.basho.status })
+          .from(sqlite.basho)
+          .where(eq(sqlite.basho.id, team.bashoId))
+          .get();
+
+        if (basho?.status !== "upcoming") {
+          return false;
+        }
+
         transaction
           .insert(sqlite.fantasyTeams)
           .values(toFantasyTeamRow(team))
@@ -182,32 +273,51 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
             .values(toFantasyPickRow(pick))
             .run();
         }
-      });
-    },
-    saveFantasyTeamWithPicks: async (team, picks) => {
+
+        return true;
+      }),
+    saveOwnedFantasyTeamWithPicksIfBashoUpcoming: async (team, picks) =>
       db.transaction((transaction) => {
-        transaction
+        const basho = transaction
+          .select({ status: sqlite.basho.status })
+          .from(sqlite.basho)
+          .where(eq(sqlite.basho.id, team.bashoId))
+          .get();
+
+        if (basho?.status !== "upcoming") {
+          return undefined;
+        }
+
+        const savedTeam = transaction
           .insert(sqlite.fantasyTeams)
           .values(toFantasyTeamRow(team))
           .onConflictDoUpdate({
-            target: sqlite.fantasyTeams.id,
-            set: toFantasyTeamRow(team),
+            target: [
+              sqlite.fantasyTeams.bashoId,
+              sqlite.fantasyTeams.ownerUserId,
+            ],
+            set: {
+              displayName: team.displayName,
+              ownerName: team.ownerName ?? null,
+            },
           })
-          .run();
+          .returning()
+          .get();
 
         transaction
           .delete(sqlite.fantasyPicks)
-          .where(eq(sqlite.fantasyPicks.teamId, team.id))
+          .where(eq(sqlite.fantasyPicks.teamId, savedTeam.id))
           .run();
 
         for (const pick of picks) {
           transaction
             .insert(sqlite.fantasyPicks)
-            .values(toFantasyPickRow(pick))
+            .values(toFantasyPickRow({ ...pick, teamId: savedTeam.id }))
             .run();
         }
-      });
-    },
+
+        return toFantasyTeam(savedTeam);
+      }),
     getFantasyTeam: async (id) => {
       const row = db
         .select()
@@ -249,6 +359,30 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
           ),
         )
         .run();
+    },
+    lockBashoAndFantasyTeams: async (bashoId, lockedAt) => {
+      db.transaction((transaction) => {
+        transaction
+          .update(sqlite.basho)
+          .set({ status: "locked" })
+          .where(
+            and(
+              eq(sqlite.basho.id, bashoId),
+              eq(sqlite.basho.status, "upcoming"),
+            ),
+          )
+          .run();
+        transaction
+          .update(sqlite.fantasyTeams)
+          .set({ lockedAt })
+          .where(
+            and(
+              eq(sqlite.fantasyTeams.bashoId, bashoId),
+              isNull(sqlite.fantasyTeams.lockedAt),
+            ),
+          )
+          .run();
+      });
     },
 
     insertFantasyPick: async (entry) => {
@@ -298,12 +432,22 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
     },
     applyBanzukeImport: async (importData) => {
       db.transaction((transaction) => {
+        const existingBasho = transaction
+          .select()
+          .from(sqlite.basho)
+          .where(eq(sqlite.basho.id, importData.basho.id))
+          .get();
+        const nextBasho = preserveBashoLifecycleProgress(
+          existingBasho === undefined ? undefined : toBasho(existingBasho),
+          importData.basho,
+        );
+
         transaction
           .insert(sqlite.basho)
-          .values(toBashoRow(importData.basho))
+          .values(toBashoRow(nextBasho))
           .onConflictDoUpdate({
             target: sqlite.basho.id,
-            set: toBashoRow(importData.basho),
+            set: toBashoRow(nextBasho),
           })
           .run();
 
@@ -347,6 +491,25 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
     },
     applyBoutResultsImport: async (importData) => {
       db.transaction((transaction) => {
+        if (importData.basho !== undefined) {
+          transaction
+            .insert(sqlite.basho)
+            .values(toBashoRow(importData.basho))
+            .onConflictDoUpdate({
+              target: sqlite.basho.id,
+              set: toBashoRow(importData.basho),
+            })
+            .run();
+        }
+
+        for (const entry of importData.rikishi ?? []) {
+          transaction
+            .insert(sqlite.rikishi)
+            .values(toRikishiRow(entry))
+            .onConflictDoNothing({ target: sqlite.rikishi.id })
+            .run();
+        }
+
         for (const entry of importData.results) {
           transaction
             .insert(sqlite.boutResults)
@@ -382,13 +545,69 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
 
 function createPostgresRepositories(db: PostgresDatabase): Repositories {
   const repositories: Repositories = {
-    resetData: async () => {
+    resetAllDataForLocalFixtures: async () => {
       await db.delete(pg.fantasyPicks);
       await db.delete(pg.fantasyTeams);
       await db.delete(pg.boutResults);
       await db.delete(pg.banzukeEntries);
       await db.delete(pg.rikishi);
       await db.delete(pg.basho);
+    },
+    replaceDemoBashoData: async (resetData) => {
+      assertDemoBashoResetData(resetData);
+
+      await db.transaction(async (transaction) => {
+        const existingBasho = (
+          await transaction
+            .select({ isDemo: pg.basho.isDemo })
+            .from(pg.basho)
+            .where(eq(pg.basho.id, resetData.basho.id))
+            .for("update")
+        ).at(0);
+
+        if (existingBasho !== undefined && !existingBasho.isDemo) {
+          throw new Error(
+            `Refusing to replace live basho ${resetData.basho.id} with demo data.`,
+          );
+        }
+
+        await transaction
+          .delete(pg.basho)
+          .where(
+            and(eq(pg.basho.id, resetData.basho.id), eq(pg.basho.isDemo, true)),
+          );
+
+        for (const entry of resetData.rikishi) {
+          await transaction
+            .insert(pg.rikishi)
+            .values(toRikishiRow(entry))
+            .onConflictDoNothing({ target: pg.rikishi.id });
+        }
+
+        await transaction.insert(pg.basho).values(toBashoRow(resetData.basho));
+
+        for (const entry of resetData.banzukeEntries) {
+          await transaction.insert(pg.banzukeEntries).values(entry);
+        }
+
+        for (const entry of resetData.fantasyTeams) {
+          await transaction
+            .insert(pg.fantasyTeams)
+            .values(toFantasyTeamRow(entry));
+        }
+
+        for (const entry of resetData.fantasyPicks) {
+          await transaction
+            .insert(pg.fantasyPicks)
+            .values(toFantasyPickRow(entry));
+        }
+
+        for (const entry of resetData.boutResults) {
+          await transaction
+            .insert(pg.boutResults)
+            .values(toBoutResultRow(entry));
+        }
+      });
     },
     insertBasho: async (entry) => {
       await db.insert(pg.basho).values(toBashoRow(entry));
@@ -453,8 +672,20 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
     insertFantasyTeam: async (entry) => {
       await db.insert(pg.fantasyTeams).values(toFantasyTeamRow(entry));
     },
-    insertFantasyTeamWithPicks: async (team, picks) => {
-      await db.transaction(async (transaction) => {
+    insertFantasyTeamWithPicksIfBashoUpcoming: async (team, picks) =>
+      db.transaction(async (transaction) => {
+        const basho = (
+          await transaction
+            .select({ status: pg.basho.status })
+            .from(pg.basho)
+            .where(eq(pg.basho.id, team.bashoId))
+            .for("update")
+        ).at(0);
+
+        if (basho?.status !== "upcoming") {
+          return false;
+        }
+
         await transaction
           .insert(pg.fantasyTeams)
           .values(toFantasyTeamRow(team));
@@ -464,29 +695,49 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
             .insert(pg.fantasyPicks)
             .values(toFantasyPickRow(pick));
         }
-      });
-    },
-    saveFantasyTeamWithPicks: async (team, picks) => {
-      await db.transaction(async (transaction) => {
-        await transaction
-          .insert(pg.fantasyTeams)
-          .values(toFantasyTeamRow(team))
-          .onConflictDoUpdate({
-            target: pg.fantasyTeams.id,
-            set: toFantasyTeamRow(team),
-          });
+
+        return true;
+      }),
+    saveOwnedFantasyTeamWithPicksIfBashoUpcoming: async (team, picks) =>
+      db.transaction(async (transaction) => {
+        const basho = (
+          await transaction
+            .select({ status: pg.basho.status })
+            .from(pg.basho)
+            .where(eq(pg.basho.id, team.bashoId))
+            .for("update")
+        ).at(0);
+
+        if (basho?.status !== "upcoming") {
+          return undefined;
+        }
+
+        const savedTeam = (
+          await transaction
+            .insert(pg.fantasyTeams)
+            .values(toFantasyTeamRow(team))
+            .onConflictDoUpdate({
+              target: [pg.fantasyTeams.bashoId, pg.fantasyTeams.ownerUserId],
+              set: {
+                displayName: team.displayName,
+                ownerName: team.ownerName ?? null,
+              },
+            })
+            .returning()
+        ).at(0)!;
 
         await transaction
           .delete(pg.fantasyPicks)
-          .where(eq(pg.fantasyPicks.teamId, team.id));
+          .where(eq(pg.fantasyPicks.teamId, savedTeam.id));
 
         for (const pick of picks) {
           await transaction
             .insert(pg.fantasyPicks)
-            .values(toFantasyPickRow(pick));
+            .values(toFantasyPickRow({ ...pick, teamId: savedTeam.id }));
         }
-      });
-    },
+
+        return toFantasyTeam(savedTeam);
+      }),
     getFantasyTeam: async (id) => {
       const row = (
         await db
@@ -530,6 +781,25 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
             isNull(pg.fantasyTeams.lockedAt),
           ),
         );
+    },
+    lockBashoAndFantasyTeams: async (bashoId, lockedAt) => {
+      await db.transaction(async (transaction) => {
+        await transaction
+          .update(pg.basho)
+          .set({ status: "locked" })
+          .where(
+            and(eq(pg.basho.id, bashoId), eq(pg.basho.status, "upcoming")),
+          );
+        await transaction
+          .update(pg.fantasyTeams)
+          .set({ lockedAt })
+          .where(
+            and(
+              eq(pg.fantasyTeams.bashoId, bashoId),
+              isNull(pg.fantasyTeams.lockedAt),
+            ),
+          );
+      });
     },
 
     insertFantasyPick: async (entry) => {
@@ -579,12 +849,24 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
     },
     applyBanzukeImport: async (importData) => {
       await db.transaction(async (transaction) => {
+        const existingBasho = (
+          await transaction
+            .select()
+            .from(pg.basho)
+            .where(eq(pg.basho.id, importData.basho.id))
+            .for("update")
+        ).at(0);
+        const nextBasho = preserveBashoLifecycleProgress(
+          existingBasho === undefined ? undefined : toBasho(existingBasho),
+          importData.basho,
+        );
+
         await transaction
           .insert(pg.basho)
-          .values(toBashoRow(importData.basho))
+          .values(toBashoRow(nextBasho))
           .onConflictDoUpdate({
             target: pg.basho.id,
-            set: toBashoRow(importData.basho),
+            set: toBashoRow(nextBasho),
           });
 
         for (const entry of importData.rikishi) {
@@ -622,6 +904,23 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
     },
     applyBoutResultsImport: async (importData) => {
       await db.transaction(async (transaction) => {
+        if (importData.basho !== undefined) {
+          await transaction
+            .insert(pg.basho)
+            .values(toBashoRow(importData.basho))
+            .onConflictDoUpdate({
+              target: pg.basho.id,
+              set: toBashoRow(importData.basho),
+            });
+        }
+
+        for (const entry of importData.rikishi ?? []) {
+          await transaction
+            .insert(pg.rikishi)
+            .values(toRikishiRow(entry))
+            .onConflictDoNothing({ target: pg.rikishi.id });
+        }
+
         for (const entry of importData.results) {
           await transaction
             .insert(pg.boutResults)
@@ -658,9 +957,41 @@ function toBashoRow(entry: Basho) {
   };
 }
 
+function assertDemoBashoResetData(resetData: DemoBashoResetData): void {
+  if (resetData.basho.id !== DEMO_BASHO_ID) {
+    throw new Error(
+      `Demo reset may only replace the fixed basho ${DEMO_BASHO_ID}.`,
+    );
+  }
+
+  if (!resetData.basho.isDemo) {
+    throw new Error(
+      `Refusing to replace live basho ${resetData.basho.id} through the demo reset path.`,
+    );
+  }
+
+  if (
+    resetData.banzukeEntries.some(
+      (entry) => entry.bashoId !== resetData.basho.id,
+    ) ||
+    resetData.fantasyTeams.some(
+      (entry) => entry.bashoId !== resetData.basho.id,
+    ) ||
+    resetData.boutResults.some((entry) => entry.bashoId !== resetData.basho.id)
+  ) {
+    throw new Error("Demo reset data must be scoped to one demo basho.");
+  }
+
+  const teamIds = new Set(resetData.fantasyTeams.map((team) => team.id));
+  if (resetData.fantasyPicks.some((pick) => !teamIds.has(pick.teamId))) {
+    throw new Error("Demo reset picks must belong to demo reset teams.");
+  }
+}
+
 function toBasho(row: typeof sqlite.basho.$inferSelect): Basho {
   return {
     id: row.id,
+    isDemo: row.isDemo,
     name: row.name,
     startDate: row.startDate,
     endDate: row.endDate,

@@ -3,13 +3,22 @@ import { describe, expect, it } from "vitest";
 import { PageHeader } from "./PageHeader";
 
 describe("PageHeader", () => {
-  it("shows the app title and team-building prompt", () => {
-    render(<PageHeader />);
+  it("shows contextual team-building copy", () => {
+    render(<PageHeader activeView="selection" />);
 
     expect(
       screen.getByRole("heading", { name: "Build your basho team" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Fantasy Sumo")).toBeInTheDocument();
-    expect(screen.getByText(/Pick rikishi/)).toBeInTheDocument();
+    expect(screen.getByText("Current basho")).toBeInTheDocument();
+    expect(screen.getByText(/Choose your rikishi/)).toBeInTheDocument();
+  });
+
+  it("shows contextual leaderboard copy", () => {
+    render(<PageHeader activeView="leaderboard" />);
+
+    expect(
+      screen.getByRole("heading", { name: "Follow the leaderboard" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Basho standings")).toBeInTheDocument();
   });
 });

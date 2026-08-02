@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import type { CreatedTeamResponse, RankedRikishi } from "../types";
+import "./TeamSelection.css";
 
 interface TeamSelectionProps {
   canSubmit: boolean;

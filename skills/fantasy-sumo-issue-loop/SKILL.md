@@ -6,11 +6,11 @@ Use this skill when the user asks to work an issue through the Fantasy Sumo repo
 Use the Fantasy Sumo issue loop on #44.
 ```
 
-This is a repo-local adapter for Fantasy Sumo's current architecture, data safety rules, and completion evidence. Keep it lightweight. It should help one issue become one focused draft PR; it should not automate issue intake, reviews, merges, or deployment.
+This is a repo-local adapter for Fantasy Sumo's current architecture, data safety rules, and completion evidence. Keep it lightweight. It should help one issue become one focused PR; hand pre-handoff review and later PR feedback to `skills/fantasy-sumo-pr-review-loop/SKILL.md`. It should not automate issue intake, merges, or deployment.
 
 ## Baseline Rules
 
-Start by reading `AGENTS.md`. It is the baseline rule set for this repo. This skill narrows that guidance into a repeatable issue-to-draft-PR loop.
+Start by reading `AGENTS.md`. It is the baseline rule set for this repo. This skill narrows that guidance into a repeatable issue-to-PR loop.
 
 Also read the current issue and any linked issues, pull requests, or review comments before planning implementation. Use GitHub issue and PR data as the source of truth for acceptance criteria when it conflicts with older local notes.
 
@@ -86,6 +86,8 @@ For documentation-only changes, `make check` is usually sufficient if it covers 
 
 For changes that touch repo-root Vercel handlers such as `api/index.ts`, also run a direct TypeScript compile probe for that path or the relevant deployment build check, because root handlers may not be covered by package-level builds.
 
+After checks pass for a non-trivial code change, invoke `skills/fantasy-sumo-pr-review-loop/SKILL.md` in pre-handoff mode. Address accepted findings, revalidate, and record any finding that requires user input before calling the PR ready.
+
 ## E2E Rules
 
 Read `docs/E2E_TESTING.md` before adding or relying on E2E coverage.
@@ -99,13 +101,17 @@ Run targeted E2E or `make e2e` once the harness exists when the change affects:
 - database seed/reset behaviour used by the browser game loop;
 - basho lifecycle UI behaviour.
 
+Run this coverage before the initial PR handoff, not only after review feedback. When a change materially affects visual layout, interaction, responsive behaviour, or a state that Playwright assertions do not represent well, add an agent-browser visual pass when the tooling is available. The visual pass supplements E2E and does not replace it.
+
 Use deterministic local test data and a test-only `DATABASE_URL`. Do not run default E2E against live sumo sources or production data.
 
 If E2E is skipped, record the reason in the PR summary. Acceptable reasons include documentation-only changes, harness not yet implemented, local browser install constraints, sandbox/port constraints, or a change that has no browser game-loop impact.
 
-## Draft PR
+## Pull Request
 
-Open a draft PR when the issue slice is implemented and relevant checks have been attempted. The PR body should include:
+Open the PR ready for review once the issue slice is complete, required checks and E2E have passed or have an accepted skip reason, and the pre-handoff review gate is satisfied. This allows the automatic Codex GitHub review to run immediately. Open a draft only when the user explicitly requests a checkpoint or the work is knowingly incomplete, blocked, or missing required validation.
+
+The PR body should include:
 
 - the issue number it closes or addresses;
 - a concise implementation summary;
@@ -114,17 +120,19 @@ Open a draft PR when the issue slice is implemented and relevant checks have bee
 - docs updated, if any;
 - known follow-up work or explicit non-goals.
 
-Do not mark the PR ready for review until required checks and issue-specific acceptance criteria are satisfied.
+Do not mark a draft ready for review until required checks, issue-specific acceptance criteria, and the pre-handoff review gate are satisfied. Once those gates pass, convert it to ready rather than leaving it in draft.
+
+When Codex automations are available, start a PR-scoped scheduled babysitter after opening the PR. Invoke `skills/fantasy-sumo-pr-review-loop/SKILL.md` in scheduled mode, use an isolated worktree, and stop monitoring when the PR is merged or closed. The generated task prompt must explicitly authorize the skill's limited safe-fix writes: edit the PR branch, commit, push without force, reply to addressed review threads, and resolve only those addressed threads. It must repeat that merge, close, approval, branch deletion, and high-risk or ambiguous fixes are not authorized. If automation is unavailable, state that review follow-up remains manual.
 
 ## Automation Boundary
 
-This skill is manual or semi-manual. It does not create a fully automatic "new issue equals new PR" system.
+This skill is manual or semi-manual. It does not create a fully automatic "new issue equals new PR" system. After the PR exists, use `skills/fantasy-sumo-pr-review-loop/SKILL.md` for thread-aware feedback follow-up or a guarded scheduled babysitter.
 
 A later queue can add automation with safer constraints:
 
 - only labelled issues, such as `ready-for-agent`, are eligible;
 - one issue is handled per branch and PR;
-- PRs open as drafts;
+- PRs open ready for review after their handoff gates pass; drafts are reserved for incomplete or blocked work;
 - checks and E2E evidence are required before review;
 - nothing auto-merges.
 

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   createRepositories,
   createDatabaseClient,
+  demoBasho,
   runMigrations,
   seedDatabase,
   sampleBasho,
@@ -54,13 +55,14 @@ describe("basho routes", () => {
 
   it("prefers a locked current basho over a later upcoming basho", async () => {
     const repositories = createRepositories(client);
-    repositories.upsertBasho({
+    await repositories.upsertBasho({
       ...sampleBasho,
       status: "locked",
       currentDay: 1,
     });
-    repositories.insertBasho({
+    await repositories.insertBasho({
       id: "2026-07",
+      isDemo: false,
       name: "July 2026 Future Basho",
       startDate: "2026-07-12",
       endDate: "2026-07-26",
@@ -78,6 +80,67 @@ describe("basho routes", () => {
       id: "2026-05",
       status: "locked",
       currentDay: 1,
+    });
+  });
+
+  it("prefers a live basho over an active demo basho", async () => {
+    const repositories = createRepositories(client);
+    await repositories.insertBasho({
+      ...demoBasho,
+      status: "active",
+      currentDay: 3,
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/basho/current",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      id: sampleBasho.id,
+      isDemo: false,
+    });
+  });
+
+  it("returns the flagged demo basho only when demo mode is explicit", async () => {
+    const repositories = createRepositories(client);
+    await repositories.insertBasho({
+      ...demoBasho,
+      status: "active",
+      currentDay: 3,
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/basho/current?mode=demo",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      id: demoBasho.id,
+      isDemo: true,
+      status: "active",
+      currentDay: 3,
+    });
+  });
+
+  it("does not treat a live fixed-ID collision as the demo basho", async () => {
+    const repositories = createRepositories(client);
+    await repositories.insertBasho({
+      ...demoBasho,
+      isDemo: false,
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/basho/current?mode=demo",
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({
+      error: "not-found",
+      message: "The demo basho is not available.",
     });
   });
 
@@ -148,6 +211,55 @@ describe("basho routes", () => {
     expect(getResponse.json().team).toMatchObject({
       id: "team-north",
       displayName: "North Side",
+    });
+  });
+
+  it("uses the stored upcoming status rather than the current date", async () => {
+    await app.close();
+    app = buildApp({
+      db: client,
+      now: () => new Date("2026-05-25T12:00:00.000Z"),
+      teamIdFactory: () => "status-only",
+    });
+    const headers = await signIn();
+
+    const response = await app.inject({
+      headers,
+      method: "POST",
+      url: "/api/basho/2026-05/teams",
+      payload: {
+        displayName: "Status Controlled",
+        rikishiIds: ["onosato", "kotozakura"],
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+
+    const currentResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/current",
+    });
+
+    expect(currentResponse.statusCode).toBe(200);
+    expect(currentResponse.json()).toMatchObject({
+      id: "2026-05",
+      status: "upcoming",
+    });
+
+    const rikishiResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/rikishi",
+    });
+
+    expect(rikishiResponse.json().basho).toMatchObject({ status: "upcoming" });
+
+    const leaderboardResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/leaderboard",
+    });
+
+    expect(leaderboardResponse.json().basho).toMatchObject({
+      status: "upcoming",
     });
   });
 
@@ -382,6 +494,32 @@ describe("basho routes", () => {
         rank: 2,
       },
     ]);
+    expect(response.json().leaderboard[0]).toMatchObject({
+      latestDayScore: {
+        day: 2,
+        score: 1,
+      },
+      scoreHistory: [
+        {
+          day: 1,
+          dailyScore: 1,
+          cumulativeScore: 1,
+          rikishiScores: [
+            { rikishiId: "kirishima", outcome: "loss", score: 0 },
+            { rikishiId: "onosato", outcome: "win", score: 1 },
+          ],
+        },
+        {
+          day: 2,
+          dailyScore: 1,
+          cumulativeScore: 2,
+          rikishiScores: [
+            { rikishiId: "kirishima", outcome: "win", score: 1 },
+            { rikishiId: "onosato", outcome: "no-result", score: 0 },
+          ],
+        },
+      ],
+    });
   });
 
   it("returns clear 404 errors for unknown basho and teams", async () => {

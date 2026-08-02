@@ -1,4 +1,5 @@
 import type { ActiveView } from "../types";
+import "./ViewSwitch.css";
 
 interface ViewSwitchProps {
   activeView: ActiveView;
@@ -12,23 +13,25 @@ export function ViewSwitch({
   onChange,
 }: ViewSwitchProps) {
   return (
-    <div className="view-switch" aria-label="View switcher">
+    <nav className="view-switch" aria-label="Primary navigation">
       <button
         type="button"
         className={activeView === "selection" ? "active" : ""}
         disabled={disabled}
         onClick={() => onChange("selection")}
+        aria-current={activeView === "selection" ? "page" : undefined}
       >
-        Team selection
+        My stable
       </button>
       <button
         type="button"
         className={activeView === "leaderboard" ? "active" : ""}
         disabled={disabled}
         onClick={() => onChange("leaderboard")}
+        aria-current={activeView === "leaderboard" ? "page" : undefined}
       >
         Leaderboard
       </button>
-    </div>
+    </nav>
   );
 }

@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createFantasyTeam, setAuthTokenProvider } from "./api";
+import {
+  createFantasyTeam,
+  fetchCurrentBasho,
+  getCurrentBashoUrl,
+  setAuthTokenProvider,
+} from "./api";
 
 afterEach(() => {
   setAuthTokenProvider(null);
@@ -19,9 +24,7 @@ describe("api auth headers", () => {
             },
           }),
           {
-            headers: {
-              "content-type": "application/json",
-            },
+            headers: { "content-type": "application/json" },
             status: 201,
           },
         ),
@@ -48,5 +51,39 @@ describe("api auth headers", () => {
       },
       method: "POST",
     });
+  });
+
+  it("does not consult the auth provider for public basho reads", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ id: "2026-09" }), {
+          headers: { "content-type": "application/json" },
+          status: 200,
+        }),
+      ),
+    );
+    const tokenProvider = vi.fn(() =>
+      Promise.reject(new Error("Token refresh failed")),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+    setAuthTokenProvider(tokenProvider);
+
+    await expect(fetchCurrentBasho()).resolves.toMatchObject({ id: "2026-09" });
+    expect(tokenProvider).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith("/api/basho/current", {
+      credentials: "same-origin",
+      headers: {},
+    });
+  });
+});
+
+describe("getCurrentBashoUrl", () => {
+  it("uses the normal current-basho route by default", () => {
+    expect(getCurrentBashoUrl(undefined)).toBe("/api/basho/current");
+  });
+
+  it("selects the demo basho only in explicit demo mode", () => {
+    expect(getCurrentBashoUrl("demo")).toBe("/api/basho/current?mode=demo");
   });
 });
