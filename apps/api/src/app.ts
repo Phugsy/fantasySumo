@@ -20,6 +20,7 @@ import {
   createAuthService,
   registerAuthRoutes,
   type AuthenticatedUser,
+  type NeonJwtVerificationFailureReporter,
 } from "./auth.js";
 import { registerAdminDemoRoutes } from "./routes/admin-demo.js";
 import { registerAdminImportRoutes } from "./routes/admin-imports.js";
@@ -39,6 +40,7 @@ interface AppOptions {
   neonAuthIssuer?: string;
   neonAuthJwksUrl?: string;
   neonJwtVerifier?: (token: string) => Promise<AuthenticatedUser | undefined>;
+  neonJwtVerificationFailureReporter?: NeonJwtVerificationFailureReporter;
   cronSecret?: string;
   allowUnprotectedAdminImports?: boolean;
   allowUnprotectedDemoAdmin?: boolean;
@@ -58,6 +60,8 @@ export function buildApp(options: AppOptions = {}) {
     neonAuthIssuer: options.neonAuthIssuer ?? getNeonAuthIssuer(),
     neonAuthJwksUrl: options.neonAuthJwksUrl ?? getNeonAuthJwksUrl(),
     neonJwtVerifier: options.neonJwtVerifier,
+    neonJwtVerificationFailureReporter:
+      options.neonJwtVerificationFailureReporter,
   });
 
   if (ownedClient !== undefined) {

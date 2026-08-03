@@ -3,6 +3,8 @@ import type { SessionResponse, SessionUser } from "./types";
 
 const PASSWORD_REQUIREMENTS_MESSAGE =
   "Choose a stronger password. Use at least 8 characters and avoid common passwords.";
+const ACCESS_TOKEN_ERROR_MESSAGE =
+  "Neon Auth signed you in, but did not issue an access token. Please sign in again.";
 
 const neonAuthUrl = import.meta.env.VITE_NEON_AUTH_URL as string | undefined;
 const neonAuthClient =
@@ -14,6 +16,13 @@ export function isNeonAuthConfigured(): boolean {
   return neonAuthClient !== null;
 }
 
+export class NeonAccessTokenError extends Error {
+  constructor() {
+    super(ACCESS_TOKEN_ERROR_MESSAGE);
+    this.name = "NeonAccessTokenError";
+  }
+}
+
 export async function getNeonAccessToken(): Promise<string | null> {
   if (neonAuthClient === null) {
     return null;
@@ -21,11 +30,20 @@ export async function getNeonAccessToken(): Promise<string | null> {
 
   const response = await neonAuthClient.token();
 
-  if (response.error !== null) {
-    return null;
+  return requireNeonAccessToken(response);
+}
+
+export function requireNeonAccessToken(response: {
+  data: { token?: string } | null;
+  error: unknown | null;
+}): string {
+  const token = response.data?.token?.trim();
+
+  if (response.error !== null || token === undefined || token.length === 0) {
+    throw new NeonAccessTokenError();
   }
 
-  return response.data.token;
+  return token;
 }
 
 export async function getNeonSession(): Promise<SessionResponse> {

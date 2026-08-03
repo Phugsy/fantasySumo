@@ -21,6 +21,7 @@ import {
 import {
   getNeonAccessToken,
   isNeonAuthConfigured,
+  NeonAccessTokenError,
   signInWithNeon,
   signOutNeon,
   signUpWithNeon,
@@ -560,6 +561,10 @@ async function waitForVerifiedSession(): Promise<SessionResponse> {
         return session;
       }
     } catch (error) {
+      if (error instanceof NeonAccessTokenError) {
+        throw error;
+      }
+
       if (attempt === maxAttempts) {
         throw error;
       }
