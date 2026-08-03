@@ -3,6 +3,7 @@ import {
   createFantasyTeam,
   fetchCurrentBasho,
   getCurrentBashoUrl,
+  reportAuthClientTokenUnavailable,
   setAuthTokenProvider,
 } from "./api";
 
@@ -75,6 +76,28 @@ describe("api auth headers", () => {
       credentials: "same-origin",
       headers: {},
     });
+  });
+
+  it("reports a safe client auth diagnostic without requesting a token", async () => {
+    const fetchMock = vi.fn(() => new Promise<Response>(() => undefined));
+    const tokenProvider = vi.fn(() =>
+      Promise.reject(new Error("provider detail must stay private")),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+    setAuthTokenProvider(tokenProvider);
+
+    expect(reportAuthClientTokenUnavailable()).toBeUndefined();
+    expect(tokenProvider).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith("/api/session", {
+      credentials: "same-origin",
+      headers: {
+        "X-Fantasy-Sumo-Auth-Diagnostic": "access-token-unavailable",
+      },
+    });
+    expect(JSON.stringify(fetchMock.mock.calls)).not.toContain(
+      "provider detail must stay private",
+    );
   });
 });
 

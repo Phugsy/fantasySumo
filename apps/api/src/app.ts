@@ -19,6 +19,7 @@ import {
 import {
   createAuthService,
   registerAuthRoutes,
+  type AuthClientSessionFailureReporter,
   type AuthenticatedUser,
   type NeonJwtVerificationFailureReporter,
 } from "./auth.js";
@@ -41,6 +42,7 @@ interface AppOptions {
   neonAuthJwksUrl?: string;
   neonJwtVerifier?: (token: string) => Promise<AuthenticatedUser | undefined>;
   neonJwtVerificationFailureReporter?: NeonJwtVerificationFailureReporter;
+  authClientSessionFailureReporter?: AuthClientSessionFailureReporter;
   cronSecret?: string;
   allowUnprotectedAdminImports?: boolean;
   allowUnprotectedDemoAdmin?: boolean;
@@ -76,7 +78,9 @@ export function buildApp(options: AppOptions = {}) {
     domain: "core-ready",
   }));
 
-  registerAuthRoutes(app, auth);
+  registerAuthRoutes(app, auth, {
+    authClientSessionFailureReporter: options.authClientSessionFailureReporter,
+  });
   registerBashoRoutes(app, {
     auth,
     repositories,

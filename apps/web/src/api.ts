@@ -26,6 +26,9 @@ export class ApiRequestError extends Error {
 
 let authTokenProvider: (() => Promise<string | null>) | null = null;
 
+const AUTH_CLIENT_DIAGNOSTIC_HEADER = "X-Fantasy-Sumo-Auth-Diagnostic";
+const ACCESS_TOKEN_UNAVAILABLE_DIAGNOSTIC = "access-token-unavailable";
+
 export function setAuthTokenProvider(
   provider: (() => Promise<string | null>) | null,
 ) {
@@ -61,6 +64,17 @@ export async function fetchLeaderboard(
 
 export async function fetchSession(): Promise<SessionResponse> {
   return getJson<SessionResponse>("/api/session");
+}
+
+export function reportAuthClientTokenUnavailable(): void {
+  void fetch("/api/session", {
+    credentials: "same-origin",
+    headers: {
+      [AUTH_CLIENT_DIAGNOSTIC_HEADER]: ACCESS_TOKEN_UNAVAILABLE_DIAGNOSTIC,
+    },
+  }).catch(() => {
+    // Diagnostics are best-effort and must never replace the original auth error.
+  });
 }
 
 export async function createSession(body: {

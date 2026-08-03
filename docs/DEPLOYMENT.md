@@ -170,14 +170,18 @@ development session cannot be enabled on a production deployment.
 Do not set `AUTH_MODE=neon` without `NEON_AUTH_JWKS_URL`; the API will fail closed and treat requests as unauthenticated.
 
 When Neon accepts a login but the app cannot establish its API session, inspect
-the production runtime logs for `event=neon-jwt-verification-failed`:
+the production runtime logs for these warning events:
 
-- `reason=verification-error` includes only the safe JOSE error name and code,
+- `event=auth-client-session-failed` with
+  `reason=access-token-unavailable` means the browser could not obtain a session
+  token, so it sent a safe diagnostic session request without an authorization
+  header. The API emits at most one of these warnings per runtime instance per
+  minute to bound unauthenticated diagnostic traffic.
+- `event=neon-jwt-verification-failed` with
+  `reason=verification-error` includes only the safe JOSE error name and code,
   which distinguishes claim, signature, JWKS, and missing-verifier failures.
-- `reason=token-rejected` means verification returned no authenticated user.
-- If repeated `/api/session` requests have no matching verification event, the
-  browser did not attach a bearer token. The web app reports this separately
-  when Neon does not issue a non-empty access token.
+- `event=neon-jwt-verification-failed` with `reason=token-rejected` means
+  verification returned no authenticated user.
 
 Never add the JWT, its claims, provider error message, or authorization header
 to these logs. Provider and JOSE error messages are uncontrolled text that can

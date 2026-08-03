@@ -31,6 +31,17 @@ export type NeonJwtVerificationFailureReporter = (
   failure: NeonJwtVerificationFailure,
 ) => void;
 
+export interface AuthClientSessionFailure {
+  event: "auth-client-session-failed";
+  reason: "access-token-unavailable";
+}
+
+export type AuthClientSessionFailureReporter = (
+  failure: AuthClientSessionFailure,
+) => void;
+
+const AUTH_CLIENT_SESSION_FAILURE_REPORT_INTERVAL_MS = 60_000;
+
 export interface AuthService {
   mode: AuthMode;
   getCurrentUser: (
@@ -103,8 +114,28 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
   };
 }
 
-export function registerAuthRoutes(app: FastifyInstance, auth: AuthService) {
+export function registerAuthRoutes(
+  app: FastifyInstance,
+  auth: AuthService,
+  options: {
+    authClientSessionFailureReporter?: AuthClientSessionFailureReporter;
+  } = {},
+) {
+  let nextAuthClientSessionFailureReportAt = 0;
+
   app.get("/api/session", async (request) => {
+    if (Date.now() >= nextAuthClientSessionFailureReportAt) {
+      const reported = reportAuthClientSessionFailure(
+        request,
+        auth.mode,
+        options.authClientSessionFailureReporter,
+      );
+
+      if (reported) {
+        nextAuthClientSessionFailureReportAt =
+          Date.now() + AUTH_CLIENT_SESSION_FAILURE_REPORT_INTERVAL_MS;
+      }
+    }
     const user = await auth.getCurrentUser(request);
 
     return {
@@ -162,6 +193,33 @@ export function registerAuthRoutes(app: FastifyInstance, auth: AuthService) {
 
     return reply.code(204).send();
   });
+}
+
+function reportAuthClientSessionFailure(
+  request: FastifyRequest,
+  mode: AuthMode,
+  reporter: AuthClientSessionFailureReporter | undefined,
+): boolean {
+  if (
+    mode !== "neon" ||
+    firstHeaderValue(request.headers["x-fantasy-sumo-auth-diagnostic"]) !==
+      "access-token-unavailable"
+  ) {
+    return false;
+  }
+
+  const failure: AuthClientSessionFailure = {
+    event: "auth-client-session-failed",
+    reason: "access-token-unavailable",
+  };
+
+  if (reporter !== undefined) {
+    reporter(failure);
+    return true;
+  }
+
+  request.log.warn(failure, "Auth client could not obtain a session token.");
+  return true;
 }
 
 function createLocalUser(input: {
