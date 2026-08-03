@@ -169,6 +169,22 @@ development session cannot be enabled on a production deployment.
 
 Do not set `AUTH_MODE=neon` without `NEON_AUTH_JWKS_URL`; the API will fail closed and treat requests as unauthenticated.
 
+When Neon accepts a login but the app cannot establish its API session, inspect
+the production runtime logs for `event=neon-jwt-verification-failed`:
+
+- `reason=verification-error` includes only the safe JOSE error name and code,
+  which distinguishes claim, signature, JWKS, and missing-verifier failures.
+- `reason=token-rejected` means verification returned no authenticated user.
+- If repeated `/api/session` requests have no matching verification event, the
+  browser did not attach a bearer token. The web app reports this separately
+  when Neon does not issue a non-empty access token.
+
+Never add the JWT, its claims, provider error message, or authorization header
+to these logs. Provider and JOSE error messages are uncontrolled text that can
+contain request-derived values; runtime logs also persist and may later be
+forwarded to other systems. The stable error name and code provide the useful
+failure classification without that exposure.
+
 Neon Auth also requires each deployed app origin to be added as a trusted domain in Neon Console -> Auth -> Configuration -> Domains. Add the exact production and preview origins with protocol and no trailing slash, for example `https://fantasy-sumo.vercel.app`. Wildcard subdomains are not supported, so each Vercel preview domain that needs auth testing must be added explicitly.
 
 The Postgres migration ledger records each filename and a SHA-256 checksum of

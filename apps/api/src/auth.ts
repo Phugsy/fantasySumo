@@ -17,7 +17,19 @@ interface AuthServiceOptions {
   neonAuthIssuer?: string;
   neonAuthJwksUrl?: string;
   neonJwtVerifier?: (token: string) => Promise<AuthenticatedUser | undefined>;
+  neonJwtVerificationFailureReporter?: NeonJwtVerificationFailureReporter;
 }
+
+export interface NeonJwtVerificationFailure {
+  errorCode?: string;
+  errorName: string;
+  event: "neon-jwt-verification-failed";
+  reason: "token-rejected" | "verification-error";
+}
+
+export type NeonJwtVerificationFailureReporter = (
+  failure: NeonJwtVerificationFailure,
+) => void;
 
 export interface AuthService {
   mode: AuthMode;
@@ -55,7 +67,35 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
       if (options.mode === "neon") {
         const token = getBearerToken(request);
 
-        return token === undefined ? undefined : neonJwtVerifier(token);
+        if (token === undefined) {
+          return undefined;
+        }
+
+        try {
+          const user = await neonJwtVerifier(token);
+
+          if (user === undefined) {
+            reportNeonJwtVerificationFailure(
+              {
+                errorName: "NeonJwtRejectedError",
+                event: "neon-jwt-verification-failed",
+                reason: "token-rejected",
+              },
+              options.neonJwtVerificationFailureReporter,
+              request,
+            );
+          }
+
+          return user;
+        } catch (error) {
+          reportNeonJwtVerificationFailure(
+            toSafeNeonJwtVerificationFailure(error),
+            options.neonJwtVerificationFailureReporter,
+            request,
+          );
+
+          return undefined;
+        }
       }
 
       return Promise.resolve(getLocalSessionUser(request));
@@ -192,40 +232,95 @@ function createNeonJwtVerifier(options: {
   jwksUrl?: string;
 }): (token: string) => Promise<AuthenticatedUser | undefined> {
   if (options.jwksUrl === undefined) {
-    return async () => undefined;
+    return async () => {
+      throw new NeonAuthConfigurationError();
+    };
   }
 
   const jwks = createRemoteJWKSet(new URL(options.jwksUrl));
 
   return async (token) => {
-    try {
-      const { payload } = await jwtVerify(token, jwks, {
-        ...(options.audience === undefined
-          ? {}
-          : { audience: options.audience }),
-        ...(options.issuer === undefined ? {} : { issuer: options.issuer }),
-      });
+    const { payload } = await jwtVerify(token, jwks, {
+      ...(options.audience === undefined ? {} : { audience: options.audience }),
+      ...(options.issuer === undefined ? {} : { issuer: options.issuer }),
+    });
 
-      if (payload.sub === undefined || payload.sub.length === 0) {
-        return undefined;
-      }
-
-      const email =
-        typeof payload.email === "string" ? payload.email.trim() : undefined;
-      const displayName =
-        typeof payload.name === "string" ? payload.name.trim() : undefined;
-
-      return {
-        id: payload.sub,
-        ...(email === undefined || email.length === 0 ? {} : { email }),
-        ...(displayName === undefined || displayName.length === 0
-          ? {}
-          : { displayName }),
-      };
-    } catch {
+    if (payload.sub === undefined || payload.sub.length === 0) {
       return undefined;
     }
+
+    const email =
+      typeof payload.email === "string" ? payload.email.trim() : undefined;
+    const displayName =
+      typeof payload.name === "string" ? payload.name.trim() : undefined;
+
+    return {
+      id: payload.sub,
+      ...(email === undefined || email.length === 0 ? {} : { email }),
+      ...(displayName === undefined || displayName.length === 0
+        ? {}
+        : { displayName }),
+    };
   };
+}
+
+class NeonAuthConfigurationError extends Error {
+  readonly code = "NEON_AUTH_JWKS_URL_MISSING";
+
+  constructor() {
+    super("Neon Auth JWT verification is not configured.");
+    this.name = "NeonAuthConfigurationError";
+  }
+}
+
+function toSafeNeonJwtVerificationFailure(
+  error: unknown,
+): NeonJwtVerificationFailure {
+  const errorCode = getStringProperty(error, "code");
+
+  return {
+    ...(errorCode === undefined ? {} : { errorCode }),
+    errorName:
+      error instanceof Error && error.name.length > 0
+        ? error.name
+        : "UnknownError",
+    event: "neon-jwt-verification-failed",
+    reason: "verification-error",
+  };
+}
+
+function getStringProperty(
+  value: unknown,
+  property: string,
+): string | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+
+  let propertyValue: unknown;
+
+  try {
+    propertyValue = Reflect.get(value, property);
+  } catch {
+    return undefined;
+  }
+
+  return typeof propertyValue === "string" && propertyValue.length > 0
+    ? propertyValue
+    : undefined;
+}
+
+function reportNeonJwtVerificationFailure(
+  failure: NeonJwtVerificationFailure,
+  reporter: NeonJwtVerificationFailureReporter | undefined,
+  request: FastifyRequest,
+) {
+  if (reporter !== undefined) {
+    reporter(failure);
+    return;
+  }
+
+  request.log.warn(failure, "Neon JWT verification failed.");
 }
 
 function parseCookies(
