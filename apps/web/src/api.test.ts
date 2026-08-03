@@ -79,14 +79,7 @@ describe("api auth headers", () => {
   });
 
   it("reports a safe client auth diagnostic without requesting a token", async () => {
-    const fetchMock = vi.fn(() =>
-      Promise.resolve(
-        new Response(JSON.stringify({ mode: "neon", user: null }), {
-          headers: { "content-type": "application/json" },
-          status: 200,
-        }),
-      ),
-    );
+    const fetchMock = vi.fn(() => new Promise<Response>(() => undefined));
     const tokenProvider = vi.fn(() =>
       Promise.reject(new Error("provider detail must stay private")),
     );
@@ -94,7 +87,7 @@ describe("api auth headers", () => {
     vi.stubGlobal("fetch", fetchMock);
     setAuthTokenProvider(tokenProvider);
 
-    await expect(reportAuthClientTokenUnavailable()).resolves.toBeUndefined();
+    expect(reportAuthClientTokenUnavailable()).toBeUndefined();
     expect(tokenProvider).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledWith("/api/session", {
       credentials: "same-origin",

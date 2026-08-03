@@ -66,17 +66,15 @@ export async function fetchSession(): Promise<SessionResponse> {
   return getJson<SessionResponse>("/api/session");
 }
 
-export async function reportAuthClientTokenUnavailable(): Promise<void> {
-  try {
-    await fetch("/api/session", {
-      credentials: "same-origin",
-      headers: {
-        [AUTH_CLIENT_DIAGNOSTIC_HEADER]: ACCESS_TOKEN_UNAVAILABLE_DIAGNOSTIC,
-      },
-    });
-  } catch {
+export function reportAuthClientTokenUnavailable(): void {
+  void fetch("/api/session", {
+    credentials: "same-origin",
+    headers: {
+      [AUTH_CLIENT_DIAGNOSTIC_HEADER]: ACCESS_TOKEN_UNAVAILABLE_DIAGNOSTIC,
+    },
+  }).catch(() => {
     // Diagnostics are best-effort and must never replace the original auth error.
-  }
+  });
 }
 
 export async function createSession(body: {

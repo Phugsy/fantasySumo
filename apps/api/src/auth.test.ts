@@ -212,6 +212,16 @@ describe("auth routes", () => {
 
       await app.inject({
         headers: {
+          "x-fantasy-sumo-auth-diagnostic": "access-token-unavailable",
+        },
+        method: "GET",
+        url: "/api/session",
+      });
+
+      expect(clientFailureReporter).toHaveBeenCalledOnce();
+
+      await app.inject({
+        headers: {
           "x-fantasy-sumo-auth-diagnostic": "provider detail must stay private",
         },
         method: "GET",

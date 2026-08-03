@@ -548,7 +548,7 @@ async function submitNeonAccount(input: {
     session = await waitForVerifiedSession(fetchSession, wait);
   } catch (error) {
     if (error instanceof IncompleteSessionError) {
-      await reportAuthClientTokenUnavailable();
+      reportAuthClientTokenUnavailable();
     }
 
     throw error;

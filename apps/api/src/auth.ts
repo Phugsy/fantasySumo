@@ -40,6 +40,8 @@ export type AuthClientSessionFailureReporter = (
   failure: AuthClientSessionFailure,
 ) => void;
 
+const AUTH_CLIENT_SESSION_FAILURE_REPORT_INTERVAL_MS = 60_000;
+
 export interface AuthService {
   mode: AuthMode;
   getCurrentUser: (
@@ -119,12 +121,21 @@ export function registerAuthRoutes(
     authClientSessionFailureReporter?: AuthClientSessionFailureReporter;
   } = {},
 ) {
+  let nextAuthClientSessionFailureReportAt = 0;
+
   app.get("/api/session", async (request) => {
-    reportAuthClientSessionFailure(
-      request,
-      auth.mode,
-      options.authClientSessionFailureReporter,
-    );
+    if (Date.now() >= nextAuthClientSessionFailureReportAt) {
+      const reported = reportAuthClientSessionFailure(
+        request,
+        auth.mode,
+        options.authClientSessionFailureReporter,
+      );
+
+      if (reported) {
+        nextAuthClientSessionFailureReportAt =
+          Date.now() + AUTH_CLIENT_SESSION_FAILURE_REPORT_INTERVAL_MS;
+      }
+    }
     const user = await auth.getCurrentUser(request);
 
     return {
@@ -188,13 +199,13 @@ function reportAuthClientSessionFailure(
   request: FastifyRequest,
   mode: AuthMode,
   reporter: AuthClientSessionFailureReporter | undefined,
-) {
+): boolean {
   if (
     mode !== "neon" ||
     firstHeaderValue(request.headers["x-fantasy-sumo-auth-diagnostic"]) !==
       "access-token-unavailable"
   ) {
-    return;
+    return false;
   }
 
   const failure: AuthClientSessionFailure = {
@@ -204,10 +215,11 @@ function reportAuthClientSessionFailure(
 
   if (reporter !== undefined) {
     reporter(failure);
-    return;
+    return true;
   }
 
   request.log.warn(failure, "Auth client could not obtain a session token.");
+  return true;
 }
 
 function createLocalUser(input: {

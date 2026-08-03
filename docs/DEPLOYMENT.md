@@ -175,7 +175,8 @@ the production runtime logs for these warning events:
 - `event=auth-client-session-failed` with
   `reason=access-token-unavailable` means the browser could not obtain a session
   token, so it sent a safe diagnostic session request without an authorization
-  header.
+  header. The API emits at most one of these warnings per runtime instance per
+  minute to bound unauthenticated diagnostic traffic.
 - `event=neon-jwt-verification-failed` with
   `reason=verification-error` includes only the safe JOSE error name and code,
   which distinguishes claim, signature, JWKS, and missing-verifier failures.
