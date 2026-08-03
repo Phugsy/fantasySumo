@@ -180,7 +180,10 @@ the production runtime logs for `event=neon-jwt-verification-failed`:
   when Neon does not issue a non-empty access token.
 
 Never add the JWT, its claims, provider error message, or authorization header
-to these logs.
+to these logs. Provider and JOSE error messages are uncontrolled text that can
+contain request-derived values; runtime logs also persist and may later be
+forwarded to other systems. The stable error name and code provide the useful
+failure classification without that exposure.
 
 Neon Auth also requires each deployed app origin to be added as a trusted domain in Neon Console -> Auth -> Configuration -> Domains. Add the exact production and preview origins with protocol and no trailing slash, for example `https://fantasy-sumo.vercel.app`. Wildcard subdomains are not supported, so each Vercel preview domain that needs auth testing must be added explicitly.
 

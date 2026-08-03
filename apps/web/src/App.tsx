@@ -20,8 +20,8 @@ import {
 } from "./api";
 import {
   getNeonAccessToken,
+  INCOMPLETE_SESSION_ERROR_MESSAGE,
   isNeonAuthConfigured,
-  NeonAccessTokenError,
   signInWithNeon,
   signOutNeon,
   signUpWithNeon,
@@ -32,6 +32,7 @@ import { BashoPanel } from "./components/BashoPanel";
 import { LeaderboardPanel } from "./components/LeaderboardPanel";
 import { PageHeader } from "./components/PageHeader";
 import { TeamSelection } from "./components/TeamSelection";
+import { waitForVerifiedSession } from "./sessionVerification";
 import type {
   ActiveView,
   Basho,
@@ -539,44 +540,13 @@ async function submitNeonAccount(input: {
 
   setAuthTokenProvider(getNeonAccessToken);
 
-  const session = await waitForVerifiedSession();
+  const session = await waitForVerifiedSession(fetchSession, wait);
 
   if (session.user === null) {
-    throw new Error(
-      "Signed in, but the app could not verify your session yet. Please try signing in again.",
-    );
+    throw new Error(INCOMPLETE_SESSION_ERROR_MESSAGE);
   }
 
   return session;
-}
-
-async function waitForVerifiedSession(): Promise<SessionResponse> {
-  const maxAttempts = 8;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      const session = await fetchSession();
-
-      if (session.user !== null || attempt === maxAttempts) {
-        return session;
-      }
-    } catch (error) {
-      if (error instanceof NeonAccessTokenError) {
-        throw error;
-      }
-
-      if (attempt === maxAttempts) {
-        throw error;
-      }
-    }
-
-    await wait(250);
-  }
-
-  return {
-    mode: "neon",
-    user: null,
-  };
 }
 
 function wait(ms: number): Promise<void> {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getNeonAuthErrorMessage,
-  NeonAccessTokenError,
+  IncompleteSessionError,
   requireNeonAccessToken,
 } from "./authClient";
 
@@ -63,11 +63,12 @@ describe("requireNeonAccessToken", () => {
       thrownError = error;
     }
 
-    expect(thrownError).toBeInstanceOf(NeonAccessTokenError);
+    expect(thrownError).toBeInstanceOf(IncompleteSessionError);
     expect(thrownError).toMatchObject({
       message:
-        "Neon Auth signed you in, but did not issue an access token. Please sign in again.",
+        "We signed you in, but could not complete your session. Refresh the page or try signing in again.",
     });
+    expect(String(thrownError)).not.toMatch(/Neon|access token/i);
     expect(String(thrownError)).not.toContain(
       "provider detail must stay private",
     );
