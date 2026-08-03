@@ -179,6 +179,54 @@ describe("auth routes", () => {
     }
   });
 
+  it("reports a safe client-side session failure in Neon mode", async () => {
+    const clientFailureReporter = vi.fn();
+    const verificationFailureReporter = vi.fn();
+    const app = buildApp({
+      authMode: "neon",
+      authClientSessionFailureReporter: clientFailureReporter,
+      neonJwtVerificationFailureReporter: verificationFailureReporter,
+      neonJwtVerifier: async () => undefined,
+    });
+
+    try {
+      const response = await app.inject({
+        headers: {
+          "x-fantasy-sumo-auth-diagnostic": "access-token-unavailable",
+        },
+        method: "GET",
+        url: "/api/session",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        mode: "neon",
+        user: null,
+      });
+      expect(clientFailureReporter).toHaveBeenCalledOnce();
+      expect(clientFailureReporter).toHaveBeenCalledWith({
+        event: "auth-client-session-failed",
+        reason: "access-token-unavailable",
+      });
+      expect(verificationFailureReporter).not.toHaveBeenCalled();
+
+      await app.inject({
+        headers: {
+          "x-fantasy-sumo-auth-diagnostic": "provider detail must stay private",
+        },
+        method: "GET",
+        url: "/api/session",
+      });
+
+      expect(clientFailureReporter).toHaveBeenCalledOnce();
+      expect(JSON.stringify(clientFailureReporter.mock.calls)).not.toContain(
+        "provider detail must stay private",
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
   it("treats malformed cookie values as an anonymous local session", async () => {
     const app = buildApp({
       authMode: "local",

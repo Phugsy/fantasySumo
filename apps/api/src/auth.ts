@@ -31,6 +31,15 @@ export type NeonJwtVerificationFailureReporter = (
   failure: NeonJwtVerificationFailure,
 ) => void;
 
+export interface AuthClientSessionFailure {
+  event: "auth-client-session-failed";
+  reason: "access-token-unavailable";
+}
+
+export type AuthClientSessionFailureReporter = (
+  failure: AuthClientSessionFailure,
+) => void;
+
 export interface AuthService {
   mode: AuthMode;
   getCurrentUser: (
@@ -103,8 +112,19 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
   };
 }
 
-export function registerAuthRoutes(app: FastifyInstance, auth: AuthService) {
+export function registerAuthRoutes(
+  app: FastifyInstance,
+  auth: AuthService,
+  options: {
+    authClientSessionFailureReporter?: AuthClientSessionFailureReporter;
+  } = {},
+) {
   app.get("/api/session", async (request) => {
+    reportAuthClientSessionFailure(
+      request,
+      auth.mode,
+      options.authClientSessionFailureReporter,
+    );
     const user = await auth.getCurrentUser(request);
 
     return {
@@ -162,6 +182,32 @@ export function registerAuthRoutes(app: FastifyInstance, auth: AuthService) {
 
     return reply.code(204).send();
   });
+}
+
+function reportAuthClientSessionFailure(
+  request: FastifyRequest,
+  mode: AuthMode,
+  reporter: AuthClientSessionFailureReporter | undefined,
+) {
+  if (
+    mode !== "neon" ||
+    firstHeaderValue(request.headers["x-fantasy-sumo-auth-diagnostic"]) !==
+      "access-token-unavailable"
+  ) {
+    return;
+  }
+
+  const failure: AuthClientSessionFailure = {
+    event: "auth-client-session-failed",
+    reason: "access-token-unavailable",
+  };
+
+  if (reporter !== undefined) {
+    reporter(failure);
+    return;
+  }
+
+  request.log.warn(failure, "Auth client could not obtain a session token.");
 }
 
 function createLocalUser(input: {

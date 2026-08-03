@@ -16,10 +16,12 @@ import {
   fetchMyTeam,
   fetchSession,
   getErrorMessage,
+  reportAuthClientTokenUnavailable,
   setAuthTokenProvider,
 } from "./api";
 import {
   getNeonAccessToken,
+  IncompleteSessionError,
   INCOMPLETE_SESSION_ERROR_MESSAGE,
   isNeonAuthConfigured,
   signInWithNeon,
@@ -540,7 +542,17 @@ async function submitNeonAccount(input: {
 
   setAuthTokenProvider(getNeonAccessToken);
 
-  const session = await waitForVerifiedSession(fetchSession, wait);
+  let session: SessionResponse;
+
+  try {
+    session = await waitForVerifiedSession(fetchSession, wait);
+  } catch (error) {
+    if (error instanceof IncompleteSessionError) {
+      await reportAuthClientTokenUnavailable();
+    }
+
+    throw error;
+  }
 
   if (session.user === null) {
     throw new Error(INCOMPLETE_SESSION_ERROR_MESSAGE);

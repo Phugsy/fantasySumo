@@ -28,16 +28,18 @@ export async function getNeonAccessToken(): Promise<string | null> {
     return null;
   }
 
-  const response = await neonAuthClient.token();
+  // Neon injects the JWT into session.token. Reading the session avoids the
+  // cache-affected /token response immediately after an email sign-in.
+  const response = await neonAuthClient.getSession();
 
   return requireNeonAccessToken(response);
 }
 
 export function requireNeonAccessToken(response: {
-  data: { token?: string } | null;
+  data: { session?: { token?: string } | null } | null;
   error: unknown | null;
 }): string {
-  const token = response.data?.token?.trim();
+  const token = response.data?.session?.token?.trim();
 
   if (response.error !== null || token === undefined || token.length === 0) {
     throw new IncompleteSessionError();

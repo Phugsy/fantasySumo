@@ -39,7 +39,7 @@ describe("requireNeonAccessToken", () => {
   it("returns a non-empty Neon access token", () => {
     expect(
       requireNeonAccessToken({
-        data: { token: " signed-jwt " },
+        data: { session: { token: " signed-jwt " } },
         error: null,
       }),
     ).toBe("signed-jwt");
@@ -51,7 +51,7 @@ describe("requireNeonAccessToken", () => {
       error: { message: "provider detail must stay private" },
     },
     {
-      data: { token: "" },
+      data: { session: { token: "" } },
       error: null,
     },
   ])("raises a safe error when Neon does not issue a token", (response) => {
