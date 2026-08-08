@@ -338,6 +338,140 @@ describe("App", () => {
     expect(screen.getByText("Onosato")).toBeInTheDocument();
   });
 
+  it("edits the current user's stable and shows the saved picks immediately", async () => {
+    const fetchMock = vi.fn(
+      (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        if (
+          String(input) === "/api/basho/2026-05/my-team" &&
+          init?.method === "PUT"
+        ) {
+          return jsonResponse({
+            team: {
+              id: "team-existing",
+              displayName: "Updated Champions",
+            },
+            picks: [{ rikishiId: "kotozakura" }, { rikishiId: "hoshoryu" }],
+          });
+        }
+
+        return mockExistingTeamAfterLoginFetch(input, init);
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    await signInThroughAccountPanel();
+    await screen.findByRole("heading", { name: "Existing Champions" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit picks" }));
+
+    expect(await screen.findByLabelText("Team name")).toHaveValue(
+      "Existing Champions",
+    );
+    expect(
+      screen.getByRole("heading", { name: "Edit stable" }),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Team name"), {
+      target: { value: "Updated Champions" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Remove Onosato" }));
+    fireEvent.click(screen.getByRole("button", { name: /Hoshoryu/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/basho/2026-05/my-team", {
+        body: JSON.stringify({
+          displayName: "Updated Champions",
+          rikishiIds: ["kotozakura", "hoshoryu"],
+        }),
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "PUT",
+      }),
+    );
+    expect(
+      await screen.findByText("Changes saved for Updated Champions."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Updated Champions" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Hoshoryu")).toBeInTheDocument();
+    expect(screen.queryByText("Onosato")).not.toBeInTheDocument();
+  });
+
+  it("switches an open editor to read-only when the basho locks before save", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (
+          String(input) === "/api/basho/2026-05/my-team" &&
+          init?.method === "PUT"
+        ) {
+          return jsonResponse(
+            {
+              error: "picks-locked",
+              message: "This basho has started, so picks are locked.",
+              bashoStatus: "active",
+            },
+            { status: 409 },
+          );
+        }
+
+        return mockExistingTeamAfterLoginFetch(input, init);
+      }),
+    );
+    render(<App />);
+
+    await signInThroughAccountPanel();
+    await screen.findByRole("heading", { name: "Existing Champions" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit picks" }));
+    fireEvent.change(await screen.findByLabelText("Team name"), {
+      target: { value: "Too Late Stable" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(
+      await screen.findByText(
+        "This basho has started, so picks are locked. Your line-up is read-only.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Existing Champions" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit picks" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Save changes" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("cancels stable edits and restores the saved picks", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockExistingTeamAfterLoginFetch));
+    render(<App />);
+
+    await signInThroughAccountPanel();
+    await screen.findByRole("heading", { name: "Existing Champions" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit picks" }));
+    fireEvent.change(await screen.findByLabelText("Team name"), {
+      target: { value: "Unsaved Name" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Remove Onosato" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Existing Champions" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit picks" }));
+
+    expect(await screen.findByLabelText("Team name")).toHaveValue(
+      "Existing Champions",
+    );
+    expect(screen.getByText("2 of 2 selected")).toBeInTheDocument();
+  });
+
   it("keeps My Stable lifecycle aligned with its private score snapshot", async () => {
     const ownerSnapshotBasho = {
       ...currentBasho,
@@ -428,7 +562,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Edit picks" }));
 
     expect(
-      await screen.findByRole("heading", { name: "Selection" }),
+      await screen.findByRole("heading", { name: "Edit stable" }),
     ).toBeInTheDocument();
     expect(screen.getByText("1 of 2 selected")).toBeInTheDocument();
     expect(screen.getByText("Pick slot")).toBeInTheDocument();

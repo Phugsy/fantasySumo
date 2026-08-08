@@ -64,7 +64,13 @@ export interface Repositories {
   saveOwnedFantasyTeamWithPicksIfBashoUpcoming: (
     team: FantasyTeam & { ownerUserId: string },
     picks: readonly FantasyPick[],
-  ) => Promise<FantasyTeam | undefined>;
+  ) => Promise<
+    | {
+        team: FantasyTeam;
+        picks: FantasyPick[];
+      }
+    | undefined
+  >;
   getFantasyTeam: (id: FantasyTeam["id"]) => Promise<FantasyTeam | undefined>;
   getFantasyTeamForOwner: (
     bashoId: Basho["id"],
@@ -331,7 +337,18 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
             .run();
         }
 
-        return toFantasyTeam(savedTeam);
+        return {
+          team: toFantasyTeam(savedTeam),
+          picks: picks
+            .map((pick) => ({
+              ...pick,
+              id: `${savedTeam.id}-${pick.rikishiId}`,
+              teamId: savedTeam.id,
+            }))
+            .sort((left, right) =>
+              left.rikishiId.localeCompare(right.rikishiId),
+            ),
+        };
       }),
     getFantasyTeam: async (id) => {
       const row = db
@@ -768,7 +785,18 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
             .values(toFantasyPickRow({ ...pick, teamId: savedTeam.id }));
         }
 
-        return toFantasyTeam(savedTeam);
+        return {
+          team: toFantasyTeam(savedTeam),
+          picks: picks
+            .map((pick) => ({
+              ...pick,
+              id: `${savedTeam.id}-${pick.rikishiId}`,
+              teamId: savedTeam.id,
+            }))
+            .sort((left, right) =>
+              left.rikishiId.localeCompare(right.rikishiId),
+            ),
+        };
       }),
     getFantasyTeam: async (id) => {
       const row = (

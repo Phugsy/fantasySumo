@@ -130,6 +130,7 @@ Useful API endpoints:
 - `GET /api/basho/:bashoId/rikishi`
 - `POST /api/basho/:bashoId/teams`
 - `GET /api/basho/:bashoId/my-team`
+- `PUT /api/basho/:bashoId/my-team`
 - `GET /api/basho/:bashoId/teams/:teamId`
 - `GET /api/basho/:bashoId/leaderboard`
 - `POST /api/admin/demo/reset`
@@ -156,13 +157,14 @@ Basho records use this lifecycle:
 - `active` - results are being applied and leaderboard scoring is in progress.
 - `complete` - final scores are available.
 
-The API enforces pick locking from persisted lifecycle state.
-`POST /api/basho/:bashoId/teams` succeeds only while the basho is `upcoming`;
-`locked`, `active`, and `complete` bashos return `409 picks-locked`. This also
-allows an administrator to lock picks early by changing the basho lifecycle.
-The repository rechecks that status inside the team-insert transaction, which
-serializes with the production lock update so an in-flight submission cannot
-slip through the transition.
+The API enforces pick locking from persisted lifecycle state. Team creation
+through `POST /api/basho/:bashoId/teams` and current-user pick replacement
+through `PUT /api/basho/:bashoId/my-team` succeed only while the basho is
+`upcoming`; `locked`, `active`, and `complete` bashos return `409
+picks-locked`. This also allows an administrator to lock picks early by
+changing the basho lifecycle. The repository rechecks that status inside the
+team-and-picks transaction, which serializes with the production lock update
+so an in-flight save cannot slip through the transition.
 The protected daily cron normally persists the lock and stamps existing teams
 on the evening before day 0, where day 0 is the calendar day before the basho.
 
@@ -200,7 +202,7 @@ Set `CRON_SECRET` in production to authenticate Vercel's scheduled basho job.
 
 Fantasy team creation now requires a current user. Local development uses `AUTH_MODE=local`, which exposes a simple development-only session flow through `POST /api/session` and an in-app sign-in panel. This keeps SQLite demos and tests self-contained.
 
-Production uses Neon Auth as the identity source. The web app signs users in with `VITE_NEON_AUTH_URL`, sends the Neon JWT to the API, and the API verifies that token in `AUTH_MODE=neon` with `NEON_AUTH_JWKS_URL`. The API stores team ownership as `ownerUserId`, enforces one team per user per basho, and keeps the leaderboard public by team/display name.
+Production uses Neon Auth as the identity source. The web app signs users in with `VITE_NEON_AUTH_URL`, sends the Neon JWT to the API, and the API verifies that token in `AUTH_MODE=neon` with `NEON_AUTH_JWKS_URL`. The API stores team ownership as `ownerUserId`, enforces one team per user per basho, and keeps the leaderboard public by team/display name. Signed-in users can replace only their own picks through the current-user team endpoint while the basho remains open.
 
 ## Data import
 

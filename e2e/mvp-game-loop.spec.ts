@@ -51,6 +51,25 @@ test("creates a fantasy team and follows its My Stable score", async ({
   await expect(page.getByText("Maegashira #1")).toBeVisible();
   await expect(page.getByRole("button", { name: "Edit picks" })).toBeVisible();
 
+  await page.getByRole("button", { name: "Edit picks" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Edit stable" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Team name")).toHaveValue("Codex Stable");
+  await page.getByLabel("Team name").fill("Codex Stable Updated");
+  await page.getByRole("button", { name: "Remove Ura" }).click();
+  await page.getByRole("button", { name: /Hoshoryu/ }).click();
+  await page.getByRole("button", { name: "Save changes" }).click();
+
+  await expect(
+    page.getByText("Changes saved for Codex Stable Updated."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Codex Stable Updated" }),
+  ).toBeVisible();
+  await expect(page.getByText("Hoshoryu")).toBeVisible();
+  await expect(page.getByText("Ura", { exact: true })).toHaveCount(0);
+
   await page.setViewportSize({ width: 320, height: 800 });
   expect(
     await page.evaluate(
@@ -58,10 +77,20 @@ test("creates a fantasy team and follows its My Stable score", async ({
     ),
   ).toBe(true);
 
+  await page.getByRole("button", { name: "Edit picks" }).click();
+
   const startResponse = await request.post("/api/admin/demo/start", {
     headers: demoAdminHeaders,
   });
   await expect(startResponse).toBeOK();
+  await page.getByLabel("Team name").fill("Too Late Stable");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(
+    page.getByText(
+      "This basho has started, so picks are locked. Your line-up is read-only.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit picks" })).toHaveCount(0);
   const advanceResponse = await request.post("/api/admin/demo/advance-day", {
     headers: demoAdminHeaders,
   });
@@ -83,10 +112,10 @@ test("creates a fantasy team and follows its My Stable score", async ({
 
   await page.getByRole("button", { name: "Leaderboard" }).click();
   await expect(
-    page.getByRole("button", { name: /Codex Stable.*0 pts/ }),
+    page.getByRole("button", { name: /Codex Stable Updated.*0 pts/ }),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: /Codex Stable.*1 pts/ }),
+    page.getByRole("button", { name: /Codex Stable Updated.*1 pts/ }),
   ).toHaveAttribute("aria-expanded", "true");
 });
 

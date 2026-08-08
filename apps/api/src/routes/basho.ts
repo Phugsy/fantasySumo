@@ -137,63 +137,24 @@ export function registerBashoRoutes(
       });
     }
 
-    const parsedBody = createTeamBodySchema.safeParse(request.body);
-
-    if (!parsedBody.success) {
-      return reply.code(400).send({
-        error: "invalid-request",
-        message: "Team creation request is invalid.",
-        details: parsedBody.error.issues.map((issue) => ({
-          path: issue.path.join("."),
-          message: issue.message,
-        })),
-      });
-    }
-
-    const { displayName, rikishiIds } = parsedBody.data;
     const existingTeam = await context.repositories.getFantasyTeamForOwner(
       basho.id,
       currentUser.id,
     );
     const teamId = existingTeam?.id ?? `team-${context.teamIdFactory()}`;
-    const picks = rikishiIds.map(
-      (rikishiId): FantasyPick => ({
-        teamId,
-        rikishiId,
-      }),
+    const validatedRequest = await validateTeamRequest(
+      request.body,
+      basho.id,
+      teamId,
+      context,
+      "Team creation request is invalid.",
     );
-    const pickErrors = validateFantasyPicks(picks, {
-      teamSize: context.teamSize,
-    });
 
-    if (pickErrors.length > 0) {
-      return reply.code(400).send({
-        error: "invalid-picks",
-        message: "Fantasy team picks are invalid.",
-        details: pickErrors,
-      });
+    if (!validatedRequest.success) {
+      return reply.code(400).send(validatedRequest.body);
     }
 
-    const validRikishiIds = new Set(
-      (await context.repositories.listBanzukeEntriesForBasho(basho.id)).map(
-        (entry) => entry.rikishiId,
-      ),
-    );
-    const invalidRikishiIds = rikishiIds.filter(
-      (rikishiId) => !validRikishiIds.has(rikishiId),
-    );
-
-    if (invalidRikishiIds.length > 0) {
-      return reply.code(400).send({
-        error: "invalid-picks",
-        message: "Fantasy team picks include rikishi outside this basho.",
-        details: invalidRikishiIds.map((rikishiId) => ({
-          code: "unknown-rikishi",
-          message: `Rikishi ${rikishiId} is not available for basho ${basho.id}.`,
-          rikishiId,
-        })),
-      });
-    }
+    const { displayName, picks } = validatedRequest;
 
     const team: FantasyTeam & { ownerUserId: string } = {
       id: teamId,
@@ -207,13 +168,13 @@ export function registerBashoRoutes(
       createdAt: existingTeam?.createdAt ?? context.now().toISOString(),
     };
 
-    const savedTeam =
+    const savedTeamWithPicks =
       await context.repositories.saveOwnedFantasyTeamWithPicksIfBashoUpcoming(
         team,
         picks,
       );
 
-    if (savedTeam === undefined) {
+    if (savedTeamWithPicks === undefined) {
       const currentBasho = await context.repositories.getBasho(basho.id);
 
       return reply.code(409).send({
@@ -227,12 +188,10 @@ export function registerBashoRoutes(
       });
     }
 
-    const created = existingTeam === undefined && savedTeam.id === team.id;
+    const created =
+      existingTeam === undefined && savedTeamWithPicks.team.id === team.id;
 
-    return reply.code(created ? 201 : 200).send({
-      team: savedTeam,
-      picks: await context.repositories.listFantasyPicksForTeam(savedTeam.id),
-    });
+    return reply.code(created ? 201 : 200).send(savedTeamWithPicks);
   });
 
   app.get<{
@@ -323,6 +282,95 @@ export function registerBashoRoutes(
     };
   });
 
+  app.put<{
+    Params: { bashoId: string };
+    Body: unknown;
+  }>("/api/basho/:bashoId/my-team", async (request, reply) => {
+    const currentUser = await context.auth.getCurrentUser(request);
+
+    if (currentUser === undefined) {
+      return reply.code(401).send({
+        error: "unauthenticated",
+        message: "Sign in before editing your fantasy team.",
+      });
+    }
+
+    const basho = await context.repositories.getBasho(request.params.bashoId);
+
+    if (basho === undefined) {
+      return reply.code(404).send({
+        error: "not-found",
+        message: `Basho ${request.params.bashoId} was not found.`,
+      });
+    }
+
+    if (!canEditFantasyPicks(basho)) {
+      return reply.code(409).send({
+        error: "picks-locked",
+        message:
+          getPickLockMessage(basho) ??
+          "Fantasy team picks are locked for this basho.",
+        bashoStatus: basho.status,
+      });
+    }
+
+    const existingTeam = await context.repositories.getFantasyTeamForOwner(
+      basho.id,
+      currentUser.id,
+    );
+
+    if (existingTeam === undefined) {
+      return reply.code(404).send({
+        error: "not-found",
+        message: "You do not have a fantasy team for this basho yet.",
+      });
+    }
+
+    const validatedRequest = await validateTeamRequest(
+      request.body,
+      basho.id,
+      existingTeam.id,
+      context,
+      "Team update request is invalid.",
+    );
+
+    if (!validatedRequest.success) {
+      return reply.code(400).send(validatedRequest.body);
+    }
+
+    const { displayName, picks } = validatedRequest;
+
+    const updatedTeamWithPicks =
+      await context.repositories.saveOwnedFantasyTeamWithPicksIfBashoUpcoming(
+        {
+          ...existingTeam,
+          displayName,
+          ownerUserId: currentUser.id,
+          ...(currentUser.displayName === undefined ||
+          currentUser.displayName.length === 0
+            ? {}
+            : { ownerName: currentUser.displayName }),
+        },
+        picks,
+      );
+
+    if (updatedTeamWithPicks === undefined) {
+      const currentBasho = await context.repositories.getBasho(basho.id);
+
+      return reply.code(409).send({
+        error: "picks-locked",
+        message:
+          (currentBasho === undefined
+            ? undefined
+            : getPickLockMessage(currentBasho)) ??
+          "Fantasy team picks are locked for this basho.",
+        bashoStatus: currentBasho?.status ?? "locked",
+      });
+    }
+
+    return updatedTeamWithPicks;
+  });
+
   app.get<{
     Params: { bashoId: string; teamId: string };
   }>("/api/basho/:bashoId/teams/:teamId", async (request, reply) => {
@@ -402,6 +450,82 @@ export function registerBashoRoutes(
           : leaderboard,
     };
   });
+}
+
+async function validateTeamRequest(
+  body: unknown,
+  bashoId: string,
+  teamId: string,
+  context: Pick<RouteContext, "repositories" | "teamSize">,
+  invalidRequestMessage: string,
+) {
+  const parsedBody = createTeamBodySchema.safeParse(body);
+
+  if (!parsedBody.success) {
+    return {
+      success: false as const,
+      body: {
+        error: "invalid-request",
+        message: invalidRequestMessage,
+        details: parsedBody.error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message,
+        })),
+      },
+    };
+  }
+
+  const { displayName, rikishiIds } = parsedBody.data;
+  const picks = rikishiIds.map(
+    (rikishiId): FantasyPick => ({
+      teamId,
+      rikishiId,
+    }),
+  );
+  const pickErrors = validateFantasyPicks(picks, {
+    teamSize: context.teamSize,
+  });
+
+  if (pickErrors.length > 0) {
+    return {
+      success: false as const,
+      body: {
+        error: "invalid-picks",
+        message: "Fantasy team picks are invalid.",
+        details: pickErrors,
+      },
+    };
+  }
+
+  const validRikishiIds = new Set(
+    (await context.repositories.listBanzukeEntriesForBasho(bashoId)).map(
+      (entry) => entry.rikishiId,
+    ),
+  );
+  const invalidRikishiIds = rikishiIds.filter(
+    (rikishiId) => !validRikishiIds.has(rikishiId),
+  );
+
+  if (invalidRikishiIds.length > 0) {
+    return {
+      success: false as const,
+      body: {
+        error: "invalid-picks",
+        message: "Fantasy team picks include rikishi outside this basho.",
+        details: invalidRikishiIds.map((rikishiId) => ({
+          code: "unknown-rikishi",
+          message: `Rikishi ${rikishiId} is not available for basho ${bashoId}.`,
+          rikishiId,
+        })),
+      },
+    };
+  }
+
+  return {
+    success: true as const,
+    displayName,
+    picks,
+  };
 }
 
 function getBashoTotalDays(basho: { startDate: string; endDate: string }) {

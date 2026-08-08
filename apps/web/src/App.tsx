@@ -18,6 +18,7 @@ import {
   getErrorMessage,
   reportAuthClientTokenUnavailable,
   setAuthTokenProvider,
+  updateFantasyTeam,
 } from "./api";
 import {
   getNeonAccessToken,
@@ -86,6 +87,9 @@ export function App() {
   const [createdTeam, setCreatedTeam] = useState<CreatedTeamResponse | null>(
     null,
   );
+  const [lastSaveAction, setLastSaveAction] = useState<
+    "created" | "updated" | null
+  >(null);
   const [myTeam, setMyTeam] = useState<MyTeamResponse | null>(null);
   const [ownedTeamId, setOwnedTeamId] = useState<string | null>(null);
   const bashoRequestIdRef = useRef(0);
@@ -142,14 +146,22 @@ export function App() {
     setErrorMessage(null);
     setLeaderboardErrorMessage(null);
     setCreatedTeam(null);
+    setLastSaveAction(null);
 
     try {
-      const response = await createFantasyTeam(basho.id, {
-        displayName: displayName.trim(),
-        rikishiIds: selectedIds,
-      });
+      const saveAction = myTeam === null ? "created" : "updated";
+      const response = await (saveAction === "created"
+        ? createFantasyTeam(basho.id, {
+            displayName: displayName.trim(),
+            rikishiIds: selectedIds,
+          })
+        : updateFantasyTeam(basho.id, {
+            displayName: displayName.trim(),
+            rikishiIds: selectedIds,
+          }));
 
       setCreatedTeam(response);
+      setLastSaveAction(saveAction);
       setOwnedTeamId(response.team.id);
       setMyTeam(createMyTeamResponse(response, basho, rikishi));
       setActiveView("stable");
@@ -182,10 +194,56 @@ export function App() {
         setLeaderboardErrorMessage(getErrorMessage(error));
       }
     } catch (error) {
+      if (
+        error instanceof ApiRequestError &&
+        error.status === 409 &&
+        error.code === "picks-locked" &&
+        error.bashoStatus !== undefined
+      ) {
+        const lockedStatus = error.bashoStatus;
+
+        setBasho((current) =>
+          current === null ? null : { ...current, status: lockedStatus },
+        );
+        setMyTeam((current) =>
+          current === null
+            ? null
+            : {
+                ...current,
+                basho: { ...current.basho, status: lockedStatus },
+              },
+        );
+        setActiveView("stable");
+      }
+
       setErrorMessage(getErrorMessage(error));
     } finally {
       setSubmitState("idle");
     }
+  }
+
+  function openTeamEditor() {
+    setCreatedTeam(null);
+    setLastSaveAction(null);
+    setErrorMessage(null);
+
+    if (myTeam !== null) {
+      applyMyTeam(myTeam, rikishi, false, setDisplayName, setSelectedIds);
+    }
+
+    setActiveView("selection");
+  }
+
+  function cancelTeamEdit() {
+    if (myTeam === null) {
+      return;
+    }
+
+    applyMyTeam(myTeam, rikishi, false, setDisplayName, setSelectedIds);
+    setCreatedTeam(null);
+    setLastSaveAction(null);
+    setErrorMessage(null);
+    setActiveView("stable");
   }
 
   async function handleSignIn(event: FormEvent<HTMLFormElement>) {
@@ -253,6 +311,7 @@ export function App() {
       setAccountEmail("");
       setAccountDisplayName("");
       setCreatedTeam(null);
+      setLastSaveAction(null);
       setMyTeam(null);
       setOwnedTeamId(null);
       setDisplayName("");
@@ -472,23 +531,26 @@ export function App() {
           <>
             <BashoPanel basho={basho} selectedCount={selectedIds.length} />
 
-            {activeView === "stable" && createdTeam !== null && (
-              <div className="confirmation stable-confirmation" role="status">
-                <strong>{createdTeam.team.displayName} submitted.</strong>
-                <span>
-                  {createdTeam.picks.length} rikishi selected for this basho.
-                </span>
-              </div>
-            )}
+            {activeView === "stable" &&
+              createdTeam !== null &&
+              lastSaveAction !== null && (
+                <div className="confirmation stable-confirmation" role="status">
+                  <strong>
+                    {lastSaveAction === "created"
+                      ? `${createdTeam.team.displayName} submitted.`
+                      : `Changes saved for ${createdTeam.team.displayName}.`}
+                  </strong>
+                  <span>
+                    {createdTeam.picks.length} rikishi selected for this basho.
+                  </span>
+                </div>
+              )}
 
             {activeView === "stable" && (
               <MyStablePanel
                 basho={basho}
                 myTeam={myTeam}
-                onEdit={() => {
-                  setCreatedTeam(null);
-                  setActiveView("selection");
-                }}
+                onEdit={openTeamEditor}
                 user={sessionUser}
               />
             )}
@@ -501,9 +563,12 @@ export function App() {
                 errorMessage={errorMessage}
                 isLocked={!canEditPicks || sessionState === "submitting"}
                 lockMessage={pickLockMessage}
+                mode={myTeam === null ? "create" : "edit"}
+                onCancel={cancelTeamEdit}
                 onDisplayNameChange={(nextDisplayName) => {
                   setDisplayName(nextDisplayName);
                   setCreatedTeam(null);
+                  setLastSaveAction(null);
                 }}
                 onSubmit={handleSubmit}
                 onToggleRikishi={toggleRikishi}

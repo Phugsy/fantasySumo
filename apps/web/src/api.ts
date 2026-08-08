@@ -8,7 +8,9 @@ import type {
 } from "./types";
 
 interface ApiErrorBody {
+  error?: string;
   message?: string;
+  bashoStatus?: Basho["status"];
   details?: Array<{
     message?: string;
   }>;
@@ -18,6 +20,8 @@ export class ApiRequestError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly code: string | undefined = undefined,
+    readonly bashoStatus: Basho["status"] | undefined = undefined,
   ) {
     super(message);
     this.name = "ApiRequestError";
@@ -92,7 +96,7 @@ export async function clearSession(): Promise<void> {
   });
 
   if (!response.ok) {
-    throw new ApiRequestError(await readApiError(response), response.status);
+    throw await createApiRequestError(response);
   }
 }
 
@@ -110,6 +114,16 @@ export async function createFantasyTeam(
   return postJson<CreatedTeamResponse>(`/api/basho/${bashoId}/teams`, body);
 }
 
+export async function updateFantasyTeam(
+  bashoId: string,
+  body: {
+    displayName: string;
+    rikishiIds: string[];
+  },
+): Promise<CreatedTeamResponse> {
+  return putJson<CreatedTeamResponse>(`/api/basho/${bashoId}/my-team`, body);
+}
+
 async function getJson<T>(url: string, includeAuth = true): Promise<T> {
   const response = await fetch(url, {
     credentials: "same-origin",
@@ -117,13 +131,25 @@ async function getJson<T>(url: string, includeAuth = true): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new ApiRequestError(await readApiError(response), response.status);
+    throw await createApiRequestError(response);
   }
 
   return response.json() as Promise<T>;
 }
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
+  return sendJson<T>(url, body, "POST");
+}
+
+async function putJson<T>(url: string, body: unknown): Promise<T> {
+  return sendJson<T>(url, body, "PUT");
+}
+
+async function sendJson<T>(
+  url: string,
+  body: unknown,
+  method: "POST" | "PUT",
+): Promise<T> {
   const response = await fetch(url, {
     body: JSON.stringify(body),
     credentials: "same-origin",
@@ -131,11 +157,11 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
       "Content-Type": "application/json",
       ...(await getAuthHeaders()),
     },
-    method: "POST",
+    method,
   });
 
   if (!response.ok) {
-    throw new ApiRequestError(await readApiError(response), response.status);
+    throw await createApiRequestError(response);
   }
 
   return response.json() as Promise<T>;
@@ -161,7 +187,24 @@ export function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
 }
 
-async function readApiError(response: Response): Promise<string> {
+async function createApiRequestError(
+  response: Response,
+): Promise<ApiRequestError> {
+  const error = await readApiError(response);
+
+  return new ApiRequestError(
+    error.message,
+    response.status,
+    error.code,
+    error.bashoStatus,
+  );
+}
+
+async function readApiError(response: Response): Promise<{
+  message: string;
+  code?: string;
+  bashoStatus?: Basho["status"];
+}> {
   try {
     const body = (await response.json()) as ApiErrorBody;
     const details = body.details
@@ -169,11 +212,23 @@ async function readApiError(response: Response): Promise<string> {
       .filter((message): message is string => message !== undefined);
 
     if (details !== undefined && details.length > 0) {
-      return `${body.message ?? "Request failed"} ${details.join(" ")}`;
+      return {
+        message: `${body.message ?? "Request failed"} ${details.join(" ")}`,
+        ...(body.error === undefined ? {} : { code: body.error }),
+        ...(body.bashoStatus === undefined
+          ? {}
+          : { bashoStatus: body.bashoStatus }),
+      };
     }
 
-    return body.message ?? `Request failed with status ${response.status}.`;
+    return {
+      message: body.message ?? `Request failed with status ${response.status}.`,
+      ...(body.error === undefined ? {} : { code: body.error }),
+      ...(body.bashoStatus === undefined
+        ? {}
+        : { bashoStatus: body.bashoStatus }),
+    };
   } catch {
-    return `Request failed with status ${response.status}.`;
+    return { message: `Request failed with status ${response.status}.` };
   }
 }

@@ -122,6 +122,24 @@ describe("TeamSelection", () => {
     ).toBeDisabled();
     expect(screen.getByRole("button", { name: "Submit team" })).toBeDisabled();
   });
+
+  it("labels edit saves clearly and lets the user cancel", () => {
+    const onCancel = vi.fn();
+
+    renderTeamSelection({ createdTeam, mode: "edit", onCancel });
+
+    expect(
+      screen.getByRole("heading", { name: "Edit stable" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+    expect(
+      screen.getByText("Changes saved for East Stand Heroes."),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
 });
 
 function renderTeamSelection(
@@ -138,6 +156,8 @@ function renderTeamSelection(
       errorMessage={props.errorMessage ?? null}
       isLocked={props.isLocked ?? false}
       lockMessage={props.lockMessage}
+      mode={props.mode ?? "create"}
+      onCancel={props.onCancel ?? vi.fn()}
       onDisplayNameChange={props.onDisplayNameChange ?? vi.fn()}
       onSubmit={props.onSubmit ?? vi.fn()}
       onToggleRikishi={props.onToggleRikishi ?? vi.fn()}
