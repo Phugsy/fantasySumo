@@ -37,7 +37,7 @@ test("creates a fantasy team and follows its My Stable score", async ({
 
   await page.getByLabel("Team name").fill("Codex Stable");
   await page.getByRole("button", { name: /Wakatakakage/ }).click();
-  await page.getByRole("button", { name: /Maegashira #1 Ura/ }).click();
+  await page.getByRole("button", { name: /Ura/ }).click();
   await expect(page.getByText("Team full")).toBeVisible();
 
   await page.getByRole("button", { name: "Submit team" }).click();
