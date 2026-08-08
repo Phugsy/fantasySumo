@@ -134,6 +134,10 @@ h2 {
   border-radius: 9px;
 }
 
+.stable-confirmation {
+  margin-bottom: 16px;
+}
+
 .form-message {
   border: 1px solid var(--clay-light);
   background: var(--paper-warm);

@@ -9,6 +9,12 @@ const pageCopy: Record<
   ActiveView,
   { eyebrow: string; title: string; description: string }
 > = {
+  stable: {
+    eyebrow: "Your basho team",
+    title: "My stable",
+    description:
+      "See your line-up, pick status, and scoring progress in one place.",
+  },
   selection: {
     eyebrow: "Current basho",
     title: "Build your basho team",

@@ -16,10 +16,16 @@ export function ViewSwitch({
     <nav className="view-switch" aria-label="Primary navigation">
       <button
         type="button"
-        className={activeView === "selection" ? "active" : ""}
+        className={
+          activeView === "stable" || activeView === "selection" ? "active" : ""
+        }
         disabled={disabled}
-        onClick={() => onChange("selection")}
-        aria-current={activeView === "selection" ? "page" : undefined}
+        onClick={() => onChange("stable")}
+        aria-current={
+          activeView === "stable" || activeView === "selection"
+            ? "page"
+            : undefined
+        }
       >
         My stable
       </button>

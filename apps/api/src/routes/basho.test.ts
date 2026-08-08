@@ -334,6 +334,29 @@ describe("basho routes", () => {
       },
     });
 
+    const upcomingResponse = await app.inject({
+      headers,
+      method: "GET",
+      url: "/api/basho/2026-05/my-team",
+    });
+
+    expect(upcomingResponse.statusCode).toBe(200);
+    expect(upcomingResponse.json().totalScore).toBe(0);
+    expect(upcomingResponse.json().picks).toEqual([
+      expect.objectContaining({ rikishiId: "onosato", wins: 0, score: 0 }),
+      expect.objectContaining({
+        rikishiId: "kotozakura",
+        wins: 0,
+        score: 0,
+      }),
+    ]);
+
+    await createRepositories(client).upsertBasho({
+      ...sampleBasho,
+      status: "active",
+      currentDay: 1,
+    });
+
     const response = await app.inject({
       headers,
       method: "GET",
@@ -341,14 +364,48 @@ describe("basho routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
+    expect(response.json().basho).toMatchObject({
+      id: "2026-05",
+      status: "active",
+      currentDay: 1,
+    });
     expect(response.json().team).toMatchObject({
       id: "team-north",
       ownerUserId: expect.stringMatching(/^local-/),
     });
+    expect(response.json().totalScore).toBe(2);
     expect(response.json().picks).toEqual([
-      expect.objectContaining({ rikishiId: "kotozakura" }),
-      expect.objectContaining({ rikishiId: "onosato" }),
+      expect.objectContaining({
+        rikishiId: "onosato",
+        shikona: "Onosato",
+        heya: "Nishonoseki",
+        rank: "Ozeki",
+        rankOrder: 1,
+        wins: 1,
+        score: 1,
+      }),
+      expect.objectContaining({
+        rikishiId: "kotozakura",
+        shikona: "Kotozakura",
+        heya: "Sadogatake",
+        rank: "Ozeki",
+        rankOrder: 2,
+        wins: 1,
+        score: 1,
+      }),
     ]);
+  });
+
+  it("requires a signed-in user before returning a private team", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/my-team",
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({
+      error: "unauthenticated",
+    });
   });
 
   it("rejects invalid team picks", async () => {

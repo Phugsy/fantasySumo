@@ -3,8 +3,8 @@ import type {
   BashoRikishiResponse,
   CreatedTeamResponse,
   LeaderboardResponse,
+  MyTeamResponse,
   SessionResponse,
-  TeamResponse,
 } from "./types";
 
 interface ApiErrorBody {
@@ -96,8 +96,8 @@ export async function clearSession(): Promise<void> {
   }
 }
 
-export async function fetchMyTeam(bashoId: string): Promise<TeamResponse> {
-  return getJson<TeamResponse>(`/api/basho/${bashoId}/my-team`);
+export async function fetchMyTeam(bashoId: string): Promise<MyTeamResponse> {
+  return getJson<MyTeamResponse>(`/api/basho/${bashoId}/my-team`);
 }
 
 export async function createFantasyTeam(
