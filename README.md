@@ -11,6 +11,7 @@ The current codebase has been reset onto the clean rebuild foundation described 
 At present, the app has the first local playable foundations:
 
 - A Vite + React front end for creating a fantasy team from seeded basho data and viewing leaderboard standings with recent team scores and expandable rikishi result history.
+- A private My Stable view with the signed-in player's picks, edit/lock state, rikishi details, and scoring progress.
 - A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.
 - A shared TypeScript domain package with MVP types, lifecycle rules, validation, scoring, and leaderboard logic.
 - A swappable Drizzle database package with local SQLite, production Postgres, repositories, migrations, sample seed data, and deterministic demo data.
@@ -128,6 +129,7 @@ Useful API endpoints:
 - `GET /api/basho/current`
 - `GET /api/basho/:bashoId/rikishi`
 - `POST /api/basho/:bashoId/teams`
+- `GET /api/basho/:bashoId/my-team`
 - `GET /api/basho/:bashoId/teams/:teamId`
 - `GET /api/basho/:bashoId/leaderboard`
 - `POST /api/admin/demo/reset`

@@ -28,33 +28,66 @@ test("loads API-backed current basho content", async ({ page, request }) => {
   await expect(page.getByRole("button", { name: /Onosato/ })).toBeVisible();
 });
 
-test("creates a fantasy team and shows it on the leaderboard", async ({
+test("creates a fantasy team and follows its My Stable score", async ({
   page,
+  request,
 }) => {
   await page.goto("/");
   await signInAsDemoUser(page);
 
   await page.getByLabel("Team name").fill("Codex Stable");
-  await page.getByRole("button", { name: /Onosato/ }).click();
-  await page.getByRole("button", { name: /Hoshoryu/ }).click();
+  await page.getByRole("button", { name: /Wakatakakage/ }).click();
+  await page.getByRole("button", { name: /Maegashira #1 Ura/ }).click();
   await expect(page.getByText("Team full")).toBeVisible();
 
   await page.getByRole("button", { name: "Submit team" }).click();
 
   await expect(page.getByText("Codex Stable submitted.")).toBeVisible();
   await expect(
-    page.getByRole("button", { name: /Codex Stable.*0 pts/ }),
+    page.getByRole("heading", { name: "Codex Stable" }),
   ).toBeVisible();
+  await expect(page.getByLabel("0 total points")).toBeVisible();
+  await expect(page.getByText("Wakatakakage")).toBeVisible();
+  await expect(page.getByText("Maegashira #1")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit picks" })).toBeVisible();
+
+  await page.setViewportSize({ width: 320, height: 800 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+
+  const startResponse = await request.post("/api/admin/demo/start", {
+    headers: demoAdminHeaders,
+  });
+  await expect(startResponse).toBeOK();
+  const advanceResponse = await request.post("/api/admin/demo/advance-day", {
+    headers: demoAdminHeaders,
+  });
+  await expect(advanceResponse).toBeOK();
 
   await page.reload();
 
   await expect(
-    page.getByRole("heading", { name: "Leaderboard", exact: true }),
+    page.getByText("Demo May Basho · Scoring in progress · Day 1"),
   ).toBeVisible();
+  await expect(page.getByLabel("1 total points")).toBeVisible();
+  await expect(page.getByText("1 win")).toBeVisible();
+  await expect(
+    page.getByText(
+      "This basho has started, so picks are locked. Your line-up is read-only.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit picks" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Leaderboard" }).click();
   await expect(
     page.getByRole("button", { name: /Codex Stable.*0 pts/ }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /Codex Stable.*1 pts/ }),
   ).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByText("Your team", { exact: true })).toBeVisible();
 });
 
 test("blocks sign-out while a team save is in flight", async ({ page }) => {
@@ -129,6 +162,7 @@ test("blocks draft editing while sign-in is in flight", async ({ page }) => {
   });
 
   await page.goto("/");
+  await page.getByLabel("Team name").fill("Waiting Draft");
   await page.getByLabel("Email").fill("e2e-player@example.com");
   await page.getByLabel("Display name").fill("E2E Player");
   await page.getByRole("button", { name: "Sign in" }).click();
@@ -444,10 +478,28 @@ async function resetDemo(request: APIRequestContext) {
 }
 
 async function signInAsDemoUser(page: Page) {
+  const teamName = page.getByLabel("Team name");
+  const preserveDraft = (await teamName.inputValue()).trim().length > 0;
+  const bashoReload = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/basho/current") && response.ok(),
+  );
+
   await page.getByLabel("Email").fill("e2e-player@example.com");
   await page.getByLabel("Display name").fill("E2E Player");
   await page.getByRole("button", { name: "Sign in" }).click();
+  await bashoReload;
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+
+  if (!preserveDraft) {
+    const createStable = page.getByRole("button", {
+      name: "Create your stable",
+    });
+    await expect(createStable).toBeVisible();
+    await createStable.click();
+  }
+
+  await expect(teamName).toBeVisible();
 }
 
 async function signInRequest(request: APIRequestContext) {

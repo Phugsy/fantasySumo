@@ -32,6 +32,7 @@ import { AccountPanel } from "./components/AccountPanel";
 import { AppHeader } from "./components/AppHeader";
 import { BashoPanel } from "./components/BashoPanel";
 import { LeaderboardPanel } from "./components/LeaderboardPanel";
+import { MyStablePanel } from "./components/MyStablePanel";
 import { PageHeader } from "./components/PageHeader";
 import { TeamSelection } from "./components/TeamSelection";
 import { waitForVerifiedSession } from "./sessionVerification";
@@ -43,10 +44,10 @@ import type {
   LeaderboardLoadState,
   LeaderboardResponse,
   LoadState,
+  MyTeamResponse,
   RankedRikishi,
   SessionResponse,
   SessionUser,
-  TeamResponse,
 } from "./types";
 import { canEditFantasyPicks, getPickLockMessage } from "./lifecycle";
 
@@ -85,6 +86,7 @@ export function App() {
   const [createdTeam, setCreatedTeam] = useState<CreatedTeamResponse | null>(
     null,
   );
+  const [myTeam, setMyTeam] = useState<MyTeamResponse | null>(null);
   const [ownedTeamId, setOwnedTeamId] = useState<string | null>(null);
   const bashoRequestIdRef = useRef(0);
   const leaderboardRequestIdRef = useRef(0);
@@ -149,6 +151,8 @@ export function App() {
 
       setCreatedTeam(response);
       setOwnedTeamId(response.team.id);
+      setMyTeam(createMyTeamResponse(response, basho, rikishi));
+      setActiveView("stable");
 
       const requestId = nextLeaderboardRequestId(leaderboardRequestIdRef);
       setLeaderboardLoadState("loading");
@@ -169,14 +173,13 @@ export function App() {
           getExpandedTeamId(leaderboardResponse, response.team.id),
         );
         setLeaderboardLoadState("ready");
-        setActiveView("leaderboard");
       } catch (error) {
         if (!isCurrentLeaderboardRequest(leaderboardRequestIdRef, requestId)) {
           return;
         }
 
         setLeaderboardLoadState("ready");
-        setErrorMessage(getErrorMessage(error));
+        setLeaderboardErrorMessage(getErrorMessage(error));
       }
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
@@ -250,6 +253,7 @@ export function App() {
       setAccountEmail("");
       setAccountDisplayName("");
       setCreatedTeam(null);
+      setMyTeam(null);
       setOwnedTeamId(null);
       setDisplayName("");
       setSelectedIds([]);
@@ -287,12 +291,12 @@ export function App() {
 
     let currentBasho: Basho;
     let bashoRikishi: Awaited<ReturnType<typeof fetchBashoRikishi>>;
-    let myTeam: TeamResponse | null;
+    let loadedMyTeam: MyTeamResponse | null;
 
     try {
       currentBasho = await fetchCurrentBasho();
       bashoRikishi = await fetchBashoRikishi(currentBasho.id);
-      myTeam =
+      loadedMyTeam =
         session.user === null ? null : await fetchMyTeamOrNull(currentBasho.id);
     } catch (error) {
       if (!isCurrentBashoRequest()) {
@@ -312,14 +316,23 @@ export function App() {
     });
     setRikishi(bashoRikishi.rikishi);
     applyMyTeam(
-      myTeam,
+      loadedMyTeam,
       bashoRikishi.rikishi,
       preserveDraftWhenTeamMissing,
       setDisplayName,
       setSelectedIds,
     );
-    setOwnedTeamId(myTeam?.team.id ?? null);
-    setActiveView(myTeam === null ? "selection" : "leaderboard");
+    setMyTeam(loadedMyTeam);
+    setOwnedTeamId(loadedMyTeam?.team.id ?? null);
+    setActiveView(
+      loadedMyTeam !== null
+        ? "stable"
+        : preserveDraftWhenTeamMissing
+          ? "selection"
+          : session.user !== null
+            ? "stable"
+            : "selection",
+    );
     setLoadState(bashoRikishi.rikishi.length === 0 ? "empty" : "ready");
 
     const requestId = nextLeaderboardRequestId(leaderboardRequestIdRef);
@@ -341,7 +354,7 @@ export function App() {
       setLeaderboardTotalDays(leaderboardResponse.totalDays);
       setLeaderboard(leaderboardResponse.leaderboard);
       setExpandedTeamId(
-        getExpandedTeamId(leaderboardResponse, myTeam?.team.id ?? null),
+        getExpandedTeamId(leaderboardResponse, loadedMyTeam?.team.id ?? null),
       );
       setLeaderboardErrorMessage(null);
       setLeaderboardLoadState("ready");
@@ -458,6 +471,27 @@ export function App() {
         {loadState === "ready" && basho !== null && (
           <>
             <BashoPanel basho={basho} selectedCount={selectedIds.length} />
+
+            {activeView === "stable" && createdTeam !== null && (
+              <div className="confirmation stable-confirmation" role="status">
+                <strong>{createdTeam.team.displayName} submitted.</strong>
+                <span>
+                  {createdTeam.picks.length} rikishi selected for this basho.
+                </span>
+              </div>
+            )}
+
+            {activeView === "stable" && (
+              <MyStablePanel
+                basho={basho}
+                myTeam={myTeam}
+                onEdit={() => {
+                  setCreatedTeam(null);
+                  setActiveView("selection");
+                }}
+                user={sessionUser}
+              />
+            )}
 
             {activeView === "selection" && (
               <TeamSelection
@@ -578,7 +612,7 @@ function mergeLeaderboardBasho(
 }
 
 function applyMyTeam(
-  myTeam: TeamResponse | null,
+  myTeam: MyTeamResponse | null,
   availableRikishi: readonly { id: string }[],
   preserveDraftWhenTeamMissing: boolean,
   setDisplayName: (displayName: string) => void,
@@ -608,9 +642,57 @@ function applyMyTeam(
   );
 }
 
+function createMyTeamResponse(
+  createdTeam: CreatedTeamResponse,
+  basho: Basho,
+  rankedRikishi: RankedRikishi[],
+): MyTeamResponse {
+  const rikishiById = new Map(
+    rankedRikishi.map((rikishi) => [rikishi.id, rikishi]),
+  );
+
+  return {
+    basho: {
+      id: basho.id,
+      isDemo: basho.isDemo,
+      name: basho.name,
+      startDate: basho.startDate,
+      endDate: basho.endDate,
+      status: basho.status,
+      ...(basho.currentDay === undefined
+        ? {}
+        : { currentDay: basho.currentDay }),
+    },
+    team: createdTeam.team,
+    totalScore: 0,
+    picks: createdTeam.picks
+      .map((pick) => {
+        const rikishi = rikishiById.get(pick.rikishiId);
+
+        return {
+          ...pick,
+          shikona: rikishi?.shikona ?? pick.rikishiId,
+          ...(rikishi?.heya === undefined ? {} : { heya: rikishi.heya }),
+          ...(rikishi?.rank === undefined ? {} : { rank: rikishi.rank }),
+          ...(rikishi?.rankOrder === undefined
+            ? {}
+            : { rankOrder: rikishi.rankOrder }),
+          wins: 0,
+          score: 0,
+        };
+      })
+      .sort(
+        (left, right) =>
+          (left.rankOrder ?? Number.MAX_SAFE_INTEGER) -
+            (right.rankOrder ?? Number.MAX_SAFE_INTEGER) ||
+          left.shikona.localeCompare(right.shikona),
+      ),
+  };
+}
+
 async function fetchMyTeamOrNull(
   bashoId: string,
-): Promise<TeamResponse | null> {
+): Promise<MyTeamResponse | null> {
   try {
     return await fetchMyTeam(bashoId);
   } catch (error) {

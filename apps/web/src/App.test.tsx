@@ -157,6 +157,7 @@ describe("App", () => {
     expect(
       await screen.findByRole("heading", { name: "May 2026 Sample Basho" }),
     ).toBeInTheDocument();
+    await openTeamEditor();
     expect(screen.getByRole("button", { name: /Onosato/ })).toBeInTheDocument();
     expect(screen.getByText("0 of 2 selected")).toBeInTheDocument();
   });
@@ -212,6 +213,10 @@ describe("App", () => {
     expect(
       await screen.findByRole("button", { name: "Sign out" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "No team for this basho yet" }),
+    ).toBeInTheDocument();
+    await openTeamEditor();
     expect(screen.getByLabelText("Team name")).toHaveValue("");
   });
 
@@ -309,10 +314,11 @@ describe("App", () => {
     expect(
       await screen.findByRole("heading", { name: "May 2026 Sample Basho" }),
     ).toBeInTheDocument();
+    await openTeamEditor();
     expect(screen.getByRole("button", { name: /Onosato/ })).toBeInTheDocument();
   });
 
-  it("shows the leaderboard after sign in when the user already has picks", async () => {
+  it("shows My Stable after sign in when the user already has picks", async () => {
     vi.stubGlobal("fetch", vi.fn(mockExistingTeamAfterLoginFetch));
     render(<App />);
 
@@ -326,9 +332,61 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(
-      await screen.findByRole("heading", { name: "Leaderboard" }),
+      await screen.findByRole("heading", { name: "Existing Champions" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Existing Champions")).toBeInTheDocument();
+    expect(screen.getByLabelText("0 total points")).toBeInTheDocument();
+    expect(screen.getByText("Onosato")).toBeInTheDocument();
+  });
+
+  it("keeps My Stable lifecycle aligned with its private score snapshot", async () => {
+    const ownerSnapshotBasho = {
+      ...currentBasho,
+      status: "active" as const,
+      currentDay: 1,
+    };
+    const newerLeaderboardBasho = {
+      ...ownerSnapshotBasho,
+      currentDay: 2,
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+
+        if (url === "/api/basho/2026-05/my-team") {
+          return jsonResponse({
+            ...createExistingMyTeamResponse(),
+            basho: ownerSnapshotBasho,
+            totalScore: 1,
+          });
+        }
+
+        if (url === "/api/basho/2026-05/leaderboard") {
+          return jsonResponse(
+            createLeaderboardResponse({
+              basho: newerLeaderboardBasho,
+              entries: leaderboard,
+            }),
+          );
+        }
+
+        return mockExistingTeamAfterLoginFetch(input, init);
+      }),
+    );
+    render(<App />);
+
+    await signInThroughAccountPanel();
+
+    expect(
+      await screen.findByText(
+        "May 2026 Sample Basho · Scoring in progress · Day 1",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("1 total points")).toBeInTheDocument();
+    expect(
+      screen.queryByText("May 2026 Sample Basho · Scoring in progress · Day 2"),
+    ).not.toBeInTheDocument();
   });
 
   it("drops saved picks that are no longer on the current banzuke", async () => {
@@ -337,11 +395,26 @@ describe("App", () => {
       vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
         if (String(input) === "/api/basho/2026-05/my-team") {
           return jsonResponse({
+            basho: currentBasho,
             team: {
               id: "team-existing",
               displayName: "Existing Champions",
             },
-            picks: [{ rikishiId: "onosato" }, { rikishiId: "removed-rikishi" }],
+            totalScore: 0,
+            picks: [
+              {
+                rikishiId: "onosato",
+                shikona: "Onosato",
+                wins: 0,
+                score: 0,
+              },
+              {
+                rikishiId: "removed-rikishi",
+                shikona: "Removed Rikishi",
+                wins: 0,
+                score: 0,
+              },
+            ],
           });
         }
 
@@ -351,8 +424,8 @@ describe("App", () => {
     render(<App />);
 
     await signInThroughAccountPanel();
-    await screen.findByRole("heading", { name: "Leaderboard" });
-    fireEvent.click(screen.getByRole("button", { name: "My stable" }));
+    await screen.findByRole("heading", { name: "Existing Champions" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit picks" }));
 
     expect(
       await screen.findByRole("heading", { name: "Selection" }),
@@ -385,9 +458,8 @@ describe("App", () => {
     await signInThroughAccountPanel();
 
     expect(
-      await screen.findByRole("heading", { name: "Leaderboard" }),
+      await screen.findByRole("heading", { name: "Existing Champions" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Existing Champions")).toBeInTheDocument();
 
     await act(async () => {
       initialCurrentBashoRequest.resolve(await jsonResponse(currentBasho));
@@ -395,9 +467,8 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { name: "Leaderboard" }),
+        screen.getByRole("heading", { name: "Existing Champions" }),
       ).toBeInTheDocument();
-      expect(screen.getByText("Existing Champions")).toBeInTheDocument();
       expect(
         screen.queryByRole("heading", { name: "Selection" }),
       ).not.toBeInTheDocument();
@@ -410,17 +481,19 @@ describe("App", () => {
 
     await signInThroughAccountPanel();
     expect(
-      await screen.findByRole("heading", { name: "Leaderboard" }),
+      await screen.findByRole("heading", { name: "Existing Champions" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Existing Champions")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
     await screen.findByRole("button", { name: "Sign in" });
     await signInThroughAccountPanel();
 
     expect(
-      await screen.findByRole("heading", { name: "Selection" }),
+      await screen.findByRole("heading", {
+        name: "No team for this basho yet",
+      }),
     ).toBeInTheDocument();
+    await openTeamEditor();
     expect(screen.getByLabelText("Team name")).toHaveValue("");
     expect(screen.getByText("0 of 2 selected")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Onosato/ })).toHaveAttribute(
@@ -457,6 +530,7 @@ describe("App", () => {
     expect(
       await screen.findByRole("heading", { name: "May 2026 Sample Basho" }),
     ).toBeInTheDocument();
+    await openTeamEditor();
     expect(screen.getByRole("button", { name: /Onosato/ })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
@@ -500,6 +574,7 @@ describe("App", () => {
     );
     render(<App />);
 
+    await openTeamEditor();
     await screen.findByRole("button", { name: /Onosato/ });
     fireEvent.change(screen.getByLabelText("Team name"), {
       target: { value: "East Stand Heroes" },
@@ -508,6 +583,8 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: /Kotozakura/ }));
     fireEvent.click(screen.getByRole("button", { name: "Submit team" }));
 
+    await screen.findByRole("heading", { name: "East Stand Heroes" });
+    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
     expect(await screen.findByText("4 pts")).toBeInTheDocument();
 
     initialLeaderboardRequest.resolve(
@@ -523,6 +600,7 @@ describe("App", () => {
   it("allows selecting and removing rikishi up to the team size", async () => {
     render(<App />);
 
+    await openTeamEditor();
     await screen.findByRole("button", { name: /Onosato/ });
     fireEvent.click(screen.getByRole("button", { name: /Onosato/ }));
     fireEvent.click(screen.getByRole("button", { name: /Kotozakura/ }));
@@ -551,12 +629,15 @@ describe("App", () => {
     render(<App />);
 
     expect(
-      await screen.findByText("This basho has started, so picks are locked."),
+      await screen.findByText(
+        "This basho has started, so new stables can no longer enter.",
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText("Scoring in progress")).toBeInTheDocument();
     expect(screen.getByText(/Day 5/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Onosato/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Submit team" })).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Create your stable" }),
+    ).not.toBeInTheDocument();
   });
 
   it("submits a selected team and shows confirmation", async () => {
@@ -564,6 +645,7 @@ describe("App", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
 
+    await openTeamEditor();
     await screen.findByRole("button", { name: /Onosato/ });
     fireEvent.change(screen.getByLabelText("Team name"), {
       target: { value: "East Stand Heroes" },
@@ -589,14 +671,15 @@ describe("App", () => {
       await screen.findByText("East Stand Heroes submitted."),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Leaderboard" }),
+      screen.getByRole("heading", { name: "East Stand Heroes" }),
     ).toBeInTheDocument();
   });
 
-  it("stays on team selection and shows the refresh error when standings fail after submit", async () => {
+  it("keeps the saved stable available when standings fail to refresh", async () => {
     vi.stubGlobal("fetch", vi.fn(mockSubmitLeaderboardErrorFetch()));
     render(<App />);
 
+    await openTeamEditor();
     await screen.findByRole("button", { name: /Onosato/ });
     fireEvent.change(screen.getByLabelText("Team name"), {
       target: { value: "East Stand Heroes" },
@@ -609,10 +692,11 @@ describe("App", () => {
       await screen.findByText("East Stand Heroes submitted."),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Unable to refresh leaderboard."),
+      screen.getByRole("heading", { name: "East Stand Heroes" }),
     ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
     expect(
-      screen.getByRole("heading", { name: "Selection" }),
+      screen.getByText("Unable to refresh leaderboard."),
     ).toBeInTheDocument();
   });
 
@@ -620,6 +704,7 @@ describe("App", () => {
     vi.stubGlobal("fetch", vi.fn(mockValidationErrorFetch));
     render(<App />);
 
+    await openTeamEditor();
     await screen.findByRole("button", { name: /Onosato/ });
     fireEvent.change(screen.getByLabelText("Team name"), {
       target: { value: "East Stand Heroes" },
@@ -898,13 +983,7 @@ function mockExistingTeamAfterLoginFetch(
   }
 
   if (url === "/api/basho/2026-05/my-team") {
-    return jsonResponse({
-      team: {
-        id: "team-existing",
-        displayName: "Existing Champions",
-      },
-      picks: [{ rikishiId: "onosato" }, { rikishiId: "kotozakura" }],
-    });
+    return jsonResponse(createExistingMyTeamResponse());
   }
 
   if (url === "/api/basho/2026-05/leaderboard") {
@@ -958,13 +1037,7 @@ function mockUserSwitchFetch() {
     }
 
     if (url === "/api/basho/2026-05/my-team" && signedInUser === 1) {
-      return jsonResponse({
-        team: {
-          id: "team-existing",
-          displayName: "Existing Champions",
-        },
-        picks: [{ rikishiId: "onosato" }, { rikishiId: "kotozakura" }],
-      });
+      return jsonResponse(createExistingMyTeamResponse());
     }
 
     if (url === "/api/basho/2026-05/my-team") {
@@ -1006,6 +1079,33 @@ async function signInThroughAccountPanel() {
     target: { value: "New Player" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+}
+
+async function openTeamEditor() {
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Create your stable" }),
+  );
+  await screen.findByLabelText("Team name");
+}
+
+function createExistingMyTeamResponse() {
+  return {
+    basho: currentBasho,
+    team: {
+      id: "team-existing",
+      displayName: "Existing Champions",
+    },
+    totalScore: 0,
+    picks: rankedRikishi.slice(0, 2).map((rikishi) => ({
+      rikishiId: rikishi.id,
+      shikona: rikishi.shikona,
+      heya: rikishi.heya,
+      rank: rikishi.rank,
+      rankOrder: rikishi.rankOrder,
+      wins: 0,
+      score: 0,
+    })),
+  };
 }
 
 function mockEmptyLeaderboardFetch(

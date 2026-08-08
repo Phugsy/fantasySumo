@@ -5,6 +5,7 @@ import type { FantasyPick, FantasyTeam } from "@fantasy-sumo/domain";
 import type { AuthService } from "../auth.js";
 import {
   calculateLeaderboard,
+  calculateTeamScore,
   canEditFantasyPicks,
   getPickLockMessage,
   validateFantasyPicks,
@@ -267,9 +268,58 @@ export function registerBashoRoutes(
       });
     }
 
-    return {
+    const picks = await context.repositories.listFantasyPicksForTeam(team.id);
+    const teamScore = calculateTeamScore(
       team,
-      picks: await context.repositories.listFantasyPicksForTeam(team.id),
+      picks,
+      await context.repositories.listBoutResultsForBasho(basho.id),
+      { throughDay: basho.currentDay },
+    );
+    const scoresByRikishiId = new Map(
+      teamScore.rikishiScores.map((score) => [score.rikishiId, score]),
+    );
+    const banzukeByRikishiId = new Map(
+      (await context.repositories.listBanzukeEntriesForBasho(basho.id)).map(
+        (entry) => [entry.rikishiId, entry],
+      ),
+    );
+    const rikishiById = new Map(
+      (await context.repositories.listRikishi()).map((rikishi) => [
+        rikishi.id,
+        rikishi,
+      ]),
+    );
+
+    return {
+      basho,
+      team,
+      totalScore: teamScore.score,
+      picks: picks
+        .map((pick) => {
+          const rikishi = rikishiById.get(pick.rikishiId);
+          const banzukeEntry = banzukeByRikishiId.get(pick.rikishiId);
+          const score = scoresByRikishiId.get(pick.rikishiId);
+
+          return {
+            ...pick,
+            shikona: rikishi?.shikona ?? pick.rikishiId,
+            ...(rikishi?.heya === undefined ? {} : { heya: rikishi.heya }),
+            ...(banzukeEntry === undefined
+              ? {}
+              : {
+                  rank: banzukeEntry.rank,
+                  rankOrder: banzukeEntry.rankOrder,
+                }),
+            wins: score?.wins ?? 0,
+            score: score?.score ?? 0,
+          };
+        })
+        .sort(
+          (left, right) =>
+            (left.rankOrder ?? Number.MAX_SAFE_INTEGER) -
+              (right.rankOrder ?? Number.MAX_SAFE_INTEGER) ||
+            left.shikona.localeCompare(right.shikona),
+        ),
     };
   });
 

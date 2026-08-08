@@ -33,7 +33,21 @@ export interface CreatedTeamResponse {
   }>;
 }
 
-export type TeamResponse = CreatedTeamResponse;
+export interface MyTeamResponse {
+  basho: Omit<Basho, "teamSize">;
+  team: CreatedTeamResponse["team"];
+  totalScore: number;
+  picks: Array<
+    CreatedTeamResponse["picks"][number] & {
+      shikona: string;
+      heya?: string;
+      rank?: string;
+      rankOrder?: number;
+      wins: number;
+      score: number;
+    }
+  >;
+}
 
 export interface SessionUser {
   id: string;
@@ -85,4 +99,4 @@ export interface TeamScoreHistoryEntry {
 
 export type LoadState = "loading" | "ready" | "empty" | "error";
 export type LeaderboardLoadState = "loading" | "ready";
-export type ActiveView = "selection" | "leaderboard";
+export type ActiveView = "stable" | "selection" | "leaderboard";

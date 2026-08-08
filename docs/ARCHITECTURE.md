@@ -42,6 +42,9 @@ Current behaviour:
 - Fetches leaderboard standings from the Fastify API.
 - Lets a player select and deselect rikishi up to the API-configured team size.
 - Captures a display/team name and submits the team to the API for the signed-in/current user.
+- Gives the signed-in player a dedicated My Stable view with private pick
+  details, rikishi rank/heya, individual wins and points, total score, and an
+  edit or read-only state derived from the basho lifecycle.
 - Provides a local development sign-in panel that establishes the current user session.
 - Shows ordered team standings with the latest daily score, compact five-day
   team form, and expandable picked-rikishi tournament totals. Each rikishi row
@@ -79,7 +82,9 @@ Current routes:
   - Enforces one owned team per user per basho and preserves basho pick-locking rules.
 - `GET /api/basho/:bashoId/my-team`
   - Requires a current user.
-  - Returns the current user's fantasy team and picks for the basho.
+  - Returns only the current user's fantasy team for the basho, with private
+    picks enriched by shikona, heya and banzuke rank where available, plus each
+    rikishi's wins/points and the total team score.
 - `GET /api/basho/:bashoId/teams/:teamId`
   - Returns a fantasy team and its picks.
   - Owned teams can only be viewed by their owner; legacy unowned seed/demo teams remain readable.
