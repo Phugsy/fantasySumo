@@ -663,6 +663,46 @@ describe("basho routes", () => {
     },
   );
 
+  it("reports a team-level lock while the basho remains upcoming", async () => {
+    const headers = await signIn();
+    const repositories = createRepositories(client);
+
+    await app.inject({
+      headers,
+      method: "POST",
+      url: "/api/basho/2026-05/teams",
+      payload: {
+        displayName: "Original Team",
+        rikishiIds: ["onosato", "kotozakura"],
+      },
+    });
+    await repositories.lockFantasyTeamsForBasho(
+      sampleBasho.id,
+      "2026-05-08T02:00:00.000Z",
+    );
+
+    expect((await repositories.getBasho(sampleBasho.id))?.status).toBe(
+      "upcoming",
+    );
+
+    const response = await app.inject({
+      headers,
+      method: "PUT",
+      url: "/api/basho/2026-05/my-team",
+      payload: {
+        displayName: "Late Update",
+        rikishiIds: ["hoshoryu", "kirishima"],
+      },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      error: "picks-locked",
+      bashoStatus: "upcoming",
+      teamLockedAt: "2026-05-08T02:00:00.000Z",
+    });
+  });
+
   it("keeps pick identities private on an upcoming leaderboard", async () => {
     const response = await app.inject({
       method: "GET",

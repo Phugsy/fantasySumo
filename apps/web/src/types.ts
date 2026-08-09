@@ -26,6 +26,7 @@ export interface CreatedTeamResponse {
   team: {
     id: string;
     displayName: string;
+    lockedAt?: string;
     ownerUserId?: string;
   };
   picks: Array<{

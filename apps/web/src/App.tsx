@@ -179,6 +179,9 @@ export function App() {
         setBasho((current) =>
           mergeLeaderboardBasho(current, leaderboardResponse),
         );
+        setMyTeam((current) =>
+          mergeLeaderboardMyTeam(current, leaderboardResponse),
+        );
         setLeaderboardTotalDays(leaderboardResponse.totalDays);
         setLeaderboard(leaderboardResponse.leaderboard);
         setExpandedTeamId(
@@ -197,23 +200,36 @@ export function App() {
       if (
         error instanceof ApiRequestError &&
         error.status === 409 &&
-        error.code === "picks-locked" &&
-        error.bashoStatus !== undefined
+        error.code === "picks-locked"
       ) {
-        const lockedStatus = error.bashoStatus;
+        if (error.teamLockedAt !== undefined) {
+          const teamLockedAt = error.teamLockedAt;
 
-        setBasho((current) =>
-          current === null ? null : { ...current, status: lockedStatus },
-        );
-        setMyTeam((current) =>
-          current === null
-            ? null
-            : {
-                ...current,
-                basho: { ...current.basho, status: lockedStatus },
-              },
-        );
-        setActiveView("stable");
+          setMyTeam((current) =>
+            current === null
+              ? null
+              : {
+                  ...current,
+                  team: { ...current.team, lockedAt: teamLockedAt },
+                },
+          );
+          setActiveView("stable");
+        } else if (error.bashoStatus !== undefined) {
+          const lockedStatus = error.bashoStatus;
+
+          setBasho((current) =>
+            current === null ? null : { ...current, status: lockedStatus },
+          );
+          setMyTeam((current) =>
+            current === null
+              ? null
+              : {
+                  ...current,
+                  basho: { ...current.basho, status: lockedStatus },
+                },
+          );
+          setActiveView("stable");
+        }
       }
 
       setErrorMessage(getErrorMessage(error));
@@ -673,6 +689,26 @@ function mergeLeaderboardBasho(
   return {
     ...leaderboardResponse.basho,
     teamSize: currentBasho?.teamSize ?? 0,
+  };
+}
+
+function mergeLeaderboardMyTeam(
+  currentTeam: MyTeamResponse | null,
+  leaderboardResponse: LeaderboardResponse,
+): MyTeamResponse | null {
+  if (
+    currentTeam === null ||
+    currentTeam.basho.id !== leaderboardResponse.basho.id
+  ) {
+    return currentTeam;
+  }
+
+  return {
+    ...currentTeam,
+    basho: {
+      ...currentTeam.basho,
+      ...leaderboardResponse.basho,
+    },
   };
 }
 

@@ -400,6 +400,64 @@ describe("App", () => {
     expect(screen.queryByText("Onosato")).not.toBeInTheDocument();
   });
 
+  it("shows a saved stable as read-only when the post-save leaderboard reports a lock", async () => {
+    let teamUpdated = false;
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (
+          String(input) === "/api/basho/2026-05/my-team" &&
+          init?.method === "PUT"
+        ) {
+          teamUpdated = true;
+
+          return jsonResponse({
+            team: {
+              id: "team-existing",
+              displayName: "Updated Champions",
+            },
+            picks: [{ rikishiId: "onosato" }, { rikishiId: "kotozakura" }],
+          });
+        }
+
+        if (String(input) === "/api/basho/2026-05/leaderboard" && teamUpdated) {
+          return jsonResponse(
+            createLeaderboardResponse({
+              basho: {
+                ...currentBasho,
+                status: "active",
+              },
+            }),
+          );
+        }
+
+        return mockExistingTeamAfterLoginFetch(input, init);
+      }),
+    );
+    render(<App />);
+
+    await signInThroughAccountPanel();
+    await screen.findByRole("heading", { name: "Existing Champions" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit picks" }));
+    fireEvent.change(await screen.findByLabelText("Team name"), {
+      target: { value: "Updated Champions" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(
+      await screen.findByText(
+        "This basho has started, so picks are locked. Your line-up is read-only.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Updated Champions" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit picks" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("switches an open editor to read-only when the basho locks before save", async () => {
     vi.stubGlobal(
       "fetch",
@@ -411,8 +469,9 @@ describe("App", () => {
           return jsonResponse(
             {
               error: "picks-locked",
-              message: "This basho has started, so picks are locked.",
-              bashoStatus: "active",
+              message: "Fantasy team picks are locked for this basho.",
+              bashoStatus: "upcoming",
+              teamLockedAt: "2026-05-08T02:00:00.000Z",
             },
             { status: 409 },
           );
@@ -433,7 +492,7 @@ describe("App", () => {
 
     expect(
       await screen.findByText(
-        "This basho has started, so picks are locked. Your line-up is read-only.",
+        "Picks are locked for this basho. Your line-up is read-only.",
       ),
     ).toBeInTheDocument();
     expect(

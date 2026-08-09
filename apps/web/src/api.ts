@@ -11,6 +11,7 @@ interface ApiErrorBody {
   error?: string;
   message?: string;
   bashoStatus?: Basho["status"];
+  teamLockedAt?: string;
   details?: Array<{
     message?: string;
   }>;
@@ -22,6 +23,7 @@ export class ApiRequestError extends Error {
     readonly status: number,
     readonly code: string | undefined = undefined,
     readonly bashoStatus: Basho["status"] | undefined = undefined,
+    readonly teamLockedAt: string | undefined = undefined,
   ) {
     super(message);
     this.name = "ApiRequestError";
@@ -197,6 +199,7 @@ async function createApiRequestError(
     response.status,
     error.code,
     error.bashoStatus,
+    error.teamLockedAt,
   );
 }
 
@@ -204,6 +207,7 @@ async function readApiError(response: Response): Promise<{
   message: string;
   code?: string;
   bashoStatus?: Basho["status"];
+  teamLockedAt?: string;
 }> {
   try {
     const body = (await response.json()) as ApiErrorBody;
@@ -218,6 +222,9 @@ async function readApiError(response: Response): Promise<{
         ...(body.bashoStatus === undefined
           ? {}
           : { bashoStatus: body.bashoStatus }),
+        ...(body.teamLockedAt === undefined
+          ? {}
+          : { teamLockedAt: body.teamLockedAt }),
       };
     }
 
@@ -227,6 +234,9 @@ async function readApiError(response: Response): Promise<{
       ...(body.bashoStatus === undefined
         ? {}
         : { bashoStatus: body.bashoStatus }),
+      ...(body.teamLockedAt === undefined
+        ? {}
+        : { teamLockedAt: body.teamLockedAt }),
     };
   } catch {
     return { message: `Request failed with status ${response.status}.` };

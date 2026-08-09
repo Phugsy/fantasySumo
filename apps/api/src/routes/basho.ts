@@ -355,7 +355,10 @@ export function registerBashoRoutes(
       );
 
     if (updatedTeamWithPicks === undefined) {
-      const currentBasho = await context.repositories.getBasho(basho.id);
+      const [currentBasho, currentTeam] = await Promise.all([
+        context.repositories.getBasho(basho.id),
+        context.repositories.getFantasyTeamForOwner(basho.id, currentUser.id),
+      ]);
 
       return reply.code(409).send({
         error: "picks-locked",
@@ -365,6 +368,10 @@ export function registerBashoRoutes(
             : getPickLockMessage(currentBasho)) ??
           "Fantasy team picks are locked for this basho.",
         bashoStatus: currentBasho?.status ?? "locked",
+        ...(currentBasho?.status !== "upcoming" ||
+        currentTeam?.lockedAt === undefined
+          ? {}
+          : { teamLockedAt: currentTeam.lockedAt }),
       });
     }
 

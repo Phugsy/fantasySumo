@@ -155,6 +155,7 @@ describe("repositories", () => {
         },
         [
           {
+            id: "pick-custom-kotozakura",
             teamId: "team-racing-request",
             rikishiId: "kotozakura",
           },
@@ -177,7 +178,7 @@ describe("repositories", () => {
           rikishiId: "hoshoryu",
         },
         {
-          id: "team-owned-kotozakura",
+          id: "pick-custom-kotozakura",
           teamId: "team-owned",
           rikishiId: "kotozakura",
         },
@@ -198,14 +199,14 @@ describe("repositories", () => {
     });
     expect(await repositories.listFantasyPicksForTeam("team-owned")).toEqual([
       {
+        id: "pick-custom-kotozakura",
+        teamId: "team-owned",
+        rikishiId: "kotozakura",
+      },
+      {
         id: "team-owned-hoshoryu",
         teamId: "team-owned",
         rikishiId: "hoshoryu",
-      },
-      {
-        id: "team-owned-kotozakura",
-        teamId: "team-owned",
-        rikishiId: "kotozakura",
       },
     ]);
   });

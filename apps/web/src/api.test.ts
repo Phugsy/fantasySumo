@@ -107,6 +107,7 @@ describe("api auth headers", () => {
               error: "picks-locked",
               message: "This basho has started, so picks are locked.",
               bashoStatus: "active",
+              teamLockedAt: "2026-05-08T02:00:00.000Z",
             }),
             {
               headers: { "content-type": "application/json" },
@@ -127,6 +128,7 @@ describe("api auth headers", () => {
       status: 409,
       code: "picks-locked",
       bashoStatus: "active",
+      teamLockedAt: "2026-05-08T02:00:00.000Z",
       message: "This basho has started, so picks are locked.",
     });
   });

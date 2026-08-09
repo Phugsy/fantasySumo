@@ -339,15 +339,7 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
 
         return {
           team: toFantasyTeam(savedTeam),
-          picks: picks
-            .map((pick) => ({
-              ...pick,
-              id: `${savedTeam.id}-${pick.rikishiId}`,
-              teamId: savedTeam.id,
-            }))
-            .sort((left, right) =>
-              left.rikishiId.localeCompare(right.rikishiId),
-            ),
+          picks: toSavedFantasyPicks(picks, savedTeam.id),
         };
       }),
     getFantasyTeam: async (id) => {
@@ -787,15 +779,7 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
 
         return {
           team: toFantasyTeam(savedTeam),
-          picks: picks
-            .map((pick) => ({
-              ...pick,
-              id: `${savedTeam.id}-${pick.rikishiId}`,
-              teamId: savedTeam.id,
-            }))
-            .sort((left, right) =>
-              left.rikishiId.localeCompare(right.rikishiId),
-            ),
+          picks: toSavedFantasyPicks(picks, savedTeam.id),
         };
       }),
     getFantasyTeam: async (id) => {
@@ -1121,6 +1105,15 @@ function toFantasyPickRow(entry: FantasyPick) {
     teamId: entry.teamId,
     rikishiId: entry.rikishiId,
   };
+}
+
+function toSavedFantasyPicks(
+  picks: readonly FantasyPick[],
+  savedTeamId: FantasyTeam["id"],
+): FantasyPick[] {
+  return picks
+    .map((pick) => toFantasyPickRow({ ...pick, teamId: savedTeamId }))
+    .sort((left, right) => left.rikishiId.localeCompare(right.rikishiId));
 }
 
 function toBoutResultRow(entry: BoutResult) {
