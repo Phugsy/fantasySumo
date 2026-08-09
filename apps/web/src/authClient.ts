@@ -3,8 +3,20 @@ import type { SessionResponse, SessionUser } from "./types";
 
 const PASSWORD_REQUIREMENTS_MESSAGE =
   "Choose a stronger password. Use at least 8 characters and avoid common passwords.";
+const FORCE_NEON_TOKEN_FETCH_OPTIONS = {
+  fetchOptions: {
+    headers: {
+      "X-Force-Fetch": "true",
+    },
+  },
+} as const;
 export const INCOMPLETE_SESSION_ERROR_MESSAGE =
   "We signed you in, but could not complete your session. Refresh the page or try signing in again.";
+
+interface NeonAccessTokenResponse {
+  data: { token?: string } | null;
+  error: unknown | null;
+}
 
 const neonAuthUrl = import.meta.env.VITE_NEON_AUTH_URL as string | undefined;
 const neonAuthClient =
@@ -28,18 +40,26 @@ export async function getNeonAccessToken(): Promise<string | null> {
     return null;
   }
 
-  // Neon injects the JWT into session.token. Reading the session avoids the
-  // cache-affected /token response immediately after an email sign-in.
-  const response = await neonAuthClient.getSession();
+  // Neon groups /token with getSession in its in-memory cache. Force the
+  // dedicated token request to reach Neon so a tokenless post-login session
+  // cannot be replayed for every verification retry.
+  return requestNeonAccessToken((options) => neonAuthClient.token(options));
+}
+
+export async function requestNeonAccessToken(
+  requestToken: (
+    options: typeof FORCE_NEON_TOKEN_FETCH_OPTIONS,
+  ) => Promise<NeonAccessTokenResponse>,
+): Promise<string> {
+  const response = await requestToken(FORCE_NEON_TOKEN_FETCH_OPTIONS);
 
   return requireNeonAccessToken(response);
 }
 
-export function requireNeonAccessToken(response: {
-  data: { session?: { token?: string } | null } | null;
-  error: unknown | null;
-}): string {
-  const token = response.data?.session?.token?.trim();
+export function requireNeonAccessToken(
+  response: NeonAccessTokenResponse,
+): string {
+  const token = response.data?.token?.trim();
 
   if (response.error !== null || token === undefined || token.length === 0) {
     throw new IncompleteSessionError();

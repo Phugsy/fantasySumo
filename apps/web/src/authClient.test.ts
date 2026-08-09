@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   getNeonAuthErrorMessage,
   IncompleteSessionError,
+  requestNeonAccessToken,
   requireNeonAccessToken,
 } from "./authClient";
 
@@ -39,7 +40,7 @@ describe("requireNeonAccessToken", () => {
   it("returns a non-empty Neon access token", () => {
     expect(
       requireNeonAccessToken({
-        data: { session: { token: " signed-jwt " } },
+        data: { token: " signed-jwt " },
         error: null,
       }),
     ).toBe("signed-jwt");
@@ -51,7 +52,7 @@ describe("requireNeonAccessToken", () => {
       error: { message: "provider detail must stay private" },
     },
     {
-      data: { session: { token: "" } },
+      data: { token: "" },
       error: null,
     },
   ])("raises a safe error when Neon does not issue a token", (response) => {
@@ -72,5 +73,26 @@ describe("requireNeonAccessToken", () => {
     expect(String(thrownError)).not.toContain(
       "provider detail must stay private",
     );
+  });
+});
+
+describe("requestNeonAccessToken", () => {
+  it("bypasses Neon's session cache when requesting the JWT", async () => {
+    const requestToken = vi.fn(async () => ({
+      data: { token: "signed-jwt" },
+      error: null,
+    }));
+
+    await expect(requestNeonAccessToken(requestToken)).resolves.toBe(
+      "signed-jwt",
+    );
+    expect(requestToken).toHaveBeenCalledOnce();
+    expect(requestToken).toHaveBeenCalledWith({
+      fetchOptions: {
+        headers: {
+          "X-Force-Fetch": "true",
+        },
+      },
+    });
   });
 });
