@@ -83,8 +83,6 @@ For issue-to-PR work, use the repo-local process in `skills/fantasy-sumo-issue-l
 
 For pre-handoff review, PR comment follow-up, or scheduled PR babysitting, use `skills/fantasy-sumo-pr-review-loop/SKILL.md`.
 
-After opening a `codex/*` pull request, start a PR-scoped scheduled babysitter when Codex automations are available. Run it in an isolated worktree, limit automatic fixes to the safe scope in the review-loop skill, and stop it when the PR is merged or closed. Never auto-merge.
-
 ## Definition of done for future changes
 
 A change is ready when:
