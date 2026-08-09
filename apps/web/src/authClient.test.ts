@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  createNeonSessionCompletionTokenProvider,
   getNeonAuthErrorMessage,
   IncompleteSessionError,
-  requestNeonAccessToken,
+  requestFreshNeonAccessToken,
   requireNeonAccessToken,
 } from "./authClient";
 
@@ -40,7 +41,7 @@ describe("requireNeonAccessToken", () => {
   it("returns a non-empty Neon access token", () => {
     expect(
       requireNeonAccessToken({
-        data: { token: " signed-jwt " },
+        data: { session: { token: " signed-jwt " } },
         error: null,
       }),
     ).toBe("signed-jwt");
@@ -52,7 +53,7 @@ describe("requireNeonAccessToken", () => {
       error: { message: "provider detail must stay private" },
     },
     {
-      data: { token: "" },
+      data: { session: { token: "" } },
       error: null,
     },
   ])("raises a safe error when Neon does not issue a token", (response) => {
@@ -76,18 +77,18 @@ describe("requireNeonAccessToken", () => {
   });
 });
 
-describe("requestNeonAccessToken", () => {
-  it("bypasses Neon's session cache when requesting the JWT", async () => {
-    const requestToken = vi.fn(async () => ({
-      data: { token: "signed-jwt" },
+describe("requestFreshNeonAccessToken", () => {
+  it("bypasses Neon's cache while refreshing the post-login session", async () => {
+    const requestSession = vi.fn(async () => ({
+      data: { session: { token: "signed-jwt" } },
       error: null,
     }));
 
-    await expect(requestNeonAccessToken(requestToken)).resolves.toBe(
+    await expect(requestFreshNeonAccessToken(requestSession)).resolves.toBe(
       "signed-jwt",
     );
-    expect(requestToken).toHaveBeenCalledOnce();
-    expect(requestToken).toHaveBeenCalledWith({
+    expect(requestSession).toHaveBeenCalledOnce();
+    expect(requestSession).toHaveBeenCalledWith({
       fetchOptions: {
         headers: {
           "X-Force-Fetch": "true",
@@ -96,3 +97,64 @@ describe("requestNeonAccessToken", () => {
     });
   });
 });
+
+describe("createNeonSessionCompletionTokenProvider", () => {
+  it("returns to the cached session path after the first fresh token", async () => {
+    const getFreshToken = vi.fn(async () => "fresh-jwt");
+    const getCachedToken = vi.fn(async () => "cached-jwt");
+    const getToken = createNeonSessionCompletionTokenProvider(
+      getFreshToken,
+      getCachedToken,
+    );
+
+    await expect(getToken()).resolves.toBe("fresh-jwt");
+    await expect(getToken()).resolves.toBe("cached-jwt");
+    await expect(getToken()).resolves.toBe("cached-jwt");
+    expect(getFreshToken).toHaveBeenCalledOnce();
+    expect(getCachedToken).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries the fresh session path until Neon issues a token", async () => {
+    const getFreshToken = vi
+      .fn<AccessTokenProvider>()
+      .mockRejectedValueOnce(new IncompleteSessionError())
+      .mockResolvedValueOnce("fresh-jwt");
+    const getCachedToken = vi.fn(async () => "cached-jwt");
+    const getToken = createNeonSessionCompletionTokenProvider(
+      getFreshToken,
+      getCachedToken,
+    );
+
+    await expect(getToken()).rejects.toBeInstanceOf(IncompleteSessionError);
+    await expect(getToken()).resolves.toBe("fresh-jwt");
+    await expect(getToken()).resolves.toBe("cached-jwt");
+    expect(getFreshToken).toHaveBeenCalledTimes(2);
+    expect(getCachedToken).toHaveBeenCalledOnce();
+  });
+
+  it("shares one forced request between concurrent completion checks", async () => {
+    let resolveFreshToken: (token: string) => void = () => undefined;
+    const freshToken = new Promise<string>((resolve) => {
+      resolveFreshToken = resolve;
+    });
+    const getFreshToken = vi.fn(() => freshToken);
+    const getCachedToken = vi.fn(async () => "cached-jwt");
+    const getToken = createNeonSessionCompletionTokenProvider(
+      getFreshToken,
+      getCachedToken,
+    );
+
+    const firstRequest = getToken();
+    const concurrentRequest = getToken();
+
+    expect(getFreshToken).toHaveBeenCalledOnce();
+    resolveFreshToken("fresh-jwt");
+    await expect(
+      Promise.all([firstRequest, concurrentRequest]),
+    ).resolves.toEqual(["fresh-jwt", "fresh-jwt"]);
+    await expect(getToken()).resolves.toBe("cached-jwt");
+    expect(getCachedToken).toHaveBeenCalledOnce();
+  });
+});
+
+type AccessTokenProvider = () => Promise<string | null>;

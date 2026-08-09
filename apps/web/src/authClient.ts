@@ -3,7 +3,7 @@ import type { SessionResponse, SessionUser } from "./types";
 
 const PASSWORD_REQUIREMENTS_MESSAGE =
   "Choose a stronger password. Use at least 8 characters and avoid common passwords.";
-const FORCE_NEON_TOKEN_FETCH_OPTIONS = {
+const FORCE_NEON_SESSION_FETCH_OPTIONS = {
   fetchOptions: {
     headers: {
       "X-Force-Fetch": "true",
@@ -14,9 +14,11 @@ export const INCOMPLETE_SESSION_ERROR_MESSAGE =
   "We signed you in, but could not complete your session. Refresh the page or try signing in again.";
 
 interface NeonAccessTokenResponse {
-  data: { token?: string } | null;
+  data: { session?: { token?: string } | null } | null;
   error: unknown | null;
 }
+
+type AccessTokenProvider = () => Promise<string | null>;
 
 const neonAuthUrl = import.meta.env.VITE_NEON_AUTH_URL as string | undefined;
 const neonAuthClient =
@@ -40,26 +42,63 @@ export async function getNeonAccessToken(): Promise<string | null> {
     return null;
   }
 
-  // Neon groups /token with getSession in its in-memory cache. Force the
-  // dedicated token request to reach Neon so a tokenless post-login session
-  // cannot be replayed for every verification retry.
-  return requestNeonAccessToken((options) => neonAuthClient.token(options));
+  return requireNeonAccessToken(await neonAuthClient.getSession());
 }
 
-export async function requestNeonAccessToken(
-  requestToken: (
-    options: typeof FORCE_NEON_TOKEN_FETCH_OPTIONS,
+export async function getFreshNeonAccessToken(): Promise<string | null> {
+  if (neonAuthClient === null) {
+    return null;
+  }
+
+  return requestFreshNeonAccessToken((options) =>
+    neonAuthClient.getSession(options),
+  );
+}
+
+export async function requestFreshNeonAccessToken(
+  requestSession: (
+    options: typeof FORCE_NEON_SESSION_FETCH_OPTIONS,
   ) => Promise<NeonAccessTokenResponse>,
 ): Promise<string> {
-  const response = await requestToken(FORCE_NEON_TOKEN_FETCH_OPTIONS);
+  // A live session response seeds Neon's normal expiry-aware session cache.
+  // Only the post-login completion provider uses this bypass.
+  const response = await requestSession(FORCE_NEON_SESSION_FETCH_OPTIONS);
 
   return requireNeonAccessToken(response);
+}
+
+export function createNeonSessionCompletionTokenProvider(
+  getFreshToken: AccessTokenProvider,
+  getCachedToken: AccessTokenProvider,
+): AccessTokenProvider {
+  let needsFreshSession = true;
+  let freshTokenRequest: Promise<string | null> | null = null;
+
+  return async () => {
+    if (!needsFreshSession) {
+      return getCachedToken();
+    }
+
+    freshTokenRequest ??= getFreshToken();
+
+    try {
+      const token = await freshTokenRequest;
+
+      if (token !== null) {
+        needsFreshSession = false;
+      }
+
+      return token;
+    } finally {
+      freshTokenRequest = null;
+    }
+  };
 }
 
 export function requireNeonAccessToken(
   response: NeonAccessTokenResponse,
 ): string {
-  const token = response.data?.token?.trim();
+  const token = response.data?.session?.token?.trim();
 
   if (response.error !== null || token === undefined || token.length === 0) {
     throw new IncompleteSessionError();

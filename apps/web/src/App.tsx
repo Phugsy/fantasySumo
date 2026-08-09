@@ -20,6 +20,8 @@ import {
   setAuthTokenProvider,
 } from "./api";
 import {
+  createNeonSessionCompletionTokenProvider,
+  getFreshNeonAccessToken,
   getNeonAccessToken,
   IncompleteSessionError,
   INCOMPLETE_SESSION_ERROR_MESSAGE,
@@ -90,6 +92,7 @@ export function App() {
   const [ownedTeamId, setOwnedTeamId] = useState<string | null>(null);
   const bashoRequestIdRef = useRef(0);
   const leaderboardRequestIdRef = useRef(0);
+  const sessionOperationInFlightRef = useRef(false);
 
   const selectedRikishi = useMemo(
     () =>
@@ -199,6 +202,11 @@ export function App() {
   }
 
   async function submitAccount(intent: "sign-in" | "sign-up") {
+    if (sessionOperationInFlightRef.current) {
+      return;
+    }
+
+    sessionOperationInFlightRef.current = true;
     let bashoReloadStarted = false;
     const preserveAnonymousDraft =
       sessionUser === null &&
@@ -233,11 +241,17 @@ export function App() {
       }
       setSessionErrorMessage(getErrorMessage(error));
     } finally {
+      sessionOperationInFlightRef.current = false;
       setSessionState("ready");
     }
   }
 
   async function handleSignOut() {
+    if (sessionOperationInFlightRef.current) {
+      return;
+    }
+
+    sessionOperationInFlightRef.current = true;
     let bashoReloadStarted = false;
 
     setSessionState("submitting");
@@ -270,6 +284,7 @@ export function App() {
       }
       setSessionErrorMessage(getErrorMessage(error));
     } finally {
+      sessionOperationInFlightRef.current = false;
       setSessionState("ready");
     }
   }
@@ -574,7 +589,12 @@ async function submitNeonAccount(input: {
     });
   }
 
-  setAuthTokenProvider(getNeonAccessToken);
+  setAuthTokenProvider(
+    createNeonSessionCompletionTokenProvider(
+      getFreshNeonAccessToken,
+      getNeonAccessToken,
+    ),
+  );
 
   let session: SessionResponse;
 
@@ -586,6 +606,8 @@ async function submitNeonAccount(input: {
     }
 
     throw error;
+  } finally {
+    setAuthTokenProvider(getNeonAccessToken);
   }
 
   if (session.user === null) {
