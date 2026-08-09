@@ -3,8 +3,22 @@ import type { SessionResponse, SessionUser } from "./types";
 
 const PASSWORD_REQUIREMENTS_MESSAGE =
   "Choose a stronger password. Use at least 8 characters and avoid common passwords.";
+const FORCE_NEON_SESSION_FETCH_OPTIONS = {
+  fetchOptions: {
+    headers: {
+      "X-Force-Fetch": "true",
+    },
+  },
+} as const;
 export const INCOMPLETE_SESSION_ERROR_MESSAGE =
   "We signed you in, but could not complete your session. Refresh the page or try signing in again.";
+
+interface NeonAccessTokenResponse {
+  data: { session?: { token?: string } | null } | null;
+  error: unknown | null;
+}
+
+type AccessTokenProvider = () => Promise<string | null>;
 
 const neonAuthUrl = import.meta.env.VITE_NEON_AUTH_URL as string | undefined;
 const neonAuthClient =
@@ -28,17 +42,62 @@ export async function getNeonAccessToken(): Promise<string | null> {
     return null;
   }
 
-  // Neon injects the JWT into session.token. Reading the session avoids the
-  // cache-affected /token response immediately after an email sign-in.
-  const response = await neonAuthClient.getSession();
+  return requireNeonAccessToken(await neonAuthClient.getSession());
+}
+
+export async function getFreshNeonAccessToken(): Promise<string | null> {
+  if (neonAuthClient === null) {
+    return null;
+  }
+
+  return requestFreshNeonAccessToken((options) =>
+    neonAuthClient.getSession(options),
+  );
+}
+
+export async function requestFreshNeonAccessToken(
+  requestSession: (
+    options: typeof FORCE_NEON_SESSION_FETCH_OPTIONS,
+  ) => Promise<NeonAccessTokenResponse>,
+): Promise<string> {
+  // A live session response seeds Neon's normal expiry-aware session cache.
+  // Only the post-login completion provider uses this bypass.
+  const response = await requestSession(FORCE_NEON_SESSION_FETCH_OPTIONS);
 
   return requireNeonAccessToken(response);
 }
 
-export function requireNeonAccessToken(response: {
-  data: { session?: { token?: string } | null } | null;
-  error: unknown | null;
-}): string {
+export function createNeonSessionCompletionTokenProvider(
+  getFreshToken: AccessTokenProvider,
+  getCachedToken: AccessTokenProvider,
+): AccessTokenProvider {
+  let needsFreshSession = true;
+  let freshTokenRequest: Promise<string | null> | null = null;
+
+  return async () => {
+    if (!needsFreshSession) {
+      return getCachedToken();
+    }
+
+    freshTokenRequest ??= getFreshToken();
+
+    try {
+      const token = await freshTokenRequest;
+
+      if (token !== null) {
+        needsFreshSession = false;
+      }
+
+      return token;
+    } finally {
+      freshTokenRequest = null;
+    }
+  };
+}
+
+export function requireNeonAccessToken(
+  response: NeonAccessTokenResponse,
+): string {
   const token = response.data?.session?.token?.trim();
 
   if (response.error !== null || token === undefined || token.length === 0) {

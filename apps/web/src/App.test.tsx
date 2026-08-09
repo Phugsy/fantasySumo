@@ -179,6 +179,60 @@ describe("App", () => {
     expect(screen.getByText("player@example.com")).toBeInTheDocument();
   });
 
+  it("keeps account submission single-flight across rapid form submits", async () => {
+    const sessionRequest = createDeferred<Response>();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/session" && init?.method === "POST") {
+        return sessionRequest.promise;
+      }
+
+      return mockAnonymousFetch(input, init);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    fireEvent.change(await screen.findByLabelText("Email"), {
+      target: { value: "player@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Display name"), {
+      target: { value: "New Player" },
+    });
+    const signInButton = screen.getByRole("button", { name: "Sign in" });
+    const accountForm = signInButton.closest("form");
+
+    expect(accountForm).not.toBeNull();
+    fireEvent.submit(accountForm!);
+    fireEvent.submit(accountForm!);
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.filter(
+          ([input, init]) =>
+            String(input) === "/api/session" && init?.method === "POST",
+        ),
+      ).toHaveLength(1);
+    });
+
+    await act(async () => {
+      sessionRequest.resolve(
+        await jsonResponse(
+          {
+            mode: "local",
+            user: {
+              id: "local-user",
+              email: "player@example.com",
+              displayName: "New Player",
+            },
+          },
+          { status: 201 },
+        ),
+      );
+    });
+
+    expect(await screen.findByText("New Player")).toBeInTheDocument();
+  });
+
   it("does not expose the team form until private picks finish loading", async () => {
     const myTeamRequest = createDeferred<Response>();
 

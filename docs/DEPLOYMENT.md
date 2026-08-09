@@ -175,8 +175,13 @@ the production runtime logs for these warning events:
 - `event=auth-client-session-failed` with
   `reason=access-token-unavailable` means the browser could not obtain a session
   token, so it sent a safe diagnostic session request without an authorization
-  header. The API emits at most one of these warnings per runtime instance per
-  minute to bound unauthenticated diagnostic traffic.
+  header. During post-login session completion, the browser forces a fresh Neon
+  session request until the first JWT is available, then returns to Neon's
+  normal expiry-aware session cache for later API calls. This prevents a stale
+  tokenless session from blocking the bounded verification retries without
+  bypassing the cache during ordinary app use. The API emits at most one of
+  these warnings per runtime instance per minute to bound unauthenticated
+  diagnostic traffic.
 - `event=neon-jwt-verification-failed` with
   `reason=verification-error` includes only the safe JOSE error name and code,
   which distinguishes claim, signature, JWKS, and missing-verifier failures.
