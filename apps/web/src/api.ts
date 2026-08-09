@@ -1,4 +1,8 @@
 import type {
+  AdminActionResponse,
+  AdminBashoResponse,
+  AdminDemoAction,
+  AdminLifecycleAction,
   Basho,
   BashoRikishiResponse,
   CreatedTeamResponse,
@@ -70,6 +74,32 @@ export async function fetchLeaderboard(
 
 export async function fetchSession(): Promise<SessionResponse> {
   return getJson<SessionResponse>("/api/session");
+}
+
+export async function fetchAdminBasho(
+  mode: "live" | "demo",
+): Promise<AdminBashoResponse> {
+  return getJson<AdminBashoResponse>(
+    mode === "demo"
+      ? "/api/admin/basho/current?mode=demo"
+      : "/api/admin/basho/current",
+  );
+}
+
+export async function runAdminLifecycleAction(
+  bashoId: string,
+  action: AdminLifecycleAction,
+): Promise<AdminActionResponse> {
+  return postJson<AdminActionResponse>(
+    `/api/admin/basho/${bashoId}/${action}`,
+    {},
+  );
+}
+
+export async function runAdminDemoAction(
+  action: AdminDemoAction,
+): Promise<AdminActionResponse> {
+  return postJson<AdminActionResponse>(`/api/admin/demo/${action}`, {});
 }
 
 export function reportAuthClientTokenUnavailable(): void {

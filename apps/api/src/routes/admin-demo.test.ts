@@ -42,9 +42,9 @@ describe("admin demo routes", () => {
       url: "/api/admin/demo/reset",
     });
 
-    expect(missingTokenResponse.statusCode).toBe(401);
+    expect(missingTokenResponse.statusCode).toBe(403);
     expect(missingTokenResponse.json()).toMatchObject({
-      error: "demo-admin-unauthorized",
+      error: "admin-forbidden",
     });
 
     const invalidTokenResponse = await app.inject({
@@ -55,13 +55,13 @@ describe("admin demo routes", () => {
       url: "/api/admin/demo/reset",
     });
 
-    expect(invalidTokenResponse.statusCode).toBe(401);
+    expect(invalidTokenResponse.statusCode).toBe(403);
     expect(invalidTokenResponse.json()).toMatchObject({
-      error: "demo-admin-unauthorized",
+      error: "admin-forbidden",
     });
   });
 
-  it("hides demo progression routes when no token is configured", async () => {
+  it("forbids demo progression when no admin access is configured", async () => {
     vi.stubEnv("DEMO_ADMIN_TOKEN", "");
     const disabledApp = buildApp({
       db: client,
@@ -74,9 +74,9 @@ describe("admin demo routes", () => {
         url: "/api/admin/demo/reset",
       });
 
-      expect(response.statusCode).toBe(404);
+      expect(response.statusCode).toBe(403);
       expect(response.json()).toMatchObject({
-        error: "demo-admin-disabled",
+        error: "admin-forbidden",
       });
     } finally {
       await disabledApp.close();

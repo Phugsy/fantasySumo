@@ -54,6 +54,7 @@ export interface SessionUser {
   id: string;
   email?: string;
   displayName?: string;
+  isAdmin?: boolean;
 }
 
 export interface SessionResponse {
@@ -100,4 +101,17 @@ export interface TeamScoreHistoryEntry {
 
 export type LoadState = "loading" | "ready" | "empty" | "error";
 export type LeaderboardLoadState = "loading" | "ready";
-export type ActiveView = "stable" | "selection" | "leaderboard";
+export interface AdminBashoResponse {
+  basho: Omit<Basho, "teamSize">;
+}
+
+export type AdminLifecycleAction = "open-picks" | "start" | "close";
+export type AdminDemoAction = "reset" | "start" | "advance-day" | "complete";
+
+export interface AdminActionResponse extends AdminBashoResponse {
+  action: AdminLifecycleAction | AdminDemoAction;
+  changed?: boolean;
+  appliedResults?: number;
+}
+
+export type ActiveView = "stable" | "selection" | "leaderboard" | "admin";

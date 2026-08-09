@@ -27,6 +27,7 @@ describe("auth routes", () => {
           id: expect.stringMatching(/^local-/),
           email: "player@example.com",
           displayName: "East Stand",
+          isAdmin: false,
         },
       });
 
@@ -42,6 +43,7 @@ describe("auth routes", () => {
       expect(sessionResponse.json()).toMatchObject({
         user: {
           email: "player@example.com",
+          isAdmin: false,
         },
       });
 
@@ -85,8 +87,37 @@ describe("auth routes", () => {
           id: "neon-user-123",
           email: "neon@example.com",
           displayName: "Neon Player",
+          isAdmin: false,
         },
       });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("reports admin access only for configured verified user ids", async () => {
+    const app = buildApp({
+      adminUserIds: ["neon-admin-123"],
+      authMode: "neon",
+      neonJwtVerifier: async (token) => ({
+        id: token === "admin-token" ? "neon-admin-123" : "neon-player-456",
+      }),
+    });
+
+    try {
+      const adminResponse = await app.inject({
+        headers: { authorization: "Bearer admin-token" },
+        method: "GET",
+        url: "/api/session",
+      });
+      const playerResponse = await app.inject({
+        headers: { authorization: "Bearer player-token" },
+        method: "GET",
+        url: "/api/session",
+      });
+
+      expect(adminResponse.json().user).toMatchObject({ isAdmin: true });
+      expect(playerResponse.json().user).toMatchObject({ isAdmin: false });
     } finally {
       await app.close();
     }

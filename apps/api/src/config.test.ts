@@ -1,43 +1,23 @@
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  allowsUnprotectedAdminImports,
-  getAuthMode,
-  getNeonAuthJwksUrl,
-} from "./config.js";
+import { getAdminUserIds, getAuthMode, getNeonAuthJwksUrl } from "./config.js";
 
 const originalNodeEnv = process.env.NODE_ENV;
 const originalAuthMode = process.env.AUTH_MODE;
 const originalNeonAuthJwksUrl = process.env.NEON_AUTH_JWKS_URL;
+const originalAdminUserIds = process.env.ADMIN_USER_IDS;
 
 afterEach(() => {
   process.env.NODE_ENV = originalNodeEnv;
   process.env.AUTH_MODE = originalAuthMode;
   process.env.NEON_AUTH_JWKS_URL = originalNeonAuthJwksUrl;
+  process.env.ADMIN_USER_IDS = originalAdminUserIds;
 });
 
 describe("API config", () => {
-  it("fails closed for unprotected admin imports in production", () => {
-    process.env.NODE_ENV = "production";
+  it("reads unique trimmed admin user ids from the server environment", () => {
+    process.env.ADMIN_USER_IDS = " neon-admin-1,local-admin-2,neon-admin-1 ";
 
-    expect(allowsUnprotectedAdminImports()).toBe(false);
-  });
-
-  it("fails closed for unprotected admin imports when the environment is unset", () => {
-    process.env.NODE_ENV = "";
-
-    expect(allowsUnprotectedAdminImports()).toBe(false);
-  });
-
-  it("allows unprotected admin imports in development", () => {
-    process.env.NODE_ENV = "development";
-
-    expect(allowsUnprotectedAdminImports()).toBe(true);
-  });
-
-  it("allows unprotected admin imports in test", () => {
-    process.env.NODE_ENV = "test";
-
-    expect(allowsUnprotectedAdminImports()).toBe(true);
+    expect(getAdminUserIds()).toEqual(["neon-admin-1", "local-admin-2"]);
   });
 
   it("uses local auth in development and Neon auth in production by default", () => {

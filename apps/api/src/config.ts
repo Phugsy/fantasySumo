@@ -20,6 +20,17 @@ export function getDemoAdminToken(): string | undefined {
   return token === undefined || token.length === 0 ? undefined : token;
 }
 
+export function getAdminUserIds(): string[] {
+  return Array.from(
+    new Set(
+      (process.env.ADMIN_USER_IDS ?? "")
+        .split(",")
+        .map((userId) => userId.trim())
+        .filter((userId) => userId.length > 0),
+    ),
+  );
+}
+
 export function getAdminImportToken(): string | undefined {
   const token = process.env.ADMIN_IMPORT_TOKEN?.trim();
 
@@ -30,12 +41,6 @@ export function getCronSecret(): string | undefined {
   const secret = process.env.CRON_SECRET?.trim();
 
   return secret === undefined || secret.length === 0 ? undefined : secret;
-}
-
-export function allowsUnprotectedAdminImports(): boolean {
-  const nodeEnv = process.env.NODE_ENV?.trim();
-
-  return nodeEnv === "development" || nodeEnv === "test";
 }
 
 export function getAuthMode(): AuthMode {

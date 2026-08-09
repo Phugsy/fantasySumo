@@ -6,12 +6,14 @@ interface AppHeaderProps {
   activeView: ActiveView;
   disabled?: boolean;
   onChange: (view: ActiveView) => void;
+  showAdmin?: boolean;
 }
 
 export function AppHeader({
   activeView,
   disabled = false,
   onChange,
+  showAdmin = false,
 }: AppHeaderProps) {
   return (
     <header className="app-header">
@@ -29,6 +31,7 @@ export function AppHeader({
           activeView={activeView}
           disabled={disabled}
           onChange={onChange}
+          showAdmin={showAdmin}
         />
       </div>
     </header>

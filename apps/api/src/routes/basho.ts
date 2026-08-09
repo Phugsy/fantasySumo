@@ -561,10 +561,23 @@ function getBashoTotalDays(basho: { startDate: string; endDate: string }) {
   return Math.floor((endDate - startDate) / millisecondsPerDay) + 1;
 }
 
-async function findCurrentBasho(repositories: Repositories) {
+export async function findCurrentBasho(repositories: Repositories) {
   const bashos = await repositories.listBashos();
   const liveBashos = bashos.filter((basho) => !basho.isDemo);
   const candidates = liveBashos.length > 0 ? liveBashos : bashos;
+
+  return findPreferredCurrentBasho(candidates);
+}
+
+export async function findCurrentLiveBasho(repositories: Repositories) {
+  return findPreferredCurrentBasho(
+    (await repositories.listBashos()).filter((basho) => !basho.isDemo),
+  );
+}
+
+function findPreferredCurrentBasho(
+  candidates: Awaited<ReturnType<Repositories["listBashos"]>>,
+) {
   const latestFirst = [...candidates].reverse();
 
   return (
@@ -574,7 +587,7 @@ async function findCurrentBasho(repositories: Repositories) {
   );
 }
 
-async function findDemoBasho(repositories: Repositories) {
+export async function findDemoBasho(repositories: Repositories) {
   const basho = await repositories.getBasho(DEMO_BASHO_ID);
   return basho?.isDemo === true ? basho : undefined;
 }

@@ -341,6 +341,34 @@ describe("repositories", () => {
     });
   });
 
+  it("does not let a stale result import undo an admin close", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
+    const staleImportBasho = {
+      ...sampleBasho,
+      status: "active" as const,
+      currentDay: 2,
+    };
+
+    await repositories.updateBasho(staleImportBasho);
+    await repositories.transitionBashoLifecycle(
+      sampleBasho.id,
+      "close",
+      "2026-05-12T02:00:00.000Z",
+    );
+    await repositories.applyBoutResultsImport({
+      basho: staleImportBasho,
+      bashoId: sampleBasho.id,
+      day: 2,
+      results: [],
+    });
+
+    expect(await repositories.getBasho(sampleBasho.id)).toMatchObject({
+      status: "complete",
+      currentDay: 2,
+    });
+  });
+
   it("loads deterministic demo data for local demos and E2E fixtures", async () => {
     await seedDemoDatabase(createRepositories(client));
     const repositories = createRepositories(client);

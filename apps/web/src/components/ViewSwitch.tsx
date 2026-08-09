@@ -5,12 +5,14 @@ interface ViewSwitchProps {
   activeView: ActiveView;
   disabled?: boolean;
   onChange: (view: ActiveView) => void;
+  showAdmin?: boolean;
 }
 
 export function ViewSwitch({
   activeView,
   disabled = false,
   onChange,
+  showAdmin = false,
 }: ViewSwitchProps) {
   return (
     <nav className="view-switch" aria-label="Primary navigation">
@@ -38,6 +40,17 @@ export function ViewSwitch({
       >
         Leaderboard
       </button>
+      {showAdmin && (
+        <button
+          type="button"
+          className={activeView === "admin" ? "active" : ""}
+          disabled={disabled}
+          onClick={() => onChange("admin")}
+          aria-current={activeView === "admin" ? "page" : undefined}
+        >
+          Admin
+        </button>
+      )}
     </nav>
   );
 }

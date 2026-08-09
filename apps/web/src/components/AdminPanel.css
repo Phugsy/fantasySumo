@@ -1,0 +1,134 @@
+.admin-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-mode-switch {
+  display: inline-flex;
+  justify-self: start;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--clay-light);
+  border-radius: 10px;
+  background: var(--paper-warm);
+}
+
+.admin-mode-switch button {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.admin-mode-switch button.active {
+  background: var(--indigo);
+  color: #fff;
+}
+
+.admin-basho-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(300px, 1fr);
+  gap: 28px;
+  padding: 24px;
+  border: 1px solid var(--clay-light);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.admin-basho-id {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.86rem;
+}
+
+.admin-basho-summary dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.admin-basho-summary dl div {
+  padding: 12px;
+  border-radius: 9px;
+  background: var(--paper-warm);
+}
+
+.admin-basho-summary dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-basho-summary dd {
+  margin: 5px 0 0;
+  color: var(--indigo-deep);
+  font-weight: 800;
+}
+
+.admin-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.admin-action-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--clay-light);
+  border-radius: var(--radius);
+  background: rgb(255 253 248 / 94%);
+  box-shadow: var(--shadow);
+}
+
+.admin-action-card h3,
+.admin-action-card p {
+  margin: 0;
+}
+
+.admin-action-card p {
+  min-height: 48px;
+  color: var(--muted);
+}
+
+.admin-action-card button {
+  justify-self: start;
+  min-height: 42px;
+  padding: 9px 15px;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 800;
+}
+
+.primary-button {
+  background: var(--indigo);
+}
+
+.danger-button {
+  background: var(--vermilion-dark);
+}
+
+.admin-action-card button:disabled {
+  background: #9aa1a4;
+}
+
+@media (max-width: 760px) {
+  .admin-basho-summary,
+  .admin-action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-basho-summary dl {
+    grid-template-columns: 1fr;
+  }
+}

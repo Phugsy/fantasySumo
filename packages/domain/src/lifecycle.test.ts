@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Basho } from "./types.js";
 import {
   canEditFantasyPicks,
+  getBashoLifecycleTransition,
   getBashoLifecycleLabel,
   getPickLockMessage,
   preserveBashoLifecycleProgress,
@@ -26,6 +27,52 @@ describe("basho lifecycle", () => {
     expect(canEditFantasyPicks({ ...baseBasho, status: "complete" })).toBe(
       false,
     );
+  });
+
+  it("models explicit live basho lifecycle actions", () => {
+    expect(
+      getBashoLifecycleTransition(baseBasho, "start", { hasResults: false }),
+    ).toEqual({ allowed: true, changed: true, nextStatus: "active" });
+    expect(
+      getBashoLifecycleTransition({ ...baseBasho, status: "active" }, "close", {
+        hasResults: true,
+      }),
+    ).toEqual({ allowed: true, changed: true, nextStatus: "complete" });
+    expect(
+      getBashoLifecycleTransition(
+        { ...baseBasho, status: "complete" },
+        "close",
+        { hasResults: true },
+      ),
+    ).toEqual({ allowed: true, changed: false, nextStatus: "complete" });
+  });
+
+  it("only reopens a locked live basho before results exist", () => {
+    expect(
+      getBashoLifecycleTransition(
+        { ...baseBasho, status: "locked", currentDay: 0 },
+        "open-picks",
+        { hasResults: false },
+      ),
+    ).toEqual({ allowed: true, changed: true, nextStatus: "upcoming" });
+    expect(
+      getBashoLifecycleTransition(
+        { ...baseBasho, status: "active", currentDay: 1 },
+        "open-picks",
+        { hasResults: true },
+      ),
+    ).toMatchObject({
+      allowed: false,
+      code: "invalid-lifecycle-transition",
+    });
+  });
+
+  it("requires the isolated demo path for demo lifecycle changes", () => {
+    expect(
+      getBashoLifecycleTransition({ ...baseBasho, isDemo: true }, "start", {
+        hasResults: false,
+      }),
+    ).toMatchObject({ allowed: false, code: "demo-action-required" });
   });
 
   it("preserves the furthest lifecycle and calendar progress", () => {
