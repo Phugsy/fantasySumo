@@ -92,6 +92,9 @@ export function App() {
   >(null);
   const [myTeam, setMyTeam] = useState<MyTeamResponse | null>(null);
   const [ownedTeamId, setOwnedTeamId] = useState<string | null>(null);
+  const [ownedTeamLockedAt, setOwnedTeamLockedAt] = useState<
+    string | undefined
+  >(undefined);
   const bashoRequestIdRef = useRef(0);
   const leaderboardRequestIdRef = useRef(0);
 
@@ -103,9 +106,10 @@ export function App() {
     [rikishi, selectedIds],
   );
   const teamSize = basho?.teamSize ?? 0;
-  const canEditPicks = basho === null ? false : canEditFantasyPicks(basho);
+  const canEditPicks =
+    basho === null ? false : canEditFantasyPicks(basho, ownedTeamLockedAt);
   const pickLockMessage =
-    basho === null ? undefined : getPickLockMessage(basho);
+    basho === null ? undefined : getPickLockMessage(basho, ownedTeamLockedAt);
   const canSubmit =
     loadState === "ready" &&
     sessionState === "ready" &&
@@ -163,6 +167,7 @@ export function App() {
       setCreatedTeam(response);
       setLastSaveAction(saveAction);
       setOwnedTeamId(response.team.id);
+      setOwnedTeamLockedAt(response.team.lockedAt);
       setMyTeam(createMyTeamResponse(response, basho, rikishi));
       setActiveView("stable");
 
@@ -205,6 +210,7 @@ export function App() {
         if (error.teamLockedAt !== undefined) {
           const teamLockedAt = error.teamLockedAt;
 
+          setOwnedTeamLockedAt(teamLockedAt);
           setMyTeam((current) =>
             current === null
               ? null
@@ -213,7 +219,28 @@ export function App() {
                   team: { ...current.team, lockedAt: teamLockedAt },
                 },
           );
-          setActiveView("stable");
+
+          if (myTeam === null && basho !== null) {
+            try {
+              const lockedTeam = await fetchMyTeam(basho.id);
+
+              applyMyTeam(
+                lockedTeam,
+                rikishi,
+                false,
+                setDisplayName,
+                setSelectedIds,
+              );
+              setMyTeam(lockedTeam);
+              setOwnedTeamId(lockedTeam.team.id);
+              setOwnedTeamLockedAt(lockedTeam.team.lockedAt ?? teamLockedAt);
+              setActiveView("stable");
+            } catch {
+              setActiveView("selection");
+            }
+          } else {
+            setActiveView("stable");
+          }
         } else if (error.bashoStatus !== undefined) {
           const lockedStatus = error.bashoStatus;
 
@@ -330,6 +357,7 @@ export function App() {
       setLastSaveAction(null);
       setMyTeam(null);
       setOwnedTeamId(null);
+      setOwnedTeamLockedAt(undefined);
       setDisplayName("");
       setSelectedIds([]);
       setActiveView("selection");
@@ -399,6 +427,7 @@ export function App() {
     );
     setMyTeam(loadedMyTeam);
     setOwnedTeamId(loadedMyTeam?.team.id ?? null);
+    setOwnedTeamLockedAt(loadedMyTeam?.team.lockedAt);
     setActiveView(
       loadedMyTeam !== null
         ? "stable"

@@ -1,7 +1,10 @@
 import type { Basho } from "./types";
 
-export function canEditFantasyPicks(basho: Basho): boolean {
-  return basho.status === "upcoming";
+export function canEditFantasyPicks(
+  basho: Basho,
+  teamLockedAt?: string,
+): boolean {
+  return basho.status === "upcoming" && teamLockedAt === undefined;
 }
 
 export function getBashoLifecycleLabel(status: Basho["status"]): string {
@@ -17,9 +20,16 @@ export function getBashoLifecycleLabel(status: Basho["status"]): string {
   }
 }
 
-export function getPickLockMessage(basho: Basho): string | undefined {
-  if (canEditFantasyPicks(basho)) {
+export function getPickLockMessage(
+  basho: Basho,
+  teamLockedAt?: string,
+): string | undefined {
+  if (canEditFantasyPicks(basho, teamLockedAt)) {
     return undefined;
+  }
+
+  if (basho.status === "upcoming") {
+    return "Picks are locked for this basho.";
   }
 
   if (basho.status === "locked") {

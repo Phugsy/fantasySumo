@@ -868,6 +868,78 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
+  it("hydrates a stale missing team and keeps selection locked after a create race", async () => {
+    let myTeamRequestCount = 0;
+    const fetchMock = vi.fn(
+      (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        const url = String(input);
+
+        if (url === "/api/basho/2026-05/my-team") {
+          myTeamRequestCount += 1;
+
+          if (myTeamRequestCount === 1) {
+            return jsonResponse(
+              {
+                message: "You do not have a fantasy team for this basho yet.",
+              },
+              { status: 404 },
+            );
+          }
+
+          const existingTeam = createExistingMyTeamResponse();
+
+          return jsonResponse({
+            ...existingTeam,
+            team: {
+              ...existingTeam.team,
+              lockedAt: "2026-05-08T02:00:00.000Z",
+            },
+          });
+        }
+
+        if (url === "/api/basho/2026-05/teams" && init?.method === "POST") {
+          return jsonResponse(
+            {
+              error: "picks-locked",
+              message: "Fantasy team picks are locked for this basho.",
+              bashoStatus: "upcoming",
+              teamLockedAt: "2026-05-08T02:00:00.000Z",
+            },
+            { status: 409 },
+          );
+        }
+
+        return mockSuccessfulFetch(input, init ?? currentBasho);
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    await openTeamEditor();
+    fireEvent.change(screen.getByLabelText("Team name"), {
+      target: { value: "Stale Draft" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Onosato/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Kotozakura/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit team" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Existing Champions" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Picks are locked for this basho. Your line-up is read-only.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Create your stable" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit picks" }),
+    ).not.toBeInTheDocument();
+    expect(myTeamRequestCount).toBe(2);
+  });
+
   it("keeps the saved stable available when standings fail to refresh", async () => {
     vi.stubGlobal("fetch", vi.fn(mockSubmitLeaderboardErrorFetch()));
     render(<App />);

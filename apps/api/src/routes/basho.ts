@@ -175,17 +175,15 @@ export function registerBashoRoutes(
       );
 
     if (savedTeamWithPicks === undefined) {
-      const currentBasho = await context.repositories.getBasho(basho.id);
-
-      return reply.code(409).send({
-        error: "picks-locked",
-        message:
-          (currentBasho === undefined
-            ? undefined
-            : getPickLockMessage(currentBasho)) ??
-          "Fantasy team picks are locked for this basho.",
-        bashoStatus: currentBasho?.status ?? "locked",
-      });
+      return reply
+        .code(409)
+        .send(
+          await getPicksLockedResponse(
+            context.repositories,
+            basho.id,
+            currentUser.id,
+          ),
+        );
     }
 
     const created =
@@ -355,24 +353,15 @@ export function registerBashoRoutes(
       );
 
     if (updatedTeamWithPicks === undefined) {
-      const [currentBasho, currentTeam] = await Promise.all([
-        context.repositories.getBasho(basho.id),
-        context.repositories.getFantasyTeamForOwner(basho.id, currentUser.id),
-      ]);
-
-      return reply.code(409).send({
-        error: "picks-locked",
-        message:
-          (currentBasho === undefined
-            ? undefined
-            : getPickLockMessage(currentBasho)) ??
-          "Fantasy team picks are locked for this basho.",
-        bashoStatus: currentBasho?.status ?? "locked",
-        ...(currentBasho?.status !== "upcoming" ||
-        currentTeam?.lockedAt === undefined
-          ? {}
-          : { teamLockedAt: currentTeam.lockedAt }),
-      });
+      return reply
+        .code(409)
+        .send(
+          await getPicksLockedResponse(
+            context.repositories,
+            basho.id,
+            currentUser.id,
+          ),
+        );
     }
 
     return updatedTeamWithPicks;
@@ -457,6 +446,31 @@ export function registerBashoRoutes(
           : leaderboard,
     };
   });
+}
+
+async function getPicksLockedResponse(
+  repositories: Repositories,
+  bashoId: string,
+  ownerUserId: string,
+) {
+  const [currentBasho, currentTeam] = await Promise.all([
+    repositories.getBasho(bashoId),
+    repositories.getFantasyTeamForOwner(bashoId, ownerUserId),
+  ]);
+
+  return {
+    error: "picks-locked",
+    message:
+      (currentBasho === undefined
+        ? undefined
+        : getPickLockMessage(currentBasho)) ??
+      "Fantasy team picks are locked for this basho.",
+    bashoStatus: currentBasho?.status ?? "locked",
+    ...(currentBasho?.status !== "upcoming" ||
+    currentTeam?.lockedAt === undefined
+      ? {}
+      : { teamLockedAt: currentTeam.lockedAt }),
+  };
 }
 
 async function validateTeamRequest(
