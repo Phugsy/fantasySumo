@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  ApiRequestError,
   createFantasyTeam,
   fetchCurrentBasho,
   getCurrentBashoUrl,
   reportAuthClientTokenUnavailable,
   setAuthTokenProvider,
+  updateFantasyTeam,
 } from "./api";
 
 afterEach(() => {
@@ -51,6 +53,83 @@ describe("api auth headers", () => {
         "Content-Type": "application/json",
       },
       method: "POST",
+    });
+  });
+
+  it("uses the current-user endpoint when updating a fantasy team", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            picks: [],
+            team: {
+              id: "team-east",
+              displayName: "East Stand Updated",
+            },
+          }),
+          {
+            headers: { "content-type": "application/json" },
+            status: 200,
+          },
+        ),
+      ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+    setAuthTokenProvider(async () => "verified-token");
+
+    await updateFantasyTeam("2026-05", {
+      displayName: "East Stand Updated",
+      rikishiIds: ["hoshoryu", "kirishima"],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/basho/2026-05/my-team", {
+      body: JSON.stringify({
+        displayName: "East Stand Updated",
+        rikishiIds: ["hoshoryu", "kirishima"],
+      }),
+      credentials: "same-origin",
+      headers: {
+        Authorization: "Bearer verified-token",
+        "Content-Type": "application/json",
+      },
+      method: "PUT",
+    });
+  });
+
+  it("preserves lock details from a rejected team update", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              error: "picks-locked",
+              message: "This basho has started, so picks are locked.",
+              bashoStatus: "active",
+              teamLockedAt: "2026-05-08T02:00:00.000Z",
+            }),
+            {
+              headers: { "content-type": "application/json" },
+              status: 409,
+            },
+          ),
+        ),
+      ),
+    );
+
+    const error = await updateFantasyTeam("2026-05", {
+      displayName: "Too Late",
+      rikishiIds: ["onosato", "kotozakura"],
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ApiRequestError);
+    expect(error).toMatchObject({
+      status: 409,
+      code: "picks-locked",
+      bashoStatus: "active",
+      teamLockedAt: "2026-05-08T02:00:00.000Z",
+      message: "This basho has started, so picks are locked.",
     });
   });
 

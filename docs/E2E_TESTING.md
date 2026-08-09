@@ -187,10 +187,11 @@ E2E_DATABASE_URL=file:./data/e2e/local-run.sqlite make e2e
 Playwright uses ports `3000` for the API and `7866` for Vite. Stop any existing processes on those ports if the harness cannot start them. The protected demo admin controls are enabled with an E2E-only `DEMO_ADMIN_TOKEN` from the Playwright config; no live sumo data sources or production services are used.
 
 The browser suite covers API-backed app loading, local session sign-in,
-authenticated team creation, the private My Stable view, individual and total
-score progress, selection validation, pick locking, protected demo progression,
-leaderboard ordering, and responsive navigation. Direct team-mutation checks
-establish the same local session before asserting lifecycle enforcement.
+authenticated team creation and pre-lock editing, the private My Stable view,
+immediate saved-line-up updates, individual and total score progress, selection
+validation, pick locking, protected demo progression, leaderboard ordering, and
+responsive navigation. Direct team-mutation checks establish the same local
+session before asserting lifecycle enforcement.
 Admin-route configuration is also covered at the Fastify boundary: missing or
 invalid credentials are rejected, disabled demo routes return `404`, and
 enabled routes drive the real browser lifecycle tests.
@@ -256,6 +257,7 @@ Use E2E tests for user-visible journeys that cross the browser, API, domain logi
 
 - loading current basho data;
 - creating a fantasy team;
+- editing the current user's fantasy team before picks lock;
 - seeing validation errors;
 - viewing leaderboard ordering and score breakdowns;
 - exercising result-entry or result-import flows once those exist.

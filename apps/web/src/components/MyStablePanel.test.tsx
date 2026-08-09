@@ -152,4 +152,30 @@ describe("MyStablePanel", () => {
 
     expect(onEdit).toHaveBeenCalledOnce();
   });
+
+  it("keeps an individually locked team read-only during an upcoming basho", () => {
+    render(
+      <MyStablePanel
+        basho={upcomingBasho}
+        myTeam={{
+          ...myTeam,
+          team: {
+            ...myTeam.team,
+            lockedAt: "2026-05-08T02:00:00.000Z",
+          },
+        }}
+        onEdit={() => undefined}
+        user={user}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        "Picks are locked for this basho. Your line-up is read-only.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit picks" }),
+    ).not.toBeInTheDocument();
+  });
 });

@@ -20,7 +20,8 @@ export function MyStablePanel({
   user,
 }: MyStablePanelProps) {
   const stableBasho = myTeam === null ? basho : { ...basho, ...myTeam.basho };
-  const canEdit = canEditFantasyPicks(stableBasho);
+  const teamIsLocked = myTeam?.team.lockedAt !== undefined;
+  const canEdit = canEditFantasyPicks(stableBasho) && !teamIsLocked;
 
   if (user === null) {
     return (
@@ -81,7 +82,7 @@ export function MyStablePanel({
       <div
         className={canEdit ? "stable-notice editable" : "stable-notice locked"}
       >
-        <p>{getTeamStateMessage(stableBasho)}</p>
+        <p>{getTeamStateMessage(stableBasho, teamIsLocked)}</p>
         {canEdit && (
           <button className="stable-action" type="button" onClick={onEdit}>
             Edit picks
@@ -138,10 +139,14 @@ function getNoTeamMessage(basho: Basho): string {
   }
 }
 
-function getTeamStateMessage(basho: Basho): string {
-  if (canEditFantasyPicks(basho)) {
-    return "Picks are open. You can still change your team before the basho locks.";
+function getTeamStateMessage(basho: Basho, teamIsLocked: boolean): string {
+  if (!canEditFantasyPicks(basho)) {
+    return `${getPickLockMessage(basho) ?? "Picks are locked for this basho."} Your line-up is read-only.`;
   }
 
-  return `${getPickLockMessage(basho) ?? "Picks are locked for this basho."} Your line-up is read-only.`;
+  if (teamIsLocked) {
+    return "Picks are locked for this basho. Your line-up is read-only.";
+  }
+
+  return "Picks are open. You can still change your team before the basho locks.";
 }

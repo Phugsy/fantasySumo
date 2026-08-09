@@ -90,8 +90,9 @@ The MVP lifecycle is:
 - `active`: results are being applied day by day.
 - `complete`: final scores are available.
 
-Fantasy teams and picks can be created only while the persisted basho status is
-`upcoming`. Moving the basho to `locked` closes picks immediately, including
-when an administrator chooses to lock earlier than the scheduled transition.
-The final status check and team insert must be one database transaction so a
-concurrent lifecycle update cannot admit a team after locking.
+Fantasy teams and picks can be created or edited only while the persisted basho
+status is `upcoming`. Moving the basho to `locked` closes picks immediately,
+including when an administrator chooses to lock earlier than the scheduled
+transition. The final status check and team-and-picks write must be one database
+transaction so a concurrent lifecycle update cannot admit a save after
+locking.

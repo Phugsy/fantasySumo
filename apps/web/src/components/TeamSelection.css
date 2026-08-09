@@ -138,6 +138,7 @@ input:disabled {
 input:focus,
 .rikishi-row:focus-visible,
 .selected-list button:focus-visible,
+.cancel-button:focus-visible,
 .submit-button:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 3px;
@@ -182,6 +183,34 @@ input:focus,
   background: transparent;
   color: #746c62;
   font-weight: 700;
+}
+
+.selection-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.selection-actions .submit-button {
+  flex: 1;
+  width: auto;
+}
+
+.cancel-button {
+  min-height: 48px;
+  padding: 0 18px;
+  border: 1px solid var(--clay);
+  border-radius: 9px;
+  background: #ffffff;
+  color: var(--indigo-deep);
+  font-weight: 850;
+}
+
+.cancel-button:hover:not(:disabled) {
+  background: #f7f1e8;
+}
+
+.cancel-button:disabled {
+  opacity: 0.6;
 }
 
 .submit-button {

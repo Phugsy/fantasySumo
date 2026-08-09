@@ -45,6 +45,9 @@ Current behaviour:
 - Gives the signed-in player a dedicated My Stable view with private pick
   details, rikishi rank/heya, individual wins and points, total score, and an
   edit or read-only state derived from the basho lifecycle.
+- Lets the player enter a deliberate edit mode, replace picks through the
+  current-user endpoint, cancel an unsaved draft, and see the saved line-up
+  immediately.
 - Provides a local development sign-in panel that establishes the current user session.
 - Shows ordered team standings with the latest daily score, compact five-day
   team form, and expandable picked-rikishi tournament totals. Each rikishi row
@@ -85,6 +88,14 @@ Current routes:
   - Returns only the current user's fantasy team for the basho, with private
     picks enriched by shikona, heya and banzuke rank where available, plus each
     rikishi's wins/points and the total team score.
+- `PUT /api/basho/:bashoId/my-team`
+  - Replaces the current signed-in user's team name and picks.
+  - Uses the same exact-size, duplicate-pick, and banzuke validation as team
+    creation.
+  - Infers ownership from the authenticated user and returns `404` when that
+    user has no team for the basho, without exposing another user's team.
+  - Rechecks the persisted `upcoming` status in the atomic team-and-picks write;
+    locked, active, and complete bashos return `409 picks-locked`.
 - `GET /api/basho/:bashoId/teams/:teamId`
   - Returns a fantasy team and its picks.
   - Owned teams can only be viewed by their owner; legacy unowned seed/demo teams remain readable.
@@ -398,6 +409,8 @@ Potential MVP endpoints:
 GET    /api/basho/current
 GET    /api/basho/:bashoId/rikishi
 POST   /api/basho/:bashoId/teams
+GET    /api/basho/:bashoId/my-team
+PUT    /api/basho/:bashoId/my-team
 GET    /api/basho/:bashoId/teams/:teamId
 GET    /api/basho/:bashoId/leaderboard
 POST   /api/admin/import-banzuke
@@ -406,13 +419,14 @@ POST   /api/admin/basho/:bashoId/import-results
 
 Admin endpoints can be protected later. For early local development, they can remain local-only but should be clearly marked as unsafe for production.
 
-`POST /api/basho/:bashoId/teams` is allowed only while the persisted basho
-status is `upcoming`. The API rejects team creation for `locked`, `active`, and
-`complete` bashos with `409 picks-locked`. Basho read endpoints expose the same
-persisted status, keeping the UI and API aligned and allowing an administrator
-to lock picks early when needed. Team creation rechecks the status while
-holding the basho row in the same transaction as the team insert, so it
-serializes with the scheduled lock update.
+`POST /api/basho/:bashoId/teams` and `PUT
+/api/basho/:bashoId/my-team` are allowed only while the persisted basho status
+is `upcoming`. The API rejects team creation and edits for `locked`, `active`,
+and `complete` bashos with `409 picks-locked`. Basho read endpoints expose the
+same persisted status, keeping the UI and API aligned and allowing an
+administrator to lock picks early when needed. Both save paths recheck the
+status while holding the basho row in the same transaction as the team-and-pick
+write, so they serialize with the scheduled lock update.
 
 Lifecycle meanings:
 

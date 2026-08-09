@@ -18,6 +18,7 @@ import {
   getErrorMessage,
   reportAuthClientTokenUnavailable,
   setAuthTokenProvider,
+  updateFantasyTeam,
 } from "./api";
 import {
   getNeonAccessToken,
@@ -86,8 +87,14 @@ export function App() {
   const [createdTeam, setCreatedTeam] = useState<CreatedTeamResponse | null>(
     null,
   );
+  const [lastSaveAction, setLastSaveAction] = useState<
+    "created" | "updated" | null
+  >(null);
   const [myTeam, setMyTeam] = useState<MyTeamResponse | null>(null);
   const [ownedTeamId, setOwnedTeamId] = useState<string | null>(null);
+  const [ownedTeamLockedAt, setOwnedTeamLockedAt] = useState<
+    string | undefined
+  >(undefined);
   const bashoRequestIdRef = useRef(0);
   const leaderboardRequestIdRef = useRef(0);
 
@@ -99,9 +106,10 @@ export function App() {
     [rikishi, selectedIds],
   );
   const teamSize = basho?.teamSize ?? 0;
-  const canEditPicks = basho === null ? false : canEditFantasyPicks(basho);
+  const canEditPicks =
+    basho === null ? false : canEditFantasyPicks(basho, ownedTeamLockedAt);
   const pickLockMessage =
-    basho === null ? undefined : getPickLockMessage(basho);
+    basho === null ? undefined : getPickLockMessage(basho, ownedTeamLockedAt);
   const canSubmit =
     loadState === "ready" &&
     sessionState === "ready" &&
@@ -142,15 +150,24 @@ export function App() {
     setErrorMessage(null);
     setLeaderboardErrorMessage(null);
     setCreatedTeam(null);
+    setLastSaveAction(null);
 
     try {
-      const response = await createFantasyTeam(basho.id, {
-        displayName: displayName.trim(),
-        rikishiIds: selectedIds,
-      });
+      const saveAction = myTeam === null ? "created" : "updated";
+      const response = await (saveAction === "created"
+        ? createFantasyTeam(basho.id, {
+            displayName: displayName.trim(),
+            rikishiIds: selectedIds,
+          })
+        : updateFantasyTeam(basho.id, {
+            displayName: displayName.trim(),
+            rikishiIds: selectedIds,
+          }));
 
       setCreatedTeam(response);
+      setLastSaveAction(saveAction);
       setOwnedTeamId(response.team.id);
+      setOwnedTeamLockedAt(response.team.lockedAt);
       setMyTeam(createMyTeamResponse(response, basho, rikishi));
       setActiveView("stable");
 
@@ -167,6 +184,9 @@ export function App() {
         setBasho((current) =>
           mergeLeaderboardBasho(current, leaderboardResponse),
         );
+        setMyTeam((current) =>
+          mergeLeaderboardMyTeam(current, leaderboardResponse),
+        );
         setLeaderboardTotalDays(leaderboardResponse.totalDays);
         setLeaderboard(leaderboardResponse.leaderboard);
         setExpandedTeamId(
@@ -182,10 +202,92 @@ export function App() {
         setLeaderboardErrorMessage(getErrorMessage(error));
       }
     } catch (error) {
+      if (
+        error instanceof ApiRequestError &&
+        error.status === 409 &&
+        error.code === "picks-locked"
+      ) {
+        if (error.teamLockedAt !== undefined) {
+          const teamLockedAt = error.teamLockedAt;
+
+          setOwnedTeamLockedAt(teamLockedAt);
+          setMyTeam((current) =>
+            current === null
+              ? null
+              : {
+                  ...current,
+                  team: { ...current.team, lockedAt: teamLockedAt },
+                },
+          );
+
+          if (myTeam === null && basho !== null) {
+            try {
+              const lockedTeam = await fetchMyTeam(basho.id);
+
+              applyMyTeam(
+                lockedTeam,
+                rikishi,
+                false,
+                setDisplayName,
+                setSelectedIds,
+              );
+              setMyTeam(lockedTeam);
+              setOwnedTeamId(lockedTeam.team.id);
+              setOwnedTeamLockedAt(lockedTeam.team.lockedAt ?? teamLockedAt);
+              setActiveView("stable");
+            } catch {
+              setActiveView("selection");
+            }
+          } else {
+            applyMyTeam(myTeam, rikishi, false, setDisplayName, setSelectedIds);
+            setActiveView("stable");
+          }
+        } else if (error.bashoStatus !== undefined) {
+          const lockedStatus = error.bashoStatus;
+
+          setBasho((current) =>
+            current === null ? null : { ...current, status: lockedStatus },
+          );
+          setMyTeam((current) =>
+            current === null
+              ? null
+              : {
+                  ...current,
+                  basho: { ...current.basho, status: lockedStatus },
+                },
+          );
+          setActiveView("stable");
+        }
+      }
+
       setErrorMessage(getErrorMessage(error));
     } finally {
       setSubmitState("idle");
     }
+  }
+
+  function openTeamEditor() {
+    setCreatedTeam(null);
+    setLastSaveAction(null);
+    setErrorMessage(null);
+
+    if (myTeam !== null) {
+      applyMyTeam(myTeam, rikishi, false, setDisplayName, setSelectedIds);
+    }
+
+    setActiveView("selection");
+  }
+
+  function cancelTeamEdit() {
+    if (myTeam === null) {
+      return;
+    }
+
+    applyMyTeam(myTeam, rikishi, false, setDisplayName, setSelectedIds);
+    setCreatedTeam(null);
+    setLastSaveAction(null);
+    setErrorMessage(null);
+    setActiveView("stable");
   }
 
   async function handleSignIn(event: FormEvent<HTMLFormElement>) {
@@ -253,8 +355,10 @@ export function App() {
       setAccountEmail("");
       setAccountDisplayName("");
       setCreatedTeam(null);
+      setLastSaveAction(null);
       setMyTeam(null);
       setOwnedTeamId(null);
+      setOwnedTeamLockedAt(undefined);
       setDisplayName("");
       setSelectedIds([]);
       setActiveView("selection");
@@ -324,6 +428,7 @@ export function App() {
     );
     setMyTeam(loadedMyTeam);
     setOwnedTeamId(loadedMyTeam?.team.id ?? null);
+    setOwnedTeamLockedAt(loadedMyTeam?.team.lockedAt);
     setActiveView(
       loadedMyTeam !== null
         ? "stable"
@@ -472,23 +577,26 @@ export function App() {
           <>
             <BashoPanel basho={basho} selectedCount={selectedIds.length} />
 
-            {activeView === "stable" && createdTeam !== null && (
-              <div className="confirmation stable-confirmation" role="status">
-                <strong>{createdTeam.team.displayName} submitted.</strong>
-                <span>
-                  {createdTeam.picks.length} rikishi selected for this basho.
-                </span>
-              </div>
-            )}
+            {activeView === "stable" &&
+              createdTeam !== null &&
+              lastSaveAction !== null && (
+                <div className="confirmation stable-confirmation" role="status">
+                  <strong>
+                    {lastSaveAction === "created"
+                      ? `${createdTeam.team.displayName} submitted.`
+                      : `Changes saved for ${createdTeam.team.displayName}.`}
+                  </strong>
+                  <span>
+                    {createdTeam.picks.length} rikishi selected for this basho.
+                  </span>
+                </div>
+              )}
 
             {activeView === "stable" && (
               <MyStablePanel
                 basho={basho}
                 myTeam={myTeam}
-                onEdit={() => {
-                  setCreatedTeam(null);
-                  setActiveView("selection");
-                }}
+                onEdit={openTeamEditor}
                 user={sessionUser}
               />
             )}
@@ -501,9 +609,12 @@ export function App() {
                 errorMessage={errorMessage}
                 isLocked={!canEditPicks || sessionState === "submitting"}
                 lockMessage={pickLockMessage}
+                mode={myTeam === null ? "create" : "edit"}
+                onCancel={cancelTeamEdit}
                 onDisplayNameChange={(nextDisplayName) => {
                   setDisplayName(nextDisplayName);
                   setCreatedTeam(null);
+                  setLastSaveAction(null);
                 }}
                 onSubmit={handleSubmit}
                 onToggleRikishi={toggleRikishi}
@@ -608,6 +719,26 @@ function mergeLeaderboardBasho(
   return {
     ...leaderboardResponse.basho,
     teamSize: currentBasho?.teamSize ?? 0,
+  };
+}
+
+function mergeLeaderboardMyTeam(
+  currentTeam: MyTeamResponse | null,
+  leaderboardResponse: LeaderboardResponse,
+): MyTeamResponse | null {
+  if (
+    currentTeam === null ||
+    currentTeam.basho.id !== leaderboardResponse.basho.id
+  ) {
+    return currentTeam;
+  }
+
+  return {
+    ...currentTeam,
+    basho: {
+      ...currentTeam.basho,
+      ...leaderboardResponse.basho,
+    },
   };
 }
 

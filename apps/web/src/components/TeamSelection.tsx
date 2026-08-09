@@ -9,6 +9,8 @@ interface TeamSelectionProps {
   errorMessage: string | null;
   isLocked: boolean;
   lockMessage?: string;
+  mode: "create" | "edit";
+  onCancel: () => void;
   onDisplayNameChange: (displayName: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onToggleRikishi: (rikishiId: string) => void;
@@ -26,6 +28,8 @@ export function TeamSelection({
   errorMessage,
   isLocked,
   lockMessage,
+  mode,
+  onCancel,
   onDisplayNameChange,
   onSubmit,
   onToggleRikishi,
@@ -83,7 +87,9 @@ export function TeamSelection({
       <aside className="summary-panel" aria-labelledby="summary-title">
         <div className="section-heading">
           <p className="eyebrow">Your team</p>
-          <h2 id="summary-title">Selection</h2>
+          <h2 id="summary-title">
+            {mode === "edit" ? "Edit stable" : "Selection"}
+          </h2>
         </div>
 
         <label className="field-label" htmlFor="displayName">
@@ -119,13 +125,31 @@ export function TeamSelection({
           ))}
         </ol>
 
-        <button
-          className="submit-button"
-          disabled={isLocked || !canSubmit}
-          type="submit"
-        >
-          {submitState === "submitting" ? "Submitting..." : "Submit team"}
-        </button>
+        <div className="selection-actions">
+          {mode === "edit" && (
+            <button
+              className="cancel-button"
+              disabled={submitState === "submitting"}
+              onClick={onCancel}
+              type="button"
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            className="submit-button"
+            disabled={isLocked || !canSubmit}
+            type="submit"
+          >
+            {submitState === "submitting"
+              ? mode === "edit"
+                ? "Saving..."
+                : "Submitting..."
+              : mode === "edit"
+                ? "Save changes"
+                : "Submit team"}
+          </button>
+        </div>
 
         {errorMessage !== null && (
           <p className="form-message error-state" role="alert">
@@ -135,7 +159,11 @@ export function TeamSelection({
 
         {createdTeam !== null && (
           <div className="confirmation" role="status">
-            <strong>{createdTeam.team.displayName} submitted.</strong>
+            <strong>
+              {mode === "edit"
+                ? `Changes saved for ${createdTeam.team.displayName}.`
+                : `${createdTeam.team.displayName} submitted.`}
+            </strong>
             <span>
               {createdTeam.picks.length} rikishi selected for this basho.
             </span>
