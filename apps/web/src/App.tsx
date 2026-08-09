@@ -239,6 +239,7 @@ export function App() {
               setActiveView("selection");
             }
           } else {
+            applyMyTeam(myTeam, rikishi, false, setDisplayName, setSelectedIds);
             setActiveView("stable");
           }
         } else if (error.bashoStatus !== undefined) {

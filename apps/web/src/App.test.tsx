@@ -488,6 +488,8 @@ describe("App", () => {
     fireEvent.change(await screen.findByLabelText("Team name"), {
       target: { value: "Too Late Stable" },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Remove Onosato" }));
+    fireEvent.click(screen.getByRole("button", { name: /Hoshoryu/ }));
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     expect(
@@ -498,6 +500,9 @@ describe("App", () => {
     expect(
       screen.getByRole("heading", { name: "Existing Champions" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Onosato")).toBeInTheDocument();
+    expect(screen.queryByText("Hoshoryu")).not.toBeInTheDocument();
+    expect(screen.queryByText("Too Late Stable")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Edit picks" }),
     ).not.toBeInTheDocument();
