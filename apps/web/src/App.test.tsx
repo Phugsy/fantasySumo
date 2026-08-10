@@ -140,6 +140,7 @@ const leaderboard: LeaderboardEntry[] = [
 ];
 
 beforeEach(() => {
+  window.history.replaceState({}, "", "/");
   vi.stubGlobal("fetch", vi.fn(mockSuccessfulFetch));
 });
 
@@ -1025,6 +1026,33 @@ describe("App", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Status: Scoring in progress")).toBeInTheDocument();
   });
+
+  it("restores the previous player view when browser history returns from admin", async () => {
+    vi.stubGlobal("fetch", vi.fn(mockAdminExistingTeamFetch));
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "My stable" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
+    expect(
+      await screen.findByRole("heading", { name: "Follow the leaderboard" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Admin" }));
+    expect(
+      await screen.findByRole("heading", { name: "Admin controls" }),
+    ).toBeInTheDocument();
+
+    act(() => {
+      window.history.back();
+    });
+
+    expect(
+      await screen.findByRole("heading", { name: "Follow the leaderboard" }),
+    ).toBeInTheDocument();
+  });
 });
 
 function mockSuccessfulFetch(
@@ -1088,6 +1116,34 @@ function mockSuccessfulFetch(
   }
 
   return jsonResponse({ message: "Not found" }, { status: 404 });
+}
+
+function mockAdminExistingTeamFetch(
+  input: RequestInfo | URL,
+): Promise<Response> {
+  const url = String(input);
+
+  if (url === "/api/session") {
+    return jsonResponse({
+      mode: "local",
+      user: {
+        id: "admin-user",
+        email: "admin@example.com",
+        displayName: "Admin User",
+        isAdmin: true,
+      },
+    });
+  }
+
+  if (url === "/api/basho/2026-05/my-team") {
+    return jsonResponse(createExistingMyTeamResponse());
+  }
+
+  if (url === "/api/admin/basho/current") {
+    return jsonResponse({ basho: currentBasho });
+  }
+
+  return mockSuccessfulFetch(input);
 }
 
 function mockAnonymousFetch(

@@ -102,6 +102,53 @@ describe("AdminPanel", () => {
     ).toBeInTheDocument();
     expect(window.confirm).toHaveBeenCalled();
   });
+
+  it("keeps a successful admin action distinct from a player data refresh failure", async () => {
+    const demoBasho = {
+      id: "demo-2026-05",
+      isDemo: true,
+      name: "Demo Basho",
+      startDate: "2026-05-10",
+      endDate: "2026-05-24",
+      status: "active",
+      currentDay: 0,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ basho: demoBasho }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          action: "advance-day",
+          appliedResults: 1,
+          basho: { ...demoBasho, currentDay: 1 },
+        }),
+      );
+
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <AdminPanel
+        onPlayerDataRefresh={() =>
+          Promise.reject(new Error("Player data is temporarily unavailable."))
+        }
+      />,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Advance one day" }),
+    );
+
+    expect(
+      await screen.findByText("Demo advanced by one result day."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "The action succeeded, but player data could not be refreshed: Player data is temporarily unavailable.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Advance one day" }),
+    ).toBeEnabled();
+  });
 });
 
 function jsonResponse(body: unknown) {

@@ -77,23 +77,35 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
     setMessage(null);
     setErrorMessage(null);
 
+    let response: AdminActionResponse;
+
     try {
-      const response: AdminActionResponse =
+      response =
         mode === "demo"
           ? await runAdminDemoAction(action as AdminDemoAction)
           : await runAdminLifecycleAction(
               basho!.id,
               action as AdminLifecycleAction,
             );
-      setBasho(response.basho);
-      setLoadState("ready");
-      setMessage(options.success);
-      await onPlayerDataRefresh();
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
-    } finally {
       setPendingAction(null);
+      return;
     }
+
+    setBasho(response.basho);
+    setLoadState("ready");
+    setMessage(options.success);
+
+    try {
+      await onPlayerDataRefresh();
+    } catch (error) {
+      setErrorMessage(
+        `The action succeeded, but player data could not be refreshed: ${getErrorMessage(error)}`,
+      );
+    }
+
+    setPendingAction(null);
   }
 
   const pending = pendingAction !== null;

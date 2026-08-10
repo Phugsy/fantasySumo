@@ -146,7 +146,8 @@ export function App() {
     const nextPath = view === "admin" ? "/admin" : "/";
 
     if (window.location.pathname !== nextPath) {
-      window.history.pushState({}, "", nextPath);
+      window.history.replaceState({ activeView }, "", window.location.href);
+      window.history.pushState({ activeView: view }, "", nextPath);
     }
 
     setActiveView(view);
@@ -493,6 +494,16 @@ export function App() {
     }
   }
 
+  async function refreshPlayerData(session: SessionResponse) {
+    try {
+      await loadBashoData(session, () => true);
+    } catch (error) {
+      setErrorMessage(getPublicDataErrorMessage(error));
+      setLoadState("error");
+      throw error;
+    }
+  }
+
   useEffect(() => {
     let isCurrent = true;
 
@@ -544,9 +555,11 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const handlePopState = () => {
+    const handlePopState = (event: PopStateEvent) => {
       setActiveView(
-        window.location.pathname === "/admin" ? "admin" : "selection",
+        window.location.pathname === "/admin"
+          ? "admin"
+          : (getHistoryActiveView(event.state) ?? "selection"),
       );
     };
 
@@ -596,10 +609,10 @@ export function App() {
           (sessionUser?.isAdmin === true ? (
             <AdminPanel
               onPlayerDataRefresh={() =>
-                loadBashoData(
-                  { mode: authMode ?? "local", user: sessionUser },
-                  () => true,
-                )
+                refreshPlayerData({
+                  mode: authMode ?? "local",
+                  user: sessionUser,
+                })
               }
             />
           ) : (
@@ -694,6 +707,20 @@ export function App() {
       </main>
     </div>
   );
+}
+
+function getHistoryActiveView(state: unknown): ActiveView | null {
+  if (typeof state !== "object" || state === null || !("activeView" in state)) {
+    return null;
+  }
+
+  const activeView = state.activeView;
+  return activeView === "stable" ||
+    activeView === "selection" ||
+    activeView === "leaderboard" ||
+    activeView === "admin"
+    ? activeView
+    : null;
 }
 
 function getPublicDataErrorMessage(error: unknown): string {
