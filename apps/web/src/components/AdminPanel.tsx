@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  ApiRequestError,
   fetchAdminBasho,
   getErrorMessage,
   runAdminDemoAction,
@@ -20,6 +21,7 @@ interface AdminPanelProps {
 type AdminMode = "live" | "demo";
 
 export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
+  const isMountedRef = useRef(false);
   const [mode, setMode] = useState<AdminMode>(
     import.meta.env.VITE_BASHO_MODE === "demo" ? "demo" : "live",
   );
@@ -30,6 +32,14 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isCurrent = true;
@@ -88,8 +98,24 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
               action as AdminLifecycleAction,
             );
     } catch (error) {
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      if (
+        error instanceof ApiRequestError &&
+        error.status === 409 &&
+        error.basho !== undefined
+      ) {
+        setBasho(error.basho);
+        setLoadState("ready");
+      }
       setErrorMessage(getErrorMessage(error));
       setPendingAction(null);
+      return;
+    }
+
+    if (!isMountedRef.current) {
       return;
     }
 

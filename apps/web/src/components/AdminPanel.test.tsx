@@ -149,11 +149,97 @@ describe("AdminPanel", () => {
       screen.getByRole("button", { name: "Advance one day" }),
     ).toBeEnabled();
   });
+
+  it("does not refresh player data after an admin action completes post-unmount", async () => {
+    const demoBasho = {
+      id: "demo-2026-05",
+      isDemo: true,
+      name: "Demo Basho",
+      startDate: "2026-05-10",
+      endDate: "2026-05-24",
+      status: "active",
+      currentDay: 0,
+    };
+    let resolveAction: (response: Response) => void;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ basho: demoBasho }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveAction = resolve;
+          }),
+      );
+    const onPlayerDataRefresh = vi.fn(() => Promise.resolve());
+
+    vi.stubGlobal("fetch", fetchMock);
+    const { unmount } = render(
+      <AdminPanel onPlayerDataRefresh={onPlayerDataRefresh} />,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Advance one day" }),
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    unmount();
+
+    resolveAction!(
+      jsonResponse({
+        action: "advance-day",
+        appliedResults: 1,
+        basho: { ...demoBasho, currentDay: 1 },
+      }),
+    );
+
+    await Promise.resolve();
+    expect(onPlayerDataRefresh).not.toHaveBeenCalled();
+  });
+
+  it("uses the authoritative basho returned by a lifecycle conflict", async () => {
+    const lockedBasho = {
+      id: "2026-05",
+      isDemo: false,
+      name: "May 2026 Basho",
+      startDate: "2026-05-10",
+      endDate: "2026-05-24",
+      status: "locked",
+      currentDay: 0,
+    };
+    const activeBasho = { ...lockedBasho, status: "active", currentDay: 1 };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ basho: lockedBasho }))
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            error: "invalid-lifecycle-transition",
+            message: "Picks can no longer be reopened.",
+            basho: activeBasho,
+          },
+          409,
+        ),
+      );
+
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminPanel onPlayerDataRefresh={() => Promise.resolve()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open picks" }));
+
+    expect(
+      await screen.findByText("Picks can no longer be reopened."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open picks" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Close the basho" }),
+    ).toBeEnabled();
+  });
 });
 
-function jsonResponse(body: unknown) {
+function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     headers: { "content-type": "application/json" },
-    status: 200,
+    status,
   });
 }
