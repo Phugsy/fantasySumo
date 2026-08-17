@@ -474,12 +474,15 @@ describe("App", () => {
         method: "PUT",
       }),
     );
-    expect(
-      await screen.findByText("Changes saved for Updated Champions."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Updated Champions" }),
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/stable");
+      expect(
+        screen.getByText("Changes saved for Updated Champions."),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: "Updated Champions" }),
+      ).toBeInTheDocument();
+    });
     expect(screen.getByText("Hoshoryu")).toBeInTheDocument();
     expect(screen.queryByText("Onosato")).not.toBeInTheDocument();
   });
