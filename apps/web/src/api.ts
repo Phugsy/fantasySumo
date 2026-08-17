@@ -1,4 +1,8 @@
 import type {
+  AdminActionResponse,
+  AdminBashoResponse,
+  AdminDemoAction,
+  AdminLifecycleAction,
   Basho,
   BashoRikishiResponse,
   CreatedTeamResponse,
@@ -10,6 +14,7 @@ import type {
 interface ApiErrorBody {
   error?: string;
   message?: string;
+  basho?: Omit<Basho, "teamSize">;
   bashoStatus?: Basho["status"];
   teamLockedAt?: string;
   details?: Array<{
@@ -24,6 +29,7 @@ export class ApiRequestError extends Error {
     readonly code: string | undefined = undefined,
     readonly bashoStatus: Basho["status"] | undefined = undefined,
     readonly teamLockedAt: string | undefined = undefined,
+    readonly basho: Omit<Basho, "teamSize"> | undefined = undefined,
   ) {
     super(message);
     this.name = "ApiRequestError";
@@ -70,6 +76,32 @@ export async function fetchLeaderboard(
 
 export async function fetchSession(): Promise<SessionResponse> {
   return getJson<SessionResponse>("/api/session");
+}
+
+export async function fetchAdminBasho(
+  mode: "live" | "demo",
+): Promise<AdminBashoResponse> {
+  return getJson<AdminBashoResponse>(
+    mode === "demo"
+      ? "/api/admin/basho/current?mode=demo"
+      : "/api/admin/basho/current",
+  );
+}
+
+export async function runAdminLifecycleAction(
+  bashoId: string,
+  action: AdminLifecycleAction,
+): Promise<AdminActionResponse> {
+  return postJson<AdminActionResponse>(
+    `/api/admin/basho/${bashoId}/${action}`,
+    {},
+  );
+}
+
+export async function runAdminDemoAction(
+  action: AdminDemoAction,
+): Promise<AdminActionResponse> {
+  return postJson<AdminActionResponse>(`/api/admin/demo/${action}`, {});
 }
 
 export function reportAuthClientTokenUnavailable(): void {
@@ -200,12 +232,14 @@ async function createApiRequestError(
     error.code,
     error.bashoStatus,
     error.teamLockedAt,
+    error.basho,
   );
 }
 
 async function readApiError(response: Response): Promise<{
   message: string;
   code?: string;
+  basho?: Omit<Basho, "teamSize">;
   bashoStatus?: Basho["status"];
   teamLockedAt?: string;
 }> {
@@ -219,6 +253,7 @@ async function readApiError(response: Response): Promise<{
       return {
         message: `${body.message ?? "Request failed"} ${details.join(" ")}`,
         ...(body.error === undefined ? {} : { code: body.error }),
+        ...(body.basho === undefined ? {} : { basho: body.basho }),
         ...(body.bashoStatus === undefined
           ? {}
           : { bashoStatus: body.bashoStatus }),
@@ -231,6 +266,7 @@ async function readApiError(response: Response): Promise<{
     return {
       message: body.message ?? `Request failed with status ${response.status}.`,
       ...(body.error === undefined ? {} : { code: body.error }),
+      ...(body.basho === undefined ? {} : { basho: body.basho }),
       ...(body.bashoStatus === undefined
         ? {}
         : { bashoStatus: body.bashoStatus }),

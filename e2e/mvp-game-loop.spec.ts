@@ -28,6 +28,65 @@ test("loads API-backed current basho content", async ({ page, request }) => {
   await expect(page.getByRole("button", { name: /Onosato/ })).toBeVisible();
 });
 
+test("lets an authenticated admin run the deterministic demo loop", async ({
+  page,
+}) => {
+  await page.goto("/admin");
+
+  await expect(page.getByRole("button", { name: "Admin" })).toHaveCount(0);
+  await expect(
+    page.getByText("Administrator access is required to open this page."),
+  ).toBeVisible();
+
+  await page.getByLabel("Email").fill("e2e-admin@example.com");
+  await page.getByLabel("Display name").fill("E2E Admin");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(page.getByRole("button", { name: "Admin" })).toBeVisible();
+  await expect(page).toHaveURL(/\/admin$/);
+  await expect(
+    page.getByRole("heading", { name: "Demo May Basho" }),
+  ).toBeVisible();
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Reset and open picks" }).click();
+  await expect(
+    page.getByText("Demo fixture reset. Picks are open at day 0."),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "My stable" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator(".lifecycle-state")).toHaveText("Picks open");
+
+  await page.getByRole("button", { name: "Admin" }).click();
+  await page.getByRole("button", { name: "Start the demo" }).click();
+  await expect(page.getByText("Demo started. Picks are locked.")).toBeVisible();
+
+  await page.getByRole("button", { name: "My stable" }).click();
+  await expect(page.locator(".lifecycle-state")).toHaveText(
+    "Scoring in progress",
+  );
+
+  await page.getByRole("button", { name: "Admin" }).click();
+  await page.getByRole("button", { name: "Advance one day" }).click();
+  await expect(
+    page.getByText("Demo advanced by one result day."),
+  ).toBeVisible();
+  await expect(page.locator(".admin-basho-summary dd").nth(1)).toHaveText("1");
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Finish the demo" }).click();
+  await expect(page.getByText("Demo completed through day 15.")).toBeVisible();
+  await expect(page.locator(".admin-basho-summary dd").first()).toHaveText(
+    "Complete",
+  );
+
+  await page.getByRole("button", { name: "My stable" }).click();
+  await expect(page.locator(".lifecycle-state")).toHaveText(
+    "Final scores - Day 15",
+  );
+});
+
 test("creates a fantasy team and follows its My Stable score", async ({
   page,
   request,
@@ -281,7 +340,7 @@ test("locks team selection after the demo basho starts", async ({
 }) => {
   await signInRequest(request);
   const unauthorizedResponse = await request.post("/api/admin/demo/start");
-  expect(unauthorizedResponse.status()).toBe(401);
+  expect(unauthorizedResponse.status()).toBe(403);
 
   const startResponse = await request.post("/api/admin/demo/start", {
     headers: demoAdminHeaders,

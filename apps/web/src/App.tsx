@@ -32,6 +32,7 @@ import {
   signUpWithNeon,
 } from "./authClient";
 import { AccountPanel } from "./components/AccountPanel";
+import { AdminPanel } from "./components/AdminPanel";
 import { AppHeader } from "./components/AppHeader";
 import { BashoPanel } from "./components/BashoPanel";
 import { LeaderboardPanel } from "./components/LeaderboardPanel";
@@ -71,7 +72,9 @@ export function App() {
   >(undefined);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<ActiveView>("selection");
+  const [activeView, setActiveView] = useState<ActiveView>(() =>
+    window.location.pathname === "/admin" ? "admin" : "selection",
+  );
   const [leaderboardLoadState, setLeaderboardLoadState] =
     useState<LeaderboardLoadState>("loading");
   const [displayName, setDisplayName] = useState("");
@@ -140,6 +143,17 @@ export function App() {
 
       return [...current, rikishiId];
     });
+  }
+
+  function navigateToView(view: ActiveView) {
+    const nextPath = view === "admin" ? "/admin" : "/";
+
+    if (window.location.pathname !== nextPath) {
+      window.history.replaceState({ activeView }, "", window.location.href);
+      window.history.pushState({ activeView: view }, "", nextPath);
+    }
+
+    setActiveView(view);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -375,7 +389,7 @@ export function App() {
       setOwnedTeamLockedAt(undefined);
       setDisplayName("");
       setSelectedIds([]);
-      setActiveView("selection");
+      navigateToView("selection");
 
       bashoReloadStarted = true;
       await loadBashoData(
@@ -444,15 +458,17 @@ export function App() {
     setMyTeam(loadedMyTeam);
     setOwnedTeamId(loadedMyTeam?.team.id ?? null);
     setOwnedTeamLockedAt(loadedMyTeam?.team.lockedAt);
-    setActiveView(
-      loadedMyTeam !== null
-        ? "stable"
-        : preserveDraftWhenTeamMissing
-          ? "selection"
-          : session.user !== null
-            ? "stable"
-            : "selection",
-    );
+    if (window.location.pathname !== "/admin") {
+      setActiveView(
+        loadedMyTeam !== null
+          ? "stable"
+          : preserveDraftWhenTeamMissing
+            ? "selection"
+            : session.user !== null
+              ? "stable"
+              : "selection",
+      );
+    }
     setLoadState(bashoRikishi.rikishi.length === 0 ? "empty" : "ready");
 
     const requestId = nextLeaderboardRequestId(leaderboardRequestIdRef);
@@ -490,6 +506,16 @@ export function App() {
       setExpandedTeamId(null);
       setLeaderboardErrorMessage(getErrorMessage(error));
       setLeaderboardLoadState("ready");
+    }
+  }
+
+  async function refreshPlayerData(session: SessionResponse) {
+    try {
+      await loadBashoData(session, () => true);
+    } catch (error) {
+      setErrorMessage(getPublicDataErrorMessage(error));
+      setLoadState("error");
+      throw error;
     }
   }
 
@@ -543,17 +569,34 @@ export function App() {
     // call loadBashoData directly after sign-in.
   }, []);
 
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      setActiveView(
+        window.location.pathname === "/admin"
+          ? "admin"
+          : (getHistoryActiveView(event.state) ?? "selection"),
+      );
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   return (
     <div className="site-shell">
       <AppHeader
         activeView={activeView}
-        disabled={loadState !== "ready" || submitState === "submitting"}
-        onChange={setActiveView}
+        disabled={
+          submitState === "submitting" ||
+          (activeView !== "admin" && loadState !== "ready")
+        }
+        onChange={navigateToView}
+        showAdmin={sessionUser?.isAdmin === true}
       />
       <main className="app-shell">
         <PageHeader activeView={activeView} />
 
-        {loadState === "loading" && (
+        {activeView !== "admin" && loadState === "loading" && (
           <section className="state-panel" aria-live="polite">
             Loading the current basho...
           </section>
@@ -576,19 +619,36 @@ export function App() {
           userDisplayName={accountDisplayName}
         />
 
-        {loadState === "error" && (
+        {activeView === "admin" &&
+          sessionState !== "loading" &&
+          (sessionUser?.isAdmin === true ? (
+            <AdminPanel
+              onPlayerDataRefresh={() =>
+                refreshPlayerData({
+                  mode: authMode ?? "local",
+                  user: sessionUser,
+                })
+              }
+            />
+          ) : (
+            <section className="state-panel error-state" role="alert">
+              Administrator access is required to open this page.
+            </section>
+          ))}
+
+        {activeView !== "admin" && loadState === "error" && (
           <section className="state-panel error-state" role="alert">
             {errorMessage ?? "Unable to load basho data."}
           </section>
         )}
 
-        {loadState === "empty" && (
+        {activeView !== "admin" && loadState === "empty" && (
           <section className="state-panel">
             No rikishi are available for the current basho yet.
           </section>
         )}
 
-        {loadState === "ready" && basho !== null && (
+        {activeView !== "admin" && loadState === "ready" && basho !== null && (
           <>
             <BashoPanel basho={basho} selectedCount={selectedIds.length} />
 
@@ -662,6 +722,20 @@ export function App() {
       </main>
     </div>
   );
+}
+
+function getHistoryActiveView(state: unknown): ActiveView | null {
+  if (typeof state !== "object" || state === null || !("activeView" in state)) {
+    return null;
+  }
+
+  const activeView = state.activeView;
+  return activeView === "stable" ||
+    activeView === "selection" ||
+    activeView === "leaderboard" ||
+    activeView === "admin"
+    ? activeView
+    : null;
 }
 
 function getPublicDataErrorMessage(error: unknown): string {

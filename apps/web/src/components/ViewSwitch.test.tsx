@@ -28,4 +28,22 @@ describe("ViewSwitch", () => {
     expect(screen.getByRole("button", { name: "My stable" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Leaderboard" })).toBeDisabled();
   });
+
+  it("shows admin navigation only when the server-authorized session allows it", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <ViewSwitch activeView="stable" onChange={onChange} />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Admin" })).toBeNull();
+
+    rerender(<ViewSwitch activeView="admin" onChange={onChange} showAdmin />);
+    fireEvent.click(screen.getByRole("button", { name: "Admin" }));
+
+    expect(onChange).toHaveBeenCalledWith("admin");
+    expect(screen.getByRole("button", { name: "Admin" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
 });

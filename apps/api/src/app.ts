@@ -6,8 +6,8 @@ import {
   type AppDatabase,
 } from "@fantasy-sumo/db";
 import {
-  allowsUnprotectedAdminImports,
   getAdminImportToken,
+  getAdminUserIds,
   getAuthMode,
   getCronSecret,
   getDemoAdminToken,
@@ -25,6 +25,7 @@ import {
 } from "./auth.js";
 import { registerAdminDemoRoutes } from "./routes/admin-demo.js";
 import { registerAdminImportRoutes } from "./routes/admin-imports.js";
+import { registerAdminLifecycleRoutes } from "./routes/admin-lifecycle.js";
 import { registerBashoRoutes } from "./routes/basho.js";
 import { registerScheduledImportRoutes } from "./routes/scheduled-imports.js";
 
@@ -36,6 +37,7 @@ interface AppOptions {
   teamSize?: number;
   demoAdminToken?: string;
   adminImportToken?: string;
+  adminUserIds?: readonly string[];
   authMode?: "local" | "neon";
   neonAuthAudience?: string;
   neonAuthIssuer?: string;
@@ -57,6 +59,7 @@ export function buildApp(options: AppOptions = {}) {
   const db = options.db ?? ownedClient!;
   const repositories = createRepositories(db);
   const auth = createAuthService({
+    adminUserIds: options.adminUserIds ?? getAdminUserIds(),
     mode: options.authMode ?? getAuthMode(),
     neonAuthAudience: options.neonAuthAudience ?? getNeonAuthAudience(),
     neonAuthIssuer: options.neonAuthIssuer ?? getNeonAuthIssuer(),
@@ -90,16 +93,22 @@ export function buildApp(options: AppOptions = {}) {
   });
   registerAdminImportRoutes(app, {
     adminImportToken: options.adminImportToken ?? getAdminImportToken(),
-    allowUnprotectedAdminImports:
-      options.allowUnprotectedAdminImports ?? allowsUnprotectedAdminImports(),
+    allowUnprotectedAdminImports: options.allowUnprotectedAdminImports ?? false,
+    auth,
     repositories,
     sourceFetch: options.sourceFetch ?? fetch,
   });
   registerAdminDemoRoutes(app, {
     allowUnprotectedDemoAdmin: options.allowUnprotectedDemoAdmin ?? false,
+    auth,
     demoAdminToken: options.demoAdminToken ?? getDemoAdminToken(),
     repositories,
     now: options.now ?? (() => new Date()),
+  });
+  registerAdminLifecycleRoutes(app, {
+    auth,
+    now: options.now ?? (() => new Date()),
+    repositories,
   });
   registerScheduledImportRoutes(app, {
     cronSecret: options.cronSecret ?? getCronSecret(),

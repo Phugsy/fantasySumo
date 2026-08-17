@@ -19,6 +19,7 @@ beforeEach(async () => {
   client = createDatabaseClient(`file:${join(tmpRoot, "test.sqlite")}`);
   await runMigrations(client);
   app = buildApp({
+    allowUnprotectedAdminImports: true,
     db: client,
     sourceFetch: async (url) => {
       const sourceUrl = String(url);
@@ -95,7 +96,7 @@ describe("admin import routes", () => {
       payload: {},
     });
 
-    expect(unauthorizedResponse.statusCode).toBe(401);
+    expect(unauthorizedResponse.statusCode).toBe(403);
 
     const unauthorizedResultsResponse = await app.inject({
       method: "POST",
@@ -103,7 +104,7 @@ describe("admin import routes", () => {
       payload: { day: 1 },
     });
 
-    expect(unauthorizedResultsResponse.statusCode).toBe(401);
+    expect(unauthorizedResultsResponse.statusCode).toBe(403);
 
     const authorizedResponse = await app.inject({
       headers: {
@@ -114,7 +115,7 @@ describe("admin import routes", () => {
       payload: {},
     });
 
-    expect(authorizedResponse.statusCode).not.toBe(401);
+    expect(authorizedResponse.statusCode).not.toBe(403);
   });
 
   it("dry-runs and applies source-backed banzuke imports", async () => {

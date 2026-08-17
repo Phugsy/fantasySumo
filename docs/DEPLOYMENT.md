@@ -133,6 +133,7 @@ Set these in Vercel before exposing the app:
 DATABASE_URL=<managed Postgres connection string>
 TEAM_SIZE=2
 AUTH_MODE=neon
+ADMIN_USER_IDS=<comma-separated verified user IDs>
 NEON_AUTH_JWKS_URL=<Neon Auth JWKS URL>
 NEON_AUTH_ISSUER=<optional expected JWT issuer>
 NEON_AUTH_AUDIENCE=<optional expected JWT audience>
@@ -257,7 +258,25 @@ against preview Postgres. The workflows never run down migrations.
 
 ## Admin endpoints
 
-The demo admin endpoints already require `DEMO_ADMIN_TOKEN` unless explicitly opened in tests.
+The `/admin` page and browser admin APIs require an authenticated user whose
+verified API user ID appears in the server-only `ADMIN_USER_IDS` allowlist.
+For Neon Auth this is the verified JWT `sub`; for local development it is the
+deterministic `local-...` ID returned by `GET /api/session` after sign-in. IDs
+are comma-separated, whitespace is ignored, and an empty or missing allowlist
+grants no browser admin access. Configure this only as an API runtime variable,
+never as a `VITE_` variable.
+
+To assign an admin, sign in normally, inspect the authenticated
+`GET /api/session` response for `user.id`, add that exact ID to
+`ADMIN_USER_IDS`, and restart or redeploy the API. The session response then
+reports `isAdmin: true`; the React app uses that server decision only to show
+the navigation and route. Every admin API repeats authorization server-side, so
+hiding the navigation is not the security boundary.
+
+`DEMO_ADMIN_TOKEN` remains an optional machine credential for demo scripts, and
+`ADMIN_IMPORT_TOKEN` remains the equivalent credential for import scripts.
+Authenticated admins can call those routes without receiving either token in
+the browser. Missing credentials and non-admin sessions receive `403`.
 
 Demo administration is also protected at the data boundary. The application
 supports one fixed deterministic demo basho. Reset and progression require its
@@ -279,7 +298,9 @@ Normal builds omit this flag and `/api/basho/current` continues to prefer live
 bashos. The explicit demo query still verifies both the fixed ID and `isDemo`
 classification before returning a basho.
 
-The source-backed import endpoints require `ADMIN_IMPORT_TOKEN` by default. They can run without a token only when `NODE_ENV` is `development` or `test`.
+The source-backed import endpoints require an authenticated admin or
+`ADMIN_IMPORT_TOKEN`. Tests may explicitly opt into an unprotected route
+fixture, but normal development and production app construction fail closed.
 
 ```bash
 curl -X POST "https://<deployment>/api/admin/import-banzuke?dryRun=true" \
@@ -289,6 +310,28 @@ curl -X POST "https://<deployment>/api/admin/import-banzuke?dryRun=true" \
 ```
 
 The same token can also be supplied with `Authorization: Bearer <token>`.
+
+### Lifecycle control safety
+
+The admin page exposes explicit actions rather than a generic status editor:
+
+- **Open picks** is allowed only for an upcoming live basho (idempotent) or a
+  locked live basho at day 0 with no stored results. Active and completed live
+  bashos can never be reopened.
+- **Start the basho** moves upcoming or locked live data to active and stamps
+  existing team locks in the same database transaction. Postgres team writes
+  lock the same basho row, so an in-flight save cannot cross the transition.
+- **Close the basho** is allowed only from active and requires browser
+  confirmation. It marks lifecycle state complete but does not import missing
+  results.
+- **Demo reset/progression** always uses the fixed demo ID plus persisted
+  `isDemo: true` check. Reset replaces only that fixture and its dependent data;
+  it cannot mutate live bashos, teams, picks, or results.
+
+Live start and close are operational production actions. Confirm the selected
+basho and result completeness before using them. Demo controls are safe to
+enable alongside live data because their destructive boundary remains the
+flagged deterministic fixture.
 
 ## Scheduled production jobs
 

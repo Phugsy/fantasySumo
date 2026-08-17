@@ -185,6 +185,9 @@ E2E_DATABASE_URL=file:./data/e2e/local-run.sqlite make e2e
 ```
 
 Playwright uses ports `3000` for the API and `7866` for Vite. Stop any existing processes on those ports if the harness cannot start them. The protected demo admin controls are enabled with an E2E-only `DEMO_ADMIN_TOKEN` from the Playwright config; no live sumo data sources or production services are used.
+The config also assigns one deterministic local session ID through
+`ADMIN_USER_IDS` so the browser suite can cover `/admin` without weakening the
+API authorization boundary.
 
 The browser suite covers API-backed app loading, local session sign-in,
 authenticated team creation and pre-lock editing, the private My Stable view,
@@ -192,6 +195,9 @@ immediate saved-line-up updates, individual and total score progress, selection
 validation, pick locking, protected demo progression, leaderboard ordering, and
 responsive navigation. Direct team-mutation checks establish the same local
 session before asserting lifecycle enforcement.
+The suite also signs in as the configured local admin, resets and opens the demo
+fixture, starts it, advances results, completes it, and checks player-facing
+navigation and lifecycle state after those actions.
 Admin-route configuration is also covered at the Fastify boundary: missing or
 invalid credentials are rejected, disabled demo routes return `404`, and
 enabled routes drive the real browser lifecycle tests.
@@ -277,6 +283,7 @@ E2E should prove that the pieces work together for the main game loop. It should
 
 ## Deferred Journeys
 
-Production Neon registration and browser-driven admin/import controls are not
-covered by the deterministic local harness. Add those journeys only when a
-safe, isolated test boundary exists instead of encoding speculative tests here.
+Production Neon registration and browser-driven import controls are not covered
+by the deterministic local harness. The role-gated deterministic demo admin
+loop is covered locally; add hosted admin journeys only when a safe isolated
+production-auth boundary exists.

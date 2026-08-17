@@ -12,6 +12,7 @@ export interface AuthenticatedUser {
 export type AuthMode = "local" | "neon";
 
 interface AuthServiceOptions {
+  adminUserIds?: readonly string[];
   mode: AuthMode;
   neonAuthAudience?: string;
   neonAuthIssuer?: string;
@@ -47,6 +48,7 @@ export interface AuthService {
   getCurrentUser: (
     request: FastifyRequest,
   ) => Promise<AuthenticatedUser | undefined>;
+  isAdmin: (user: AuthenticatedUser) => boolean;
 }
 
 const LOCAL_AUTH_COOKIE = "fantasy_sumo_dev_user";
@@ -64,6 +66,7 @@ const loginBodySchema = z.object({
 });
 
 export function createAuthService(options: AuthServiceOptions): AuthService {
+  const adminUserIds = new Set(options.adminUserIds ?? []);
   const neonJwtVerifier =
     options.neonJwtVerifier ??
     createNeonJwtVerifier({
@@ -74,6 +77,7 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
 
   return {
     mode: options.mode,
+    isAdmin: (user) => adminUserIds.has(user.id),
     getCurrentUser: async (request) => {
       if (options.mode === "neon") {
         const token = getBearerToken(request);
@@ -139,7 +143,8 @@ export function registerAuthRoutes(
     const user = await auth.getCurrentUser(request);
 
     return {
-      user: user ?? null,
+      user:
+        user === undefined ? null : { ...user, isAdmin: auth.isAdmin(user) },
       mode: auth.mode,
     };
   });
@@ -177,7 +182,10 @@ export function registerAuthRoutes(
       }),
     );
 
-    return reply.code(201).send({ user, mode: auth.mode });
+    return reply.code(201).send({
+      user: { ...user, isAdmin: auth.isAdmin(user) },
+      mode: auth.mode,
+    });
   });
 
   app.delete("/api/session", async (_request, reply) => {

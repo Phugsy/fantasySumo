@@ -11,10 +11,13 @@ import {
   ImportValidationError,
 } from "../imports/service.js";
 import type { SourceFetch } from "../imports/types.js";
+import type { AuthService } from "../auth.js";
+import { isAuthenticatedAdmin, sendAdminForbidden } from "../admin-auth.js";
 
 interface RouteContext {
   adminImportToken?: string;
   allowUnprotectedAdminImports: boolean;
+  auth: AuthService;
   repositories: Repositories;
   sourceFetch: SourceFetch;
 }
@@ -126,7 +129,7 @@ export function registerAdminImportRoutes(
   });
 }
 
-function authorizeAdminImport(
+async function authorizeAdminImport(
   request: FastifyRequest,
   reply: FastifyReply,
   context: RouteContext,
@@ -135,19 +138,18 @@ function authorizeAdminImport(
     return;
   }
 
-  if (context.adminImportToken === undefined) {
-    return reply.code(404).send({
-      error: "admin-import-disabled",
-      message: "Admin import controls are not enabled.",
-    });
+  if (
+    context.adminImportToken !== undefined &&
+    getSuppliedAdminImportToken(request) === context.adminImportToken
+  ) {
+    return;
   }
 
-  if (getSuppliedAdminImportToken(request) !== context.adminImportToken) {
-    return reply.code(401).send({
-      error: "admin-import-unauthorized",
-      message: "Admin import controls require a valid token.",
-    });
+  if (await isAuthenticatedAdmin(request, context.auth)) {
+    return;
   }
+
+  return sendAdminForbidden(reply);
 }
 
 function getSuppliedAdminImportToken(

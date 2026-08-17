@@ -54,13 +54,15 @@ Current behaviour:
   shows up to five recent outcomes and expands to the full result history.
 - Charts cumulative team scores across scored days with team filters,
   inspectable points, and an accessible exact-value table.
+- Exposes a dedicated `/admin` route only for sessions the API marks as admin,
+  with live lifecycle controls and isolated deterministic demo progression.
 - Shows loading, empty, success, and API error states.
 - Has Vitest coverage through React Testing Library.
 
 Current limitations:
 
 - No routing.
-- No result import UI yet.
+- No result import or game-configuration UI yet.
 - No persistence of the last created team in browser storage yet.
 
 ## Back end
@@ -126,16 +128,16 @@ Current routes:
   - Replaces stale result rows only for the imported basho/day.
   - Supports `?dryRun=true`.
 - `POST /api/admin/demo/reset`
-  - Requires `DEMO_ADMIN_TOKEN`.
+  - Requires an authenticated admin session or `DEMO_ADMIN_TOKEN`.
   - Resets deterministic demo data to day 0 with picks open and no applied results.
 - `POST /api/admin/demo/start`
-  - Requires `DEMO_ADMIN_TOKEN`.
+  - Requires an authenticated admin session or `DEMO_ADMIN_TOKEN`.
   - Locks existing demo picks and starts the demo basho without applying results.
 - `POST /api/admin/demo/advance-day`
-  - Requires `DEMO_ADMIN_TOKEN`.
+  - Requires an authenticated admin session or `DEMO_ADMIN_TOKEN`.
   - Applies the next day of deterministic demo results.
 - `POST /api/admin/demo/complete`
-  - Requires `DEMO_ADMIN_TOKEN`.
+  - Requires an authenticated admin session or `DEMO_ADMIN_TOKEN`.
   - Applies all deterministic demo results and marks the demo basho complete.
 - `GET /api/cron/import-results`
   - Requires Vercel's `Authorization: Bearer <CRON_SECRET>` header.
@@ -154,12 +156,24 @@ Current routes:
     with day 15.
   - Returns structured locked/imported/skipped status and logs success or
     failure.
+- `GET /api/admin/basho/current`
+  - Requires an authenticated admin selected by the server-only
+    `ADMIN_USER_IDS` allowlist.
+  - Returns the selected live or deterministic demo basho for the admin page.
+- `POST /api/admin/basho/:bashoId/open-picks`
+  - Reopens only a locked, non-demo basho with day 0 progress and no stored
+    results; active and complete live bashos fail closed.
+- `POST /api/admin/basho/:bashoId/start`
+  - Atomically moves an upcoming or locked live basho to active and locks its
+    teams, serializing with Postgres pick writes.
+- `POST /api/admin/basho/:bashoId/close`
+  - Marks only an active live basho complete; repeat completion is idempotent.
 
 Current limitations:
 
 - Auth remains intentionally small. Local development uses a cookie-based development session, while production identity comes from Neon Auth JWTs verified by the API auth boundary.
 - No dedicated API client package.
-- No admin UI yet.
+- Import and game-configuration controls remain outside the first admin UI slice.
 
 ## Domain package
 
@@ -417,7 +431,9 @@ POST   /api/admin/import-banzuke
 POST   /api/admin/basho/:bashoId/import-results
 ```
 
-Admin endpoints can be protected later. For early local development, they can remain local-only but should be clearly marked as unsafe for production.
+Browser admin access is derived by the API from verified user IDs configured in
+`ADMIN_USER_IDS`. Import and demo machine routes also retain separate tokens for
+scripts. No admin token or role decision is made in browser code.
 
 `POST /api/basho/:bashoId/teams` and `PUT
 /api/basho/:bashoId/my-team` are allowed only while the persisted basho status

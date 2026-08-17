@@ -7,8 +7,11 @@ import {
   resetDemoProgression,
   startDemoBasho,
 } from "@fantasy-sumo/db";
+import type { AuthService } from "../auth.js";
+import { isAuthenticatedAdmin, sendAdminForbidden } from "../admin-auth.js";
 
 interface RouteContext {
+  auth: AuthService;
   allowUnprotectedDemoAdmin: boolean;
   demoAdminToken?: string;
   repositories: Repositories;
@@ -56,7 +59,7 @@ export function registerAdminDemoRoutes(
   );
 }
 
-function authorizeDemoAdmin(
+async function authorizeDemoAdmin(
   request: FastifyRequest,
   reply: FastifyReply,
   context: RouteContext,
@@ -65,19 +68,18 @@ function authorizeDemoAdmin(
     return;
   }
 
-  if (context.demoAdminToken === undefined) {
-    return reply.code(404).send({
-      error: "demo-admin-disabled",
-      message: "Demo admin controls are not enabled.",
-    });
+  if (
+    context.demoAdminToken !== undefined &&
+    getSuppliedDemoAdminToken(request) === context.demoAdminToken
+  ) {
+    return;
   }
 
-  if (getSuppliedDemoAdminToken(request) !== context.demoAdminToken) {
-    return reply.code(401).send({
-      error: "demo-admin-unauthorized",
-      message: "Demo admin controls require a valid token.",
-    });
+  if (await isAuthenticatedAdmin(request, context.auth)) {
+    return;
   }
+
+  return sendAdminForbidden(reply);
 }
 
 function getSuppliedDemoAdminToken(

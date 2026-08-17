@@ -1,12 +1,19 @@
+import { createHash } from "node:crypto";
 import { defineConfig, devices } from "@playwright/test";
 
 const e2eDatabaseUrl =
   process.env.E2E_DATABASE_URL ?? "file:./data/e2e/fantasy-sumo-e2e.sqlite";
 const demoAdminToken =
   process.env.DEMO_ADMIN_TOKEN ?? "playwright-demo-admin-token";
+const adminEmail = "e2e-admin@example.com";
+const adminUserId = `local-${createHash("sha256")
+  .update(adminEmail)
+  .digest("base64url")
+  .slice(0, 24)}`;
 
 process.env.E2E_DATABASE_URL = e2eDatabaseUrl;
 process.env.DEMO_ADMIN_TOKEN = demoAdminToken;
+process.env.ADMIN_USER_IDS = adminUserId;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -46,6 +53,7 @@ export default defineConfig({
         ...process.env,
         DATABASE_URL: e2eDatabaseUrl,
         DEMO_ADMIN_TOKEN: demoAdminToken,
+        ADMIN_USER_IDS: adminUserId,
       },
       url: "http://127.0.0.1:3000/api/health",
       reuseExistingServer: !process.env.CI,

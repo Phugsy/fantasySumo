@@ -19,9 +19,14 @@ export type {
 } from "./types.js";
 export {
   canEditFantasyPicks,
+  getBashoLifecycleTransition,
   getBashoLifecycleLabel,
   getPickLockMessage,
   preserveBashoLifecycleProgress,
+} from "./lifecycle.js";
+export type {
+  BashoLifecycleAction,
+  BashoLifecycleTransition,
 } from "./lifecycle.js";
 export {
   calculateLeaderboard,

@@ -2,12 +2,17 @@ import { and, eq, isNull, notInArray } from "drizzle-orm";
 import type {
   BanzukeEntry,
   Basho,
+  BashoLifecycleAction,
+  BashoLifecycleTransition,
   BoutResult,
   FantasyPick,
   FantasyTeam,
   Rikishi,
 } from "@fantasy-sumo/domain";
-import { preserveBashoLifecycleProgress } from "@fantasy-sumo/domain";
+import {
+  getBashoLifecycleTransition,
+  preserveBashoLifecycleProgress,
+} from "@fantasy-sumo/domain";
 import type {
   AppDatabase,
   PostgresDatabase,
@@ -37,6 +42,11 @@ export interface DemoBashoResetData extends BanzukeImportData {
   boutResults: readonly BoutResult[];
 }
 
+export interface BashoLifecycleUpdateResult {
+  basho: Basho;
+  transition: BashoLifecycleTransition;
+}
+
 export interface Repositories {
   /** Clears every game record. Production and admin paths must never call this. */
   resetAllDataForLocalFixtures: () => Promise<void>;
@@ -47,6 +57,11 @@ export interface Repositories {
   listBashos: () => Promise<Basho[]>;
   getBasho: (id: Basho["id"]) => Promise<Basho | undefined>;
   updateBasho: (entry: Basho) => Promise<void>;
+  transitionBashoLifecycle: (
+    bashoId: Basho["id"],
+    action: BashoLifecycleAction,
+    changedAt: string,
+  ) => Promise<BashoLifecycleUpdateResult | undefined>;
 
   insertRikishi: (entry: Rikishi) => Promise<void>;
   upsertRikishi: (entry: Rikishi) => Promise<void>;
@@ -212,6 +227,64 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
         .where(eq(sqlite.basho.id, entry.id))
         .run();
     },
+    transitionBashoLifecycle: async (bashoId, action, changedAt) =>
+      db.transaction((transaction) => {
+        const row = transaction
+          .select()
+          .from(sqlite.basho)
+          .where(eq(sqlite.basho.id, bashoId))
+          .get();
+
+        if (row === undefined) {
+          return undefined;
+        }
+
+        const basho = toBasho(row);
+        const hasResults =
+          transaction
+            .select({ id: sqlite.boutResults.id })
+            .from(sqlite.boutResults)
+            .where(eq(sqlite.boutResults.bashoId, bashoId))
+            .limit(1)
+            .get() !== undefined;
+        const transition = getBashoLifecycleTransition(basho, action, {
+          hasResults,
+        });
+
+        if (!transition.allowed || !transition.changed) {
+          return { basho, transition };
+        }
+
+        transaction
+          .update(sqlite.basho)
+          .set({ status: transition.nextStatus })
+          .where(eq(sqlite.basho.id, bashoId))
+          .run();
+
+        if (action === "start") {
+          transaction
+            .update(sqlite.fantasyTeams)
+            .set({ lockedAt: changedAt })
+            .where(
+              and(
+                eq(sqlite.fantasyTeams.bashoId, bashoId),
+                isNull(sqlite.fantasyTeams.lockedAt),
+              ),
+            )
+            .run();
+        } else if (action === "open-picks") {
+          transaction
+            .update(sqlite.fantasyTeams)
+            .set({ lockedAt: null })
+            .where(eq(sqlite.fantasyTeams.bashoId, bashoId))
+            .run();
+        }
+
+        return {
+          basho: { ...basho, status: transition.nextStatus },
+          transition,
+        };
+      }),
 
     insertRikishi: async (entry) => {
       db.insert(sqlite.rikishi).values(toRikishiRow(entry)).run();
@@ -516,12 +589,22 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
     applyBoutResultsImport: async (importData) => {
       db.transaction((transaction) => {
         if (importData.basho !== undefined) {
+          const existingBasho = transaction
+            .select()
+            .from(sqlite.basho)
+            .where(eq(sqlite.basho.id, importData.basho.id))
+            .get();
+          const nextBasho = preserveBashoLifecycleProgress(
+            existingBasho === undefined ? undefined : toBasho(existingBasho),
+            importData.basho,
+          );
+
           transaction
             .insert(sqlite.basho)
-            .values(toBashoRow(importData.basho))
+            .values(toBashoRow(nextBasho))
             .onConflictDoUpdate({
               target: sqlite.basho.id,
-              set: toBashoRow(importData.basho),
+              set: toBashoRow(nextBasho),
             })
             .run();
         }
@@ -659,6 +742,64 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
         .set(toBashoRow(entry))
         .where(eq(pg.basho.id, entry.id));
     },
+    transitionBashoLifecycle: async (bashoId, action, changedAt) =>
+      db.transaction(async (transaction) => {
+        const row = (
+          await transaction
+            .select()
+            .from(pg.basho)
+            .where(eq(pg.basho.id, bashoId))
+            .for("update")
+        ).at(0);
+
+        if (row === undefined) {
+          return undefined;
+        }
+
+        const basho = toBasho(row);
+        const hasResults =
+          (
+            await transaction
+              .select({ id: pg.boutResults.id })
+              .from(pg.boutResults)
+              .where(eq(pg.boutResults.bashoId, bashoId))
+              .limit(1)
+          ).length > 0;
+        const transition = getBashoLifecycleTransition(basho, action, {
+          hasResults,
+        });
+
+        if (!transition.allowed || !transition.changed) {
+          return { basho, transition };
+        }
+
+        await transaction
+          .update(pg.basho)
+          .set({ status: transition.nextStatus })
+          .where(eq(pg.basho.id, bashoId));
+
+        if (action === "start") {
+          await transaction
+            .update(pg.fantasyTeams)
+            .set({ lockedAt: changedAt })
+            .where(
+              and(
+                eq(pg.fantasyTeams.bashoId, bashoId),
+                isNull(pg.fantasyTeams.lockedAt),
+              ),
+            );
+        } else if (action === "open-picks") {
+          await transaction
+            .update(pg.fantasyTeams)
+            .set({ lockedAt: null })
+            .where(eq(pg.fantasyTeams.bashoId, bashoId));
+        }
+
+        return {
+          basho: { ...basho, status: transition.nextStatus },
+          transition,
+        };
+      }),
 
     insertRikishi: async (entry) => {
       await db.insert(pg.rikishi).values(toRikishiRow(entry));
@@ -949,12 +1090,24 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
     applyBoutResultsImport: async (importData) => {
       await db.transaction(async (transaction) => {
         if (importData.basho !== undefined) {
+          const existingBasho = (
+            await transaction
+              .select()
+              .from(pg.basho)
+              .where(eq(pg.basho.id, importData.basho.id))
+              .for("update")
+          ).at(0);
+          const nextBasho = preserveBashoLifecycleProgress(
+            existingBasho === undefined ? undefined : toBasho(existingBasho),
+            importData.basho,
+          );
+
           await transaction
             .insert(pg.basho)
-            .values(toBashoRow(importData.basho))
+            .values(toBashoRow(nextBasho))
             .onConflictDoUpdate({
               target: pg.basho.id,
-              set: toBashoRow(importData.basho),
+              set: toBashoRow(nextBasho),
             });
         }
 

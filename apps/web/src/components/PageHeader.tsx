@@ -27,6 +27,12 @@ const pageCopy: Record<
     description:
       "Track each stable's score as results are recorded through the tournament.",
   },
+  admin: {
+    eyebrow: "Basho operations",
+    title: "Admin controls",
+    description:
+      "Manage explicit lifecycle transitions and the isolated demo testing loop.",
+  },
 };
 
 export function PageHeader({ activeView }: PageHeaderProps) {

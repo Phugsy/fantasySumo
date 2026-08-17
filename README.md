@@ -16,10 +16,11 @@ At present, the app has the first local playable foundations:
 - A shared TypeScript domain package with MVP types, lifecycle rules, validation, scoring, and leaderboard logic.
 - A swappable Drizzle database package with local SQLite, production Postgres, repositories, migrations, sample seed data, and deterministic demo data.
 - Automated source-backed import commands and local admin endpoints for current banzuke and daily results.
+- A role-gated `/admin` page for explicit live basho lifecycle actions and safe deterministic demo progression.
 - A minimal current-user/session boundary for local development and production auth integration.
 - Vitest, ESLint, and Prettier wired through pnpm scripts.
 
-It is close to a local playable loop, but still needs a friendlier admin UI before it is useful during a real basho.
+It is close to a local playable loop; import and game-configuration controls remain follow-up admin work.
 
 ## Tech Stack
 
@@ -137,16 +138,24 @@ Useful API endpoints:
 - `POST /api/admin/demo/start`
 - `POST /api/admin/demo/advance-day`
 - `POST /api/admin/demo/complete`
+- `GET /api/admin/basho/current`
+- `POST /api/admin/basho/:bashoId/open-picks`
+- `POST /api/admin/basho/:bashoId/start`
+- `POST /api/admin/basho/:bashoId/close`
 - `POST /api/admin/import-banzuke`
 - `POST /api/admin/basho/:bashoId/import-results`
 - `GET /api/cron/import-results`
 
-The demo admin endpoints require `DEMO_ADMIN_TOKEN` and an
-`x-demo-admin-token` header. They operate only on the fixed basho ID whose
-persisted record is marked `isDemo`; a colliding live record fails closed.
-Keep the token private even though reset is scoped away from live bashos.
+Browser admin endpoints require an authenticated user whose verified user ID is
+listed in the server-only `ADMIN_USER_IDS` environment variable. The Admin
+navigation item and `/admin` controls appear only after the API reports that
+role. `DEMO_ADMIN_TOKEN` and `ADMIN_IMPORT_TOKEN` remain optional, separate
+machine credentials for scripts; neither token is sent to browser code.
 
-The admin import endpoints are local development tools for now. Do not expose them publicly without authentication/protection.
+Demo controls operate only on the fixed basho ID whose persisted record is
+marked `isDemo`; a colliding live record fails closed. Live controls expose
+only validated open, start, and close transitions rather than a generic status
+setter. See `docs/DEPLOYMENT.md` for assignment and production-safety details.
 
 ## Basho lifecycle
 
@@ -195,7 +204,11 @@ DATABASE_URL=file:./data/dev.sqlite pnpm db:seed
 Use a `postgres:` or `postgresql:` `DATABASE_URL` for managed production persistence.
 
 The local team size defaults to `2`. Override it for the API with `TEAM_SIZE`.
-Set `DEMO_ADMIN_TOKEN` to enable protected demo admin API controls.
+Set `DEMO_ADMIN_TOKEN` only when scripts need a separate machine credential for
+the protected demo admin API controls.
+Set `ADMIN_USER_IDS` to a comma-separated list of verified API user IDs that
+may open `/admin`. In local mode, sign in once and read the returned `user.id`
+from `GET /api/session`, then add that ID and restart the API.
 Set `CRON_SECRET` in production to authenticate Vercel's scheduled basho job.
 
 ## Auth and team ownership
