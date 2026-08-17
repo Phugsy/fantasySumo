@@ -10,7 +10,7 @@ The current codebase has been reset onto the clean rebuild foundation described 
 
 At present, the app has the first local playable foundations:
 
-- A Vite + React front end for creating a fantasy team from seeded basho data and viewing leaderboard standings with recent team scores and expandable rikishi result history.
+- A routed Vite + React front end with a public current-basho leaderboard, a dedicated login page, and authenticated team and stable pages.
 - A private My Stable view with the signed-in player's picks, edit/lock state, rikishi details, and scoring progress.
 - A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.
 - A shared TypeScript domain package with MVP types, lifecycle rules, validation, scoring, and leaderboard logic.
@@ -213,7 +213,17 @@ Set `CRON_SECRET` in production to authenticate Vercel's scheduled basho job.
 
 ## Auth and team ownership
 
-Fantasy team creation now requires a current user. Local development uses `AUTH_MODE=local`, which exposes a simple development-only session flow through `POST /api/session` and an in-app sign-in panel. This keeps SQLite demos and tests self-contained.
+Fantasy team creation requires a current user. The browser route split is:
+
+- `/` — public current-basho summary and leaderboard.
+- `/login` — dedicated sign-in and registration controls.
+- `/stable` — authenticated My Stable view.
+- `/team` — authenticated team creation and editing.
+- `/admin` — authenticated, role-gated admin controls.
+
+Signed-out visits to protected routes return through `/login` with an allow-listed internal destination. Signing out clears private browser state and returns to `/`. Vite and the deployed SPA fallback both serve direct route visits and refreshes.
+
+Local development uses `AUTH_MODE=local`, which exposes a simple development-only session flow through `POST /api/session` and the `/login` page. This keeps SQLite demos and tests self-contained.
 
 Production uses Neon Auth as the identity source. The web app signs users in with `VITE_NEON_AUTH_URL`, sends the Neon JWT to the API, and the API verifies that token in `AUTH_MODE=neon` with `NEON_AUTH_JWKS_URL`. The API stores team ownership as `ownerUserId`, enforces one team per user per basho, and keeps the leaderboard public by team/display name. Signed-in users can replace only their own picks through the current-user team endpoint while the basho remains open.
 

@@ -2,9 +2,19 @@ import type {
   Dispatch,
   FormEvent,
   MutableRefObject,
+  ReactNode,
   SetStateAction,
 } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  BrowserRouter,
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router";
 import {
   ApiRequestError,
   clearSession,
@@ -39,9 +49,14 @@ import { LeaderboardPanel } from "./components/LeaderboardPanel";
 import { MyStablePanel } from "./components/MyStablePanel";
 import { PageHeader } from "./components/PageHeader";
 import { TeamSelection } from "./components/TeamSelection";
+import {
+  appPaths,
+  getActiveView,
+  getLoginPath,
+  getSafeReturnPath,
+} from "./routing";
 import { waitForVerifiedSession } from "./sessionVerification";
 import type {
-  ActiveView,
   Basho,
   CreatedTeamResponse,
   LeaderboardEntry,
@@ -56,6 +71,16 @@ import type {
 import { canEditFantasyPicks, getPickLockMessage } from "./lifecycle";
 
 export function App() {
+  return (
+    <BrowserRouter>
+      <RoutedApp />
+    </BrowserRouter>
+  );
+}
+
+function RoutedApp() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [sessionState, setSessionState] = useState<
     "loading" | "ready" | "submitting"
@@ -72,9 +97,6 @@ export function App() {
   >(undefined);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<ActiveView>(() =>
-    window.location.pathname === "/admin" ? "admin" : "selection",
-  );
   const [leaderboardLoadState, setLeaderboardLoadState] =
     useState<LeaderboardLoadState>("loading");
   const [displayName, setDisplayName] = useState("");
@@ -96,13 +118,13 @@ export function App() {
     "created" | "updated" | null
   >(null);
   const [myTeam, setMyTeam] = useState<MyTeamResponse | null>(null);
-  const [ownedTeamId, setOwnedTeamId] = useState<string | null>(null);
   const [ownedTeamLockedAt, setOwnedTeamLockedAt] = useState<
     string | undefined
   >(undefined);
   const bashoRequestIdRef = useRef(0);
   const leaderboardRequestIdRef = useRef(0);
   const sessionOperationInFlightRef = useRef(false);
+  const activeView = getActiveView(location.pathname);
 
   const selectedRikishi = useMemo(
     () =>
@@ -145,17 +167,6 @@ export function App() {
     });
   }
 
-  function navigateToView(view: ActiveView) {
-    const nextPath = view === "admin" ? "/admin" : "/";
-
-    if (window.location.pathname !== nextPath) {
-      window.history.replaceState({ activeView }, "", window.location.href);
-      window.history.pushState({ activeView: view }, "", nextPath);
-    }
-
-    setActiveView(view);
-  }
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -183,10 +194,9 @@ export function App() {
 
       setCreatedTeam(response);
       setLastSaveAction(saveAction);
-      setOwnedTeamId(response.team.id);
       setOwnedTeamLockedAt(response.team.lockedAt);
       setMyTeam(createMyTeamResponse(response, basho, rikishi));
-      setActiveView("stable");
+      navigate(appPaths.stable);
 
       const requestId = nextLeaderboardRequestId(leaderboardRequestIdRef);
       setLeaderboardLoadState("loading");
@@ -249,15 +259,14 @@ export function App() {
                 setSelectedIds,
               );
               setMyTeam(lockedTeam);
-              setOwnedTeamId(lockedTeam.team.id);
               setOwnedTeamLockedAt(lockedTeam.team.lockedAt ?? teamLockedAt);
-              setActiveView("stable");
+              navigate(appPaths.stable, { replace: true });
             } catch {
-              setActiveView("selection");
+              navigate(appPaths.team, { replace: true });
             }
           } else {
             applyMyTeam(myTeam, rikishi, false, setDisplayName, setSelectedIds);
-            setActiveView("stable");
+            navigate(appPaths.stable, { replace: true });
           }
         } else if (error.bashoStatus !== undefined) {
           const lockedStatus = error.bashoStatus;
@@ -273,7 +282,7 @@ export function App() {
                   basho: { ...current.basho, status: lockedStatus },
                 },
           );
-          setActiveView("stable");
+          navigate(appPaths.stable, { replace: true });
         }
       }
 
@@ -292,7 +301,7 @@ export function App() {
       applyMyTeam(myTeam, rikishi, false, setDisplayName, setSelectedIds);
     }
 
-    setActiveView("selection");
+    navigate(appPaths.team);
   }
 
   function cancelTeamEdit() {
@@ -304,7 +313,7 @@ export function App() {
     setCreatedTeam(null);
     setLastSaveAction(null);
     setErrorMessage(null);
-    setActiveView("stable");
+    navigate(appPaths.stable);
   }
 
   async function handleSignIn(event: FormEvent<HTMLFormElement>) {
@@ -353,6 +362,7 @@ export function App() {
       await loadBashoData(session, () => true, preserveAnonymousDraft);
     } catch (error) {
       if (bashoReloadStarted) {
+        setErrorMessage(getErrorMessage(error));
         setLoadState("error");
       }
       setSessionErrorMessage(getErrorMessage(error));
@@ -372,6 +382,7 @@ export function App() {
 
     setSessionState("submitting");
     setSessionErrorMessage(null);
+    navigate(appPaths.home, { replace: true });
 
     try {
       if (authMode === "neon") {
@@ -385,11 +396,9 @@ export function App() {
       setCreatedTeam(null);
       setLastSaveAction(null);
       setMyTeam(null);
-      setOwnedTeamId(null);
       setOwnedTeamLockedAt(undefined);
       setDisplayName("");
       setSelectedIds([]);
-      navigateToView("selection");
 
       bashoReloadStarted = true;
       await loadBashoData(
@@ -456,19 +465,7 @@ export function App() {
       setSelectedIds,
     );
     setMyTeam(loadedMyTeam);
-    setOwnedTeamId(loadedMyTeam?.team.id ?? null);
     setOwnedTeamLockedAt(loadedMyTeam?.team.lockedAt);
-    if (window.location.pathname !== "/admin") {
-      setActiveView(
-        loadedMyTeam !== null
-          ? "stable"
-          : preserveDraftWhenTeamMissing
-            ? "selection"
-            : session.user !== null
-              ? "stable"
-              : "selection",
-      );
-    }
     setLoadState(bashoRikishi.rikishi.length === 0 ? "empty" : "ready");
 
     const requestId = nextLeaderboardRequestId(leaderboardRequestIdRef);
@@ -570,172 +567,311 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const handlePopState = (event: PopStateEvent) => {
-      setActiveView(
-        window.location.pathname === "/admin"
-          ? "admin"
-          : (getHistoryActiveView(event.state) ?? "selection"),
-      );
-    };
+    document.title = `${getPageTitle(activeView)} | Fantasy Sumo`;
 
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
+    const focusTimer = window.setTimeout(() => {
+      document.getElementById("page-title")?.focus();
+    }, 0);
+
+    return () => window.clearTimeout(focusTimer);
+  }, [activeView]);
+
+  function renderPlayerData(content: ReactNode) {
+    if (loadState === "loading") {
+      return (
+        <section className="state-panel" aria-live="polite">
+          Loading the current basho...
+        </section>
+      );
+    }
+
+    if (loadState === "error") {
+      return (
+        <section className="state-panel error-state" role="alert">
+          {errorMessage ?? "Unable to load basho data."}
+        </section>
+      );
+    }
+
+    if (loadState === "empty" || basho === null) {
+      return (
+        <section className="state-panel">
+          No rikishi are available for the current basho yet.
+        </section>
+      );
+    }
+
+    return (
+      <>
+        <BashoPanel basho={basho} selectedCount={selectedIds.length} />
+        {content}
+      </>
+    );
+  }
+
+  const safeLoginReturnPath =
+    getSafeReturnPath(location.search) ?? appPaths.stable;
 
   return (
     <div className="site-shell">
       <AppHeader
-        activeView={activeView}
-        disabled={
-          submitState === "submitting" ||
-          (activeView !== "admin" && loadState !== "ready")
-        }
-        onChange={navigateToView}
+        onSignOut={handleSignOut}
+        sessionState={sessionState}
+        signOutDisabled={submitState === "submitting"}
         showAdmin={sessionUser?.isAdmin === true}
+        showTeam={sessionUser !== null && canEditPicks}
+        user={sessionUser}
       />
       <main className="app-shell">
         <PageHeader activeView={activeView} />
 
-        {activeView !== "admin" && loadState === "loading" && (
-          <section className="state-panel" aria-live="polite">
-            Loading the current basho...
-          </section>
-        )}
-
-        <AccountPanel
-          email={accountEmail}
-          errorMessage={sessionErrorMessage}
-          mode={authMode}
-          onDisplayNameChange={setAccountDisplayName}
-          onEmailChange={setAccountEmail}
-          onPasswordChange={setAccountPassword}
-          onSignIn={handleSignIn}
-          onSignOut={handleSignOut}
-          onSignUp={handleSignUp}
-          password={accountPassword}
-          sessionState={sessionState}
-          signOutDisabled={submitState === "submitting"}
-          user={sessionUser}
-          userDisplayName={accountDisplayName}
-        />
-
-        {activeView === "admin" &&
-          sessionState !== "loading" &&
-          (sessionUser?.isAdmin === true ? (
-            <AdminPanel
-              onPlayerDataRefresh={() =>
-                refreshPlayerData({
-                  mode: authMode ?? "local",
-                  user: sessionUser,
-                })
-              }
-            />
-          ) : (
-            <section className="state-panel error-state" role="alert">
-              Administrator access is required to open this page.
-            </section>
-          ))}
-
-        {activeView !== "admin" && loadState === "error" && (
-          <section className="state-panel error-state" role="alert">
-            {errorMessage ?? "Unable to load basho data."}
-          </section>
-        )}
-
-        {activeView !== "admin" && loadState === "empty" && (
-          <section className="state-panel">
-            No rikishi are available for the current basho yet.
-          </section>
-        )}
-
-        {activeView !== "admin" && loadState === "ready" && basho !== null && (
-          <>
-            <BashoPanel basho={basho} selectedCount={selectedIds.length} />
-
-            {activeView === "stable" &&
-              createdTeam !== null &&
-              lastSaveAction !== null && (
-                <div className="confirmation stable-confirmation" role="status">
-                  <strong>
-                    {lastSaveAction === "created"
-                      ? `${createdTeam.team.displayName} submitted.`
-                      : `Changes saved for ${createdTeam.team.displayName}.`}
-                  </strong>
-                  <span>
-                    {createdTeam.picks.length} rikishi selected for this basho.
-                  </span>
-                </div>
-              )}
-
-            {activeView === "stable" && (
-              <MyStablePanel
-                basho={basho}
-                myTeam={myTeam}
-                onEdit={openTeamEditor}
+        <Routes>
+          <Route
+            path={appPaths.home}
+            element={
+              loadState === "loading" ? (
+                <section className="state-panel" aria-live="polite">
+                  Loading the current basho...
+                </section>
+              ) : loadState === "error" ? (
+                <section className="state-panel error-state" role="alert">
+                  {errorMessage ?? "Unable to load basho data."}
+                </section>
+              ) : loadState === "empty" || basho === null ? (
+                <section className="state-panel">
+                  No rikishi are available for the current basho yet.
+                </section>
+              ) : (
+                <>
+                  <BashoPanel
+                    basho={basho}
+                    selectedCount={0}
+                    showPickProgress={false}
+                  />
+                  {sessionState === "ready" && sessionUser === null && (
+                    <section
+                      className="public-cta"
+                      aria-labelledby="join-title"
+                    >
+                      <div>
+                        <p className="eyebrow">Join this basho</p>
+                        <h2 id="join-title">Build your own stable</h2>
+                        <p>
+                          Log in or register to choose rikishi before picks
+                          close.
+                        </p>
+                      </div>
+                      <Link to={getLoginPath(appPaths.team)}>
+                        Log in / Join
+                      </Link>
+                    </section>
+                  )}
+                  <LeaderboardPanel
+                    basho={basho}
+                    createdTeam={null}
+                    currentTeamId={null}
+                    errorMessage={leaderboardErrorMessage}
+                    expandedTeamId={expandedTeamId}
+                    leaderboard={leaderboard}
+                    loadState={leaderboardLoadState}
+                    onToggleTeam={(teamId) =>
+                      setExpandedTeamId(
+                        expandedTeamId === teamId ? null : teamId,
+                      )
+                    }
+                    rikishi={rikishi}
+                    totalDays={leaderboardTotalDays}
+                  />
+                </>
+              )
+            }
+          />
+          <Route
+            path={appPaths.login}
+            element={
+              sessionState === "ready" && sessionUser !== null ? (
+                <Navigate replace to={safeLoginReturnPath} />
+              ) : (
+                <>
+                  <AccountPanel
+                    email={accountEmail}
+                    errorMessage={sessionErrorMessage}
+                    mode={authMode}
+                    onDisplayNameChange={setAccountDisplayName}
+                    onEmailChange={setAccountEmail}
+                    onPasswordChange={setAccountPassword}
+                    onSignIn={handleSignIn}
+                    onSignOut={handleSignOut}
+                    onSignUp={handleSignUp}
+                    password={accountPassword}
+                    sessionState={sessionState}
+                    signOutDisabled={submitState === "submitting"}
+                    user={null}
+                    userDisplayName={accountDisplayName}
+                  />
+                  {loadState === "error" && (
+                    <section className="state-panel error-state" role="alert">
+                      {errorMessage ?? "Unable to load basho data."}
+                    </section>
+                  )}
+                </>
+              )
+            }
+          />
+          <Route
+            path={appPaths.stable}
+            element={
+              <ProtectedRoute
+                returnTo={appPaths.stable}
+                sessionState={sessionState}
                 user={sessionUser}
-              />
-            )}
-
-            {activeView === "selection" && (
-              <TeamSelection
-                canSubmit={canSubmit}
-                createdTeam={createdTeam}
-                displayName={displayName}
-                errorMessage={errorMessage}
-                isLocked={!canEditPicks || sessionState === "submitting"}
-                lockMessage={pickLockMessage}
-                mode={myTeam === null ? "create" : "edit"}
-                onCancel={cancelTeamEdit}
-                onDisplayNameChange={(nextDisplayName) => {
-                  setDisplayName(nextDisplayName);
-                  setCreatedTeam(null);
-                  setLastSaveAction(null);
-                }}
-                onSubmit={handleSubmit}
-                onToggleRikishi={toggleRikishi}
-                rikishi={rikishi}
-                selectedIds={selectedIds}
-                selectedRikishi={selectedRikishi}
-                submitState={submitState}
-                teamSize={teamSize}
-              />
-            )}
-
-            {activeView === "leaderboard" && (
-              <LeaderboardPanel
-                basho={basho}
-                createdTeam={createdTeam}
-                currentTeamId={ownedTeamId}
-                errorMessage={leaderboardErrorMessage}
-                expandedTeamId={expandedTeamId}
-                leaderboard={leaderboard}
-                loadState={leaderboardLoadState}
-                onToggleTeam={(teamId) =>
-                  setExpandedTeamId(expandedTeamId === teamId ? null : teamId)
-                }
-                rikishi={rikishi}
-                totalDays={leaderboardTotalDays}
-              />
-            )}
-          </>
-        )}
+              >
+                {renderPlayerData(
+                  <>
+                    {createdTeam !== null && lastSaveAction !== null && (
+                      <div
+                        className="confirmation stable-confirmation"
+                        role="status"
+                      >
+                        <strong>
+                          {lastSaveAction === "created"
+                            ? `${createdTeam.team.displayName} submitted.`
+                            : `Changes saved for ${createdTeam.team.displayName}.`}
+                        </strong>
+                        <span>
+                          {createdTeam.picks.length} rikishi selected for this
+                          basho.
+                        </span>
+                      </div>
+                    )}
+                    <MyStablePanel
+                      basho={basho!}
+                      myTeam={myTeam}
+                      onEdit={openTeamEditor}
+                      user={sessionUser}
+                    />
+                  </>,
+                )}
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={appPaths.team}
+            element={
+              <ProtectedRoute
+                returnTo={appPaths.team}
+                sessionState={sessionState}
+                user={sessionUser}
+              >
+                {renderPlayerData(
+                  <TeamSelection
+                    canSubmit={canSubmit}
+                    createdTeam={createdTeam}
+                    displayName={displayName}
+                    errorMessage={errorMessage}
+                    isLocked={!canEditPicks || sessionState === "submitting"}
+                    lockMessage={pickLockMessage}
+                    mode={myTeam === null ? "create" : "edit"}
+                    onCancel={cancelTeamEdit}
+                    onDisplayNameChange={(nextDisplayName) => {
+                      setDisplayName(nextDisplayName);
+                      setCreatedTeam(null);
+                      setLastSaveAction(null);
+                    }}
+                    onSubmit={handleSubmit}
+                    onToggleRikishi={toggleRikishi}
+                    rikishi={rikishi}
+                    selectedIds={selectedIds}
+                    selectedRikishi={selectedRikishi}
+                    submitState={submitState}
+                    teamSize={teamSize}
+                  />,
+                )}
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={appPaths.admin}
+            element={
+              <ProtectedRoute
+                adminOnly
+                returnTo={appPaths.admin}
+                sessionState={sessionState}
+                user={sessionUser}
+              >
+                <AdminPanel
+                  onPlayerDataRefresh={() =>
+                    refreshPlayerData({
+                      mode: authMode ?? "local",
+                      user: sessionUser,
+                    })
+                  }
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/leaderboard"
+            element={<Navigate replace to={appPaths.home} />}
+          />
+          <Route path="*" element={<Navigate replace to={appPaths.home} />} />
+        </Routes>
       </main>
     </div>
   );
 }
 
-function getHistoryActiveView(state: unknown): ActiveView | null {
-  if (typeof state !== "object" || state === null || !("activeView" in state)) {
-    return null;
+interface ProtectedRouteProps {
+  adminOnly?: boolean;
+  children: ReactNode;
+  returnTo: "/stable" | "/team" | "/admin";
+  sessionState: "loading" | "ready" | "submitting";
+  user: SessionUser | null;
+}
+
+function ProtectedRoute({
+  adminOnly = false,
+  children,
+  returnTo,
+  sessionState,
+  user,
+}: ProtectedRouteProps) {
+  if (sessionState !== "ready") {
+    return (
+      <section className="state-panel" aria-live="polite">
+        Checking your session...
+      </section>
+    );
   }
 
-  const activeView = state.activeView;
-  return activeView === "stable" ||
-    activeView === "selection" ||
-    activeView === "leaderboard" ||
-    activeView === "admin"
-    ? activeView
-    : null;
+  if (user === null) {
+    return <Navigate replace to={getLoginPath(returnTo)} />;
+  }
+
+  if (adminOnly && user.isAdmin !== true) {
+    return (
+      <section className="state-panel error-state" role="alert">
+        Administrator access is required to open this page.
+      </section>
+    );
+  }
+
+  return children;
+}
+
+function getPageTitle(activeView: ReturnType<typeof getActiveView>): string {
+  switch (activeView) {
+    case "login":
+      return "Log in or join";
+    case "stable":
+      return "My stable";
+    case "team":
+      return "Team picks";
+    case "admin":
+      return "Admin controls";
+    default:
+      return "Leaderboard";
+  }
 }
 
 function getPublicDataErrorMessage(error: unknown): string {

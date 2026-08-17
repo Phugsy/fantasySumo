@@ -134,6 +134,43 @@ h2 {
   border-radius: 9px;
 }
 
+.public-cta {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 18px 0;
+  padding: 20px 22px;
+  border: 1px solid #c8dad2;
+  border-radius: var(--radius);
+  background: var(--moss-light);
+  color: #263f38;
+}
+
+.public-cta p:last-child {
+  margin-bottom: 0;
+}
+
+.public-cta a {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 11px 16px;
+  border-radius: 8px;
+  background: var(--indigo);
+  color: #ffffff;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.public-cta a:hover {
+  background: var(--indigo-deep);
+}
+
+.public-cta a:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
 .stable-confirmation {
   margin-bottom: 16px;
 }
@@ -168,6 +205,14 @@ h2 {
 @media (max-width: 640px) {
   .app-shell {
     padding-top: 26px;
+  }
+
+  .public-cta {
+    display: grid;
+  }
+
+  .public-cta a {
+    text-align: center;
   }
 }
 

@@ -1,24 +1,34 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { AppHeader } from "./AppHeader";
 
 describe("AppHeader", () => {
-  it("shows the wordmark and primary navigation", () => {
-    const onChange = vi.fn();
-
-    render(<AppHeader activeView="selection" onChange={onChange} />);
+  it("shows signed-in navigation and session actions", () => {
+    render(
+      <MemoryRouter initialEntries={["/stable"]}>
+        <AppHeader
+          onSignOut={vi.fn()}
+          sessionState="ready"
+          showTeam
+          user={{ id: "player", displayName: "East Stand" }}
+        />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByLabelText("Fantasy Sumo")).toBeInTheDocument();
     expect(
       screen.getByRole("navigation", { name: "Primary navigation" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "My stable" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "My stable" })).toHaveAttribute(
       "aria-current",
       "page",
     );
-
-    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
-
-    expect(onChange).toHaveBeenCalledWith("leaderboard");
+    expect(
+      screen.getByRole("link", { name: "Team picks" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sign out" }),
+    ).toBeInTheDocument();
   });
 });
