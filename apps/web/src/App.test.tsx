@@ -329,6 +329,58 @@ describe("App", () => {
     expect(screen.getByLabelText("Display name")).toHaveValue("");
   });
 
+  it("keeps public standings available when private-team loading fails", async () => {
+    window.history.replaceState({}, "", "/");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/basho/2026-05/my-team") {
+          return jsonResponse(
+            { message: "Unable to load your fantasy team." },
+            { status: 503 },
+          );
+        }
+
+        return mockSuccessfulFetch(input, init ?? currentBasho);
+      }),
+    );
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Leaderboard" }),
+    ).toBeInTheDocument();
+    expect(await screen.findAllByText("East Side")).not.toHaveLength(0);
+    expect(
+      screen.queryByText("Unable to load your fantasy team."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("stays on the private page and reports a failed sign-out", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/session" && init?.method === "DELETE") {
+          return jsonResponse(
+            { message: "Unable to sign out right now." },
+            { status: 503 },
+          );
+        }
+
+        return mockSuccessfulFetch(input, init ?? currentBasho);
+      }),
+    );
+    render(<App />);
+
+    await screen.findByRole("heading", { name: "No team for this basho yet" });
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+
+    expect(
+      await screen.findByText("Unable to sign out right now."),
+    ).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/stable");
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled();
+  });
+
   it("shows public basho data when the session probe is unauthorized", async () => {
     window.history.replaceState({}, "", "/");
     const fetchMock = vi.fn(mockUnauthorizedSessionFetch);
@@ -350,6 +402,69 @@ describe("App", () => {
         String(input).includes("/my-team"),
       ),
     ).toBe(false);
+  });
+
+  it("hides the public join prompt when picks are closed", async () => {
+    window.history.replaceState({}, "", "/");
+    const activeBasho = {
+      ...currentBasho,
+      status: "active" as const,
+      currentDay: 1,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        if (String(input) === "/api/session") {
+          return jsonResponse({ mode: "local", user: null });
+        }
+
+        return mockSuccessfulFetch(input, activeBasho);
+      }),
+    );
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Leaderboard" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Build your own stable" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("marks the signed-in player's team on the public leaderboard", async () => {
+    window.history.replaceState({}, "", "/");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+
+        if (url === "/api/basho/2026-05/my-team") {
+          return jsonResponse(createExistingMyTeamResponse());
+        }
+
+        if (url === "/api/basho/2026-05/leaderboard") {
+          return jsonResponse(
+            createLeaderboardResponse({
+              entries: [
+                {
+                  rank: 1,
+                  teamId: "team-existing",
+                  displayName: "Existing Champions",
+                  score: 0,
+                  scoreHistory: [],
+                  rikishiScores: [],
+                },
+              ],
+            }),
+          );
+        }
+
+        return mockSuccessfulFetch(input, init ?? currentBasho);
+      }),
+    );
+    render(<App />);
+
+    expect(await screen.findAllByText("Your team")).not.toHaveLength(0);
   });
 
   it("keeps the account panel available when initial basho loading is unauthorized", async () => {

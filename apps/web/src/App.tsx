@@ -118,6 +118,12 @@ function RoutedApp() {
     "created" | "updated" | null
   >(null);
   const [myTeam, setMyTeam] = useState<MyTeamResponse | null>(null);
+  const [privateTeamLoadState, setPrivateTeamLoadState] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
+  const [privateTeamErrorMessage, setPrivateTeamErrorMessage] = useState<
+    string | null
+  >(null);
   const [ownedTeamLockedAt, setOwnedTeamLockedAt] = useState<
     string | undefined
   >(undefined);
@@ -382,7 +388,6 @@ function RoutedApp() {
 
     setSessionState("submitting");
     setSessionErrorMessage(null);
-    navigate(appPaths.home, { replace: true });
 
     try {
       if (authMode === "neon") {
@@ -390,6 +395,8 @@ function RoutedApp() {
       } else {
         await clearSession();
       }
+      navigate(appPaths.home, { replace: true });
+      await wait(0);
       setSessionUser(null);
       setAccountEmail("");
       setAccountDisplayName("");
@@ -430,16 +437,20 @@ function RoutedApp() {
 
     setErrorMessage(null);
     setLeaderboardErrorMessage(null);
+    setPrivateTeamErrorMessage(null);
+    setPrivateTeamLoadState(session.user === null ? "ready" : "loading");
+
+    if (session.user !== null) {
+      setMyTeam(null);
+      setOwnedTeamLockedAt(undefined);
+    }
 
     let currentBasho: Basho;
     let bashoRikishi: Awaited<ReturnType<typeof fetchBashoRikishi>>;
-    let loadedMyTeam: MyTeamResponse | null;
 
     try {
       currentBasho = await fetchCurrentBasho();
       bashoRikishi = await fetchBashoRikishi(currentBasho.id);
-      loadedMyTeam =
-        session.user === null ? null : await fetchMyTeamOrNull(currentBasho.id);
     } catch (error) {
       if (!isCurrentBashoRequest()) {
         return;
@@ -457,53 +468,111 @@ function RoutedApp() {
       teamSize: currentBasho.teamSize,
     });
     setRikishi(bashoRikishi.rikishi);
-    applyMyTeam(
-      loadedMyTeam,
-      bashoRikishi.rikishi,
-      preserveDraftWhenTeamMissing,
-      setDisplayName,
-      setSelectedIds,
-    );
-    setMyTeam(loadedMyTeam);
-    setOwnedTeamLockedAt(loadedMyTeam?.team.lockedAt);
     setLoadState(bashoRikishi.rikishi.length === 0 ? "empty" : "ready");
 
     const requestId = nextLeaderboardRequestId(leaderboardRequestIdRef);
     setLeaderboardLoadState("loading");
 
-    try {
-      const leaderboardResponse = await fetchLeaderboard(currentBasho.id);
+    const leaderboardPromise = (async () => {
+      try {
+        const leaderboardResponse = await fetchLeaderboard(currentBasho.id);
 
-      if (
-        !isCurrentBashoRequest() ||
-        !isCurrentLeaderboardRequest(leaderboardRequestIdRef, requestId)
-      ) {
-        return;
+        if (
+          !isCurrentBashoRequest() ||
+          !isCurrentLeaderboardRequest(leaderboardRequestIdRef, requestId)
+        ) {
+          return null;
+        }
+
+        setBasho((current) =>
+          mergeLeaderboardBasho(current, leaderboardResponse),
+        );
+        setLeaderboardTotalDays(leaderboardResponse.totalDays);
+        setLeaderboard(leaderboardResponse.leaderboard);
+        setExpandedTeamId(getExpandedTeamId(leaderboardResponse, null));
+        setLeaderboardErrorMessage(null);
+        setLeaderboardLoadState("ready");
+
+        return leaderboardResponse;
+      } catch (error) {
+        if (
+          !isCurrentBashoRequest() ||
+          !isCurrentLeaderboardRequest(leaderboardRequestIdRef, requestId)
+        ) {
+          return null;
+        }
+
+        setLeaderboard([]);
+        setExpandedTeamId(null);
+        setLeaderboardErrorMessage(getErrorMessage(error));
+        setLeaderboardLoadState("ready");
+
+        return null;
+      }
+    })();
+
+    const privateTeamPromise = (async () => {
+      if (session.user === null) {
+        applyMyTeam(
+          null,
+          bashoRikishi.rikishi,
+          preserveDraftWhenTeamMissing,
+          setDisplayName,
+          setSelectedIds,
+        );
+        setMyTeam(null);
+        setOwnedTeamLockedAt(undefined);
+
+        return null;
       }
 
-      setBasho((current) =>
-        mergeLeaderboardBasho(current, leaderboardResponse),
-      );
-      setLeaderboardTotalDays(leaderboardResponse.totalDays);
-      setLeaderboard(leaderboardResponse.leaderboard);
-      setExpandedTeamId(
-        getExpandedTeamId(leaderboardResponse, loadedMyTeam?.team.id ?? null),
-      );
-      setLeaderboardErrorMessage(null);
-      setLeaderboardLoadState("ready");
-    } catch (error) {
-      if (
-        !isCurrentBashoRequest() ||
-        !isCurrentLeaderboardRequest(leaderboardRequestIdRef, requestId)
-      ) {
-        return;
-      }
+      try {
+        const loadedMyTeam = await fetchMyTeamOrNull(currentBasho.id);
 
-      setLeaderboard([]);
-      setExpandedTeamId(null);
-      setLeaderboardErrorMessage(getErrorMessage(error));
-      setLeaderboardLoadState("ready");
+        if (!isCurrentBashoRequest()) {
+          return null;
+        }
+
+        applyMyTeam(
+          loadedMyTeam,
+          bashoRikishi.rikishi,
+          preserveDraftWhenTeamMissing,
+          setDisplayName,
+          setSelectedIds,
+        );
+        setMyTeam(loadedMyTeam);
+        setOwnedTeamLockedAt(loadedMyTeam?.team.lockedAt);
+        setPrivateTeamLoadState("ready");
+
+        return loadedMyTeam;
+      } catch (error) {
+        if (!isCurrentBashoRequest()) {
+          return null;
+        }
+
+        setPrivateTeamErrorMessage(getErrorMessage(error));
+        setPrivateTeamLoadState("error");
+
+        return null;
+      }
+    })();
+
+    const [leaderboardResponse, loadedMyTeam] = await Promise.all([
+      leaderboardPromise,
+      privateTeamPromise,
+    ]);
+
+    if (
+      !isCurrentBashoRequest() ||
+      leaderboardResponse === null ||
+      loadedMyTeam === null
+    ) {
+      return;
     }
+
+    setExpandedTeamId(
+      getExpandedTeamId(leaderboardResponse, loadedMyTeam.team.id),
+    );
   }
 
   async function refreshPlayerData(session: SessionResponse) {
@@ -601,6 +670,22 @@ function RoutedApp() {
       );
     }
 
+    if (privateTeamLoadState === "loading") {
+      return (
+        <section className="state-panel" aria-live="polite">
+          Loading your stable...
+        </section>
+      );
+    }
+
+    if (privateTeamLoadState === "error") {
+      return (
+        <section className="state-panel error-state" role="alert">
+          {privateTeamErrorMessage ?? "Unable to load your fantasy team."}
+        </section>
+      );
+    }
+
     return (
       <>
         <BashoPanel basho={basho} selectedCount={selectedIds.length} />
@@ -624,6 +709,11 @@ function RoutedApp() {
       />
       <main className="app-shell">
         <PageHeader activeView={activeView} />
+        {sessionUser !== null && sessionErrorMessage !== null && (
+          <section className="state-panel error-state" role="alert">
+            {sessionErrorMessage}
+          </section>
+        )}
 
         <Routes>
           <Route
@@ -648,28 +738,30 @@ function RoutedApp() {
                     selectedCount={0}
                     showPickProgress={false}
                   />
-                  {sessionState === "ready" && sessionUser === null && (
-                    <section
-                      className="public-cta"
-                      aria-labelledby="join-title"
-                    >
-                      <div>
-                        <p className="eyebrow">Join this basho</p>
-                        <h2 id="join-title">Build your own stable</h2>
-                        <p>
-                          Log in or register to choose rikishi before picks
-                          close.
-                        </p>
-                      </div>
-                      <Link to={getLoginPath(appPaths.team)}>
-                        Log in / Join
-                      </Link>
-                    </section>
-                  )}
+                  {sessionState === "ready" &&
+                    sessionUser === null &&
+                    canEditPicks && (
+                      <section
+                        className="public-cta"
+                        aria-labelledby="join-title"
+                      >
+                        <div>
+                          <p className="eyebrow">Join this basho</p>
+                          <h2 id="join-title">Build your own stable</h2>
+                          <p>
+                            Log in or register to choose rikishi before picks
+                            close.
+                          </p>
+                        </div>
+                        <Link to={getLoginPath(appPaths.team)}>
+                          Log in / Join
+                        </Link>
+                      </section>
+                    )}
                   <LeaderboardPanel
                     basho={basho}
                     createdTeam={null}
-                    currentTeamId={null}
+                    currentTeamId={myTeam?.team.id ?? null}
                     errorMessage={leaderboardErrorMessage}
                     expandedTeamId={expandedTeamId}
                     leaderboard={leaderboard}

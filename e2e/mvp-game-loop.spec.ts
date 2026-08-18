@@ -186,7 +186,7 @@ test("creates a fantasy team and follows its My Stable score", async ({
     page.getByRole("heading", { name: "Follow the leaderboard" }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Log in / Join" })).toHaveCount(
-    2,
+    1,
   );
   await expect(page.getByRole("link", { name: "My stable" })).toHaveCount(0);
 });
@@ -238,9 +238,10 @@ test("blocks team submission while sign-out is in flight", async ({ page }) => {
 
   await page.getByRole("button", { name: "Sign out" }).click();
 
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/team$/);
   await expect(page.getByRole("button", { name: "Sign out" })).toBeDisabled();
   releaseSignOut();
+  await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("link", { name: "Log in / Join" })).toHaveCount(
     2,
   );

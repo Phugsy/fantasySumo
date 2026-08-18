@@ -119,10 +119,22 @@
 
 @media (max-width: 640px) {
   .app-header-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
     align-items: stretch;
+    justify-content: stretch;
     min-height: 0;
     padding-top: 12px;
+    padding-right: 16px;
     padding-bottom: 12px;
+    padding-left: 16px;
+  }
+
+  .app-header-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100%;
   }
 
   .wordmark-copy small {
@@ -131,23 +143,6 @@
 
   .session-actions span {
     display: none;
-  }
-}
-
-@media (max-width: 460px) {
-  .app-header-inner {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-    justify-content: stretch;
-    padding-right: 16px;
-    padding-left: 16px;
-  }
-
-  .app-header-actions {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    width: 100%;
   }
 
   .wordmark-mark {
