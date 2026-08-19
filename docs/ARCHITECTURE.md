@@ -136,6 +136,11 @@ Current routes:
   - Request body: `day` and optional `division`.
   - Maps source payloads into local `BoutResult` records using local shikona-based rikishi ids.
   - Replaces stale result rows only for the imported basho/day.
+  - After results commit, attempts to import the following day's published
+    schedule through the same workflow used by production cron.
+  - Returns `status: "partial"` plus an `unavailable` or `failed` schedule
+    result when that second source-backed step cannot complete; completed
+    results remain committed and any stored schedule remains unchanged.
   - Supports `?dryRun=true`.
 - `POST /api/admin/basho/:bashoId/import-schedule`
   - Fetches one published Makuuchi torikumi day without requiring winner data.
@@ -164,15 +169,17 @@ Current routes:
   - On days 1-15, selects the single date-eligible basho, derives its day from
     the current calendar date in `Asia/Tokyo`, and sequentially imports every
     day missing from stored bout results through that day, while refreshing the
-    current day on every run.
+    current day on every run. The current-day step also attempts the published
+    day N+1 schedule, except after day 15.
   - Keeps locked or active bashos eligible after their end date until the final
     day's results complete them.
   - Reuses the source adapter and transactional result import service used by
     the manual admin route.
   - Moves an upcoming or locked basho to active with day 1 and completes it
     with day 15.
-  - Returns structured locked/imported/skipped status and logs success or
-    failure.
+  - Returns structured locked/imported/partial/skipped status. A schedule-only
+    warning is logged as partial success after results commit; result-source,
+    validation, and target-selection failures remain unsuccessful requests.
 - `GET /api/admin/basho/current`
   - Requires an authenticated admin selected by the server-only
     `ADMIN_USER_IDS` allowlist.

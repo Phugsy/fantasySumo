@@ -52,6 +52,15 @@ interface SumoApiTorikumiRow {
   winnerEn?: string;
 }
 
+export class ScheduleUnavailableError extends Error {
+  constructor(bashoId: string, day: number) {
+    super(
+      `Sumo API schedule for ${bashoId} day ${day} is not published or unavailable.`,
+    );
+    this.name = "ScheduleUnavailableError";
+  }
+}
+
 export async function fetchJsaBanzukeImport(
   fetchFn: SourceFetch,
   options: JsaBanzukeImportOptions = {},
@@ -150,9 +159,7 @@ export function mapSumoApiSchedulePayload(
   const rows = payload.torikumi ?? [];
 
   if (rows.length === 0) {
-    throw new Error(
-      `Sumo API schedule for ${options.bashoId} day ${options.day} is not published or unavailable.`,
-    );
+    throw new ScheduleUnavailableError(options.bashoId, options.day);
   }
 
   const participants = rows.flatMap((row) => [

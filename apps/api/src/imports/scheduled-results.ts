@@ -1,6 +1,10 @@
 import type { Basho } from "@fantasy-sumo/domain";
 import type { Repositories } from "@fantasy-sumo/db";
 import { fetchSumoApiResultsImport } from "./adapters.js";
+import {
+  importDailyResultsAndFollowingSchedule,
+  type FollowingDayScheduleImportResult,
+} from "./daily-update.js";
 import { importBoutResults } from "./service.js";
 import type { ImportResult, SourceFetch } from "./types.js";
 import { formatJapanDate } from "../time.js";
@@ -22,12 +26,13 @@ export type ScheduledResultsImportResult =
       lockedAt: string;
     }
   | {
-      status: "imported";
+      status: "imported" | "partial";
       bashoId: string;
       day: number;
       importedDays: number[];
       japanDate: string;
       import: ImportResult;
+      schedule: FollowingDayScheduleImportResult;
     };
 
 interface ScheduledResultsImportOptions {
@@ -114,29 +119,36 @@ export async function runScheduledResultsImport(
   ).filter(
     (importDay) => importDay === day || !storedResultDays.has(importDay),
   );
-  let importResult: ImportResult | undefined;
-
-  for (const importDay of importedDays) {
+  for (const importDay of importedDays.slice(0, -1)) {
     const command = await fetchSumoApiResultsImport(sourceFetch, {
       bashoId: basho.id,
       day: importDay,
     });
-    importResult = await importBoutResults(repositories, command);
+    await importBoutResults(repositories, command);
   }
 
-  if (importResult === undefined) {
-    throw new Error(
-      `Scheduled basho update resolved no import days for ${basho.id}.`,
-    );
-  }
+  const dailyUpdate = await importDailyResultsAndFollowingSchedule(
+    repositories,
+    sourceFetch,
+    {
+      bashoId: basho.id,
+      day,
+    },
+  );
+  const {
+    schedule,
+    status: dailyUpdateStatus,
+    ...currentDayImport
+  } = dailyUpdate;
 
   return {
-    status: "imported",
+    status: dailyUpdateStatus === "partial" ? "partial" : "imported",
     bashoId: basho.id,
     day,
     importedDays,
     japanDate,
-    import: importResult,
+    import: currentDayImport,
+    schedule,
   };
 }
 

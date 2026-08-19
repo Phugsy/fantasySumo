@@ -5,6 +5,7 @@ import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   createDatabaseClient,
+  createRepositories,
   runMigrations,
   type DatabaseClient,
 } from "@fantasy-sumo/db";
@@ -179,9 +180,17 @@ describe("admin import routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
+      status: "complete",
       source: "sumo-api-results",
       summary: {
         results: { created: 1 },
+      },
+      schedule: {
+        status: "imported",
+        day: 2,
+        import: {
+          summary: { scheduledBouts: { created: 1 } },
+        },
       },
     });
 
@@ -190,6 +199,66 @@ describe("admin import routes", () => {
       url: "/api/basho/2026-05/leaderboard",
     });
     expect(leaderboardResponse.statusCode).toBe(200);
+  });
+
+  it("keeps imported results and reports partial success when the next schedule is unavailable", async () => {
+    await app.inject({
+      method: "POST",
+      url: "/api/admin/import-banzuke",
+      payload: {},
+    });
+
+    await app.close();
+    app = buildApp({
+      allowUnprotectedAdminImports: true,
+      db: client,
+      sourceFetch: async (url) => {
+        const day = Number(String(url).split("/").at(-1));
+
+        return day === 1
+          ? jsonResponse({
+              torikumi: [
+                {
+                  bashoId: "202605",
+                  day: 1,
+                  matchNo: 1,
+                  eastId: 4227,
+                  eastShikona: "Onosato",
+                  westId: 3661,
+                  westShikona: "Kotozakura",
+                  winnerId: 4227,
+                },
+              ],
+            })
+          : jsonResponse({ torikumi: [] });
+      },
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/admin/basho/2026-05/import-results",
+      payload: { day: 1 },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "partial",
+      summary: { results: { created: 1 } },
+      schedule: {
+        status: "unavailable",
+        day: 2,
+        message:
+          "Sumo API schedule for 2026-05 day 2 is not published or unavailable.",
+      },
+    });
+
+    const repositories = createRepositories(client);
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toHaveLength(
+      1,
+    );
+    expect(
+      await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
+    ).toEqual([]);
   });
 
   it("imports future schedules without creating scored results", async () => {
