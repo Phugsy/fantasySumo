@@ -3,6 +3,7 @@ import {
   ApiRequestError,
   createFantasyTeam,
   fetchCurrentBasho,
+  fetchSchedule,
   getCurrentBashoUrl,
   reportAuthClientTokenUnavailable,
   setAuthTokenProvider,
@@ -152,6 +153,30 @@ describe("api auth headers", () => {
     await expect(fetchCurrentBasho()).resolves.toMatchObject({ id: "2026-09" });
     expect(tokenProvider).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledWith("/api/basho/current", {
+      credentials: "same-origin",
+      headers: {},
+    });
+  });
+
+  it("loads published schedules through the public basho boundary", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ bashoId: "2026-05", publishedDays: [], bouts: [] }),
+          { headers: { "content-type": "application/json" }, status: 200 },
+        ),
+      ),
+    );
+    const tokenProvider = vi.fn(() => Promise.resolve("verified-token"));
+
+    vi.stubGlobal("fetch", fetchMock);
+    setAuthTokenProvider(tokenProvider);
+
+    await expect(fetchSchedule("2026-05")).resolves.toMatchObject({
+      publishedDays: [],
+    });
+    expect(tokenProvider).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith("/api/basho/2026-05/schedule", {
       credentials: "same-origin",
       headers: {},
     });

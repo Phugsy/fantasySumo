@@ -105,6 +105,68 @@ export function registerBashoRoutes(
     };
   });
 
+  app.get<{
+    Params: { bashoId: string };
+  }>("/api/basho/:bashoId/schedule", async (request, reply) => {
+    const basho = await context.repositories.getBasho(request.params.bashoId);
+
+    if (basho === undefined) {
+      return reply.code(404).send({
+        error: "not-found",
+        message: `Basho ${request.params.bashoId} was not found.`,
+      });
+    }
+
+    const afterDay = basho.currentDay ?? 0;
+    const publications = (
+      await context.repositories.listScheduledBoutPublicationsForBasho(basho.id)
+    ).filter((publication) => publication.day > afterDay);
+    const publishedDays = new Set(
+      publications.map((publication) => publication.day),
+    );
+    const banzukeByRikishiId = new Map(
+      (await context.repositories.listBanzukeEntriesForBasho(basho.id)).map(
+        (entry) => [entry.rikishiId, entry],
+      ),
+    );
+    const rikishiById = new Map(
+      (await context.repositories.listRikishi()).map((rikishi) => [
+        rikishi.id,
+        rikishi,
+      ]),
+    );
+    const toScheduledRikishi = (rikishiId: string) => {
+      const rikishi = rikishiById.get(rikishiId);
+      const banzuke = banzukeByRikishiId.get(rikishiId);
+
+      return {
+        id: rikishiId,
+        shikona: rikishi?.shikona ?? rikishiId,
+        ...(banzuke === undefined ? {} : { rank: banzuke.rank }),
+      };
+    };
+    const bouts = (
+      await context.repositories.listScheduledBoutsForBasho(basho.id)
+    )
+      .filter((bout) => publishedDays.has(bout.day))
+      .map((bout) => ({
+        id: bout.id,
+        day: bout.day,
+        status: bout.status,
+        east: toScheduledRikishi(bout.eastRikishiId),
+        west: toScheduledRikishi(bout.westRikishiId),
+        ...(bout.withdrawnRikishiId === undefined
+          ? {}
+          : { withdrawnRikishiId: bout.withdrawnRikishiId }),
+      }));
+
+    return {
+      bashoId: basho.id,
+      publishedDays: publications.map((publication) => publication.day),
+      bouts,
+    };
+  });
+
   app.post<{
     Params: { bashoId: string };
     Body: unknown;

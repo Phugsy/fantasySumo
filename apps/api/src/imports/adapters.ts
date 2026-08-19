@@ -2,8 +2,10 @@ import type {
   BanzukeImportCommand,
   JsaBanzukeImportOptions,
   SourceFetch,
+  SumoApiScheduleImportOptions,
   SumoApiResultsImportOptions,
   BoutResultsImportCommand,
+  ScheduledBoutsImportCommand,
 } from "./types.js";
 import { toCompactBashoId, toLocalBashoId, toLocalRikishiId } from "./ids.js";
 
@@ -125,6 +127,61 @@ export async function fetchSumoApiResultsImport(
     bashoId: options.bashoId,
     day: options.day,
   });
+}
+
+export async function fetchSumoApiScheduleImport(
+  fetchFn: SourceFetch,
+  options: SumoApiScheduleImportOptions,
+): Promise<ScheduledBoutsImportCommand> {
+  const division = options.division ?? "Makuuchi";
+  const sourceBashoId = toCompactBashoId(options.bashoId);
+  const payload = await fetchJson<SumoApiTorikumiPayload>(
+    fetchFn,
+    `${SUMO_API_BASE_URL}/basho/${sourceBashoId}/torikumi/${division}/${options.day}`,
+  );
+
+  return mapSumoApiSchedulePayload(payload, options);
+}
+
+export function mapSumoApiSchedulePayload(
+  payload: SumoApiTorikumiPayload,
+  options: { bashoId: string; day: number },
+): ScheduledBoutsImportCommand {
+  const rows = payload.torikumi ?? [];
+
+  if (rows.length === 0) {
+    throw new Error(
+      `Sumo API schedule for ${options.bashoId} day ${options.day} is not published or unavailable.`,
+    );
+  }
+
+  const participants = rows.flatMap((row) => [
+    toSourceRikishi(requiredString(row.eastShikona, "eastShikona")),
+    toSourceRikishi(requiredString(row.westShikona, "westShikona")),
+  ]);
+
+  return {
+    source: "sumo-api-schedule",
+    bashoId: options.bashoId,
+    day: options.day,
+    rikishi: uniqueRikishi(participants),
+    bouts: rows.map((row, index) => {
+      const matchNo = row.matchNo ?? index + 1;
+
+      return {
+        id: `${options.bashoId}-day-${options.day}-match-${matchNo}`,
+        bashoId: toLocalBashoId(row.bashoId ?? options.bashoId),
+        day: row.day ?? options.day,
+        eastRikishiId: toLocalRikishiId(
+          requiredString(row.eastShikona, "eastShikona"),
+        ),
+        westRikishiId: toLocalRikishiId(
+          requiredString(row.westShikona, "westShikona"),
+        ),
+        status: "scheduled",
+      };
+    }),
+  };
 }
 
 export function mapSumoApiTorikumiPayload(

@@ -3,6 +3,7 @@ import type {
   Basho,
   BoutResult,
   Rikishi,
+  ScheduledBout,
 } from "@fantasy-sumo/domain";
 import { preserveBashoLifecycleProgress } from "@fantasy-sumo/domain";
 import type { Repositories } from "@fantasy-sumo/db";
@@ -14,6 +15,7 @@ import type {
   ImportResult,
   ImportSummary,
   ImportValidationIssue,
+  ScheduledBoutsImportCommand,
 } from "./types.js";
 
 export class ImportValidationError extends Error {
@@ -121,6 +123,60 @@ export async function importBoutResults(
       day: command.results[0]!.day,
       rikishi: missingSourceRikishi,
       results: command.results,
+    });
+  }
+
+  return {
+    dryRun: options.dryRun === true,
+    source: command.source,
+    summary,
+  };
+}
+
+export async function importScheduledBouts(
+  repositories: Repositories,
+  command: ScheduledBoutsImportCommand,
+  options: ImportOptions = {},
+): Promise<ImportResult> {
+  const issues = await validateScheduledBoutsImport(repositories, command);
+
+  if (issues.length > 0) {
+    throw new ImportValidationError(issues);
+  }
+
+  const summary = createEmptySummary();
+  const existingRikishi = await repositories.listRikishi();
+  const existingRikishiIds = new Set(
+    existingRikishi.map((rikishi) => rikishi.id),
+  );
+  const missingSourceRikishi = (command.rikishi ?? []).filter(
+    (rikishi) => !existingRikishiIds.has(rikishi.id),
+  );
+  summary.scheduledBouts = summarizeMany(
+    (await repositories.listScheduledBoutsForBasho(command.bashoId)).filter(
+      (bout) => bout.day === command.day,
+    ),
+    command.bouts,
+    isEqualScheduledBout,
+    { countDeleted: true },
+  );
+  summary.rikishi = summarizeMany(
+    existingRikishi,
+    missingSourceRikishi,
+    isEqualRikishi,
+  );
+
+  if (options.dryRun !== true) {
+    await repositories.applyScheduledBoutsImport({
+      publication: {
+        id: `${command.bashoId}-day-${command.day}-schedule`,
+        bashoId: command.bashoId,
+        day: command.day,
+        source: command.source,
+        publishedAt: new Date().toISOString(),
+      },
+      rikishi: missingSourceRikishi,
+      bouts: command.bouts,
     });
   }
 
@@ -294,12 +350,129 @@ async function validateBoutResultsImport(
   return issues;
 }
 
+async function validateScheduledBoutsImport(
+  repositories: Repositories,
+  command: ScheduledBoutsImportCommand,
+): Promise<ImportValidationIssue[]> {
+  const issues: ImportValidationIssue[] = [];
+  const rikishiIds = new Set(
+    (await repositories.listRikishi()).map((rikishi) => rikishi.id),
+  );
+  const importedRikishiIds = new Set(
+    (command.rikishi ?? []).map((rikishi) => rikishi.id),
+  );
+  for (const rikishiId of importedRikishiIds) {
+    rikishiIds.add(rikishiId);
+  }
+  const banzukeRikishiIds = new Set(
+    (await repositories.listBanzukeEntriesForBasho(command.bashoId)).map(
+      (entry) => entry.rikishiId,
+    ),
+  );
+  const boutIds = new Set<string>();
+  const scheduledRikishiIds = new Set<string>();
+
+  if ((await repositories.getBasho(command.bashoId)) === undefined) {
+    issues.push({
+      path: "bashoId",
+      message: `Basho ${command.bashoId} does not exist.`,
+    });
+  }
+
+  if (command.day < 1 || command.day > 15) {
+    issues.push({
+      path: "day",
+      message: "Schedule day must be between 1 and 15.",
+    });
+  }
+
+  for (const [index, bout] of command.bouts.entries()) {
+    if (bout.bashoId !== command.bashoId) {
+      issues.push({
+        path: `bouts.${index}.bashoId`,
+        message: "Scheduled bout basho id must match the import target.",
+      });
+    }
+
+    if (bout.day !== command.day) {
+      issues.push({
+        path: `bouts.${index}.day`,
+        message: "One schedule import can only replace a single basho day.",
+      });
+    }
+
+    if (bout.eastRikishiId === bout.westRikishiId) {
+      issues.push({
+        path: `bouts.${index}`,
+        message: "A scheduled bout must contain two different rikishi.",
+      });
+    }
+
+    const participantIds = [bout.eastRikishiId, bout.westRikishiId];
+    if (!participantIds.some((id) => banzukeRikishiIds.has(id))) {
+      issues.push({
+        path: `bouts.${index}`,
+        message: "At least one scheduled rikishi must be on the basho banzuke.",
+      });
+    }
+
+    for (const [side, rikishiId] of [
+      ["eastRikishiId", bout.eastRikishiId],
+      ["westRikishiId", bout.westRikishiId],
+    ] as const) {
+      if (!rikishiIds.has(rikishiId)) {
+        issues.push({
+          path: `bouts.${index}.${side}`,
+          message: `Rikishi ${rikishiId} does not exist.`,
+        });
+      } else if (
+        !banzukeRikishiIds.has(rikishiId) &&
+        !importedRikishiIds.has(rikishiId)
+      ) {
+        issues.push({
+          path: `bouts.${index}.${side}`,
+          message: `Rikishi ${rikishiId} is not on the basho banzuke.`,
+        });
+      }
+
+      if (scheduledRikishiIds.has(rikishiId)) {
+        issues.push({
+          path: `bouts.${index}.${side}`,
+          message: `Rikishi ${rikishiId} appears in more than one scheduled bout.`,
+        });
+      }
+      scheduledRikishiIds.add(rikishiId);
+    }
+
+    if (
+      bout.withdrawnRikishiId !== undefined &&
+      !participantIds.includes(bout.withdrawnRikishiId)
+    ) {
+      issues.push({
+        path: `bouts.${index}.withdrawnRikishiId`,
+        message: "A withdrawal must identify one of the scheduled rikishi.",
+      });
+    }
+
+    if (boutIds.has(bout.id)) {
+      issues.push({
+        path: `bouts.${index}.id`,
+        message: `Scheduled bout ${bout.id} appears more than once.`,
+      });
+    }
+    boutIds.add(bout.id);
+  }
+
+  return issues;
+}
+
 function createEmptySummary(): ImportSummary {
   return {
     basho: createEmptyEntitySummary(),
     rikishi: createEmptyEntitySummary(),
     banzuke: createEmptyEntitySummary(),
     results: createEmptyEntitySummary(),
+    scheduledBouts: createEmptyEntitySummary(),
   };
 }
 
@@ -421,5 +594,17 @@ function isEqualBoutResult(left: BoutResult, right: BoutResult) {
     left.kimarite === right.kimarite &&
     left.winnerAbsent === right.winnerAbsent &&
     left.loserAbsent === right.loserAbsent
+  );
+}
+
+function isEqualScheduledBout(left: ScheduledBout, right: ScheduledBout) {
+  return (
+    left.id === right.id &&
+    left.bashoId === right.bashoId &&
+    left.day === right.day &&
+    left.eastRikishiId === right.eastRikishiId &&
+    left.westRikishiId === right.westRikishiId &&
+    left.status === right.status &&
+    left.withdrawnRikishiId === right.withdrawnRikishiId
   );
 }

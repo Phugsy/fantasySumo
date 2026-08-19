@@ -8,6 +8,7 @@ import type {
   CreatedTeamResponse,
   LeaderboardResponse,
   MyTeamResponse,
+  ScheduleResponse,
   SessionResponse,
 } from "./types";
 
@@ -136,6 +137,12 @@ export async function clearSession(): Promise<void> {
 
 export async function fetchMyTeam(bashoId: string): Promise<MyTeamResponse> {
   return getJson<MyTeamResponse>(`/api/basho/${bashoId}/my-team`);
+}
+
+export async function fetchSchedule(
+  bashoId: string,
+): Promise<ScheduleResponse> {
+  return getJson<ScheduleResponse>(`/api/basho/${bashoId}/schedule`, false);
 }
 
 export async function createFantasyTeam(

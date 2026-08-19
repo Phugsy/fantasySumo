@@ -5,7 +5,7 @@ ifneq ($(PNPM_DIR),)
 export PATH := $(PNPM_DIR):$(PATH)
 endif
 
-.PHONY: help install dev demo dev-client dev-server build test lint format format-check check deployment-verify e2e e2e-ui e2e-install db-migrate db-seed db-seed-demo demo-reset demo-start demo-advance-day demo-complete import-banzuke import-results clean
+.PHONY: help install dev demo dev-client dev-server build test lint format format-check check deployment-verify e2e e2e-ui e2e-install db-migrate db-seed db-seed-demo demo-reset demo-start demo-advance-day demo-complete import-banzuke import-results import-schedule clean
 
 help: ## Show available make targets.
 	@awk 'BEGIN {FS = ":.*## "; printf "Fantasy Sumo development commands:\n\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -88,6 +88,9 @@ import-banzuke: ## Import current banzuke data from source.
 
 import-results: ## Import daily results from source. Pass ARGS="-- --basho 2026-05 --day 1".
 	$(PNPM) import:results $(ARGS)
+
+import-schedule: ## Import a published daily schedule. Pass ARGS="-- --basho 2026-05 --day 2".
+	$(PNPM) import:schedule $(ARGS)
 
 clean: ## Remove generated build artifacts.
 	rm -rf apps/api/dist apps/web/dist packages/db/dist packages/domain/dist

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { mapJsaBanzukePayload, mapSumoApiTorikumiPayload } from "./adapters.js";
+import {
+  mapJsaBanzukePayload,
+  mapSumoApiSchedulePayload,
+  mapSumoApiTorikumiPayload,
+} from "./adapters.js";
 
 describe("source import adapters", () => {
   it("maps JSA banzuke payloads into local import commands", () => {
@@ -177,5 +181,54 @@ describe("source import adapters", () => {
       winnerRikishiId: "kotozakura",
       loserRikishiId: "onosato",
     });
+  });
+
+  it("maps a future torikumi without inventing a result", () => {
+    const command = mapSumoApiSchedulePayload(
+      {
+        torikumi: [
+          {
+            bashoId: "202605",
+            day: 4,
+            matchNo: 2,
+            eastShikona: "Onosato",
+            westShikona: "Kotozakura",
+          },
+        ],
+      },
+      { bashoId: "2026-05", day: 4 },
+    );
+
+    expect(command).toEqual({
+      source: "sumo-api-schedule",
+      bashoId: "2026-05",
+      day: 4,
+      rikishi: [
+        { id: "onosato", shikona: "Onosato" },
+        { id: "kotozakura", shikona: "Kotozakura" },
+      ],
+      bouts: [
+        {
+          id: "2026-05-day-4-match-2",
+          bashoId: "2026-05",
+          day: 4,
+          eastRikishiId: "onosato",
+          westRikishiId: "kotozakura",
+          status: "scheduled",
+        },
+      ],
+    });
+    expect(JSON.stringify(command)).not.toContain("winner");
+  });
+
+  it("rejects an empty source schedule instead of claiming it was published", () => {
+    expect(() =>
+      mapSumoApiSchedulePayload(
+        { torikumi: [] },
+        { bashoId: "2026-05", day: 5 },
+      ),
+    ).toThrow(
+      "Sumo API schedule for 2026-05 day 5 is not published or unavailable.",
+    );
   });
 });

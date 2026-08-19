@@ -8,10 +8,12 @@ import {
   runMigrations,
   type DatabaseClient,
 } from "@fantasy-sumo/db";
+import { calculateTeamScore } from "@fantasy-sumo/domain";
 import type { BanzukeImportCommand } from "./types.js";
 import {
   importBanzuke,
   importBoutResults,
+  importScheduledBouts,
   ImportValidationError,
 } from "./service.js";
 
@@ -401,5 +403,139 @@ describe("import service", () => {
       }),
     ).rejects.toThrow(ImportValidationError);
     expect(await repositories.listBoutResultsForBasho("2026-05")).toEqual([]);
+  });
+
+  it("imports and safely amends a published schedule without affecting scores", async () => {
+    const repositories = createRepositories(client);
+    await importBanzuke(repositories, banzukeCommand);
+
+    await importScheduledBouts(repositories, {
+      source: "test-schedule",
+      bashoId: "2026-05",
+      day: 1,
+      bouts: [
+        {
+          id: "2026-05-day-1-match-1",
+          bashoId: "2026-05",
+          day: 1,
+          eastRikishiId: "onosato",
+          westRikishiId: "kotozakura",
+          status: "scheduled",
+        },
+      ],
+    });
+
+    const amended = await importScheduledBouts(repositories, {
+      source: "test-schedule",
+      bashoId: "2026-05",
+      day: 1,
+      bouts: [
+        {
+          id: "2026-05-day-1-match-1",
+          bashoId: "2026-05",
+          day: 1,
+          eastRikishiId: "onosato",
+          westRikishiId: "kotozakura",
+          status: "cancelled",
+          withdrawnRikishiId: "kotozakura",
+        },
+      ],
+    });
+
+    expect(amended.summary.scheduledBouts.updated).toBe(1);
+    expect(await repositories.listScheduledBoutsForBasho("2026-05")).toEqual([
+      expect.objectContaining({
+        id: "2026-05-day-1-match-1",
+        status: "cancelled",
+        withdrawnRikishiId: "kotozakura",
+      }),
+    ]);
+    expect(
+      calculateTeamScore(
+        {
+          id: "stable",
+          bashoId: "2026-05",
+          displayName: "Stable",
+        },
+        [{ teamId: "stable", rikishiId: "onosato" }],
+        await repositories.listBoutResultsForBasho("2026-05"),
+      ).score,
+    ).toBe(0);
+  });
+
+  it("records an empty published day and removes stale scheduled bouts", async () => {
+    const repositories = createRepositories(client);
+    await importBanzuke(repositories, banzukeCommand);
+    await importScheduledBouts(repositories, {
+      source: "test-schedule",
+      bashoId: "2026-05",
+      day: 2,
+      bouts: [
+        {
+          id: "2026-05-day-2-match-1",
+          bashoId: "2026-05",
+          day: 2,
+          eastRikishiId: "onosato",
+          westRikishiId: "kotozakura",
+          status: "scheduled",
+        },
+      ],
+    });
+
+    const replacement = await importScheduledBouts(repositories, {
+      source: "test-schedule",
+      bashoId: "2026-05",
+      day: 2,
+      bouts: [],
+    });
+
+    expect(replacement.summary.scheduledBouts.deleted).toBe(1);
+    expect(await repositories.listScheduledBoutsForBasho("2026-05")).toEqual(
+      [],
+    );
+    expect(
+      await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
+    ).toEqual([
+      expect.objectContaining({
+        bashoId: "2026-05",
+        day: 2,
+        source: "test-schedule",
+      }),
+    ]);
+  });
+
+  it("rejects duplicate rikishi and invalid withdrawal markers", async () => {
+    const repositories = createRepositories(client);
+    await importBanzuke(repositories, banzukeCommand);
+
+    await expect(
+      importScheduledBouts(repositories, {
+        source: "test-schedule",
+        bashoId: "2026-05",
+        day: 1,
+        bouts: [
+          {
+            id: "match-1",
+            bashoId: "2026-05",
+            day: 1,
+            eastRikishiId: "onosato",
+            westRikishiId: "kotozakura",
+            status: "cancelled",
+            withdrawnRikishiId: "unknown",
+          },
+          {
+            id: "match-2",
+            bashoId: "2026-05",
+            day: 1,
+            eastRikishiId: "kotozakura",
+            westRikishiId: "onosato",
+            status: "scheduled",
+          },
+        ],
+      }),
+    ).rejects.toThrow(ImportValidationError);
+    expect(await repositories.listScheduledBoutsForBasho("2026-05")).toEqual(
+      [],
+    );
   });
 });

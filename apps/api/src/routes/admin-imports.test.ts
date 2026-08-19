@@ -53,12 +53,14 @@ beforeEach(async () => {
         });
       }
 
+      const day = Number(sourceUrl.split("/").at(-1));
+
       return jsonResponse({
         torikumi: [
           {
             id: "202605-1-1-4227-3661",
             bashoId: "202605",
-            day: 1,
+            day,
             matchNo: 1,
             eastId: 4227,
             eastShikona: "Onosato",
@@ -101,10 +103,18 @@ describe("admin import routes", () => {
     const unauthorizedResultsResponse = await app.inject({
       method: "POST",
       url: "/api/admin/basho/2026-05/import-results",
-      payload: { day: 1 },
+      payload: { day: 4 },
     });
 
     expect(unauthorizedResultsResponse.statusCode).toBe(403);
+
+    const unauthorizedScheduleResponse = await app.inject({
+      method: "POST",
+      url: "/api/admin/basho/2026-05/import-schedule",
+      payload: { day: 2 },
+    });
+
+    expect(unauthorizedScheduleResponse.statusCode).toBe(403);
 
     const authorizedResponse = await app.inject({
       headers: {
@@ -180,6 +190,100 @@ describe("admin import routes", () => {
       url: "/api/basho/2026-05/leaderboard",
     });
     expect(leaderboardResponse.statusCode).toBe(200);
+  });
+
+  it("imports future schedules without creating scored results", async () => {
+    await app.inject({
+      method: "POST",
+      url: "/api/admin/import-banzuke",
+      payload: {},
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/admin/basho/2026-05/import-schedule",
+      payload: { day: 4 },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      source: "sumo-api-schedule",
+      summary: { scheduledBouts: { created: 1 } },
+    });
+
+    const scheduleResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/schedule",
+    });
+    expect(scheduleResponse.json()).toMatchObject({
+      publishedDays: [4],
+      bouts: [
+        {
+          day: 4,
+          east: { shikona: "Onosato", rank: "Ozeki" },
+          west: { shikona: "Kotozakura", rank: "Ozeki" },
+          status: "scheduled",
+        },
+      ],
+    });
+
+    const leaderboardResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/leaderboard",
+    });
+    expect(
+      leaderboardResponse
+        .json()
+        .leaderboard.every((entry: { score: number }) => entry.score === 0),
+    ).toBe(true);
+  });
+
+  it("keeps an existing schedule when the source returns no card", async () => {
+    await app.inject({
+      method: "POST",
+      url: "/api/admin/import-banzuke",
+      payload: {},
+    });
+    await app.inject({
+      method: "POST",
+      url: "/api/admin/basho/2026-05/import-schedule",
+      payload: { day: 4 },
+    });
+
+    await app.close();
+    app = buildApp({
+      allowUnprotectedAdminImports: true,
+      db: client,
+      sourceFetch: async () => jsonResponse({ torikumi: [] }),
+    });
+
+    const emptyImportResponse = await app.inject({
+      method: "POST",
+      url: "/api/admin/basho/2026-05/import-schedule",
+      payload: { day: 4 },
+    });
+
+    expect(emptyImportResponse.statusCode).toBe(502);
+    expect(emptyImportResponse.json()).toMatchObject({
+      error: "source-import-failed",
+      message:
+        "Sumo API schedule for 2026-05 day 4 is not published or unavailable.",
+    });
+
+    const scheduleResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/schedule",
+    });
+    expect(scheduleResponse.json()).toMatchObject({
+      publishedDays: [4],
+      bouts: [
+        {
+          day: 4,
+          east: { shikona: "Onosato" },
+          west: { shikona: "Kotozakura" },
+        },
+      ],
+    });
   });
 });
 

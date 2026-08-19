@@ -13,6 +13,8 @@ import {
   demoFantasyPicks,
   demoFantasyTeams,
   demoRikishi,
+  demoScheduledBoutPublications,
+  demoScheduledBouts,
 } from "./demo-seed-data.js";
 import {
   sampleBanzukeEntries,
@@ -44,6 +46,8 @@ export async function seedDemoDatabase(
     fantasyTeams: demoFantasyTeams,
     fantasyPicks: demoFantasyPicks,
     boutResults: [],
+    scheduledBoutPublications: demoScheduledBoutPublications,
+    scheduledBouts: demoScheduledBouts,
   });
 }
 

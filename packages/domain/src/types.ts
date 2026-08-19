@@ -51,6 +51,26 @@ export interface BoutResult {
   loserAbsent?: boolean;
 }
 
+export type ScheduledBoutStatus = "scheduled" | "cancelled";
+
+export interface ScheduledBout {
+  id: string;
+  bashoId: Basho["id"];
+  day: number;
+  eastRikishiId: Rikishi["id"];
+  westRikishiId: Rikishi["id"];
+  status: ScheduledBoutStatus;
+  withdrawnRikishiId?: Rikishi["id"];
+}
+
+export interface ScheduledBoutPublication {
+  id: string;
+  bashoId: Basho["id"];
+  day: number;
+  source: string;
+  publishedAt: string;
+}
+
 export interface RikishiScore {
   rikishiId: Rikishi["id"];
   wins: number;

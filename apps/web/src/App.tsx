@@ -24,6 +24,7 @@ import {
   fetchCurrentBasho,
   fetchLeaderboard,
   fetchMyTeam,
+  fetchSchedule,
   fetchSession,
   getErrorMessage,
   reportAuthClientTokenUnavailable,
@@ -65,6 +66,8 @@ import type {
   LoadState,
   MyTeamResponse,
   RankedRikishi,
+  ScheduleLoadState,
+  ScheduleResponse,
   SessionResponse,
   SessionUser,
 } from "./types";
@@ -118,6 +121,9 @@ function RoutedApp() {
     "created" | "updated" | null
   >(null);
   const [myTeam, setMyTeam] = useState<MyTeamResponse | null>(null);
+  const [schedule, setSchedule] = useState<ScheduleResponse | null>(null);
+  const [scheduleLoadState, setScheduleLoadState] =
+    useState<ScheduleLoadState>("loading");
   const [privateTeamLoadState, setPrivateTeamLoadState] = useState<
     "loading" | "ready" | "error"
   >("loading");
@@ -434,6 +440,7 @@ function RoutedApp() {
       isCurrent() && bashoRequestIdRef.current === bashoRequestId;
 
     setLoadState("loading");
+    setScheduleLoadState("loading");
 
     setErrorMessage(null);
     setLeaderboardErrorMessage(null);
@@ -469,6 +476,26 @@ function RoutedApp() {
     });
     setRikishi(bashoRikishi.rikishi);
     setLoadState(bashoRikishi.rikishi.length === 0 ? "empty" : "ready");
+
+    const schedulePromise = (async () => {
+      try {
+        const loadedSchedule = await fetchSchedule(currentBasho.id);
+
+        if (!isCurrentBashoRequest()) {
+          return;
+        }
+
+        setSchedule(loadedSchedule);
+        setScheduleLoadState("ready");
+      } catch {
+        if (!isCurrentBashoRequest()) {
+          return;
+        }
+
+        setSchedule(null);
+        setScheduleLoadState("error");
+      }
+    })();
 
     const requestId = nextLeaderboardRequestId(leaderboardRequestIdRef);
     setLeaderboardLoadState("loading");
@@ -560,6 +587,7 @@ function RoutedApp() {
     const [leaderboardResponse, loadedMyTeam] = await Promise.all([
       leaderboardPromise,
       privateTeamPromise,
+      schedulePromise,
     ]);
 
     if (
@@ -840,6 +868,8 @@ function RoutedApp() {
                       basho={basho!}
                       myTeam={myTeam}
                       onEdit={openTeamEditor}
+                      schedule={schedule}
+                      scheduleLoadState={scheduleLoadState}
                       user={sessionUser}
                     />
                   </>,
