@@ -140,7 +140,7 @@ const leaderboard: LeaderboardEntry[] = [
 ];
 
 beforeEach(() => {
-  window.history.replaceState({}, "", "/");
+  window.history.replaceState({}, "", "/stable");
   vi.stubGlobal("fetch", vi.fn(mockSuccessfulFetch));
 });
 
@@ -152,9 +152,7 @@ describe("App", () => {
   it("loads the current basho and rikishi", async () => {
     render(<App />);
 
-    expect(
-      screen.getByText("Loading the current basho..."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Checking your session...")).toBeInTheDocument();
     expect(
       await screen.findByRole("heading", { name: "May 2026 Sample Basho" }),
     ).toBeInTheDocument();
@@ -168,6 +166,8 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findByLabelText("Email")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/login");
+    expect(window.location.search).toBe("?returnTo=%2Fstable");
     fireEvent.change(screen.getByLabelText("Email"), {
       target: { value: "player@example.com" },
     });
@@ -176,8 +176,19 @@ describe("App", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
-    expect(await screen.findByText("New Player")).toBeInTheDocument();
-    expect(screen.getByText("player@example.com")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", {
+        name: "No team for this basho yet",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sign out" }),
+    ).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/stable");
+    expect(document.title).toBe("My stable | Fantasy Sumo");
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "My stable" })).toHaveFocus();
+    });
   });
 
   it("keeps account submission single-flight across rapid form submits", async () => {
@@ -300,28 +311,160 @@ describe("App", () => {
     expect(
       await screen.findByText("Unable to load your fantasy team."),
     ).toBeInTheDocument();
-    expect(screen.queryByLabelText("Team name")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Sign out" }),
+      await screen.findByRole("heading", { name: "My stable" }),
     ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Team name")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled();
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
-    expect(await screen.findByLabelText("Team name")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Email")).toHaveValue("");
+    expect(
+      await screen.findByRole("heading", { name: "Follow the leaderboard" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("link", { name: "Log in / Join" })[0]!);
+    expect(await screen.findByLabelText("Email")).toHaveValue("");
     expect(screen.getByLabelText("Display name")).toHaveValue("");
   });
 
+  it("keeps public standings available when private-team loading fails", async () => {
+    window.history.replaceState({}, "", "/");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/basho/2026-05/my-team") {
+          return jsonResponse(
+            { message: "Unable to load your fantasy team." },
+            { status: 503 },
+          );
+        }
+
+        return mockSuccessfulFetch(input, init ?? currentBasho);
+      }),
+    );
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Leaderboard" }),
+    ).toBeInTheDocument();
+    expect(await screen.findAllByText("East Side")).not.toHaveLength(0);
+    expect(
+      screen.queryByText("Unable to load your fantasy team."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("stays on the private page and reports a failed sign-out", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/session" && init?.method === "DELETE") {
+          return jsonResponse(
+            { message: "Unable to sign out right now." },
+            { status: 503 },
+          );
+        }
+
+        return mockSuccessfulFetch(input, init ?? currentBasho);
+      }),
+    );
+    render(<App />);
+
+    await screen.findByRole("heading", { name: "No team for this basho yet" });
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+
+    expect(
+      await screen.findByText("Unable to sign out right now."),
+    ).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/stable");
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled();
+  });
+
   it("shows public basho data when the session probe is unauthorized", async () => {
-    vi.stubGlobal("fetch", vi.fn(mockUnauthorizedSessionFetch));
+    window.history.replaceState({}, "", "/");
+    const fetchMock = vi.fn(mockUnauthorizedSessionFetch);
+    vi.stubGlobal("fetch", fetchMock);
     render(<App />);
 
     expect(
       await screen.findByRole("heading", { name: "May 2026 Sample Basho" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Onosato/ })).toBeInTheDocument();
-    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Leaderboard" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("link", { name: "Log in / Join" }),
+    ).not.toHaveLength(0);
+    expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        String(input).includes("/my-team"),
+      ),
+    ).toBe(false);
+  });
+
+  it("hides the public join prompt when picks are closed", async () => {
+    window.history.replaceState({}, "", "/");
+    const activeBasho = {
+      ...currentBasho,
+      status: "active" as const,
+      currentDay: 1,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        if (String(input) === "/api/session") {
+          return jsonResponse({ mode: "local", user: null });
+        }
+
+        return mockSuccessfulFetch(input, activeBasho);
+      }),
+    );
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Leaderboard" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Build your own stable" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("marks the signed-in player's team on the public leaderboard", async () => {
+    window.history.replaceState({}, "", "/");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+
+        if (url === "/api/basho/2026-05/my-team") {
+          return jsonResponse(createExistingMyTeamResponse());
+        }
+
+        if (url === "/api/basho/2026-05/leaderboard") {
+          return jsonResponse(
+            createLeaderboardResponse({
+              entries: [
+                {
+                  rank: 1,
+                  teamId: "team-existing",
+                  displayName: "Existing Champions",
+                  score: 0,
+                  scoreHistory: [],
+                  rikishiScores: [],
+                },
+              ],
+            }),
+          );
+        }
+
+        return mockSuccessfulFetch(input, init ?? currentBasho);
+      }),
+    );
+    render(<App />);
+
+    expect(await screen.findAllByText("Your team")).not.toHaveLength(0);
   });
 
   it("keeps the account panel available when initial basho loading is unauthorized", async () => {
@@ -339,6 +482,7 @@ describe("App", () => {
   });
 
   it("explains raw public API 401 responses as deployment access issues", async () => {
+    window.history.replaceState({}, "", "/");
     vi.stubGlobal("fetch", vi.fn(mockRawUnauthorizedBashoFetch));
     render(<App />);
 
@@ -445,12 +589,15 @@ describe("App", () => {
         method: "PUT",
       }),
     );
-    expect(
-      await screen.findByText("Changes saved for Updated Champions."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Updated Champions" }),
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/stable");
+      expect(
+        screen.getByText("Changes saved for Updated Champions."),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: "Updated Champions" }),
+      ).toBeInTheDocument();
+    });
     expect(screen.getByText("Hoshoryu")).toBeInTheDocument();
     expect(screen.queryByText("Onosato")).not.toBeInTheDocument();
   });
@@ -738,7 +885,7 @@ describe("App", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
-    await screen.findByRole("button", { name: "Sign in" });
+    await screen.findAllByRole("link", { name: "Log in / Join" });
     await signInThroughAccountPanel();
 
     expect(
@@ -758,8 +905,7 @@ describe("App", () => {
   it("displays leaderboard standings and team score details", async () => {
     render(<App />);
 
-    await screen.findByRole("button", { name: "Leaderboard" });
-    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
+    fireEvent.click(await screen.findByRole("link", { name: "Leaderboard" }));
 
     expect(
       screen.getByRole("heading", { name: "Leaderboard" }),
@@ -786,7 +932,7 @@ describe("App", () => {
     await openTeamEditor();
     expect(screen.getByRole("button", { name: /Onosato/ })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
+    fireEvent.click(screen.getByRole("link", { name: "Leaderboard" }));
 
     expect(
       screen.getByText("Leaderboard unavailable right now."),
@@ -807,7 +953,7 @@ describe("App", () => {
     render(<App />);
 
     await screen.findByRole("heading", { name: "May 2026 Sample Basho" });
-    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
+    fireEvent.click(screen.getByRole("link", { name: "Leaderboard" }));
 
     expect(screen.getByText("Loading leaderboard...")).toBeInTheDocument();
     expect(
@@ -837,7 +983,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit team" }));
 
     await screen.findByRole("heading", { name: "East Stand Heroes" });
-    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
+    fireEvent.click(screen.getByRole("link", { name: "Leaderboard" }));
     expect(await screen.findByText("4 pts")).toBeInTheDocument();
 
     initialLeaderboardRequest.resolve(
@@ -1019,7 +1165,7 @@ describe("App", () => {
     expect(
       screen.getByRole("heading", { name: "East Stand Heroes" }),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
+    fireEvent.click(screen.getByRole("link", { name: "Leaderboard" }));
     expect(
       screen.getByText("Unable to refresh leaderboard."),
     ).toBeInTheDocument();
@@ -1049,8 +1195,7 @@ describe("App", () => {
     vi.stubGlobal("fetch", vi.fn(mockEmptyLeaderboardFetch));
     render(<App />);
 
-    await screen.findByRole("button", { name: "Leaderboard" });
-    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
+    fireEvent.click(await screen.findByRole("link", { name: "Leaderboard" }));
 
     expect(
       screen.getByText(
@@ -1072,8 +1217,8 @@ describe("App", () => {
     );
     render(<App />);
 
-    await screen.findByRole("button", { name: "Leaderboard" });
-    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
+    await screen.findByRole("link", { name: "Leaderboard" });
+    fireEvent.click(screen.getByRole("link", { name: "Leaderboard" }));
 
     expect(
       screen.getByText("May 2026 Sample Basho - Day 1 of 15"),
@@ -1089,12 +1234,12 @@ describe("App", () => {
       await screen.findByRole("heading", { name: "My stable" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
+    fireEvent.click(screen.getByRole("link", { name: "Leaderboard" }));
     expect(
       await screen.findByRole("heading", { name: "Follow the leaderboard" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Admin" }));
+    fireEvent.click(screen.getByRole("link", { name: "Admin" }));
     expect(
       await screen.findByRole("heading", { name: "Admin controls" }),
     ).toBeInTheDocument();
@@ -1452,6 +1597,12 @@ function mockUserSwitchFetch() {
 }
 
 async function signInThroughAccountPanel() {
+  if (screen.queryByLabelText("Email") === null) {
+    fireEvent.click(
+      (await screen.findAllByRole("link", { name: "Log in / Join" }))[0]!,
+    );
+  }
+
   fireEvent.change(await screen.findByLabelText("Email"), {
     target: { value: "player@example.com" },
   });
@@ -1462,9 +1613,14 @@ async function signInThroughAccountPanel() {
 }
 
 async function openTeamEditor() {
-  fireEvent.click(
-    await screen.findByRole("button", { name: "Create your stable" }),
-  );
+  if (screen.queryByLabelText("Team name") !== null) {
+    return;
+  }
+
+  const createButton = await screen.findByRole("button", {
+    name: "Create your stable",
+  });
+  fireEvent.click(createButton);
   await screen.findByLabelText("Team name");
 }
 

@@ -38,6 +38,11 @@ The front end entry point is `apps/web/src/main.tsx`.
 
 Current behaviour:
 
+- Uses React Router for durable browser routes: public `/`, dedicated `/login`,
+  authenticated `/stable` and `/team`, and admin-only `/admin`.
+- Resolves the current session before rendering protected route content, safely
+  returns authenticated players to allow-listed internal destinations, and
+  redirects sign-out to the public home.
 - Fetches the current basho and its ranked rikishi from the Fastify API.
 - Fetches leaderboard standings from the Fastify API.
 - Lets a player select and deselect rikishi up to the API-configured team size.
@@ -61,7 +66,6 @@ Current behaviour:
 
 Current limitations:
 
-- No routing.
 - No result import or game-configuration UI yet.
 - No persistence of the last created team in browser storage yet.
 

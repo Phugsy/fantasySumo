@@ -7,6 +7,10 @@
   border-left: 4px solid var(--vermilion);
 }
 
+.basho-panel.public-summary {
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+}
+
 .basho-panel .section-heading {
   margin-bottom: 0;
 }
@@ -52,6 +56,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .basho-panel.public-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .progress-wrap {
     min-width: 0;
   }
@@ -62,6 +70,10 @@
     grid-template-columns: 1fr;
     gap: 13px;
     padding: 18px;
+  }
+
+  .basho-panel.public-summary {
+    grid-template-columns: 1fr;
   }
 
   .basho-dates,

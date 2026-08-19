@@ -5,13 +5,21 @@ import "./BashoPanel.css";
 interface BashoPanelProps {
   basho: Basho;
   selectedCount: number;
+  showPickProgress?: boolean;
 }
 
-export function BashoPanel({ basho, selectedCount }: BashoPanelProps) {
+export function BashoPanel({
+  basho,
+  selectedCount,
+  showPickProgress = true,
+}: BashoPanelProps) {
   const picksRemaining = Math.max(basho.teamSize - selectedCount, 0);
 
   return (
-    <section className="basho-panel" aria-labelledby="basho-title">
+    <section
+      className={`basho-panel${showPickProgress ? "" : " public-summary"}`}
+      aria-labelledby="basho-title"
+    >
       <div className="section-heading">
         <p className="eyebrow">Current basho</p>
         <h2 id="basho-title">{basho.name}</h2>
@@ -25,16 +33,18 @@ export function BashoPanel({ basho, selectedCount }: BashoPanelProps) {
           ? null
           : ` - Day ${basho.currentDay}`}
       </p>
-      <div className="progress-wrap" aria-label="Pick progress">
-        <span>
-          {selectedCount} of {basho.teamSize} selected
-        </span>
-        <strong>
-          {picksRemaining === 0
-            ? "Team full"
-            : `${picksRemaining} pick${picksRemaining === 1 ? "" : "s"} left`}
-        </strong>
-      </div>
+      {showPickProgress && (
+        <div className="progress-wrap" aria-label="Pick progress">
+          <span>
+            {selectedCount} of {basho.teamSize} selected
+          </span>
+          <strong>
+            {picksRemaining === 0
+              ? "Team full"
+              : `${picksRemaining} pick${picksRemaining === 1 ? "" : "s"} left`}
+          </strong>
+        </div>
+      )}
     </section>
   );
 }

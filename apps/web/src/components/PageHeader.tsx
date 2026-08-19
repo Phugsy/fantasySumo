@@ -9,23 +9,29 @@ const pageCopy: Record<
   ActiveView,
   { eyebrow: string; title: string; description: string }
 > = {
+  home: {
+    eyebrow: "Current basho",
+    title: "Follow the leaderboard",
+    description:
+      "See the current tournament and track every stable as results are recorded.",
+  },
+  login: {
+    eyebrow: "Player account",
+    title: "Log in or join",
+    description:
+      "Sign in to create your basho team, manage your picks, and follow your stable.",
+  },
   stable: {
     eyebrow: "Your basho team",
     title: "My stable",
     description:
       "See your line-up, pick status, and scoring progress in one place.",
   },
-  selection: {
+  team: {
     eyebrow: "Current basho",
     title: "Build your basho team",
     description:
       "Choose your rikishi from the current banzuke and join the standings.",
-  },
-  leaderboard: {
-    eyebrow: "Basho standings",
-    title: "Follow the leaderboard",
-    description:
-      "Track each stable's score as results are recorded through the tournament.",
   },
   admin: {
     eyebrow: "Basho operations",
@@ -42,7 +48,9 @@ export function PageHeader({ activeView }: PageHeaderProps) {
     <section className="page-header" aria-labelledby="page-title">
       <p className="eyebrow">{copy.eyebrow}</p>
       <div>
-        <h1 id="page-title">{copy.title}</h1>
+        <h1 id="page-title" tabIndex={-1}>
+          {copy.title}
+        </h1>
         <p className="lede">{copy.description}</p>
       </div>
     </section>

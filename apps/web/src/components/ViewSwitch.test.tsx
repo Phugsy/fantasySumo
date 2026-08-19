@@ -1,47 +1,61 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
+import { describe, expect, it } from "vitest";
 import { ViewSwitch } from "./ViewSwitch";
 
 describe("ViewSwitch", () => {
-  it("marks the active view and emits view changes", () => {
-    const onChange = vi.fn();
-
-    render(<ViewSwitch activeView="selection" onChange={onChange} />);
-
-    expect(screen.getByRole("button", { name: "My stable" })).toHaveClass(
-      "active",
-    );
-    expect(screen.getByRole("button", { name: "Leaderboard" })).not.toHaveClass(
-      "active",
+  it("shows signed-out public navigation", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <ViewSwitch sessionState="ready" user={null} />
+      </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
-
-    expect(onChange).toHaveBeenCalledWith("leaderboard");
+    expect(screen.getByRole("link", { name: "Leaderboard" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      screen.getByRole("link", { name: "Log in / Join" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "My stable" })).toBeNull();
   });
 
-  it("disables view changes while requested", () => {
-    const onChange = vi.fn();
+  it("does not expose private navigation before session resolution", () => {
+    render(
+      <MemoryRouter>
+        <ViewSwitch sessionState="loading" user={null} />
+      </MemoryRouter>,
+    );
 
-    render(<ViewSwitch activeView="selection" disabled onChange={onChange} />);
-
-    expect(screen.getByRole("button", { name: "My stable" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Leaderboard" })).toBeDisabled();
+    expect(screen.getByText("Checking session...")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Log in / Join" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "My stable" })).toBeNull();
   });
 
   it("shows admin navigation only when the server-authorized session allows it", () => {
-    const onChange = vi.fn();
     const { rerender } = render(
-      <ViewSwitch activeView="stable" onChange={onChange} />,
+      <MemoryRouter initialEntries={["/admin"]}>
+        <ViewSwitch
+          sessionState="ready"
+          user={{ id: "player", displayName: "Player" }}
+        />
+      </MemoryRouter>,
     );
 
-    expect(screen.queryByRole("button", { name: "Admin" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Admin" })).toBeNull();
 
-    rerender(<ViewSwitch activeView="admin" onChange={onChange} showAdmin />);
-    fireEvent.click(screen.getByRole("button", { name: "Admin" }));
+    rerender(
+      <MemoryRouter initialEntries={["/admin"]}>
+        <ViewSwitch
+          sessionState="ready"
+          showAdmin
+          user={{ id: "admin", displayName: "Admin" }}
+        />
+      </MemoryRouter>,
+    );
 
-    expect(onChange).toHaveBeenCalledWith("admin");
-    expect(screen.getByRole("button", { name: "Admin" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute(
       "aria-current",
       "page",
     );

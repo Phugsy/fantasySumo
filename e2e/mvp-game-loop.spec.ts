@@ -24,8 +24,13 @@ test("loads API-backed current basho content", async ({ page, request }) => {
   await expect(
     page.getByRole("heading", { name: "Demo May Basho" }),
   ).toBeVisible();
-  await expect(page.getByText("0 of 2 selected")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Onosato/ })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Leaderboard", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Log in / Join" })).toHaveCount(
+    2,
+  );
+  await expect(page.getByLabel("Team name")).toHaveCount(0);
 });
 
 test("lets an authenticated admin run the deterministic demo loop", async ({
@@ -33,16 +38,14 @@ test("lets an authenticated admin run the deterministic demo loop", async ({
 }) => {
   await page.goto("/admin");
 
-  await expect(page.getByRole("button", { name: "Admin" })).toHaveCount(0);
-  await expect(
-    page.getByText("Administrator access is required to open this page."),
-  ).toBeVisible();
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Fadmin$/);
+  await expect(page.getByRole("link", { name: "Admin" })).toHaveCount(0);
 
   await page.getByLabel("Email").fill("e2e-admin@example.com");
   await page.getByLabel("Display name").fill("E2E Admin");
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  await expect(page.getByRole("button", { name: "Admin" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Admin" })).toBeVisible();
   await expect(page).toHaveURL(/\/admin$/);
   await expect(
     page.getByRole("heading", { name: "Demo May Basho" }),
@@ -54,20 +57,20 @@ test("lets an authenticated admin run the deterministic demo loop", async ({
     page.getByText("Demo fixture reset. Picks are open at day 0."),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "My stable" }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await page.getByRole("link", { name: "My stable" }).click();
+  await expect(page).toHaveURL(/\/stable$/);
   await expect(page.locator(".lifecycle-state")).toHaveText("Picks open");
 
-  await page.getByRole("button", { name: "Admin" }).click();
+  await page.getByRole("link", { name: "Admin" }).click();
   await page.getByRole("button", { name: "Start the demo" }).click();
   await expect(page.getByText("Demo started. Picks are locked.")).toBeVisible();
 
-  await page.getByRole("button", { name: "My stable" }).click();
+  await page.getByRole("link", { name: "My stable" }).click();
   await expect(page.locator(".lifecycle-state")).toHaveText(
     "Scoring in progress",
   );
 
-  await page.getByRole("button", { name: "Admin" }).click();
+  await page.getByRole("link", { name: "Admin" }).click();
   await page.getByRole("button", { name: "Advance one day" }).click();
   await expect(
     page.getByText("Demo advanced by one result day."),
@@ -81,7 +84,7 @@ test("lets an authenticated admin run the deterministic demo loop", async ({
     "Complete",
   );
 
-  await page.getByRole("button", { name: "My stable" }).click();
+  await page.getByRole("link", { name: "My stable" }).click();
   await expect(page.locator(".lifecycle-state")).toHaveText(
     "Final scores - Day 15",
   );
@@ -169,13 +172,23 @@ test("creates a fantasy team and follows its My Stable score", async ({
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Edit picks" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Leaderboard" }).click();
+  await page.getByRole("link", { name: "Leaderboard" }).click();
   await expect(
     page.getByRole("button", { name: /Codex Stable Updated.*0 pts/ }),
   ).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: /Codex Stable Updated.*1 pts/ }),
   ).toHaveAttribute("aria-expanded", "true");
+
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(
+    page.getByRole("heading", { name: "Follow the leaderboard" }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Log in / Join" })).toHaveCount(
+    1,
+  );
+  await expect(page.getByRole("link", { name: "My stable" })).toHaveCount(0);
 });
 
 test("blocks sign-out while a team save is in flight", async ({ page }) => {
@@ -225,13 +238,13 @@ test("blocks team submission while sign-out is in flight", async ({ page }) => {
 
   await page.getByRole("button", { name: "Sign out" }).click();
 
-  await expect(
-    page.getByRole("button", { name: "Submit team" }),
-  ).toBeDisabled();
+  await expect(page).toHaveURL(/\/team$/);
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeDisabled();
   releaseSignOut();
-  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
-  await expect(page.getByLabel("Email")).toHaveValue("");
-  await expect(page.getByLabel("Display name")).toHaveValue("");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("link", { name: "Log in / Join" })).toHaveCount(
+    2,
+  );
   await expect(page.getByText("Departing Stable submitted.")).toHaveCount(0);
 });
 
@@ -250,60 +263,42 @@ test("blocks draft editing while sign-in is in flight", async ({ page }) => {
   });
 
   await page.goto("/");
-  await page.getByLabel("Team name").fill("Waiting Draft");
+  await page.getByRole("link", { name: "Log in / Join" }).first().click();
   await page.getByLabel("Email").fill("e2e-player@example.com");
   await page.getByLabel("Display name").fill("E2E Player");
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  await expect(page.getByLabel("Team name")).toBeDisabled();
-  await expect(page.getByRole("button", { name: /Onosato/ })).toBeDisabled();
+  await expect(page.getByLabel("Email")).toBeDisabled();
+  await expect(page.getByLabel("Display name")).toBeDisabled();
   releaseSignIn();
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
-  await expect(page.getByLabel("Team name")).toBeEnabled();
-  await expect(page.getByRole("button", { name: /Onosato/ })).toBeEnabled();
+  await expect(page).toHaveURL(/\/stable$/);
 });
 
-test("preserves an anonymous team draft through sign-in", async ({ page }) => {
-  let hideHoshoryu = false;
-  await page.route("**/api/basho/*/rikishi*", async (route) => {
-    const response = await route.fetch();
+test("returns a signed-in player to an intended protected route", async ({
+  page,
+}) => {
+  await page.goto("/team");
 
-    if (!hideHoshoryu) {
-      await route.fulfill({ response });
-      return;
-    }
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Fteam$/);
+  await expect(page.getByLabel("Team name")).toHaveCount(0);
+  await page.getByLabel("Email").fill("e2e-player@example.com");
+  await page.getByLabel("Display name").fill("E2E Player");
+  await page.getByRole("button", { name: "Sign in" }).click();
 
-    const payload = await response.json();
-    await route.fulfill({
-      response,
-      json: {
-        ...payload,
-        rikishi: payload.rikishi.filter(
-          (rikishi: { id: string }) => rikishi.id !== "hoshoryu",
-        ),
-      },
-    });
-  });
+  await expect(page).toHaveURL(/\/team$/);
+  await expect(page.getByLabel("Team name")).toBeVisible();
+  await page.reload();
+  await expect(page).toHaveURL(/\/team$/);
+  await expect(page.getByLabel("Team name")).toBeVisible();
 
-  await page.goto("/");
-  await page.getByLabel("Team name").fill("Draft Stable");
-  await page.getByRole("button", { name: /Onosato/ }).click();
-  await page.getByRole("button", { name: /Hoshoryu/ }).click();
-
-  hideHoshoryu = true;
-  await signInAsDemoUser(page);
-
-  await expect(page.getByLabel("Team name")).toHaveValue("Draft Stable");
-  await expect(page.getByText("1 of 2 selected")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Hoshoryu/ })).toHaveCount(0);
-  await expect(
-    page.locator("button.rikishi-row").filter({ hasText: "Onosato" }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: /Kotozakura/ }).click();
-  await expect(page.getByText("2 of 2 selected")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Submit team" })).toBeEnabled();
-  await page.getByRole("button", { name: "Submit team" }).click();
-  await expect(page.getByText("Draft Stable submitted.")).toBeVisible();
+  await page.getByRole("link", { name: "Leaderboard" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/team$/);
+  await expect(page.getByLabel("Team name")).toBeVisible();
+  await page.goForward();
+  await expect(page).toHaveURL(/\/$/);
 });
 
 test("shows completed demo leaderboard entries in score order", async ({
@@ -316,7 +311,6 @@ test("shows completed demo leaderboard entries in score order", async ({
   await expect(completeResponse).toBeOK();
 
   await page.goto("/");
-  await page.getByRole("button", { name: "Leaderboard" }).click();
 
   const leaderboardRows = page.locator(".leaderboard-summary");
   await expect(leaderboardRows).toHaveCount(4);
@@ -347,7 +341,10 @@ test("locks team selection after the demo basho starts", async ({
   });
   await expect(startResponse).toBeOK();
 
-  await page.goto("/");
+  await page.goto("/team");
+  await page.getByLabel("Email").fill("e2e-player@example.com");
+  await page.getByLabel("Display name").fill("E2E Player");
+  await page.getByRole("button", { name: "Sign in" }).click();
 
   await expect(
     page.getByText("This basho has started, so picks are locked."),
@@ -395,7 +392,7 @@ test("advances the demo basho and refreshes scored leaderboard state", async ({
   await expect(secondAdvanceResponse).toBeOK();
 
   await page.goto("/");
-  await page.getByRole("button", { name: "Leaderboard" }).click();
+  await page.getByRole("link", { name: "Leaderboard" }).click();
 
   await expect(page.getByText("Demo May Basho - Day 2 of 15")).toBeVisible();
   await expect(page.getByText("Status: Scoring in progress")).toBeVisible();
@@ -515,7 +512,7 @@ test("prevents incomplete and overfull team submissions", async ({ page }) => {
   await expect(submitButton).toBeDisabled();
 });
 
-test("keeps navigation, ranks, and core views usable on the emulated device", async ({
+test("keeps public navigation and core views usable on the emulated device", async ({
   page,
 }) => {
   await page.goto("/");
@@ -524,21 +521,15 @@ test("keeps navigation, ranks, and core views usable on the emulated device", as
     page.getByRole("navigation", { name: "Primary navigation" }),
   ).toBeVisible();
 
-  const longRank = page.getByText("Maegashira #1", { exact: true });
-  await expect(longRank).toBeVisible();
-  expect(
-    await longRank.evaluate(
-      (element) => element.scrollWidth <= element.clientWidth,
-    ),
-  ).toBe(true);
-
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
 
-  await page.getByRole("button", { name: "Leaderboard" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Follow the leaderboard" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Follow the leaderboard" }),
   ).toBeVisible();
@@ -566,28 +557,19 @@ async function resetDemo(request: APIRequestContext) {
 }
 
 async function signInAsDemoUser(page: Page) {
-  const teamName = page.getByLabel("Team name");
-  const preserveDraft = (await teamName.inputValue()).trim().length > 0;
   const bashoReload = page.waitForResponse(
     (response) =>
       response.url().includes("/api/basho/current") && response.ok(),
   );
 
+  await page.locator('a[href="/login?returnTo=%2Fteam"]').click();
   await page.getByLabel("Email").fill("e2e-player@example.com");
   await page.getByLabel("Display name").fill("E2E Player");
   await page.getByRole("button", { name: "Sign in" }).click();
   await bashoReload;
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
-
-  if (!preserveDraft) {
-    const createStable = page.getByRole("button", {
-      name: "Create your stable",
-    });
-    await expect(createStable).toBeVisible();
-    await createStable.click();
-  }
-
-  await expect(teamName).toBeVisible();
+  await expect(page).toHaveURL(/\/team$/);
+  await expect(page.getByLabel("Team name")).toBeVisible();
 }
 
 async function signInRequest(request: APIRequestContext) {

@@ -74,11 +74,16 @@ export function AccountPanel({
           Checking your session...
         </p>
       ) : user === null ? (
-        <form className="account-form" onSubmit={handleSubmit}>
+        <form
+          aria-describedby={errorMessage === null ? undefined : "account-error"}
+          className="account-form"
+          onSubmit={handleSubmit}
+        >
           {isNeonMode && (
             <div className="auth-mode-switch" aria-label="Account action">
               <button
                 className={authIntent === "sign-in" ? "active" : ""}
+                disabled={sessionState === "submitting"}
                 type="button"
                 onClick={() => setAuthIntent("sign-in")}
               >
@@ -86,6 +91,7 @@ export function AccountPanel({
               </button>
               <button
                 className={authIntent === "register" ? "active" : ""}
+                disabled={sessionState === "submitting"}
                 type="button"
                 onClick={() => setAuthIntent("register")}
               >
@@ -100,6 +106,7 @@ export function AccountPanel({
           <input
             id="account-email"
             name="email"
+            disabled={sessionState === "submitting"}
             type="email"
             value={email}
             onChange={(event) => onEmailChange(event.target.value)}
@@ -114,6 +121,7 @@ export function AccountPanel({
               <input
                 id="account-display-name"
                 name="displayName"
+                disabled={sessionState === "submitting"}
                 value={userDisplayName}
                 onChange={(event) => onDisplayNameChange(event.target.value)}
                 placeholder="East Stand"
@@ -130,6 +138,7 @@ export function AccountPanel({
                 aria-describedby="account-password-hint"
                 id="account-password"
                 name="password"
+                disabled={sessionState === "submitting"}
                 type="password"
                 value={password}
                 onChange={(event) => onPasswordChange(event.target.value)}
@@ -172,7 +181,7 @@ export function AccountPanel({
       )}
 
       {errorMessage !== null && (
-        <p className="form-message error-state" role="alert">
+        <p className="form-message error-state" id="account-error" role="alert">
           {errorMessage}
         </p>
       )}

@@ -4,7 +4,7 @@ import { PageHeader } from "./PageHeader";
 
 describe("PageHeader", () => {
   it("shows contextual team-building copy", () => {
-    render(<PageHeader activeView="selection" />);
+    render(<PageHeader activeView="team" />);
 
     expect(
       screen.getByRole("heading", { name: "Build your basho team" }),
@@ -13,12 +13,12 @@ describe("PageHeader", () => {
     expect(screen.getByText(/Choose your rikishi/)).toBeInTheDocument();
   });
 
-  it("shows contextual leaderboard copy", () => {
-    render(<PageHeader activeView="leaderboard" />);
+  it("shows contextual public-home copy", () => {
+    render(<PageHeader activeView="home" />);
 
     expect(
       screen.getByRole("heading", { name: "Follow the leaderboard" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Basho standings")).toBeInTheDocument();
+    expect(screen.getByText("Current basho")).toBeInTheDocument();
   });
 });
