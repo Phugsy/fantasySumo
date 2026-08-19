@@ -36,19 +36,31 @@ export function registerScheduledImportRoutes(
         { now: context.now },
       );
 
-      request.log.info(
-        {
-          bashoId: result.bashoId,
-          day: result.status === "skipped" ? undefined : result.day,
-          japanDate: result.japanDate,
-          importedDays:
-            result.status === "imported" ? result.importedDays : undefined,
-          lockedAt: result.status === "locked" ? result.lockedAt : undefined,
-          reason: result.status === "skipped" ? result.reason : undefined,
-          status: result.status,
-        },
-        "Scheduled basho update finished.",
-      );
+      const logContext = {
+        bashoId: result.bashoId,
+        day: result.status === "skipped" ? undefined : result.day,
+        japanDate: result.japanDate,
+        importedDays:
+          result.status === "imported" || result.status === "partial"
+            ? result.importedDays
+            : undefined,
+        lockedAt: result.status === "locked" ? result.lockedAt : undefined,
+        reason: result.status === "skipped" ? result.reason : undefined,
+        schedule:
+          result.status === "imported" || result.status === "partial"
+            ? result.schedule
+            : undefined,
+        status: result.status,
+      };
+
+      if (result.status === "partial") {
+        request.log.warn(
+          logContext,
+          "Scheduled results imported with a following-day schedule warning.",
+        );
+      } else {
+        request.log.info(logContext, "Scheduled basho update finished.");
+      }
 
       return result;
     } catch (error) {

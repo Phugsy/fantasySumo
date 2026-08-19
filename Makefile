@@ -86,7 +86,7 @@ demo-complete: ## Apply all deterministic demo results and complete the basho.
 import-banzuke: ## Import current banzuke data from source.
 	$(PNPM) import:banzuke $(ARGS)
 
-import-results: ## Import daily results from source. Pass ARGS="-- --basho 2026-05 --day 1".
+import-results: ## Import daily results, then the following schedule. Pass ARGS="-- --basho 2026-05 --day 1".
 	$(PNPM) import:results $(ARGS)
 
 import-schedule: ## Import a published daily schedule. Pass ARGS="-- --basho 2026-05 --day 2".

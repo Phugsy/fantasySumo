@@ -106,6 +106,11 @@ GET /api/basho/:bashoId/torikumi/:division/:day
 ```
 
 The site describes itself as free to access, asks users to use it responsibly, and notes that it costs money to run and maintain.
+Its [webhook guide](https://www.sumo-api.com/webhooks) says new Makuuchi
+torikumi are typically discovered after 18:00 JST and match results are sent at
+18:15 JST. The single 20:00-20:59 JST production invocation should therefore
+usually see both the completed day and the following card, but "typically" is
+not an availability guarantee.
 
 Pros:
 
@@ -278,6 +283,14 @@ Validation and replacement rules:
   no duplicates;
 - publication metadata and scheduled bouts never advance basho lifecycle or
   participate in fantasy scoring.
+
+Daily result operations compose the two source-backed imports in order: commit
+day N results, then attempt the published day N+1 schedule. The cron route,
+manual admin result endpoint, and result CLI all use this workflow. Schedule
+unavailability or a schedule-only error is returned as explicit partial
+success because completed results must not be rolled back, hidden, or fetched
+again merely because the independent next-day card is late. The rejected empty
+source response cannot delete an existing published card.
 
 ## Failure Handling
 

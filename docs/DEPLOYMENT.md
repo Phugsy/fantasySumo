@@ -349,8 +349,11 @@ The root `vercel.json` configures one daily production cron invocation:
 Vercel cron schedules use UTC. Japan does not observe daylight saving time, so
 the job runs once between **11:00-11:59 UTC / 20:00-20:59 JST**. The window
 leaves at least two hours after the expected 18:00 JST end of the top-division
-bouts. Hobby cron invocation precision is hourly. Vercel does not retry failed
-cron invocations.
+bouts. Sumo API's [webhook timing documentation](https://www.sumo-api.com/webhooks)
+says new Makuuchi torikumi are typically discovered after 18:00 JST and match
+results at 18:15 JST, so this one invocation should normally cover both
+operations. Hobby cron invocation precision is hourly. Vercel does not retry
+failed cron invocations.
 
 Set `CRON_SECRET` on the production deployment. Vercel sends it to the cron
 route as `Authorization: Bearer <CRON_SECRET>`. The route is disabled when
@@ -370,7 +373,8 @@ On each authenticated invocation, the route calculates the current date in
 3. on days 1-15, it derives the basho day and sequentially runs the
    source-backed, transactional result import for every day absent from stored
    bout results through the derived day, including a refresh of the current
-   day;
+   day, then attempts to import the published day N+1 schedule in the same
+   invocation (day 15 has no following card);
 4. after the end date, it keeps a locked or active basho eligible for final-day
    recovery until day 15 completes it;
 5. it fails without mutation when more than one live basho is eligible.
@@ -396,9 +400,14 @@ fails, the next invocation sees the earlier stored days and resumes with the
 remaining gaps. The importer replaces only each day's stable result IDs, so
 retries correct or skip existing rows without duplicating scores, teams, or
 picks. The response and Vercel function logs include the status, basho ID,
-derived day, imported days, Japan date, and skip reason when applicable.
-Source, validation, or ambiguous-live-basho errors are logged and return a
-non-2xx response so Vercel does not record silent success.
+derived day, imported days, Japan date, schedule outcome, and skip reason when
+applicable. If the following schedule is unpublished or its import alone
+fails, completed results remain committed and the route returns HTTP 200 with
+`status: "partial"`; the warning log and response identify the schedule day and
+whether it was `unavailable` or `failed`. Retry the same cron route or the
+protected schedule-only admin endpoint after confirming publication. A result
+source, result validation, or ambiguous-live-basho error is logged and returns
+a non-2xx response.
 
 This job necessarily reads and sometimes writes the authoritative Neon
 database. A Redis cache would add another network dependency without removing
@@ -406,6 +415,11 @@ that database wake-up, so it is not used to address cron cold starts. On a
 scale-to-zero plan, occasional Neon connection wake-up latency is expected;
 keeping this as one daily function invocation avoids a second scheduled cold
 start while preserving database correctness.
+
+Retain this single daily job initially. If production observation shows that
+day N+1 cards are not reliably available in the current window, add a focused
+follow-up for a second retry or schedule-only invocation; do not add that extra
+cron before the timing evidence justifies another scheduled function.
 
 For a controlled manual check, call the deployed route with the same bearer
 header Vercel uses:

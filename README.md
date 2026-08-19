@@ -279,10 +279,12 @@ Production deployments expose one Vercel Cron-only path. `GET
 contacting the results source on the evening before day 0, then derives and
 imports every missing basho day through the current day on days 1-15. Day 0
 provides a safe lock catch-up, and a later run derives missing days from stored
-bout results rather than banzuke calendar progress. Locked or active bashos can
-retry a missing final day after the end date. Result imports reuse the manual
-trigger's transactional service. See `docs/DEPLOYMENT.md` for schedule and
-authentication details.
+bout results rather than banzuke calendar progress. After current-day results,
+the same invocation attempts the published day N+1 schedule; the manual result
+API and CLI do the same. Locked or active bashos can retry a missing final day
+after the end date. An unavailable following-day card is reported as partial
+success without undoing completed results or replacing a stored schedule. See
+`docs/DEPLOYMENT.md` for timing, operator response, and authentication details.
 
 ## Makefile commands
 
@@ -309,7 +311,7 @@ Common targets:
 - `make e2e-ui` - open the Playwright UI runner.
 - `make e2e-install` - install the Chromium browser used by the E2E suite.
 - `make import-banzuke` - import current banzuke data from source.
-- `make import-results` - import one day of results from source.
+- `make import-results` - import one day of results, then attempt the following published schedule.
 - `make import-schedule` - import one published day of scheduled bouts from source.
 
 ## Security note

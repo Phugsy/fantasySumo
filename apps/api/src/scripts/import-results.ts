@@ -3,8 +3,7 @@ import {
   createRepositories,
   runMigrations,
 } from "@fantasy-sumo/db";
-import { fetchSumoApiResultsImport } from "../imports/adapters.js";
-import { importBoutResults } from "../imports/service.js";
+import { importDailyResultsAndFollowingSchedule } from "../imports/daily-update.js";
 
 const args = new Map(
   process.argv.slice(2).flatMap((arg, index, allArgs) => {
@@ -31,16 +30,18 @@ const client = createDatabaseClient();
 try {
   await runMigrations(client);
 
-  const command = await fetchSumoApiResultsImport(fetch, {
-    bashoId,
-    day,
-    division,
-  });
-  const result = await importBoutResults(createRepositories(client), command, {
-    dryRun,
-  });
+  const result = await importDailyResultsAndFollowingSchedule(
+    createRepositories(client),
+    fetch,
+    { bashoId, day, division, dryRun },
+  );
 
   console.log(JSON.stringify(result, null, 2));
+  if (result.status === "partial") {
+    console.warn(
+      `Results imported, but the day ${day + 1} schedule import was ${result.schedule.status}.`,
+    );
+  }
 } finally {
   await client.close();
 }
