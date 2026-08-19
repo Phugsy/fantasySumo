@@ -14,6 +14,7 @@ import {
   fetchCurrentBasho,
   fetchLeaderboard,
   fetchMyTeam,
+  fetchSchedule,
   fetchSession,
   getErrorMessage,
   reportAuthClientTokenUnavailable,
@@ -50,6 +51,8 @@ import type {
   LoadState,
   MyTeamResponse,
   RankedRikishi,
+  ScheduleLoadState,
+  ScheduleResponse,
   SessionResponse,
   SessionUser,
 } from "./types";
@@ -96,6 +99,9 @@ export function App() {
     "created" | "updated" | null
   >(null);
   const [myTeam, setMyTeam] = useState<MyTeamResponse | null>(null);
+  const [schedule, setSchedule] = useState<ScheduleResponse | null>(null);
+  const [scheduleLoadState, setScheduleLoadState] =
+    useState<ScheduleLoadState>("loading");
   const [ownedTeamId, setOwnedTeamId] = useState<string | null>(null);
   const [ownedTeamLockedAt, setOwnedTeamLockedAt] = useState<
     string | undefined
@@ -418,6 +424,7 @@ export function App() {
       isCurrent() && bashoRequestIdRef.current === bashoRequestId;
 
     setLoadState("loading");
+    setScheduleLoadState("loading");
 
     setErrorMessage(null);
     setLeaderboardErrorMessage(null);
@@ -425,12 +432,17 @@ export function App() {
     let currentBasho: Basho;
     let bashoRikishi: Awaited<ReturnType<typeof fetchBashoRikishi>>;
     let loadedMyTeam: MyTeamResponse | null;
+    let loadedSchedule: ScheduleResponse | null;
 
     try {
       currentBasho = await fetchCurrentBasho();
-      bashoRikishi = await fetchBashoRikishi(currentBasho.id);
-      loadedMyTeam =
-        session.user === null ? null : await fetchMyTeamOrNull(currentBasho.id);
+      [bashoRikishi, loadedMyTeam, loadedSchedule] = await Promise.all([
+        fetchBashoRikishi(currentBasho.id),
+        session.user === null
+          ? Promise.resolve(null)
+          : fetchMyTeamOrNull(currentBasho.id),
+        fetchSchedule(currentBasho.id).catch(() => null),
+      ]);
     } catch (error) {
       if (!isCurrentBashoRequest()) {
         return;
@@ -456,6 +468,8 @@ export function App() {
       setSelectedIds,
     );
     setMyTeam(loadedMyTeam);
+    setSchedule(loadedSchedule);
+    setScheduleLoadState(loadedSchedule === null ? "error" : "ready");
     setOwnedTeamId(loadedMyTeam?.team.id ?? null);
     setOwnedTeamLockedAt(loadedMyTeam?.team.lockedAt);
     if (window.location.pathname !== "/admin") {
@@ -672,6 +686,8 @@ export function App() {
                 basho={basho}
                 myTeam={myTeam}
                 onEdit={openTeamEditor}
+                schedule={schedule}
+                scheduleLoadState={scheduleLoadState}
                 user={sessionUser}
               />
             )}

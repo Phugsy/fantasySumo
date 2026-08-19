@@ -54,6 +54,7 @@ describe("Postgres migration ledger", () => {
       "0000_initial.sql",
       "0001_team_owner_user.sql",
       "0002_basho_demo_flag.sql",
+      "0003_scheduled_bouts.sql",
     ]);
     const initialMigration = readFileSync(
       join(migrationsFolder, "0000_initial.sql"),
@@ -67,6 +68,10 @@ describe("Postgres migration ledger", () => {
       join(migrationsFolder, "0002_basho_demo_flag.sql"),
       "utf8",
     );
+    const scheduleMigration = readFileSync(
+      join(migrationsFolder, "0003_scheduled_bouts.sql"),
+      "utf8",
+    );
 
     expect(getMigrationChecksum(initialMigration)).toBe(
       "355dc080c83437a8a07343062a0d60be1513c3c2c03f0602aaff4fc3963d2ad8",
@@ -78,6 +83,9 @@ describe("Postgres migration ledger", () => {
       "c71762adeff7df2b1d4e9f92dfc4773291fb9b33ee25518b22aac7edd0d6ea42",
     );
     expect(demoMigration).toContain("ADD COLUMN IF NOT EXISTS");
+    expect(getMigrationChecksum(scheduleMigration)).toBe(
+      "af3fb3690d94ec2a0b69ce4b7f13537c9660936cbf24f8866d6f80313e019e4e",
+    );
   });
 
   it("uses stable content checksums and detects changed SQL", () => {

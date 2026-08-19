@@ -30,6 +30,8 @@ export {
   demoFantasyPicks,
   demoFantasyTeams,
   demoRikishi,
+  demoScheduledBoutPublications,
+  demoScheduledBouts,
 } from "./demo-seed-data.js";
 export {
   sampleBanzukeEntries,

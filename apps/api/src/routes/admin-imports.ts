@@ -4,10 +4,12 @@ import type { Repositories } from "@fantasy-sumo/db";
 import {
   fetchJsaBanzukeImport,
   fetchSumoApiResultsImport,
+  fetchSumoApiScheduleImport,
 } from "../imports/adapters.js";
 import {
   importBanzuke,
   importBoutResults,
+  importScheduledBouts,
   ImportValidationError,
 } from "../imports/service.js";
 import type { SourceFetch } from "../imports/types.js";
@@ -54,7 +56,8 @@ export function registerAdminImportRoutes(
   app.addHook("preHandler", async (request, reply) => {
     if (
       !request.url.startsWith("/api/admin/basho/") ||
-      !request.url.includes("/import-results")
+      (!request.url.includes("/import-results") &&
+        !request.url.includes("/import-schedule"))
     ) {
       return;
     }
@@ -121,6 +124,40 @@ export function registerAdminImportRoutes(
       });
 
       return await importBoutResults(context.repositories, command, {
+        dryRun: parsedQuery.data.dryRun,
+      });
+    } catch (error) {
+      return sendImportError(reply, error);
+    }
+  });
+
+  app.post<{
+    Params: { bashoId: string };
+    Querystring: unknown;
+    Body: unknown;
+  }>("/api/admin/basho/:bashoId/import-schedule", async (request, reply) => {
+    const parsedQuery = dryRunQuerySchema.safeParse(request.query);
+    const parsedBody = importResultsBodySchema.safeParse(request.body ?? {});
+
+    if (!parsedQuery.success || !parsedBody.success) {
+      return reply.code(400).send({
+        error: "invalid-request",
+        message: "Schedule import request is invalid.",
+        details: [
+          ...formatZodIssues(parsedQuery),
+          ...formatZodIssues(parsedBody),
+        ],
+      });
+    }
+
+    try {
+      const command = await fetchSumoApiScheduleImport(context.sourceFetch, {
+        bashoId: request.params.bashoId,
+        day: parsedBody.data.day,
+        division: parsedBody.data.division,
+      });
+
+      return await importScheduledBouts(context.repositories, command, {
         dryRun: parsedQuery.data.dryRun,
       });
     } catch (error) {

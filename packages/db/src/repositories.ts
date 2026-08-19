@@ -8,6 +8,8 @@ import type {
   FantasyPick,
   FantasyTeam,
   Rikishi,
+  ScheduledBout,
+  ScheduledBoutPublication,
 } from "@fantasy-sumo/domain";
 import {
   getBashoLifecycleTransition,
@@ -36,10 +38,18 @@ export interface BoutResultsImportData {
   results: readonly BoutResult[];
 }
 
+export interface ScheduledBoutsImportData {
+  publication: ScheduledBoutPublication;
+  rikishi?: readonly Rikishi[];
+  bouts: readonly ScheduledBout[];
+}
+
 export interface DemoBashoResetData extends BanzukeImportData {
   fantasyTeams: readonly FantasyTeam[];
   fantasyPicks: readonly FantasyPick[];
   boutResults: readonly BoutResult[];
+  scheduledBoutPublications: readonly ScheduledBoutPublication[];
+  scheduledBouts: readonly ScheduledBout[];
 }
 
 export interface BashoLifecycleUpdateResult {
@@ -111,8 +121,17 @@ export interface Repositories {
   upsertBoutResult: (entry: BoutResult) => Promise<void>;
   listBoutResultsForBasho: (bashoId: Basho["id"]) => Promise<BoutResult[]>;
   deleteBoutResultsForBasho: (bashoId: Basho["id"]) => Promise<void>;
+  listScheduledBoutPublicationsForBasho: (
+    bashoId: Basho["id"],
+  ) => Promise<ScheduledBoutPublication[]>;
+  listScheduledBoutsForBasho: (
+    bashoId: Basho["id"],
+  ) => Promise<ScheduledBout[]>;
   applyBanzukeImport: (importData: BanzukeImportData) => Promise<void>;
   applyBoutResultsImport: (importData: BoutResultsImportData) => Promise<void>;
+  applyScheduledBoutsImport: (
+    importData: ScheduledBoutsImportData,
+  ) => Promise<void>;
 }
 
 export function createRepositories(database: AppDatabase): Repositories {
@@ -128,6 +147,8 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
     resetAllDataForLocalFixtures: async () => {
       db.delete(sqlite.fantasyPicks).run();
       db.delete(sqlite.fantasyTeams).run();
+      db.delete(sqlite.scheduledBouts).run();
+      db.delete(sqlite.scheduledBoutPublications).run();
       db.delete(sqlite.boutResults).run();
       db.delete(sqlite.banzukeEntries).run();
       db.delete(sqlite.rikishi).run();
@@ -194,6 +215,20 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
           transaction
             .insert(sqlite.boutResults)
             .values(toBoutResultRow(entry))
+            .run();
+        }
+
+        for (const entry of resetData.scheduledBoutPublications) {
+          transaction
+            .insert(sqlite.scheduledBoutPublications)
+            .values(entry)
+            .run();
+        }
+
+        for (const entry of resetData.scheduledBouts) {
+          transaction
+            .insert(sqlite.scheduledBouts)
+            .values(toScheduledBoutRow(entry))
             .run();
         }
       });
@@ -527,6 +562,21 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
         .where(eq(sqlite.boutResults.bashoId, bashoId))
         .run();
     },
+    listScheduledBoutPublicationsForBasho: async (bashoId) =>
+      db
+        .select()
+        .from(sqlite.scheduledBoutPublications)
+        .where(eq(sqlite.scheduledBoutPublications.bashoId, bashoId))
+        .orderBy(sqlite.scheduledBoutPublications.day)
+        .all(),
+    listScheduledBoutsForBasho: async (bashoId) =>
+      db
+        .select()
+        .from(sqlite.scheduledBouts)
+        .where(eq(sqlite.scheduledBouts.bashoId, bashoId))
+        .orderBy(sqlite.scheduledBouts.day, sqlite.scheduledBouts.id)
+        .all()
+        .map(toScheduledBout),
     applyBanzukeImport: async (importData) => {
       db.transaction((transaction) => {
         const existingBasho = transaction
@@ -645,6 +695,65 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
         }
       });
     },
+    applyScheduledBoutsImport: async (importData) => {
+      db.transaction((transaction) => {
+        for (const entry of importData.rikishi ?? []) {
+          transaction
+            .insert(sqlite.rikishi)
+            .values(toRikishiRow(entry))
+            .onConflictDoNothing({ target: sqlite.rikishi.id })
+            .run();
+        }
+
+        transaction
+          .insert(sqlite.scheduledBoutPublications)
+          .values(importData.publication)
+          .onConflictDoUpdate({
+            target: [
+              sqlite.scheduledBoutPublications.bashoId,
+              sqlite.scheduledBoutPublications.day,
+            ],
+            set: importData.publication,
+          })
+          .run();
+
+        for (const entry of importData.bouts) {
+          transaction
+            .insert(sqlite.scheduledBouts)
+            .values(toScheduledBoutRow(entry))
+            .onConflictDoUpdate({
+              target: sqlite.scheduledBouts.id,
+              set: toScheduledBoutRow(entry),
+            })
+            .run();
+        }
+
+        const importedDayFilter = and(
+          eq(sqlite.scheduledBouts.bashoId, importData.publication.bashoId),
+          eq(sqlite.scheduledBouts.day, importData.publication.day),
+        );
+
+        if (importData.bouts.length === 0) {
+          transaction
+            .delete(sqlite.scheduledBouts)
+            .where(importedDayFilter)
+            .run();
+        } else {
+          transaction
+            .delete(sqlite.scheduledBouts)
+            .where(
+              and(
+                importedDayFilter,
+                notInArray(
+                  sqlite.scheduledBouts.id,
+                  importData.bouts.map((entry) => entry.id),
+                ),
+              ),
+            )
+            .run();
+        }
+      });
+    },
   };
 
   return repositories;
@@ -655,6 +764,8 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
     resetAllDataForLocalFixtures: async () => {
       await db.delete(pg.fantasyPicks);
       await db.delete(pg.fantasyTeams);
+      await db.delete(pg.scheduledBouts);
+      await db.delete(pg.scheduledBoutPublications);
       await db.delete(pg.boutResults);
       await db.delete(pg.banzukeEntries);
       await db.delete(pg.rikishi);
@@ -713,6 +824,16 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
           await transaction
             .insert(pg.boutResults)
             .values(toBoutResultRow(entry));
+        }
+
+        for (const entry of resetData.scheduledBoutPublications) {
+          await transaction.insert(pg.scheduledBoutPublications).values(entry);
+        }
+
+        for (const entry of resetData.scheduledBouts) {
+          await transaction
+            .insert(pg.scheduledBouts)
+            .values(toScheduledBoutRow(entry));
         }
       });
     },
@@ -1032,6 +1153,20 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
         .delete(pg.boutResults)
         .where(eq(pg.boutResults.bashoId, bashoId));
     },
+    listScheduledBoutPublicationsForBasho: async (bashoId) =>
+      await db
+        .select()
+        .from(pg.scheduledBoutPublications)
+        .where(eq(pg.scheduledBoutPublications.bashoId, bashoId))
+        .orderBy(pg.scheduledBoutPublications.day),
+    listScheduledBoutsForBasho: async (bashoId) =>
+      (
+        await db
+          .select()
+          .from(pg.scheduledBouts)
+          .where(eq(pg.scheduledBouts.bashoId, bashoId))
+          .orderBy(pg.scheduledBouts.day, pg.scheduledBouts.id)
+      ).map(toScheduledBout),
     applyBanzukeImport: async (importData) => {
       await db.transaction(async (transaction) => {
         const existingBasho = (
@@ -1142,6 +1277,56 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
         }
       });
     },
+    applyScheduledBoutsImport: async (importData) => {
+      await db.transaction(async (transaction) => {
+        for (const entry of importData.rikishi ?? []) {
+          await transaction
+            .insert(pg.rikishi)
+            .values(toRikishiRow(entry))
+            .onConflictDoNothing({ target: pg.rikishi.id });
+        }
+
+        await transaction
+          .insert(pg.scheduledBoutPublications)
+          .values(importData.publication)
+          .onConflictDoUpdate({
+            target: [
+              pg.scheduledBoutPublications.bashoId,
+              pg.scheduledBoutPublications.day,
+            ],
+            set: importData.publication,
+          });
+
+        for (const entry of importData.bouts) {
+          await transaction
+            .insert(pg.scheduledBouts)
+            .values(toScheduledBoutRow(entry))
+            .onConflictDoUpdate({
+              target: pg.scheduledBouts.id,
+              set: toScheduledBoutRow(entry),
+            });
+        }
+
+        const importedDayFilter = and(
+          eq(pg.scheduledBouts.bashoId, importData.publication.bashoId),
+          eq(pg.scheduledBouts.day, importData.publication.day),
+        );
+
+        if (importData.bouts.length === 0) {
+          await transaction.delete(pg.scheduledBouts).where(importedDayFilter);
+        } else {
+          await transaction.delete(pg.scheduledBouts).where(
+            and(
+              importedDayFilter,
+              notInArray(
+                pg.scheduledBouts.id,
+                importData.bouts.map((entry) => entry.id),
+              ),
+            ),
+          );
+        }
+      });
+    },
   };
 
   return repositories;
@@ -1174,7 +1359,15 @@ function assertDemoBashoResetData(resetData: DemoBashoResetData): void {
     resetData.fantasyTeams.some(
       (entry) => entry.bashoId !== resetData.basho.id,
     ) ||
-    resetData.boutResults.some((entry) => entry.bashoId !== resetData.basho.id)
+    resetData.boutResults.some(
+      (entry) => entry.bashoId !== resetData.basho.id,
+    ) ||
+    resetData.scheduledBoutPublications.some(
+      (entry) => entry.bashoId !== resetData.basho.id,
+    ) ||
+    resetData.scheduledBouts.some(
+      (entry) => entry.bashoId !== resetData.basho.id,
+    )
   ) {
     throw new Error("Demo reset data must be scoped to one demo basho.");
   }
@@ -1288,5 +1481,28 @@ function toBoutResult(row: typeof sqlite.boutResults.$inferSelect): BoutResult {
     ...(row.kimarite === null ? {} : { kimarite: row.kimarite }),
     ...(row.winnerAbsent ? { winnerAbsent: true } : {}),
     ...(row.loserAbsent ? { loserAbsent: true } : {}),
+  };
+}
+
+function toScheduledBoutRow(entry: ScheduledBout) {
+  return {
+    ...entry,
+    withdrawnRikishiId: entry.withdrawnRikishiId ?? null,
+  };
+}
+
+function toScheduledBout(
+  row: typeof sqlite.scheduledBouts.$inferSelect,
+): ScheduledBout {
+  return {
+    id: row.id,
+    bashoId: row.bashoId,
+    day: row.day,
+    eastRikishiId: row.eastRikishiId,
+    westRikishiId: row.westRikishiId,
+    status: row.status,
+    ...(row.withdrawnRikishiId === null
+      ? {}
+      : { withdrawnRikishiId: row.withdrawnRikishiId }),
   };
 }

@@ -56,6 +56,8 @@ describe("MyStablePanel", () => {
         basho={upcomingBasho}
         myTeam={null}
         onEdit={() => undefined}
+        schedule={null}
+        scheduleLoadState="ready"
         user={null}
       />,
     );
@@ -73,6 +75,8 @@ describe("MyStablePanel", () => {
         basho={upcomingBasho}
         myTeam={null}
         onEdit={onEdit}
+        schedule={null}
+        scheduleLoadState="ready"
         user={user}
       />,
     );
@@ -98,6 +102,8 @@ describe("MyStablePanel", () => {
         basho={activeMyTeam.basho}
         myTeam={activeMyTeam}
         onEdit={() => undefined}
+        schedule={null}
+        scheduleLoadState="ready"
         user={user}
       />,
     );
@@ -128,6 +134,8 @@ describe("MyStablePanel", () => {
         basho={{ ...upcomingBasho, status: "active", currentDay: 6 }}
         myTeam={myTeam}
         onEdit={() => undefined}
+        schedule={null}
+        scheduleLoadState="ready"
         user={user}
       />,
     );
@@ -144,6 +152,8 @@ describe("MyStablePanel", () => {
         basho={upcomingBasho}
         myTeam={myTeam}
         onEdit={onEdit}
+        schedule={null}
+        scheduleLoadState="ready"
         user={user}
       />,
     );
@@ -165,6 +175,8 @@ describe("MyStablePanel", () => {
           },
         }}
         onEdit={() => undefined}
+        schedule={null}
+        scheduleLoadState="ready"
         user={user}
       />,
     );
@@ -177,5 +189,84 @@ describe("MyStablePanel", () => {
     expect(
       screen.queryByRole("button", { name: "Edit picks" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows each rikishi's next published opponent and partial schedule gaps", () => {
+    render(
+      <MyStablePanel
+        basho={upcomingBasho}
+        myTeam={myTeam}
+        onEdit={() => undefined}
+        schedule={{
+          bashoId: upcomingBasho.id,
+          publishedDays: [1],
+          bouts: [
+            {
+              id: "day-1-onosato-kotozakura",
+              day: 1,
+              status: "scheduled",
+              east: { id: "onosato", shikona: "Onosato", rank: "Ozeki" },
+              west: {
+                id: "kotozakura",
+                shikona: "Kotozakura",
+                rank: "Ozeki",
+              },
+            },
+          ],
+        }}
+        scheduleLoadState="ready"
+        user={user}
+      />,
+    );
+
+    expect(screen.getByText("Day 1 · vs Kotozakura")).toBeInTheDocument();
+    expect(
+      screen.getByText("Day 1 · No matchup listed in the published schedule."),
+    ).toBeInTheDocument();
+  });
+
+  it("labels withdrawals and unavailable schedules without predicting an outcome", () => {
+    const { rerender } = render(
+      <MyStablePanel
+        basho={upcomingBasho}
+        myTeam={myTeam}
+        onEdit={() => undefined}
+        schedule={{
+          bashoId: upcomingBasho.id,
+          publishedDays: [2],
+          bouts: [
+            {
+              id: "day-2-onosato-kotozakura",
+              day: 2,
+              status: "cancelled",
+              east: { id: "onosato", shikona: "Onosato" },
+              west: { id: "kotozakura", shikona: "Kotozakura" },
+              withdrawnRikishiId: "onosato",
+            },
+          ],
+        }}
+        scheduleLoadState="ready"
+        user={user}
+      />,
+    );
+
+    expect(screen.getByText("Day 2 · vs Kotozakura")).toBeInTheDocument();
+    expect(
+      screen.getByText("Withdrawal reported for your rikishi."),
+    ).toBeInTheDocument();
+
+    rerender(
+      <MyStablePanel
+        basho={upcomingBasho}
+        myTeam={myTeam}
+        onEdit={() => undefined}
+        schedule={null}
+        scheduleLoadState="error"
+        user={user}
+      />,
+    );
+    expect(
+      screen.getAllByText("Matchup schedule unavailable right now."),
+    ).toHaveLength(2);
   });
 });

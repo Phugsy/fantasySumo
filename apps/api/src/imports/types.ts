@@ -3,9 +3,15 @@ import type {
   Basho,
   BoutResult,
   Rikishi,
+  ScheduledBout,
 } from "@fantasy-sumo/domain";
 
-export type ImportEntityName = "basho" | "rikishi" | "banzuke" | "results";
+export type ImportEntityName =
+  | "basho"
+  | "rikishi"
+  | "banzuke"
+  | "results"
+  | "scheduledBouts";
 
 export interface ImportEntitySummary {
   created: number;
@@ -35,6 +41,14 @@ export interface BoutResultsImportCommand {
   source: string;
 }
 
+export interface ScheduledBoutsImportCommand {
+  bashoId: Basho["id"];
+  day: number;
+  rikishi?: Rikishi[];
+  bouts: ScheduledBout[];
+  source: string;
+}
+
 export interface ImportOptions {
   dryRun?: boolean;
 }
@@ -55,5 +69,7 @@ export interface SumoApiResultsImportOptions {
   day: number;
   division?: string;
 }
+
+export type SumoApiScheduleImportOptions = SumoApiResultsImportOptions;
 
 export type SourceFetch = typeof fetch;

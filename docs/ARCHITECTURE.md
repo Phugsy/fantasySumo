@@ -79,6 +79,12 @@ Current routes:
   - Returns the active basho and configured team size, falling back to the latest locked basho, then the latest available basho.
 - `GET /api/basho/:bashoId/rikishi`
   - Returns a basho and its rikishi with banzuke rank data.
+- `GET /api/basho/:bashoId/schedule`
+  - Returns only stored, published days after the basho's current scored day.
+  - Enriches each scheduled side with existing shikona and banzuke rank data.
+  - Empty publication metadata distinguishes a published card with no bouts
+    from a day that has not been imported; the player UI treats request failure
+    as unavailable rather than inventing an opponent.
 - `POST /api/basho/:bashoId/teams`
   - Creates or updates the signed-in user's fantasy team for the basho.
   - Request body: `displayName` and `rikishiIds`.
@@ -126,6 +132,13 @@ Current routes:
   - Request body: `day` and optional `division`.
   - Maps source payloads into local `BoutResult` records using local shikona-based rikishi ids.
   - Replaces stale result rows only for the imported basho/day.
+  - Supports `?dryRun=true`.
+- `POST /api/admin/basho/:bashoId/import-schedule`
+  - Fetches one published Makuuchi torikumi day without requiring winner data.
+  - Maps source payloads to `ScheduledBout` records, separately from
+    `BoutResult`, and atomically replaces only the imported basho/day.
+  - Supports empty, partial, amended, cancelled, and withdrawal-annotated
+    internal cards without allowing any scheduled row into scoring.
   - Supports `?dryRun=true`.
 - `POST /api/admin/demo/reset`
   - Requires an authenticated admin session or `DEMO_ADMIN_TOKEN`.
@@ -214,15 +227,19 @@ Current behaviour:
   the auth boundary now reads and writes this provider-neutral ownership key.
 - Uses `DATABASE_URL` to select the adapter: `file:` and `:memory:` use SQLite; `postgres:` and `postgresql:` use Postgres.
 - Exposes an async repository contract so API/domain workflows do not depend on a concrete database driver.
-- Provides repository functions for reading and writing basho, rikishi, banzuke entries, fantasy teams, fantasy picks, and bout results.
+- Provides repository functions for reading and writing basho, rikishi, banzuke entries, fantasy teams, fantasy picks, bout results, and published scheduled bouts.
 - Stores optional `ownerUserId` on fantasy teams so authenticated ownership can be enforced without coupling the database package to Neon Auth implementation details.
-- Provides transactional upsert helpers for banzuke and bout result imports;
+- Provides transactional replacement helpers for banzuke, bout result, and
+  scheduled-bout imports; scheduled cards and publication metadata are stored
+  separately from completed results so they cannot affect scores.
   banzuke writes preserve the furthest stored lifecycle state inside the
   transaction so concurrent refreshes cannot reopen picks.
 - Saves owned teams and replacement picks atomically while rechecking the
   persisted basho status and upserting on the per-basho owner key.
 - Provides sample seed data for one basho, four rikishi, two fantasy teams, picks, and bout results.
-- Provides deterministic demo seed data for one pickable basho, eight rikishi, four fantasy teams, picks, and a 15-day bout result fixture.
+- Provides deterministic demo seed data for one pickable basho, eight rikishi,
+  four fantasy teams, picks, 15 published matchup cards, and a separate 15-day
+  bout result fixture.
 - Classifies bashos explicitly with `isDemo`. The fixed demo reset transaction
   requires both the known demo ID and `isDemo: true`, replaces only that
   basho's dependent data, and preserves live bashos and shared rikishi metadata.
@@ -244,6 +261,7 @@ pnpm demo:advance-day
 pnpm demo:complete
 pnpm import:banzuke
 pnpm import:results -- --basho 2026-05 --day 1
+pnpm import:schedule -- --basho 2026-05 --day 2
 pnpm --filter @fantasy-sumo/db db:generate
 ```
 

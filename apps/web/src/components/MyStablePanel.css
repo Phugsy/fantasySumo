@@ -119,7 +119,8 @@
 }
 
 .stable-picks li {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 18px;
   align-items: center;
   justify-content: space-between;
@@ -127,6 +128,35 @@
   border: 1px solid var(--clay-light);
   border-radius: 10px;
   background: #ffffff;
+}
+
+.stable-matchup {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--clay-light);
+  color: #355348;
+  font-size: 0.88rem;
+}
+
+.stable-matchup strong,
+.stable-matchup span {
+  display: block;
+}
+
+.stable-matchup span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.stable-matchup.cancelled,
+.stable-matchup.unavailable {
+  color: #78523c;
+}
+
+.stable-matchup.muted {
+  color: var(--muted);
 }
 
 .stable-rikishi {
@@ -211,8 +241,12 @@
 
 @media (max-width: 360px) {
   .stable-picks li {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     gap: 10px;
+  }
+
+  .stable-matchup {
+    grid-column: 1;
   }
 
   .stable-rikishi-score {

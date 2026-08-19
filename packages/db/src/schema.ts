@@ -104,3 +104,41 @@ export const boutResults = sqliteTable("bout_results", {
     .notNull()
     .default(false),
 });
+
+export const scheduledBoutPublications = sqliteTable(
+  "scheduled_bout_publications",
+  {
+    id: text("id").primaryKey(),
+    bashoId: text("basho_id")
+      .notNull()
+      .references(() => basho.id, { onDelete: "cascade" }),
+    day: integer("day").notNull(),
+    source: text("source").notNull(),
+    publishedAt: text("published_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("scheduled_bout_publications_basho_day_idx").on(
+      table.bashoId,
+      table.day,
+    ),
+  ],
+);
+
+export const scheduledBouts = sqliteTable("scheduled_bouts", {
+  id: text("id").primaryKey(),
+  bashoId: text("basho_id")
+    .notNull()
+    .references(() => basho.id, { onDelete: "cascade" }),
+  day: integer("day").notNull(),
+  eastRikishiId: text("east_rikishi_id")
+    .notNull()
+    .references(() => rikishi.id, { onDelete: "cascade" }),
+  westRikishiId: text("west_rikishi_id")
+    .notNull()
+    .references(() => rikishi.id, { onDelete: "cascade" }),
+  status: text("status", { enum: ["scheduled", "cancelled"] }).notNull(),
+  withdrawnRikishiId: text("withdrawn_rikishi_id").references(
+    () => rikishi.id,
+    { onDelete: "set null" },
+  ),
+});

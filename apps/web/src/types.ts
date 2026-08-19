@@ -50,6 +50,27 @@ export interface MyTeamResponse {
   >;
 }
 
+export interface ScheduleResponse {
+  bashoId: string;
+  publishedDays: number[];
+  bouts: Array<{
+    id: string;
+    day: number;
+    status: "scheduled" | "cancelled";
+    east: ScheduledRikishi;
+    west: ScheduledRikishi;
+    withdrawnRikishiId?: string;
+  }>;
+}
+
+export interface ScheduledRikishi {
+  id: string;
+  shikona: string;
+  rank?: string;
+}
+
+export type ScheduleLoadState = "loading" | "ready" | "error";
+
 export interface SessionUser {
   id: string;
   email?: string;

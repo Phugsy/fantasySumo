@@ -384,6 +384,12 @@ describe("repositories", () => {
     expect(await repositories.listBoutResultsForBasho(demoBasho.id)).toEqual(
       [],
     );
+    expect(
+      await repositories.listScheduledBoutPublicationsForBasho(demoBasho.id),
+    ).toHaveLength(15);
+    expect(
+      await repositories.listScheduledBoutsForBasho(demoBasho.id),
+    ).toHaveLength(demoBoutResults.length);
 
     const leaderboard = calculateLeaderboard(
       await repositories.listFantasyTeamsForBasho(demoBasho.id),
@@ -453,6 +459,9 @@ describe("repositories", () => {
       ),
     ).toMatchObject({ heya: "Live Metadata Stable" });
     expect(await repositories.getBasho(demoBasho.id)).toEqual(demoBasho);
+    expect(
+      await repositories.listScheduledBoutsForBasho(demoBasho.id),
+    ).toHaveLength(demoBoutResults.length);
   });
 
   it("fails closed when the demo id belongs to a live basho", async () => {
@@ -484,6 +493,8 @@ describe("repositories", () => {
         fantasyTeams: [],
         fantasyPicks: [],
         boutResults: [],
+        scheduledBoutPublications: [],
+        scheduledBouts: [],
       }),
     ).rejects.toThrow(
       `Demo reset may only replace the fixed basho ${demoBasho.id}.`,

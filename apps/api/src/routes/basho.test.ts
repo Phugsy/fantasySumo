@@ -737,6 +737,67 @@ describe("basho routes", () => {
     );
   });
 
+  it("returns no published future schedule without inventing matchups", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/schedule",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      bashoId: "2026-05",
+      publishedDays: [],
+      bouts: [],
+    });
+  });
+
+  it("returns ranked future scheduled bouts and withdrawal context", async () => {
+    const repositories = createRepositories(client);
+    await repositories.applyScheduledBoutsImport({
+      publication: {
+        id: "2026-05-day-2-schedule",
+        bashoId: "2026-05",
+        day: 2,
+        source: "test",
+        publishedAt: "2026-05-11T08:00:00.000Z",
+      },
+      bouts: [
+        {
+          id: "2026-05-day-2-match-1",
+          bashoId: "2026-05",
+          day: 2,
+          eastRikishiId: "onosato",
+          westRikishiId: "kotozakura",
+          status: "cancelled",
+          withdrawnRikishiId: "kotozakura",
+        },
+      ],
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/schedule",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      publishedDays: [2],
+      bouts: [
+        {
+          day: 2,
+          status: "cancelled",
+          withdrawnRikishiId: "kotozakura",
+          east: { id: "onosato", shikona: "Onosato", rank: "Ozeki" },
+          west: {
+            id: "kotozakura",
+            shikona: "Kotozakura",
+            rank: "Ozeki",
+          },
+        },
+      ],
+    });
+  });
+
   it("returns a leaderboard ordered by score after picks lock", async () => {
     const repositories = createRepositories(client);
     await repositories.updateBasho({

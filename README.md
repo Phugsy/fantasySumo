@@ -11,7 +11,7 @@ The current codebase has been reset onto the clean rebuild foundation described 
 At present, the app has the first local playable foundations:
 
 - A Vite + React front end for creating a fantasy team from seeded basho data and viewing leaderboard standings with recent team scores and expandable rikishi result history.
-- A private My Stable view with the signed-in player's picks, edit/lock state, rikishi details, and scoring progress.
+- A private My Stable view with the signed-in player's picks, edit/lock state, rikishi details, scoring progress, and each pick's next published matchup.
 - A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.
 - A shared TypeScript domain package with MVP types, lifecycle rules, validation, scoring, and leaderboard logic.
 - A swappable Drizzle database package with local SQLite, production Postgres, repositories, migrations, sample seed data, and deterministic demo data.
@@ -129,6 +129,7 @@ Useful API endpoints:
 
 - `GET /api/basho/current`
 - `GET /api/basho/:bashoId/rikishi`
+- `GET /api/basho/:bashoId/schedule`
 - `POST /api/basho/:bashoId/teams`
 - `GET /api/basho/:bashoId/my-team`
 - `PUT /api/basho/:bashoId/my-team`
@@ -231,14 +232,21 @@ Import daily Makuuchi results from Sumo API:
 make import-results ARGS="-- --basho 2026-05 --day 1"
 ```
 
+Import a published future Makuuchi schedule from the same torikumi source:
+
+```bash
+make import-schedule ARGS="-- --basho 2026-05 --day 2"
+```
+
 Both import paths support dry runs:
 
 ```bash
 make import-banzuke ARGS="-- --dry-run"
 make import-results ARGS="-- --basho 2026-05 --day 1 --dry-run"
+make import-schedule ARGS="-- --basho 2026-05 --day 2 --dry-run"
 ```
 
-Banzuke reimports replace the stored banzuke entries for that basho without deleting rikishi, teams, or picks. Result reimports replace only the imported basho/day, so rerunning day 1 cannot delete day 2 results.
+Banzuke reimports replace the stored banzuke entries for that basho without deleting rikishi, teams, or picks. Result reimports replace only the imported basho/day, so rerunning day 1 cannot delete day 2 results. Schedule imports use separate publication and scheduled-bout tables; reimporting a day atomically replaces that card and never changes fantasy scores. An empty Sumo API response is treated as unpublished or unavailable and preserves any stored card; only a trusted internal import command can explicitly replace a day with an empty published card.
 
 The API exposes equivalent local admin triggers:
 
@@ -250,6 +258,10 @@ curl -X POST "http://localhost:3000/api/admin/import-banzuke?dryRun=true" \
 curl -X POST "http://localhost:3000/api/admin/basho/2026-05/import-results?dryRun=true" \
   -H "content-type: application/json" \
   -d '{"day":1,"division":"Makuuchi"}'
+
+curl -X POST "http://localhost:3000/api/admin/basho/2026-05/import-schedule?dryRun=true" \
+  -H "content-type: application/json" \
+  -d '{"day":2,"division":"Makuuchi"}'
 ```
 
 Production deployments expose one Vercel Cron-only path. `GET
@@ -288,6 +300,7 @@ Common targets:
 - `make e2e-install` - install the Chromium browser used by the E2E suite.
 - `make import-banzuke` - import current banzuke data from source.
 - `make import-results` - import one day of results from source.
+- `make import-schedule` - import one published day of scheduled bouts from source.
 
 ## Security note
 

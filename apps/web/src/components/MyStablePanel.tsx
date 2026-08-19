@@ -1,4 +1,10 @@
-import type { Basho, MyTeamResponse, SessionUser } from "../types";
+import type {
+  Basho,
+  MyTeamResponse,
+  ScheduleLoadState,
+  ScheduleResponse,
+  SessionUser,
+} from "../types";
 import {
   canEditFantasyPicks,
   getBashoLifecycleLabel,
@@ -10,6 +16,8 @@ interface MyStablePanelProps {
   basho: Basho;
   myTeam: MyTeamResponse | null;
   onEdit: () => void;
+  schedule: ScheduleResponse | null;
+  scheduleLoadState: ScheduleLoadState;
   user: SessionUser | null;
 }
 
@@ -17,6 +25,8 @@ export function MyStablePanel({
   basho,
   myTeam,
   onEdit,
+  schedule,
+  scheduleLoadState,
   user,
 }: MyStablePanelProps) {
   const stableBasho = myTeam === null ? basho : { ...basho, ...myTeam.basho };
@@ -110,10 +120,82 @@ export function MyStablePanel({
               </span>
               <strong>{pick.score} pts</strong>
             </div>
+            <MatchupPreview
+              basho={stableBasho}
+              rikishiId={pick.rikishiId}
+              schedule={schedule}
+              scheduleLoadState={scheduleLoadState}
+            />
           </li>
         ))}
       </ul>
     </section>
+  );
+}
+
+function MatchupPreview({
+  basho,
+  rikishiId,
+  schedule,
+  scheduleLoadState,
+}: {
+  basho: Basho;
+  rikishiId: string;
+  schedule: ScheduleResponse | null;
+  scheduleLoadState: ScheduleLoadState;
+}) {
+  if (scheduleLoadState === "loading") {
+    return <p className="stable-matchup muted">Loading next matchup…</p>;
+  }
+
+  if (scheduleLoadState === "error" || schedule === null) {
+    return (
+      <p className="stable-matchup unavailable">
+        Matchup schedule unavailable right now.
+      </p>
+    );
+  }
+
+  const matchup = schedule.bouts
+    .filter((bout) => bout.east.id === rikishiId || bout.west.id === rikishiId)
+    .sort((left, right) => left.day - right.day)[0];
+
+  if (matchup === undefined) {
+    const nextPublishedDay = schedule.publishedDays[0];
+
+    return (
+      <p className="stable-matchup muted">
+        {nextPublishedDay === undefined
+          ? basho.status === "complete"
+            ? "No future matchup is published for this basho."
+            : "Next matchup not published yet."
+          : `Day ${nextPublishedDay} · No matchup listed in the published schedule.`}
+      </p>
+    );
+  }
+
+  const opponent = matchup.east.id === rikishiId ? matchup.west : matchup.east;
+  const withdrawal =
+    matchup.withdrawnRikishiId === rikishiId
+      ? "Withdrawal reported for your rikishi."
+      : matchup.withdrawnRikishiId === opponent.id
+        ? `Withdrawal reported for ${opponent.shikona}.`
+        : undefined;
+  const status =
+    withdrawal ??
+    (matchup.status === "cancelled"
+      ? "Bout marked cancelled."
+      : "Published matchup");
+
+  return (
+    <p className={`stable-matchup ${matchup.status}`}>
+      <strong>
+        Day {matchup.day} · vs {opponent.shikona}
+      </strong>
+      <span>
+        {opponent.rank === undefined ? status : `${opponent.rank} · ${status}`}
+      </span>
+    </p>
   );
 }
 

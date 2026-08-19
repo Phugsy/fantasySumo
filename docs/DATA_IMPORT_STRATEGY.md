@@ -255,6 +255,30 @@ Validation rules:
 - importing the same result twice should be idempotent or fail with a clear duplicate-result error;
 - absent/default wins should preserve enough data for scoring to keep absences at 0 points unless rules change later.
 
+### Published schedule import
+
+Future torikumi use a separate `ScheduledBout` command and persistence table;
+they are never represented as incomplete `BoutResult` rows. A schedule import
+targets exactly one basho day and contains east/west rikishi plus an explicit
+`scheduled` or `cancelled` status. An empty Sumo API response is rejected as
+unpublished or unavailable so it cannot erase a stored card. A trusted internal
+command may explicitly record an empty published day when that state is known.
+An optional withdrawal marker may identify one of the two rikishi when the
+source provides that fact.
+
+Validation and replacement rules:
+
+- `day` must be 1-15 and every bout must match the import target;
+- the two rikishi must differ and a rikishi cannot appear twice on one card;
+- at least one side must be on the target banzuke, while source-provided
+  cross-division opponents may be added as rikishi metadata;
+- a withdrawal marker must identify one of the scheduled participants;
+- applying a later import atomically replaces all stored scheduled bouts for
+  that basho/day, so amendments and explicit trusted empty replacements leave
+  no duplicates;
+- publication metadata and scheduled bouts never advance basho lifecycle or
+  participate in fantasy scoring.
+
 ## Failure Handling
 
 Import should be explicit and reversible enough for local operation:

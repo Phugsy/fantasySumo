@@ -5,6 +5,8 @@ import type {
   FantasyPick,
   FantasyTeam,
   Rikishi,
+  ScheduledBout,
+  ScheduledBoutPublication,
 } from "@fantasy-sumo/domain";
 import { DEMO_BASHO_ID } from "./demo-constants.js";
 
@@ -676,3 +678,27 @@ export const demoBoutResults: BoutResult[] = [
     kimarite: "hatakikomi",
   },
 ];
+
+export const demoScheduledBoutPublications: ScheduledBoutPublication[] =
+  Array.from({ length: 15 }, (_, index) => {
+    const day = index + 1;
+
+    return {
+      id: `${demoBasho.id}-day-${day}-schedule`,
+      bashoId: demoBasho.id,
+      day,
+      source: "demo-fixture",
+      publishedAt: `2026-05-${String(8 + day).padStart(2, "0")}T08:00:00.000Z`,
+    };
+  });
+
+export const demoScheduledBouts: ScheduledBout[] = demoBoutResults.map(
+  (result) => ({
+    id: result.id.replace("-bout-", "-match-"),
+    bashoId: result.bashoId,
+    day: result.day,
+    eastRikishiId: result.winnerRikishiId,
+    westRikishiId: result.loserRikishiId,
+    status: "scheduled",
+  }),
+);

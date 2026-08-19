@@ -91,6 +91,8 @@ test("creates a fantasy team and follows its My Stable score", async ({
   page,
   request,
 }) => {
+  test.setTimeout(60_000);
+
   await page.goto("/");
   await signInAsDemoUser(page);
 
@@ -108,6 +110,8 @@ test("creates a fantasy team and follows its My Stable score", async ({
   await expect(page.getByLabel("0 total points")).toBeVisible();
   await expect(page.getByText("Wakatakakage")).toBeVisible();
   await expect(page.getByText("Maegashira #1")).toBeVisible();
+  await expect(page.getByText("Day 1 · vs Tobizaru")).toBeVisible();
+  await expect(page.getByText("Day 1 · vs Takayasu")).toBeVisible();
   await expect(page.getByRole("button", { name: "Edit picks" })).toBeVisible();
 
   await page.getByRole("button", { name: "Edit picks" }).click();
@@ -128,6 +132,7 @@ test("creates a fantasy team and follows its My Stable score", async ({
   ).toBeVisible();
   await expect(page.getByText("Hoshoryu")).toBeVisible();
   await expect(page.getByText("Ura", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Day 1 · vs Onosato")).toBeVisible();
 
   await page.setViewportSize({ width: 320, height: 800 });
   expect(
@@ -162,6 +167,8 @@ test("creates a fantasy team and follows its My Stable score", async ({
   ).toBeVisible();
   await expect(page.getByLabel("1 total points")).toBeVisible();
   await expect(page.getByText("1 win")).toBeVisible();
+  await expect(page.getByText("Day 2 · vs Tobizaru")).toBeVisible();
+  await expect(page.getByText("Day 2 · vs Kirishima")).toBeVisible();
   await expect(
     page.getByText(
       "This basho has started, so picks are locked. Your line-up is read-only.",
