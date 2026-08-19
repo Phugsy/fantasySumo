@@ -10,6 +10,7 @@ import {
   getBashoLifecycleLabel,
   getPickLockMessage,
 } from "../lifecycle";
+import { RikishiTournamentBadges } from "./RikishiTournamentBadges";
 import "./MyStablePanel.css";
 
 interface MyStablePanelProps {
@@ -103,6 +104,11 @@ export function MyStablePanel({
       <div className="section-heading stable-lineup-heading">
         <p className="eyebrow">Line-up</p>
         <h3>Selected rikishi</h3>
+        {myTeam.picks.some(hasTournamentNotes) && (
+          <p className="tournament-notes-disclaimer">
+            Tournament badges are informational and do not add fantasy points.
+          </p>
+        )}
       </div>
       <ul className="stable-picks" aria-label="Your selected rikishi">
         {myTeam.picks.map((pick) => (
@@ -112,6 +118,10 @@ export function MyStablePanel({
               <span>
                 <strong>{pick.shikona}</strong>
                 {pick.heya !== undefined && <small>{pick.heya}</small>}
+                <RikishiTournamentBadges
+                  notes={pick.tournamentNotes}
+                  shikona={pick.shikona}
+                />
               </span>
             </div>
             <div className="stable-rikishi-score">
@@ -130,6 +140,13 @@ export function MyStablePanel({
         ))}
       </ul>
     </section>
+  );
+}
+
+function hasTournamentNotes(pick: MyTeamResponse["picks"][number]): boolean {
+  return (
+    (pick.tournamentNotes?.statuses.length ?? 0) > 0 ||
+    (pick.tournamentNotes?.achievements.length ?? 0) > 0
   );
 }
 

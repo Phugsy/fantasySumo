@@ -1,0 +1,54 @@
+.rikishi-tournament-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.rikishi-note-badge {
+  display: inline-grid;
+  gap: 1px;
+  max-width: 100%;
+  padding: 5px 8px;
+  border: 1px solid #c8dad2;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #263f38;
+  line-height: 1.2;
+}
+
+.rikishi-note-badge.note-withdrawn,
+.rikishi-note-badge.note-make-koshi {
+  border-color: #d9b7ae;
+  background: #fff3f0;
+  color: #6f2c24;
+}
+
+.rikishi-note-badge.note-gold-star {
+  border-color: #dfc26e;
+  background: #fff8df;
+  color: #57430b;
+}
+
+.rikishi-note-badge strong,
+.rikishi-note-badge small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.rikishi-note-badge strong {
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.rikishi-note-badge small {
+  color: inherit;
+  font-size: 0.63rem;
+  font-weight: 700;
+}
+
+.tournament-notes-disclaimer {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}

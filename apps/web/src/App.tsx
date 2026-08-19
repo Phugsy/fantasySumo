@@ -1164,6 +1164,10 @@ function createMyTeamResponse(
             : { rankOrder: rikishi.rankOrder }),
           wins: 0,
           score: 0,
+          tournamentNotes: rikishi?.tournamentNotes ?? {
+            statuses: [],
+            achievements: [],
+          },
         };
       })
       .sort(

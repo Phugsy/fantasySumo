@@ -71,6 +71,32 @@ export interface ScheduledBoutPublication {
   publishedAt: string;
 }
 
+export type RikishiTournamentStatusType = "withdrawn" | "returned";
+
+export type RikishiTournamentAchievementType =
+  | "kachi-koshi"
+  | "make-koshi"
+  | "gold-star";
+
+export type RikishiTournamentNoteProvenance = "source" | "derived";
+
+export interface RikishiTournamentStatus {
+  type: RikishiTournamentStatusType;
+  effectiveDay: number;
+  provenance: RikishiTournamentNoteProvenance;
+}
+
+export interface RikishiTournamentAchievement {
+  type: RikishiTournamentAchievementType;
+  day: number;
+  provenance: RikishiTournamentNoteProvenance;
+}
+
+export interface RikishiTournamentNotes {
+  statuses: RikishiTournamentStatus[];
+  achievements: RikishiTournamentAchievement[];
+}
+
 export interface RikishiScore {
   rikishiId: Rikishi["id"];
   wins: number;

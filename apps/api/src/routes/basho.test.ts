@@ -162,7 +162,114 @@ describe("basho routes", () => {
       shikona: "Onosato",
       rank: "Ozeki",
       rankOrder: 1,
+      tournamentNotes: { statuses: [], achievements: [] },
     });
+  });
+
+  it("exposes source-reported status and derived achievements without changing scores", async () => {
+    const headers = await signIn();
+    const repositories = createRepositories(client);
+    await app.inject({
+      headers,
+      method: "POST",
+      url: "/api/basho/2026-05/teams",
+      payload: {
+        displayName: "Status Watchers",
+        rikishiIds: ["onosato", "kotozakura"],
+      },
+    });
+
+    for (let day = 2; day <= 8; day += 1) {
+      await repositories.insertBoutResult({
+        id: `2026-05-day-${day}-status-test`,
+        bashoId: "2026-05",
+        day,
+        winnerRikishiId: "onosato",
+        loserRikishiId: "hoshoryu",
+      });
+    }
+
+    await repositories.applyScheduledBoutsImport({
+      publication: {
+        id: "2026-05-day-9-status-test",
+        bashoId: "2026-05",
+        day: 9,
+        source: "test-source",
+        publishedAt: "2026-05-18T08:00:00.000Z",
+      },
+      bouts: [
+        {
+          id: "2026-05-day-9-status-match",
+          bashoId: "2026-05",
+          day: 9,
+          eastRikishiId: "kotozakura",
+          westRikishiId: "kirishima",
+          status: "cancelled",
+          withdrawnRikishiId: "kotozakura",
+        },
+      ],
+    });
+    await repositories.updateBasho({
+      ...sampleBasho,
+      status: "active",
+      currentDay: 8,
+    });
+
+    const rikishiResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/rikishi",
+    });
+    const myTeamResponse = await app.inject({
+      headers,
+      method: "GET",
+      url: "/api/basho/2026-05/my-team",
+    });
+
+    expect(rikishiResponse.statusCode).toBe(200);
+    expect(
+      rikishiResponse
+        .json()
+        .rikishi.find((entry: { id: string }) => entry.id === "onosato"),
+    ).toMatchObject({
+      tournamentNotes: {
+        statuses: [],
+        achievements: [{ type: "kachi-koshi", day: 8, provenance: "derived" }],
+      },
+    });
+    expect(
+      rikishiResponse
+        .json()
+        .rikishi.find((entry: { id: string }) => entry.id === "kotozakura"),
+    ).toMatchObject({
+      tournamentNotes: {
+        statuses: [
+          { type: "withdrawn", effectiveDay: 9, provenance: "source" },
+        ],
+        achievements: [],
+      },
+    });
+    expect(myTeamResponse.statusCode).toBe(200);
+    expect(myTeamResponse.json().totalScore).toBe(9);
+    expect(myTeamResponse.json().picks).toEqual([
+      expect.objectContaining({
+        rikishiId: "onosato",
+        score: 8,
+        tournamentNotes: expect.objectContaining({
+          achievements: [
+            { type: "kachi-koshi", day: 8, provenance: "derived" },
+          ],
+        }),
+      }),
+      expect.objectContaining({
+        rikishiId: "kotozakura",
+        score: 1,
+        tournamentNotes: expect.objectContaining({
+          statuses: [
+            { type: "withdrawn", effectiveDay: 9, provenance: "source" },
+          ],
+        }),
+      }),
+    ]);
   });
 
   it("creates and retrieves a fantasy team", async () => {

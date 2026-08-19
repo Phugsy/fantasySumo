@@ -8,6 +8,7 @@ import type {
 } from "../types";
 import { getBashoLifecycleLabel } from "../lifecycle";
 import { DailyScoreBadge } from "./DailyScoreBadge";
+import { RikishiTournamentBadges } from "./RikishiTournamentBadges";
 import { TournamentProgressChart } from "./TournamentProgressChart";
 import "./LeaderboardPanel.css";
 
@@ -180,6 +181,21 @@ function renderLeaderboardList({
             {isExpanded && (
               <div className="score-breakdown">
                 <h3>Tournament totals</h3>
+                {entry.rikishiScores.some((score) => {
+                  const notes = rikishiById.get(
+                    score.rikishiId,
+                  )?.tournamentNotes;
+
+                  return (
+                    notes !== undefined &&
+                    (notes.statuses.length > 0 || notes.achievements.length > 0)
+                  );
+                }) && (
+                  <p className="tournament-notes-disclaimer">
+                    Tournament badges are informational and do not add fantasy
+                    points.
+                  </p>
+                )}
                 {entry.rikishiScores.length === 0 ? (
                   <p>No picks recorded for this team.</p>
                 ) : (
@@ -237,6 +253,12 @@ function RikishiScoreRow({
         <span className="rikishi-identity">
           <strong>{shikona}</strong>
           <small>{pickedRikishi?.rank ?? "Unranked pick"}</small>
+          {pickedRikishi !== undefined && (
+            <RikishiTournamentBadges
+              notes={pickedRikishi.tournamentNotes}
+              shikona={shikona}
+            />
+          )}
         </span>
         <RecentRikishiResults results={results} shikona={shikona} />
         <span className="rikishi-wins">

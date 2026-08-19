@@ -10,6 +10,12 @@ export type {
   PickValidationErrorCode,
   PickValidationOptions,
   Rikishi,
+  RikishiTournamentAchievement,
+  RikishiTournamentAchievementType,
+  RikishiTournamentNoteProvenance,
+  RikishiTournamentNotes,
+  RikishiTournamentStatus,
+  RikishiTournamentStatusType,
   RikishiDayOutcome,
   RikishiDayScore,
   RikishiScore,
@@ -20,6 +26,7 @@ export type {
   TeamScore,
   TeamScoreHistoryEntry,
 } from "./types.js";
+export { deriveRikishiTournamentNotes } from "./tournament-notes.js";
 export {
   canEditFantasyPicks,
   getBashoLifecycleTransition,

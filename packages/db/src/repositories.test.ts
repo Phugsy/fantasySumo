@@ -390,6 +390,15 @@ describe("repositories", () => {
     expect(
       await repositories.listScheduledBoutsForBasho(demoBasho.id),
     ).toHaveLength(demoBoutResults.length);
+    expect(
+      (await repositories.listScheduledBoutsForBasho(demoBasho.id)).find(
+        (bout) => bout.id === "demo-2026-05-day-15-match-4",
+      ),
+    ).toMatchObject({
+      day: 15,
+      status: "cancelled",
+      withdrawnRikishiId: "tobizaru",
+    });
 
     const leaderboard = calculateLeaderboard(
       await repositories.listFantasyTeamsForBasho(demoBasho.id),

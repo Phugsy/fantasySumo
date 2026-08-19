@@ -585,9 +585,9 @@ export const demoBoutResults: BoutResult[] = [
     id: "demo-2026-05-day-13-bout-1",
     bashoId: demoBasho.id,
     day: 13,
-    winnerRikishiId: "hoshoryu",
+    winnerRikishiId: "ura",
     loserRikishiId: "onosato",
-    kimarite: "yorikiri",
+    kimarite: "katasukashi",
   },
   {
     id: "demo-2026-05-day-13-bout-2",
@@ -609,9 +609,9 @@ export const demoBoutResults: BoutResult[] = [
     id: "demo-2026-05-day-13-bout-4",
     bashoId: demoBasho.id,
     day: 13,
-    winnerRikishiId: "ura",
+    winnerRikishiId: "hoshoryu",
     loserRikishiId: "tobizaru",
-    kimarite: "katasukashi",
+    kimarite: "yorikiri",
   },
   {
     id: "demo-2026-05-day-14-bout-1",
@@ -676,6 +676,7 @@ export const demoBoutResults: BoutResult[] = [
     winnerRikishiId: "takayasu",
     loserRikishiId: "tobizaru",
     kimarite: "hatakikomi",
+    loserAbsent: true,
   },
 ];
 
@@ -699,6 +700,9 @@ export const demoScheduledBouts: ScheduledBout[] = demoBoutResults.map(
     day: result.day,
     eastRikishiId: result.winnerRikishiId,
     westRikishiId: result.loserRikishiId,
-    status: "scheduled",
+    status: result.loserAbsent === true ? "cancelled" : "scheduled",
+    ...(result.loserAbsent === true
+      ? { withdrawnRikishiId: result.loserRikishiId }
+      : {}),
   }),
 );

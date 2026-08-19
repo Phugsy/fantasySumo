@@ -292,6 +292,27 @@ success because completed results must not be rolled back, hidden, or fetched
 again merely because the independent next-day card is late. The rejected empty
 source response cannot delete an existing published card.
 
+### Tournament status and achievement visibility
+
+Player-facing tournament notes use only facts already stored through these
+import boundaries. A withdrawal badge requires an explicit scheduled-bout
+withdrawal marker; a missing or merely unpublished card does not imply that a
+rikishi is unavailable. A later non-absence result can reliably derive that a
+rikishi returned.
+
+Kachi-koshi and make-koshi are derived when the eighth recorded win or loss is
+stored. A gold-star win is derived only when the stored banzuke identifies the
+winner as maegashira, the loser as yokozuna, and the stored result is not a
+default/absence win. These notes are informational and do not participate in
+fantasy scoring.
+
+The current live source adapters do not import special-prize awards, and the
+Sumo API schedule adapter does not currently receive an explicit withdrawal
+field. Therefore the app shows no special-prize badge and no live withdrawal
+badge unless a future source adapter or trusted internal command supplies that
+fact. Demo fixtures exercise the same model without implying that unavailable
+live source data exists.
+
 ## Failure Handling
 
 Import should be explicit and reversible enough for local operation:

@@ -21,6 +21,10 @@ const rikishi: RankedRikishi[] = [
     heya: "Nishonoseki",
     rank: "Ozeki",
     rankOrder: 1,
+    tournamentNotes: {
+      statuses: [],
+      achievements: [{ type: "kachi-koshi", day: 8, provenance: "derived" }],
+    },
   },
   {
     id: "kirishima",
@@ -28,6 +32,10 @@ const rikishi: RankedRikishi[] = [
     heya: "Oitekaze",
     rank: "Komusubi",
     rankOrder: 4,
+    tournamentNotes: {
+      statuses: [{ type: "withdrawn", effectiveDay: 5, provenance: "source" }],
+      achievements: [],
+    },
   },
 ];
 
@@ -100,6 +108,13 @@ describe("LeaderboardPanel", () => {
     expect(screen.getByText("Onosato")).toBeInTheDocument();
     expect(screen.getByText("Kirishima")).toBeInTheDocument();
     expect(screen.getAllByText("1 win")).toHaveLength(2);
+    expect(screen.getByText("Kachi-koshi")).toBeInTheDocument();
+    expect(screen.getByText("Withdrawn")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Tournament badges are informational and do not add fantasy points.",
+      ),
+    ).toBeInTheDocument();
     const leaderboardList =
       document.querySelector<HTMLElement>(".leaderboard-list");
     expect(leaderboardList).not.toBeNull();

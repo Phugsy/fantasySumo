@@ -1,0 +1,151 @@
+import { describe, expect, it } from "vitest";
+import type { BanzukeEntry, BoutResult, ScheduledBout } from "./types.js";
+import { deriveRikishiTournamentNotes } from "./tournament-notes.js";
+
+const bashoId = "2026-05";
+const banzukeEntries: BanzukeEntry[] = [
+  {
+    id: `${bashoId}-ura`,
+    bashoId,
+    rikishiId: "ura",
+    rank: "Maegashira #1",
+    rankOrder: 1,
+  },
+  {
+    id: `${bashoId}-onosato`,
+    bashoId,
+    rikishiId: "onosato",
+    rank: "Yokozuna East",
+    rankOrder: 2,
+  },
+];
+
+describe("deriveRikishiTournamentNotes", () => {
+  it("keeps source-reported withdrawal separate from dated achievements", () => {
+    const scheduledBouts: ScheduledBout[] = [
+      {
+        id: "day-9",
+        bashoId,
+        day: 9,
+        eastRikishiId: "ura",
+        westRikishiId: "onosato",
+        status: "cancelled",
+        withdrawnRikishiId: "ura",
+      },
+    ];
+    const boutResults = makeRecord("ura", 8, 0);
+
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries,
+        boutResults,
+        rikishiId: "ura",
+        scheduledBouts,
+        throughDay: 8,
+      }),
+    ).toEqual({
+      statuses: [{ type: "withdrawn", effectiveDay: 9, provenance: "source" }],
+      achievements: [{ type: "kachi-koshi", day: 8, provenance: "derived" }],
+    });
+  });
+
+  it("derives a return only from a later recorded non-absence", () => {
+    const scheduledBouts: ScheduledBout[] = [
+      {
+        id: "day-4",
+        bashoId,
+        day: 4,
+        eastRikishiId: "ura",
+        westRikishiId: "onosato",
+        status: "cancelled",
+        withdrawnRikishiId: "ura",
+      },
+    ];
+    const boutResults: BoutResult[] = [
+      result(5, "onosato", "ura", { loserAbsent: true }),
+      result(6, "ura", "other"),
+    ];
+
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries,
+        boutResults,
+        rikishiId: "ura",
+        scheduledBouts,
+      }).statuses,
+    ).toEqual([{ type: "returned", effectiveDay: 6, provenance: "derived" }]);
+  });
+
+  it("dates make-koshi on the eighth recorded loss", () => {
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries,
+        boutResults: makeRecord("ura", 0, 9),
+        rikishiId: "ura",
+        scheduledBouts: [],
+      }).achievements,
+    ).toEqual([{ type: "make-koshi", day: 8, provenance: "derived" }]);
+  });
+
+  it("derives a gold star only from a recorded maegashira win over a yokozuna", () => {
+    const qualifying = deriveRikishiTournamentNotes({
+      banzukeEntries,
+      boutResults: [result(3, "ura", "onosato")],
+      rikishiId: "ura",
+      scheduledBouts: [],
+    });
+    const defaultWin = deriveRikishiTournamentNotes({
+      banzukeEntries,
+      boutResults: [result(3, "ura", "onosato", { loserAbsent: true })],
+      rikishiId: "ura",
+      scheduledBouts: [],
+    });
+
+    expect(qualifying.achievements).toEqual([
+      { type: "gold-star", day: 3, provenance: "derived" },
+    ]);
+    expect(defaultWin.achievements).toEqual([]);
+  });
+
+  it("returns no notes when the required facts are missing", () => {
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries: [],
+        boutResults: [],
+        rikishiId: "unknown",
+        scheduledBouts: [],
+      }),
+    ).toEqual({ statuses: [], achievements: [] });
+  });
+});
+
+function makeRecord(
+  rikishiId: string,
+  wins: number,
+  losses: number,
+): BoutResult[] {
+  return [
+    ...Array.from({ length: wins }, (_, index) =>
+      result(index + 1, rikishiId, `opponent-${index + 1}`),
+    ),
+    ...Array.from({ length: losses }, (_, index) =>
+      result(wins + index + 1, `opponent-${wins + index + 1}`, rikishiId),
+    ),
+  ];
+}
+
+function result(
+  day: number,
+  winnerRikishiId: string,
+  loserRikishiId: string,
+  absence: Pick<BoutResult, "winnerAbsent" | "loserAbsent"> = {},
+): BoutResult {
+  return {
+    id: `day-${day}-${winnerRikishiId}-${loserRikishiId}`,
+    bashoId,
+    day,
+    winnerRikishiId,
+    loserRikishiId,
+    ...absence,
+  };
+}
