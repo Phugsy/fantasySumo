@@ -1,3 +1,8 @@
+---
+name: fantasy-sumo-issue-loop
+description: Implement a Fantasy Sumo GitHub issue as one focused, validated pull request. Use when the user asks to take a numbered issue through the repository's issue-to-PR workflow.
+---
+
 # Fantasy Sumo Issue Loop
 
 Use this skill when the user asks to work an issue through the Fantasy Sumo repo process, for example:
@@ -122,11 +127,11 @@ The PR body should include:
 
 Do not mark a draft ready for review until required checks, issue-specific acceptance criteria, and the pre-handoff review gate are satisfied. Once those gates pass, convert it to ready rather than leaving it in draft.
 
-When Codex automations are available, start a PR-scoped scheduled babysitter after opening the PR. Invoke `skills/fantasy-sumo-pr-review-loop/SKILL.md` in scheduled mode, use an isolated worktree, and stop monitoring when the PR is merged or closed. The generated task prompt must explicitly authorize the skill's limited safe-fix writes: edit the PR branch, commit, push without force, reply to addressed review threads, and resolve only those addressed threads. It must repeat that merge, close, approval, branch deletion, and high-risk or ambiguous fixes are not authorized. If automation is unavailable, state that review follow-up remains manual.
+Do not create recurring scheduled, heartbeat, or babysitting automations after opening the PR. Opening a ready PR, requesting its initial review, or having automation tools available does not authorize recurring follow-up. Review later feedback only in a manual pass that the user explicitly requests.
 
 ## Automation Boundary
 
-This skill is manual or semi-manual. It does not create a fully automatic "new issue equals new PR" system. After the PR exists, use `skills/fantasy-sumo-pr-review-loop/SKILL.md` for thread-aware feedback follow-up or a guarded scheduled babysitter.
+This skill is manual or semi-manual. It does not create a fully automatic "new issue equals new PR" system. After the PR exists, use `skills/fantasy-sumo-pr-review-loop/SKILL.md` only when the user requests a manual, thread-aware feedback pass.
 
 A later queue can add automation with safer constraints:
 

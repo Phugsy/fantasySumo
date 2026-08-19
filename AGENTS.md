@@ -45,6 +45,9 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 - Keep scoring logic isolated and well-tested.
 - Keep basho lifecycle and pick-locking rules in the domain/API layer; UI state should mirror those rules, not replace API enforcement.
 - Keep data import logic separate from scoring logic.
+- Do not create or start recurring scheduled, heartbeat, or babysitting
+  automations for pull request review follow-up. Review an open pull request
+  only in a user-requested manual pass.
 - Once an E2E harness exists, use it to validate completion for changes that affect the browser game loop.
 - Run relevant E2E before the initial handoff for browser-game-loop changes. When meaningful UI or interaction risk remains, add an agent-browser visual pass when available; it supplements rather than replaces E2E.
 
@@ -81,7 +84,7 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 
 For issue-to-PR work, use the repo-local process in `skills/fantasy-sumo-issue-loop/SKILL.md`. It can be invoked with a prompt such as: "Use the Fantasy Sumo issue loop on #44."
 
-For pre-handoff review, PR comment follow-up, or scheduled PR babysitting, use `skills/fantasy-sumo-pr-review-loop/SKILL.md`.
+For pre-handoff review or a user-requested manual PR comment follow-up, use `skills/fantasy-sumo-pr-review-loop/SKILL.md`.
 
 ## Definition of done for future changes
 
