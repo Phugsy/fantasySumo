@@ -189,12 +189,14 @@ The config also assigns one deterministic local session ID through
 `ADMIN_USER_IDS` so the browser suite can cover `/admin` without weakening the
 API authorization boundary.
 
-The browser suite covers API-backed app loading, local session sign-in,
-authenticated team creation and pre-lock editing, the private My Stable view,
-immediate saved-line-up updates, individual and total score progress, selection
-validation, pick locking, protected demo progression, leaderboard ordering, and
-responsive navigation. Direct team-mutation checks establish the same local
-session before asserting lifecycle enforcement.
+The browser suite covers the public home and leaderboard, protected-route login
+return paths, direct route refresh plus browser back/forward behaviour, local
+session sign-in and sign-out, authenticated team creation and pre-lock editing,
+the private My Stable view, immediate saved-line-up updates, individual and total
+score progress, selection validation, pick locking, protected demo progression,
+leaderboard ordering, and responsive role-aware navigation. Direct
+team-mutation checks establish the same local session before asserting lifecycle
+enforcement.
 The suite also signs in as the configured local admin, resets and opens the demo
 fixture, starts it, advances results, completes it, and checks player-facing
 navigation and lifecycle state after those actions.
