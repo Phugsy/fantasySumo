@@ -1,6 +1,6 @@
 ---
 name: fantasy-sumo-pr-review-loop
-description: Review Fantasy Sumo branch changes before handoff and safely address actionable GitHub pull request feedback. Use for dedicated pre-handoff code reviews, unresolved PR review threads, repeated Codex review findings, or scheduled PR babysitting after a pull request is open.
+description: Review Fantasy Sumo branch changes before handoff and safely address actionable GitHub pull request feedback. Use for dedicated pre-handoff code reviews or a user-requested manual pass over unresolved PR review threads.
 ---
 
 # Fantasy Sumo PR Review Loop
@@ -11,7 +11,8 @@ Keep review fixes focused, independently checked, and traceable to their GitHub 
 
 - **Pre-handoff review:** review the complete branch diff against its base before calling a change ready.
 - **PR feedback:** inspect unresolved review threads and address safe, actionable findings.
-- **Scheduled babysitting:** repeat PR feedback mode in an isolated worktree until the PR closes or user input is required.
+
+Do not create or start recurring scheduled, heartbeat, or babysitting automations from this skill. PR feedback mode is a single manual pass and requires an explicit user request.
 
 ## Pre-handoff Review
 
@@ -23,7 +24,7 @@ Keep review fixes focused, independently checked, and traceable to their GitHub 
    - review committed branch changes with **Review against a base branch**;
    - review staged, unstaged, and untracked changes with **Review uncommitted changes**;
    - run both when the branch has commits and additional worktree changes. A base-branch review does not include uncommitted work.
-   - in a scheduled or agent workflow, delegate each applicable target to a separate read-only reviewer agent with no edit or GitHub-write authority;
+   - in an agent workflow, delegate each applicable target to a separate read-only reviewer agent with no edit or GitHub-write authority;
    - use `codex review --base <base>` or `codex review --uncommitted` only when the user explicitly authorizes that CLI review and environment policy permits repository data to be sent. Never retry or bypass a denied data-export action.
 4. Treat the review as read-only. Triage findings before editing:
    - fix high-confidence correctness, security, data-integrity, lifecycle, and regression findings;
@@ -46,7 +47,7 @@ Keep review fixes focused, independently checked, and traceable to their GitHub 
 
 ## Publishing an Authorized Fix
 
-Only publish when the user or scheduled-task prompt explicitly authorizes GitHub writes.
+Only publish when the user explicitly authorizes GitHub writes.
 
 1. Confirm the branch and cleanly separate unrelated local changes.
 2. Verify Git identity is `Phugsy <263059804+Phugsy@users.noreply.github.com>` and `/opt/homebrew/bin/gh api user --jq .login` returns `Phugsy`; stop if either identity mismatches or the authenticated GitHub actor cannot be verified.
@@ -56,18 +57,3 @@ Only publish when the user or scheduled-task prompt explicitly authorizes GitHub
 6. Re-read thread-aware review state and current checks. Report any new or unresolved feedback.
 
 Never merge, close the PR, delete branches, force-push, or broaden the PR. Leave those actions to the user.
-
-## Scheduled Babysitting
-
-Run in a dedicated worktree. On each invocation:
-
-1. Require the scheduled task to supply exactly one explicit PR number. Never discover or scan other open PRs in scheduled mode; stop and request a corrected task if the PR number is missing or ambiguous.
-2. Fetch the PR remote branch, check it out cleanly in the worktree, and record its remote head SHA. Stop if the worktree is dirty or the branch cannot fast-forward to that SHA.
-3. If no unresolved actionable P1/P2 feedback exists, make no changes and report a clean poll.
-4. Address at most one coherent safe batch per PR and validate it as above.
-5. Immediately before committing or pushing, fetch the PR branch again and compare its remote head SHA with the recorded SHA. If it changed during the run, do not commit or push; preserve the diff for inspection and notify the user so the next run can restart from the new head. Never force-push.
-6. When the head is unchanged and the task prompt explicitly authorizes the limited writes, commit, push, reply, and resolve as above.
-7. Stop and notify the user when a finding needs user input, validation fails, the branch changed unexpectedly, or repository access is unavailable.
-8. Stop monitoring a PR after it is merged or closed, and pause or delete the PR-scoped automation when the scheduling surface permits it.
-
-Do not use scheduled runs to approve or merge pull requests.
