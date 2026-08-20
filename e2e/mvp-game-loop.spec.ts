@@ -31,6 +31,14 @@ test("loads API-backed current basho content", async ({ page, request }) => {
     2,
   );
   await expect(page.getByLabel("Team name")).toHaveCount(0);
+
+  await page
+    .locator(".leaderboard-summary")
+    .filter({ hasText: "Dohyo Dreamers" })
+    .click();
+  await expect(
+    page.getByLabel("Tobizaru tournament status and achievements"),
+  ).toHaveCount(0);
 });
 
 test("lets an authenticated admin run the deterministic demo loop", async ({
@@ -335,6 +343,24 @@ test("shows completed demo leaderboard entries in score order", async ({
 
   expect(scores).toEqual([...scores].sort((left, right) => right - left));
   await expect(page.getByText(/wins/).first()).toBeVisible();
+
+  await leaderboardRows.filter({ hasText: "Salt Circle" }).click();
+  const uraNotes = page.getByLabel("Ura tournament status and achievements");
+  await expect(uraNotes.getByText("Gold star")).toBeVisible();
+  await expect(uraNotes.getByText("Day 13 · derived")).toBeVisible();
+
+  await leaderboardRows.filter({ hasText: "Dohyo Dreamers" }).click();
+  const tobizaruNotes = page.getByLabel(
+    "Tobizaru tournament status and achievements",
+  );
+  await expect(tobizaruNotes.getByText("Withdrawn")).toBeVisible();
+  await expect(tobizaruNotes.getByText("Day 15 · source report")).toBeVisible();
+  await expect(tobizaruNotes.getByText("Make-koshi")).toBeVisible();
+  await expect(
+    page.getByText(
+      "Tournament badges are informational and do not add fantasy points.",
+    ),
+  ).toBeVisible();
 });
 
 test("locks team selection after the demo basho starts", async ({

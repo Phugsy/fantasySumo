@@ -1,6 +1,10 @@
 import { calculateLeaderboard, type Basho } from "@fantasy-sumo/domain";
 import { DEMO_BASHO_ID } from "./demo-constants.js";
-import { demoBoutResults } from "./demo-seed-data.js";
+import {
+  demoBoutResults,
+  demoScheduledBoutPublications,
+  demoScheduledBoutsForDay,
+} from "./demo-seed-data.js";
 import type { Repositories } from "./repositories.js";
 import { seedDemoDatabase } from "./seed.js";
 
@@ -66,6 +70,7 @@ export async function advanceDemoBashoDay(
     currentDay: nextDay,
   };
 
+  await publishDemoWithdrawalMarkers(repositories, nextDay, dayResults);
   await repositories.applyBoutResultsImport({
     bashoId: currentBasho.id,
     day: nextDay,
@@ -89,10 +94,13 @@ export async function completeDemoBasho(
   await repositories.deleteBoutResultsForBasho(basho.id);
 
   for (let day = 1; day <= DEMO_FINAL_DAY; day += 1) {
+    const dayResults = demoBoutResults.filter((result) => result.day === day);
+
+    await publishDemoWithdrawalMarkers(repositories, day, dayResults);
     await repositories.applyBoutResultsImport({
       bashoId: basho.id,
       day,
-      results: demoBoutResults.filter((result) => result.day === day),
+      results: dayResults,
     });
   }
 
@@ -105,6 +113,33 @@ export async function completeDemoBasho(
   await repositories.updateBasho(nextBasho);
 
   return describeDemoProgression(repositories, nextBasho);
+}
+
+async function publishDemoWithdrawalMarkers(
+  repositories: Repositories,
+  day: number,
+  dayResults: readonly (typeof demoBoutResults)[number][],
+): Promise<void> {
+  if (
+    !dayResults.some(
+      (result) => result.winnerAbsent === true || result.loserAbsent === true,
+    )
+  ) {
+    return;
+  }
+
+  const publication = demoScheduledBoutPublications.find(
+    (entry) => entry.day === day,
+  );
+
+  if (publication === undefined) {
+    throw new Error(`Demo schedule publication for day ${day} was not found.`);
+  }
+
+  await repositories.applyScheduledBoutsImport({
+    publication,
+    bouts: demoScheduledBoutsForDay(day),
+  });
 }
 
 async function requireDemoBasho(repositories: Repositories): Promise<Basho> {

@@ -384,6 +384,15 @@ describe("repositories", () => {
     expect(await repositories.listBoutResultsForBasho(demoBasho.id)).toEqual(
       [],
     );
+    const futureTobizaruBout = (
+      await repositories.listScheduledBoutsForBasho(demoBasho.id)
+    ).find(
+      (bout) =>
+        bout.day === DEMO_FINAL_DAY && bout.westRikishiId === "tobizaru",
+    );
+
+    expect(futureTobizaruBout).toMatchObject({ status: "scheduled" });
+    expect(futureTobizaruBout).not.toHaveProperty("withdrawnRikishiId");
     expect(
       await repositories.listScheduledBoutPublicationsForBasho(demoBasho.id),
     ).toHaveLength(15);
@@ -596,6 +605,15 @@ describe("repositories", () => {
     expect(completed.leaderboard[0]).toMatchObject({
       displayName: "Yusho Hunters",
       score: 22,
+    });
+    expect(
+      (await repositories.listScheduledBoutsForBasho(demoBasho.id)).find(
+        (bout) =>
+          bout.day === DEMO_FINAL_DAY && bout.westRikishiId === "tobizaru",
+      ),
+    ).toMatchObject({
+      status: "cancelled",
+      withdrawnRikishiId: "tobizaru",
     });
   });
 });

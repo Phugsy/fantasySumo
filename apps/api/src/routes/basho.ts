@@ -7,6 +7,7 @@ import {
   calculateLeaderboard,
   calculateTeamScore,
   canEditFantasyPicks,
+  deriveRikishiTournamentNotes,
   getPickLockMessage,
   validateFantasyPicks,
 } from "@fantasy-sumo/domain";
@@ -79,15 +80,17 @@ export function registerBashoRoutes(
       });
     }
 
+    const [allRikishi, banzukeEntries, boutResults, scheduledBouts] =
+      await Promise.all([
+        context.repositories.listRikishi(),
+        context.repositories.listBanzukeEntriesForBasho(basho.id),
+        context.repositories.listBoutResultsForBasho(basho.id),
+        context.repositories.listScheduledBoutsForBasho(basho.id),
+      ]);
     const rikishiById = new Map(
-      (await context.repositories.listRikishi()).map((rikishi) => [
-        rikishi.id,
-        rikishi,
-      ]),
+      allRikishi.map((rikishi) => [rikishi.id, rikishi]),
     );
-    const rikishi = (
-      await context.repositories.listBanzukeEntriesForBasho(basho.id)
-    ).map((entry) => {
+    const rikishi = banzukeEntries.map((entry) => {
       const rikishiEntry = rikishiById.get(entry.rikishiId);
 
       return {
@@ -96,6 +99,13 @@ export function registerBashoRoutes(
         heya: rikishiEntry?.heya,
         rank: entry.rank,
         rankOrder: entry.rankOrder,
+        tournamentNotes: deriveRikishiTournamentNotes({
+          banzukeEntries,
+          boutResults,
+          rikishiId: entry.rikishiId,
+          scheduledBouts,
+          throughDay: basho.currentDay,
+        }),
       };
     });
 
@@ -287,26 +297,25 @@ export function registerBashoRoutes(
       });
     }
 
-    const picks = await context.repositories.listFantasyPicksForTeam(team.id);
-    const teamScore = calculateTeamScore(
-      team,
-      picks,
-      await context.repositories.listBoutResultsForBasho(basho.id),
-      { throughDay: basho.currentDay },
-    );
+    const [picks, boutResults, banzukeEntries, allRikishi, scheduledBouts] =
+      await Promise.all([
+        context.repositories.listFantasyPicksForTeam(team.id),
+        context.repositories.listBoutResultsForBasho(basho.id),
+        context.repositories.listBanzukeEntriesForBasho(basho.id),
+        context.repositories.listRikishi(),
+        context.repositories.listScheduledBoutsForBasho(basho.id),
+      ]);
+    const teamScore = calculateTeamScore(team, picks, boutResults, {
+      throughDay: basho.currentDay,
+    });
     const scoresByRikishiId = new Map(
       teamScore.rikishiScores.map((score) => [score.rikishiId, score]),
     );
     const banzukeByRikishiId = new Map(
-      (await context.repositories.listBanzukeEntriesForBasho(basho.id)).map(
-        (entry) => [entry.rikishiId, entry],
-      ),
+      banzukeEntries.map((entry) => [entry.rikishiId, entry]),
     );
     const rikishiById = new Map(
-      (await context.repositories.listRikishi()).map((rikishi) => [
-        rikishi.id,
-        rikishi,
-      ]),
+      allRikishi.map((rikishi) => [rikishi.id, rikishi]),
     );
 
     return {
@@ -331,6 +340,13 @@ export function registerBashoRoutes(
                 }),
             wins: score?.wins ?? 0,
             score: score?.score ?? 0,
+            tournamentNotes: deriveRikishiTournamentNotes({
+              banzukeEntries,
+              boutResults,
+              rikishiId: pick.rikishiId,
+              scheduledBouts,
+              throughDay: basho.currentDay,
+            }),
           };
         })
         .sort(

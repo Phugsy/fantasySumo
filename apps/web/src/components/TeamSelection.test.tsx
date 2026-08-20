@@ -11,6 +11,7 @@ const rikishi: RankedRikishi[] = [
     heya: "Nishonoseki",
     rank: "Ozeki",
     rankOrder: 1,
+    tournamentNotes: { statuses: [], achievements: [] },
   },
   {
     id: "kotozakura",
@@ -18,6 +19,7 @@ const rikishi: RankedRikishi[] = [
     heya: "Sadogatake",
     rank: "Ozeki",
     rankOrder: 2,
+    tournamentNotes: { statuses: [], achievements: [] },
   },
   {
     id: "hoshoryu",
@@ -25,6 +27,7 @@ const rikishi: RankedRikishi[] = [
     heya: "Tatsunami",
     rank: "Sekiwake",
     rankOrder: 3,
+    tournamentNotes: { statuses: [], achievements: [] },
   },
 ];
 

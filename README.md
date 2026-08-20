@@ -12,6 +12,7 @@ At present, the app has the first local playable foundations:
 
 - A routed Vite + React front end with a public current-basho leaderboard, a dedicated login page, and authenticated team and stable pages.
 - A private My Stable view with the signed-in player's picks, edit/lock state, rikishi details, scoring progress, and each pick's next published matchup.
+- Informational rikishi tournament badges for source-reported withdrawal status and reliably derived record or gold-star milestones; these never change fantasy points.
 - A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.
 - A shared TypeScript domain package with MVP types, lifecycle rules, validation, scoring, and leaderboard logic.
 - A swappable Drizzle database package with local SQLite, production Postgres, repositories, migrations, sample seed data, and deterministic demo data.

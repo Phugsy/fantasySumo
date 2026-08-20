@@ -15,6 +15,20 @@ export interface RankedRikishi {
   heya?: string;
   rank: string;
   rankOrder: number;
+  tournamentNotes?: RikishiTournamentNotes;
+}
+
+export interface RikishiTournamentNotes {
+  statuses: Array<{
+    type: "withdrawn" | "returned";
+    effectiveDay: number;
+    provenance: "source" | "derived";
+  }>;
+  achievements: Array<{
+    type: "kachi-koshi" | "make-koshi" | "gold-star";
+    day: number;
+    provenance: "source" | "derived";
+  }>;
 }
 
 export interface BashoRikishiResponse {
@@ -46,6 +60,7 @@ export interface MyTeamResponse {
       rankOrder?: number;
       wins: number;
       score: number;
+      tournamentNotes?: RikishiTournamentNotes;
     }
   >;
 }

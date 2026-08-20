@@ -23,7 +23,9 @@ The active app is split into:
 
 - a React client built by Vite;
 - a Fastify API compiled by TypeScript;
-- a shared framework-free domain package with MVP types, pick validation, scoring, and leaderboard calculation;
+- a shared framework-free domain package with MVP types, pick validation,
+  scoring, leaderboard calculation, and informational rikishi tournament-note
+  derivation;
 - a Drizzle data package with local SQLite and a production Neon Postgres
   adapter;
 - an API auth boundary with local development sessions and production Neon Auth JWT verification;
@@ -57,6 +59,9 @@ Current behaviour:
 - Shows ordered team standings with the latest daily score, compact five-day
   team form, and expandable picked-rikishi tournament totals. Each rikishi row
   shows up to five recent outcomes and expands to the full result history.
+- Shows compact, dated tournament-status and achievement badges in My Stable
+  and expanded leaderboard details, with readable provenance and an explicit
+  reminder that badges do not award fantasy points.
 - Charts cumulative team scores across scored days with team filters,
   inspectable points, and an accessible exact-value table.
 - Exposes a dedicated `/admin` route only for sessions the API marks as admin,
@@ -82,7 +87,9 @@ Current routes:
 - `GET /api/basho/current`
   - Returns the active basho and configured team size, falling back to the latest locked basho, then the latest available basho.
 - `GET /api/basho/:bashoId/rikishi`
-  - Returns a basho and its rikishi with banzuke rank data.
+  - Returns a basho and its rikishi with banzuke rank data plus informational
+    tournament statuses and dated achievements derived from stored source
+    facts.
 - `GET /api/basho/:bashoId/schedule`
   - Returns only stored, published days after the basho's current scored day.
   - Enriches each scheduled side with existing shikona and banzuke rank data.
@@ -99,7 +106,8 @@ Current routes:
   - Requires a current user.
   - Returns only the current user's fantasy team for the basho, with private
     picks enriched by shikona, heya and banzuke rank where available, plus each
-    rikishi's wins/points and the total team score.
+    rikishi's wins/points, informational tournament notes, and the total team
+    score.
 - `PUT /api/basho/:bashoId/my-team`
   - Replaces the current signed-in user's team name and picks.
   - Uses the same exact-size, duplicate-pick, and banzuke validation as team

@@ -30,6 +30,10 @@ const myTeam: MyTeamResponse = {
       rankOrder: 1,
       wins: 3,
       score: 3,
+      tournamentNotes: {
+        statuses: [],
+        achievements: [{ type: "kachi-koshi", day: 8, provenance: "derived" }],
+      },
     },
     {
       rikishiId: "hoshoryu",
@@ -39,6 +43,12 @@ const myTeam: MyTeamResponse = {
       rankOrder: 2,
       wins: 1,
       score: 1,
+      tournamentNotes: {
+        statuses: [
+          { type: "withdrawn", effectiveDay: 6, provenance: "source" },
+        ],
+        achievements: [],
+      },
     },
   ],
 };
@@ -118,6 +128,15 @@ describe("MyStablePanel", () => {
     expect(screen.getByText("Onosato")).toBeInTheDocument();
     expect(screen.getByText("Nishonoseki")).toBeInTheDocument();
     expect(screen.getByText("3 wins")).toBeInTheDocument();
+    expect(screen.getByText("Kachi-koshi")).toBeInTheDocument();
+    expect(screen.getByText("Day 8 · derived")).toBeInTheDocument();
+    expect(screen.getByText("Withdrawn")).toBeInTheDocument();
+    expect(screen.getByText("Day 6 · source report")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Tournament badges are informational and do not add fantasy points.",
+      ),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(
         "This basho has started, so picks are locked. Your line-up is read-only.",
@@ -142,7 +161,9 @@ describe("MyStablePanel", () => {
 
     expect(screen.getByText("Demo May Basho · Picks open")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit picks" })).toBeEnabled();
-    expect(screen.queryByText(/Day 6/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Day 6/, { selector: ".stable-status" }),
+    ).not.toBeInTheDocument();
   });
 
   it("links an editable stable back to its pick editor", () => {
