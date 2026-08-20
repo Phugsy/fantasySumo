@@ -115,7 +115,7 @@ function deriveAchievements(
       wins += 1;
 
       if (
-        result.loserAbsent !== true &&
+        !isDefaultWin(result) &&
         isMaegashira(rankByRikishiId.get(rikishiId)) &&
         isYokozuna(rankByRikishiId.get(result.loserRikishiId))
       ) {
@@ -147,6 +147,13 @@ function deriveAchievements(
   }
 
   return achievements;
+}
+
+function isDefaultWin(result: BoutResult): boolean {
+  return (
+    result.loserAbsent === true ||
+    result.kimarite?.trim().toLowerCase() === "fusen"
+  );
 }
 
 function isRikishiAbsentFromResult(

@@ -31,6 +31,14 @@ test("loads API-backed current basho content", async ({ page, request }) => {
     2,
   );
   await expect(page.getByLabel("Team name")).toHaveCount(0);
+
+  await page
+    .locator(".leaderboard-summary")
+    .filter({ hasText: "Dohyo Dreamers" })
+    .click();
+  await expect(
+    page.getByLabel("Tobizaru tournament status and achievements"),
+  ).toHaveCount(0);
 });
 
 test("lets an authenticated admin run the deterministic demo loop", async ({

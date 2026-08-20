@@ -693,16 +693,29 @@ export const demoScheduledBoutPublications: ScheduledBoutPublication[] =
     };
   });
 
-export const demoScheduledBouts: ScheduledBout[] = demoBoutResults.map(
-  (result) => ({
+function toDemoScheduledBout(
+  result: BoutResult,
+  includeWithdrawal: boolean,
+): ScheduledBout {
+  const isWithdrawal = includeWithdrawal && result.loserAbsent === true;
+
+  return {
     id: result.id.replace("-bout-", "-match-"),
     bashoId: result.bashoId,
     day: result.day,
     eastRikishiId: result.winnerRikishiId,
     westRikishiId: result.loserRikishiId,
-    status: result.loserAbsent === true ? "cancelled" : "scheduled",
-    ...(result.loserAbsent === true
-      ? { withdrawnRikishiId: result.loserRikishiId }
-      : {}),
-  }),
+    status: isWithdrawal ? "cancelled" : "scheduled",
+    ...(isWithdrawal ? { withdrawnRikishiId: result.loserRikishiId } : {}),
+  };
+}
+
+export const demoScheduledBouts: ScheduledBout[] = demoBoutResults.map(
+  (result) => toDemoScheduledBout(result, false),
 );
+
+export function demoScheduledBoutsForDay(day: number): ScheduledBout[] {
+  return demoBoutResults
+    .filter((result) => result.day === day)
+    .map((result) => toDemoScheduledBout(result, true));
+}

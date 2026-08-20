@@ -100,11 +100,18 @@ describe("deriveRikishiTournamentNotes", () => {
       rikishiId: "ura",
       scheduledBouts: [],
     });
+    const storedFusenWin = deriveRikishiTournamentNotes({
+      banzukeEntries,
+      boutResults: [result(3, "ura", "onosato", { kimarite: "fusen" })],
+      rikishiId: "ura",
+      scheduledBouts: [],
+    });
 
     expect(qualifying.achievements).toEqual([
       { type: "gold-star", day: 3, provenance: "derived" },
     ]);
     expect(defaultWin.achievements).toEqual([]);
+    expect(storedFusenWin.achievements).toEqual([]);
   });
 
   it("returns no notes when the required facts are missing", () => {
@@ -138,7 +145,7 @@ function result(
   day: number,
   winnerRikishiId: string,
   loserRikishiId: string,
-  absence: Pick<BoutResult, "winnerAbsent" | "loserAbsent"> = {},
+  details: Pick<BoutResult, "kimarite" | "winnerAbsent" | "loserAbsent"> = {},
 ): BoutResult {
   return {
     id: `day-${day}-${winnerRikishiId}-${loserRikishiId}`,
@@ -146,6 +153,6 @@ function result(
     day,
     winnerRikishiId,
     loserRikishiId,
-    ...absence,
+    ...details,
   };
 }

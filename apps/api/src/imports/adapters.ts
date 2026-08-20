@@ -230,9 +230,14 @@ export function mapSumoApiTorikumiPayload(
         ...(row.kimarite === undefined || row.kimarite === ""
           ? {}
           : { kimarite: row.kimarite }),
+        ...(isFusen(row.kimarite) ? { loserAbsent: true } : {}),
       };
     }),
   };
+}
+
+function isFusen(kimarite: string | undefined): boolean {
+  return kimarite?.trim().toLowerCase() === "fusen";
 }
 
 function toSourceRikishi(shikona: string) {

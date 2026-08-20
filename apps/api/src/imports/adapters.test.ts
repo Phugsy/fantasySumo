@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { deriveRikishiTournamentNotes } from "@fantasy-sumo/domain";
 import {
   mapJsaBanzukePayload,
   mapSumoApiSchedulePayload,
@@ -181,6 +182,58 @@ describe("source import adapters", () => {
       winnerRikishiId: "kotozakura",
       loserRikishiId: "onosato",
     });
+  });
+
+  it("preserves a fusen loss as an absence and does not derive a gold star", () => {
+    const command = mapSumoApiTorikumiPayload(
+      {
+        torikumi: [
+          {
+            bashoId: "202605",
+            day: 3,
+            matchNo: 1,
+            eastId: 28,
+            eastShikona: "Ura",
+            westId: 8850,
+            westShikona: "Onosato",
+            kimarite: "fusen",
+            winnerId: 28,
+            winnerEn: "Ura",
+          },
+        ],
+      },
+      { bashoId: "2026-05", day: 3 },
+    );
+
+    expect(command.results[0]).toMatchObject({
+      winnerRikishiId: "ura",
+      loserRikishiId: "onosato",
+      kimarite: "fusen",
+      loserAbsent: true,
+    });
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries: [
+          {
+            id: "2026-05-ura",
+            bashoId: "2026-05",
+            rikishiId: "ura",
+            rank: "Maegashira #1",
+            rankOrder: 1,
+          },
+          {
+            id: "2026-05-onosato",
+            bashoId: "2026-05",
+            rikishiId: "onosato",
+            rank: "Yokozuna West",
+            rankOrder: 2,
+          },
+        ],
+        boutResults: command.results,
+        rikishiId: "ura",
+        scheduledBouts: [],
+      }).achievements,
+    ).toEqual([]);
   });
 
   it("maps a future torikumi without inventing a result", () => {
