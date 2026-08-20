@@ -626,6 +626,9 @@ describe("App", () => {
       token: "valid-token",
     });
     expect(signOut).toHaveBeenCalledOnce();
+    expect(signOut.mock.invocationCallOrder[0]!).toBeLessThan(
+      resetPassword.mock.invocationCallOrder[0]!,
+    );
 
     fireEvent.click(continueToSignIn);
 
@@ -644,6 +647,40 @@ describe("App", () => {
     });
 
     expect(screen.queryByText("Your team")).not.toBeInTheDocument();
+  });
+
+  it("does not consume the reset token when the previous session cannot sign out", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/reset-password?token=valid-token&returnTo=%2Fstable",
+    );
+    vi.stubGlobal("fetch", vi.fn(mockExistingNeonSessionFetch));
+    const resetPassword = vi
+      .spyOn(authClient, "resetPasswordWithNeon")
+      .mockResolvedValue();
+    vi.spyOn(authClient, "signOutNeon").mockRejectedValue(
+      new Error("private provider detail"),
+    );
+
+    render(<App />);
+
+    fireEvent.change(await screen.findByLabelText("New password"), {
+      target: { value: "new-strong-password" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm new password"), {
+      target: { value: "new-strong-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We could not securely end the current session. Check your connection and try again.",
+    );
+    expect(screen.getByLabelText("New password")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Continue to sign in" }),
+    ).not.toBeInTheDocument();
+    expect(resetPassword).not.toHaveBeenCalled();
   });
 
   it("clears a previously entered password after recovery completes", async () => {

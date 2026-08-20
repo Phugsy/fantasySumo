@@ -91,28 +91,7 @@ test("clears an existing account session before returning to login", async ({
 }) => {
   let signOutRequested = false;
 
-  await page.unroute("**/api/session");
-  await page.route("**/api/session", async (route) => {
-    await fulfillJson(route, {
-      mode: "neon",
-      user: {
-        id: "existing-user",
-        email: "existing@example.com",
-        displayName: "Existing Player",
-      },
-    });
-  });
-  await page.unroute("**/fake-neon-auth/get-session");
-  await page.route("**/fake-neon-auth/get-session", async (route) => {
-    await fulfillJson(route, {
-      session: { token: "existing-session-token" },
-      user: {
-        id: "existing-user",
-        email: "existing@example.com",
-        name: "Existing Player",
-      },
-    });
-  });
+  await stubExistingNeonSession(page);
   await page.unroute("**/fake-neon-auth/sign-out");
   await page.route("**/fake-neon-auth/sign-out", async (route) => {
     signOutRequested = true;
@@ -139,6 +118,66 @@ test("clears an existing account session before returning to login", async ({
   ).toBeVisible();
   expect(signOutRequested).toBe(true);
 });
+
+test("keeps the reset token reusable when the previous session cannot sign out", async ({
+  page,
+}) => {
+  let resetRequested = false;
+
+  await stubExistingNeonSession(page);
+  await page.unroute("**/fake-neon-auth/sign-out");
+  await page.route("**/fake-neon-auth/sign-out", async (route) => {
+    await route.fulfill({
+      body: JSON.stringify({ message: "private provider detail" }),
+      contentType: "application/json",
+      status: 503,
+    });
+  });
+  await page.route("**/fake-neon-auth/reset-password", async (route) => {
+    resetRequested = true;
+    await fulfillJson(route, { status: true });
+  });
+
+  await page.goto(
+    "/reset-password?token=browser-valid-token&returnTo=%2Fstable",
+  );
+  await page
+    .getByLabel("New password", { exact: true })
+    .fill("browser-strong-password");
+  await page.getByLabel("Confirm new password").fill("browser-strong-password");
+  await page.getByRole("button", { name: "Reset password" }).click();
+
+  await expect(page.getByRole("alert")).toHaveText(
+    "We could not securely end the current session. Check your connection and try again.",
+  );
+  await expect(page.getByLabel("New password", { exact: true })).toBeVisible();
+  expect(resetRequested).toBe(false);
+});
+
+async function stubExistingNeonSession(page: Page) {
+  await page.unroute("**/api/session");
+  await page.route("**/api/session", async (route) => {
+    await fulfillJson(route, {
+      mode: "neon",
+      user: {
+        id: "existing-user",
+        email: "existing@example.com",
+        displayName: "Existing Player",
+      },
+    });
+  });
+  await page.unroute("**/fake-neon-auth/get-session");
+  await page.route("**/fake-neon-auth/get-session", async (route) => {
+    await fulfillJson(route, {
+      session: { token: "existing-session-token" },
+      user: {
+        id: "existing-user",
+        email: "existing@example.com",
+        name: "Existing Player",
+      },
+    });
+  });
+}
 
 async function stubNeonAuth(page: Page) {
   await page.route("**/api/session", async (route) => {

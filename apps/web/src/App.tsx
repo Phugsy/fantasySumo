@@ -78,6 +78,9 @@ import type {
 } from "./types";
 import { canEditFantasyPicks, getPickLockMessage } from "./lifecycle";
 
+const PASSWORD_RESET_SESSION_ERROR_MESSAGE =
+  "We could not securely end the current session. Check your connection and try again.";
+
 export function App() {
   return (
     <BrowserRouter>
@@ -446,17 +449,16 @@ function RoutedApp() {
   }
 
   async function handlePasswordReset(newPassword: string, token: string) {
-    await resetPasswordWithNeon({ newPassword, token });
-
     try {
       await signOutNeon();
     } catch {
-      // Resetting a password may invalidate the current provider session before
-      // this cleanup request completes. The local session must still be cleared
-      // so the reset account can reach the promised sign-in form.
+      // Do not consume the single-use reset token unless the previous provider
+      // session is confirmed closed. The player can safely retry this step.
+      throw new Error(PASSWORD_RESET_SESSION_ERROR_MESSAGE);
     }
 
     clearAuthenticatedPlayerState();
+    await resetPasswordWithNeon({ newPassword, token });
   }
 
   function clearAuthenticatedPlayerState() {
