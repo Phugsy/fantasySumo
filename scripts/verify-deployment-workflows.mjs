@@ -2,12 +2,16 @@ import { readFileSync } from "node:fs";
 
 const previewPath = ".github/workflows/deploy-preview.yml";
 const productionPath = ".github/workflows/deploy-production.yml";
+const qualityPath = ".github/workflows/quality.yml";
 const smokePath = "scripts/smoke-deployment.mjs";
+const packagePath = "package.json";
 const tsconfigPath = "tsconfig.json";
 const vercelPath = "vercel.json";
 const preview = readFileSync(previewPath, "utf8");
 const production = readFileSync(productionPath, "utf8");
+const quality = readFileSync(qualityPath, "utf8");
 const smoke = readFileSync(smokePath, "utf8");
+const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
 const tsconfig = JSON.parse(readFileSync(tsconfigPath, "utf8"));
 const vercelConfig = JSON.parse(readFileSync(vercelPath, "utf8"));
 
@@ -55,6 +59,61 @@ function getJob(source, file, jobName) {
     : source.slice(contentStart, afterHeader + nextJob);
 }
 
+const playwrightVersion = packageJson.devDependencies?.["@playwright/test"];
+if (!/^\d+\.\d+\.\d+$/.test(playwrightVersion ?? "")) {
+  throw new Error(
+    `${packagePath} must pin @playwright/test to an exact semantic version.`,
+  );
+}
+
+const playwrightImage = `mcr.microsoft.com/playwright:v${playwrightVersion}-noble`;
+
+function requireContainerizedE2E(source, file, resolvedSha) {
+  const e2eJob = getJob(source, file, "e2e");
+
+  requireText(
+    e2eJob,
+    file,
+    `use the matching pinned Playwright image ${playwrightImage}`,
+    new RegExp(`image: ${playwrightImage.replaceAll(".", "\\.")}`),
+  );
+  requireText(
+    e2eJob,
+    file,
+    "share host memory with Chromium",
+    /options: --ipc=host/,
+  );
+  requireText(
+    e2eJob,
+    file,
+    "run browser E2E without downloading system dependencies",
+    /run: make e2e/,
+  );
+  forbidText(
+    source,
+    file,
+    "install Playwright browsers or operating-system dependencies at runtime",
+    /playwright install/,
+  );
+
+  if (resolvedSha) {
+    requireText(
+      e2eJob,
+      file,
+      "run E2E against the immutable resolved SHA",
+      /ref: \$\{\{ needs\.resolve\.outputs\.sha \}\}/,
+    );
+  }
+}
+
+requireContainerizedE2E(quality, qualityPath, false);
+requireText(
+  getJob(quality, qualityPath, "e2e"),
+  qualityPath,
+  "finish main validation before browser E2E",
+  /needs: validate/,
+);
+
 for (const [source, file, environment, concurrencyGroup] of [
   [preview, previewPath, "Preview", "fantasy-sumo-preview-database"],
   [
@@ -64,6 +123,13 @@ for (const [source, file, environment, concurrencyGroup] of [
     "fantasy-sumo-production-database",
   ],
 ]) {
+  requireContainerizedE2E(source, file, true);
+  requireText(
+    getJob(source, file, "e2e"),
+    file,
+    "finish main validation before browser E2E",
+    /needs:\s*\n\s+- resolve\s*\n\s+- validate/,
+  );
   const deployJob = getJob(source, file, "deploy");
   const deployJobPreamble = deployJob.slice(
     0,
@@ -85,8 +151,8 @@ for (const [source, file, environment, concurrencyGroup] of [
   requireText(
     deployJob,
     file,
-    "finish validation before deployment",
-    /needs:\s*\n\s+- resolve\s*\n\s+- validate/,
+    "finish validation and browser E2E before deployment",
+    /needs:\s*\n\s+- resolve\s*\n\s+- validate\s*\n\s+- e2e/,
   );
   requireText(
     deployJob,

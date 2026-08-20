@@ -30,10 +30,10 @@ Hosted deployments are owned by GitHub Actions:
 
 - `.github/workflows/deploy-preview.yml` runs for same-repository pull request
   commits and can also be dispatched for a specific ref. It resolves the ref to
-  an immutable SHA, runs `make check` and `make e2e`, enters the `preview`
-  environment, builds with Vercel CLI, migrates the preview database, deploys
-  that same build, and smoke-tests `/`, `/api/health`, and the database-backed
-  `/api/basho/current` route.
+  an immutable SHA, runs `make check`, runs `make e2e` in a pinned Playwright
+  container, enters the `preview` environment, builds with Vercel CLI, migrates
+  the preview database, deploys that same build, and smoke-tests `/`,
+  `/api/health`, and the database-backed `/api/basho/current` route.
 - `.github/workflows/deploy-production.yml` runs for a published, non-prerelease
   GitHub Release or a manual dispatch with an exact SHA. It rejects commits
   outside `master`, validates the resolved SHA, waits at the protected
@@ -45,6 +45,13 @@ inputs differ: preview accepts same-repository PR heads and manual refs, while
 production accepts only exact `master` ancestors behind the protected
 `Production` environment. Keeping those policies explicit is more valuable
 than sharing the comparatively small setup/deploy sequence.
+
+Browser E2E runs in the official Playwright image pinned to the exact
+`@playwright/test` version in `package.json`. The image already contains the
+matching Chromium and WebKit binaries plus their operating-system libraries,
+so validation does not run `playwright install --with-deps` or depend on Ubuntu
+package-mirror throughput. Main validation and browser E2E remain separate
+jobs, and deployments require both jobs for the same immutable SHA.
 
 The deploy jobs use constant, environment-specific concurrency groups. Only one
 preview migration/deployment and one production migration/deployment can run at
