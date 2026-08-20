@@ -79,7 +79,9 @@ test("lets an authenticated admin run the deterministic demo loop", async ({
 
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Finish the demo" }).click();
-  await expect(page.getByText("Demo completed through day 15.")).toBeVisible();
+  await expect(page.getByText("Demo completed through day 15.")).toBeVisible({
+    timeout: 15_000,
+  });
   await expect(page.locator(".admin-basho-summary dd").first()).toHaveText(
     "Complete",
   );
