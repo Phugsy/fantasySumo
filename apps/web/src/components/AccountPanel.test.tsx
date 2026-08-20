@@ -16,6 +16,7 @@ describe("AccountPanel", () => {
         mode="neon"
         onDisplayNameChange={vi.fn()}
         onEmailChange={vi.fn()}
+        onForgotPassword={vi.fn()}
         onPasswordChange={vi.fn()}
         onSignIn={onSignIn}
         onSignOut={vi.fn()}
@@ -54,6 +55,7 @@ describe("AccountPanel", () => {
         mode="neon"
         onDisplayNameChange={vi.fn()}
         onEmailChange={vi.fn()}
+        onForgotPassword={vi.fn()}
         onPasswordChange={vi.fn()}
         onSignIn={vi.fn()}
         onSignOut={vi.fn()}
@@ -71,5 +73,35 @@ describe("AccountPanel", () => {
     expect(
       screen.getByRole("button", { name: "Create account" }),
     ).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Forgot password?" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers password recovery only from Neon sign in", () => {
+    const onForgotPassword = vi.fn();
+
+    render(
+      <AccountPanel
+        email="player@example.com"
+        errorMessage={null}
+        mode="neon"
+        onDisplayNameChange={vi.fn()}
+        onEmailChange={vi.fn()}
+        onForgotPassword={onForgotPassword}
+        onPasswordChange={vi.fn()}
+        onSignIn={vi.fn()}
+        onSignOut={vi.fn()}
+        onSignUp={vi.fn()}
+        password=""
+        sessionState="ready"
+        user={null}
+        userDisplayName=""
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+
+    expect(onForgotPassword).toHaveBeenCalledOnce();
   });
 });

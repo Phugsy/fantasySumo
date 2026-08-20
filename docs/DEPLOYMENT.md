@@ -207,6 +207,41 @@ failure classification without that exposure.
 
 Neon Auth also requires each deployed app origin to be added as a trusted domain in Neon Console -> Auth -> Configuration -> Domains. Add the exact production and preview origins with protocol and no trailing slash, for example `https://fantasy-sumo.vercel.app`. Wildcard subdomains are not supported, so each Vercel preview domain that needs auth testing must be added explicitly.
 
+### Password-reset email and redirect setup
+
+Password recovery uses Neon Auth's Better Auth-compatible reset endpoints. The
+browser sends `requestPasswordReset` with an absolute redirect to:
+
+```text
+https://<deployment-origin>/reset-password
+```
+
+An allow-listed internal `returnTo` query may also be present. Neon validates
+the emailed link and redirects back with either a single-use `token` or an
+`error` query parameter. The app submits valid tokens through `resetPassword`,
+maps invalid, expired, and already-used tokens to the same recovery state, and
+never logs or sends the token to the Fantasy Sumo API.
+
+For every production or preview branch used for auth testing:
+
+1. Enable Neon Auth email/password authentication.
+2. Configure Neon Auth email delivery. The shared sender is suitable for
+   development; use the project's intended production email configuration
+   before inviting real players.
+3. Add the exact deployment origin under Neon Auth trusted domains. The app
+   derives `/reset-password` from that origin, so no separate environment
+   variable is required.
+4. Verify direct navigation to `/reset-password` uses the deployed SPA fallback.
+5. Request a reset for a test account, follow the delivered link, set a new
+   password, and confirm that the same link cannot be reused. Also request a
+   reset for an unknown address and confirm the UI shows the same neutral
+   acknowledgement.
+
+Preview origins are not wildcarded. Each preview used for a real email test
+must be trusted explicitly, and its Neon Auth branch/email configuration must
+be checked independently. Local `AUTH_MODE=local` deliberately has no password
+reset flow.
+
 The Postgres migration ledger records each filename and a SHA-256 checksum of
 its SQL. Identical reruns are skipped; if two branches reuse a filename for
 different SQL, the runner fails before applying that file. Existing

@@ -168,6 +168,13 @@ through three Playwright projects:
 - mobile Chromium using the Pixel 5 device profile;
 - mobile WebKit using the iPhone 13 device profile.
 
+A fourth desktop Chromium project runs only `e2e/password-reset.spec.ts` on a
+separate Vite port configured for Neon mode. It stubs the external Neon Auth
+HTTP boundary while exercising the real browser client, reset redirect URL,
+route state, accessible forms, valid-token completion, and invalid-token
+recovery. This keeps production-only auth coverage deterministic without
+adding credentials or changing the local-auth game-loop projects.
+
 These mobile projects emulate mobile browser behaviour, including their
 viewport, user agent, device scale, touch support, and browser engine. They are
 not substitutes for occasional testing on physical devices.
@@ -184,7 +191,11 @@ That relative URL resolves inside `packages/db`, so it does not mutate the defau
 E2E_DATABASE_URL=file:./data/e2e/local-run.sqlite make e2e
 ```
 
-Playwright uses ports `3000` for the API and `7866` for Vite. Stop any existing processes on those ports if the harness cannot start them. The protected demo admin controls are enabled with an E2E-only `DEMO_ADMIN_TOKEN` from the Playwright config; no live sumo data sources or production services are used.
+Playwright uses port `3000` for the API, `7866` for the local-auth Vite app, and
+`7867` for the stubbed-Neon password-reset app. Stop existing processes on
+those ports if the harness cannot start them. The protected demo admin controls
+are enabled with an E2E-only `DEMO_ADMIN_TOKEN` from the Playwright config; no
+live sumo data sources or production services are used.
 The config also assigns one deterministic local session ID through
 `ADMIN_USER_IDS` so the browser suite can cover `/admin` without weakening the
 API authorization boundary.
@@ -289,7 +300,9 @@ E2E should prove that the pieces work together for the main game loop. It should
 
 ## Deferred Journeys
 
-Production Neon registration and browser-driven import controls are not covered
-by the deterministic local harness. The role-gated deterministic demo admin
-loop is covered locally; add hosted admin journeys only when a safe isolated
-production-auth boundary exists.
+Production Neon registration, email delivery itself, and browser-driven import
+controls are not covered by the deterministic local harness. The password-reset
+browser project covers the app/provider contract with a stubbed Neon endpoint;
+preview smoke testing must still prove delivery and a real single-use token.
+The role-gated deterministic demo admin loop is covered locally; add hosted
+admin journeys only when a safe isolated production-auth boundary exists.

@@ -21,4 +21,13 @@ describe("PageHeader", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Current basho")).toBeInTheDocument();
   });
+
+  it("shows password recovery copy", () => {
+    render(<PageHeader activeView="reset-password" />);
+
+    expect(
+      screen.getByRole("heading", { name: "Reset your password" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Player account")).toBeInTheDocument();
+  });
 });

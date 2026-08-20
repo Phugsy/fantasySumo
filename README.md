@@ -219,6 +219,7 @@ Fantasy team creation requires a current user. The browser route split is:
 
 - `/` — public current-basho summary and leaderboard.
 - `/login` — dedicated sign-in and registration controls.
+- `/reset-password` — Neon Auth password-reset request and completion flow.
 - `/stable` — authenticated My Stable view.
 - `/team` — authenticated team creation and editing.
 - `/admin` — authenticated, role-gated admin controls.
@@ -228,6 +229,13 @@ Signed-out visits to protected routes return through `/login` with an allow-list
 Local development uses `AUTH_MODE=local`, which exposes a simple development-only session flow through `POST /api/session` and the `/login` page. This keeps SQLite demos and tests self-contained.
 
 Production uses Neon Auth as the identity source. The web app signs users in with `VITE_NEON_AUTH_URL`, sends the Neon JWT to the API, and the API verifies that token in `AUTH_MODE=neon` with `NEON_AUTH_JWKS_URL`. The API stores team ownership as `ownerUserId`, enforces one team per user per basho, and keeps the leaderboard public by team/display name. Signed-in users can replace only their own picks through the current-user team endpoint while the basho remains open.
+
+Neon mode also exposes a neutral password-reset request from `/login`. Neon
+emails the provider-managed reset link back to `/reset-password`, where the app
+accepts the provider token and returns the player to the allow-listed intended
+login route. Local auth remains passwordless and does not simulate recovery.
+Configure email delivery and the exact deployed origin in Neon Auth before
+testing this flow; see `docs/DEPLOYMENT.md`.
 
 ## Data import
 

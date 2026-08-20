@@ -3,6 +3,8 @@ import {
   appPaths,
   getActiveView,
   getLoginPath,
+  getPasswordResetPath,
+  getPasswordResetRedirectUrl,
   getSafeReturnPath,
 } from "./routing";
 
@@ -10,6 +12,7 @@ describe("routing", () => {
   it("maps known paths to their page view", () => {
     expect(getActiveView(appPaths.home)).toBe("home");
     expect(getActiveView(appPaths.login)).toBe("login");
+    expect(getActiveView(appPaths.resetPassword)).toBe("reset-password");
     expect(getActiveView(appPaths.stable)).toBe("stable");
     expect(getActiveView(appPaths.team)).toBe("team");
     expect(getActiveView(appPaths.admin)).toBe("admin");
@@ -29,5 +32,14 @@ describe("routing", () => {
 
   it("builds a login URL with an encoded internal return path", () => {
     expect(getLoginPath(appPaths.team)).toBe("/login?returnTo=%2Fteam");
+  });
+
+  it("builds local and absolute password reset URLs with safe return paths", () => {
+    expect(getPasswordResetPath(appPaths.stable)).toBe(
+      "/reset-password?returnTo=%2Fstable",
+    );
+    expect(
+      getPasswordResetRedirectUrl("https://fantasy.example", appPaths.team),
+    ).toBe("https://fantasy.example/reset-password?returnTo=%2Fteam");
   });
 });

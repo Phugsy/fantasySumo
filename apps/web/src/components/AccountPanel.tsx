@@ -8,6 +8,7 @@ interface AccountPanelProps {
   mode: SessionResponse["mode"] | null;
   onDisplayNameChange: (displayName: string) => void;
   onEmailChange: (email: string) => void;
+  onForgotPassword: () => void;
   onPasswordChange: (password: string) => void;
   onSignIn: (event: FormEvent<HTMLFormElement>) => void;
   onSignOut: () => void;
@@ -25,6 +26,7 @@ export function AccountPanel({
   mode,
   onDisplayNameChange,
   onEmailChange,
+  onForgotPassword,
   onPasswordChange,
   onSignIn,
   onSignOut,
@@ -147,6 +149,16 @@ export function AccountPanel({
               <p className="field-hint" id="account-password-hint">
                 Use at least 8 characters and avoid common passwords.
               </p>
+              {authIntent === "sign-in" && (
+                <button
+                  className="forgot-password-button"
+                  disabled={sessionState === "submitting"}
+                  type="button"
+                  onClick={onForgotPassword}
+                >
+                  Forgot password?
+                </button>
+              )}
             </>
           )}
 

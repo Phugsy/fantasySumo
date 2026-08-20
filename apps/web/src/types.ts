@@ -150,4 +150,10 @@ export interface AdminActionResponse extends AdminBashoResponse {
   appliedResults?: number;
 }
 
-export type ActiveView = "home" | "login" | "stable" | "team" | "admin";
+export type ActiveView =
+  | "home"
+  | "login"
+  | "reset-password"
+  | "stable"
+  | "team"
+  | "admin";

@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import * as authClient from "./authClient";
 import type { LeaderboardEntry } from "./types";
 
 const currentBasho = {
@@ -145,6 +146,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -479,6 +481,249 @@ describe("App", () => {
     expect(
       screen.getByText("Sign in before loading data."),
     ).toBeInTheDocument();
+  });
+
+  it("carries the login email and safe return path into password recovery", async () => {
+    window.history.replaceState({}, "", "/login?returnTo=%2Fteam");
+    vi.stubGlobal("fetch", vi.fn(mockUnauthorizedBashoFetch));
+    render(<App />);
+
+    const email = await screen.findByLabelText("Email");
+    fireEvent.change(email, { target: { value: "player@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+
+    expect(window.location.pathname).toBe("/reset-password");
+    expect(window.location.search).toBe("?returnTo=%2Fteam");
+    expect(
+      await screen.findByRole("heading", { name: "Request a reset link" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toHaveValue("player@example.com");
+    expect(screen.getByRole("link", { name: "Back to login" })).toHaveAttribute(
+      "href",
+      "/login?returnTo=%2Fteam",
+    );
+  });
+
+  it("renders provider token and invalid-link password reset states", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/reset-password?token=valid-token&returnTo=%2Fstable",
+    );
+    vi.stubGlobal("fetch", vi.fn(mockUnauthorizedBashoFetch));
+    const { unmount } = render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Complete password reset" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("New password")).toBeInTheDocument();
+
+    unmount();
+    window.history.replaceState(
+      {},
+      "",
+      "/reset-password?error=INVALID_TOKEN&returnTo=%2Fstable",
+    );
+    render(<App />);
+
+    expect(
+      await screen.findByText(
+        "This password reset link is invalid, expired, or has already been used. Request a new link to continue.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+  });
+
+  it("removes a reset token before initial API requests without losing the reset form", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/reset-password?token=secret-token&returnTo=%2Fstable",
+    );
+    const requestLocations: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        requestLocations.push(window.location.href);
+        return mockUnauthorizedBashoFetch(input);
+      }),
+    );
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Complete password reset" }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(requestLocations.length).toBeGreaterThan(0));
+    expect(requestLocations).not.toContainEqual(
+      expect.stringContaining("secret-token"),
+    );
+    expect(window.location.pathname).toBe("/reset-password");
+    expect(window.location.search).toBe("?returnTo=%2Fstable");
+  });
+
+  it("clears an existing account session after completing a password reset", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/reset-password?token=valid-token&returnTo=%2Fstable",
+    );
+    const myTeamRequest = createDeferred<Response>();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url === "/api/basho/2026-05/my-team") {
+        return myTeamRequest.promise;
+      }
+
+      if (url === "/api/basho/2026-05/leaderboard") {
+        return jsonResponse(
+          createLeaderboardResponse({
+            entries: [
+              {
+                rank: 1,
+                teamId: "team-existing",
+                displayName: "Existing Champions",
+                score: 0,
+                scoreHistory: [],
+                rikishiScores: [],
+              },
+            ],
+          }),
+        );
+      }
+
+      return mockExistingNeonSessionFetch(input);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const resetPassword = vi
+      .spyOn(authClient, "resetPasswordWithNeon")
+      .mockResolvedValue();
+    const signOut = vi.spyOn(authClient, "signOutNeon").mockResolvedValue();
+
+    render(<App />);
+
+    fireEvent.change(await screen.findByLabelText("New password"), {
+      target: { value: "new-strong-password" },
+    });
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([input]) => String(input) === "/api/basho/2026-05/my-team",
+        ),
+      ).toBe(true),
+    );
+    fireEvent.change(screen.getByLabelText("Confirm new password"), {
+      target: { value: "new-strong-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+
+    const continueToSignIn = await screen.findByRole("link", {
+      name: "Continue to sign in",
+    });
+    expect(resetPassword).toHaveBeenCalledWith({
+      newPassword: "new-strong-password",
+      token: "valid-token",
+    });
+    expect(signOut).toHaveBeenCalledOnce();
+    expect(signOut.mock.invocationCallOrder[0]!).toBeLessThan(
+      resetPassword.mock.invocationCallOrder[0]!,
+    );
+
+    fireEvent.click(continueToSignIn);
+
+    expect(window.location.pathname).toBe("/login");
+    expect(
+      await screen.findByRole("heading", { name: "Log in or join" }),
+    ).toBeInTheDocument();
+    expect(await screen.findByLabelText("Email")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("link", { name: "Leaderboard" }));
+    expect(await screen.findByText("Existing Champions")).toBeInTheDocument();
+
+    await act(async () => {
+      myTeamRequest.resolve(createJsonResponse(createExistingMyTeamResponse()));
+      await flushPromises();
+    });
+
+    expect(screen.queryByText("Your team")).not.toBeInTheDocument();
+  });
+
+  it("does not consume the reset token when the previous session cannot sign out", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/reset-password?token=valid-token&returnTo=%2Fstable",
+    );
+    vi.stubGlobal("fetch", vi.fn(mockExistingNeonSessionFetch));
+    const resetPassword = vi
+      .spyOn(authClient, "resetPasswordWithNeon")
+      .mockResolvedValue();
+    vi.spyOn(authClient, "signOutNeon").mockRejectedValue(
+      new Error("private provider detail"),
+    );
+
+    render(<App />);
+
+    fireEvent.change(await screen.findByLabelText("New password"), {
+      target: { value: "new-strong-password" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm new password"), {
+      target: { value: "new-strong-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We could not securely end the current session. Check your connection and try again.",
+    );
+    expect(screen.getByLabelText("New password")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Continue to sign in" }),
+    ).not.toBeInTheDocument();
+    expect(resetPassword).not.toHaveBeenCalled();
+  });
+
+  it("clears a previously entered password after recovery completes", async () => {
+    window.history.replaceState({}, "", "/login?returnTo=%2Fstable");
+    vi.stubGlobal("fetch", vi.fn(mockUnauthorizedBashoFetch));
+    vi.spyOn(authClient, "resetPasswordWithNeon").mockResolvedValue();
+    vi.spyOn(authClient, "signOutNeon").mockResolvedValue();
+
+    render(<App />);
+
+    fireEvent.change(await screen.findByLabelText("Email"), {
+      target: { value: "player@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "old-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Request a reset link" }),
+    ).toBeInTheDocument();
+
+    act(() => {
+      window.history.pushState(
+        {},
+        "",
+        "/reset-password?token=valid-token&returnTo=%2Fstable",
+      );
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    fireEvent.change(await screen.findByLabelText("New password"), {
+      target: { value: "new-strong-password" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm new password"), {
+      target: { value: "new-strong-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+    fireEvent.click(
+      await screen.findByRole("link", { name: "Continue to sign in" }),
+    );
+
+    expect(await screen.findByLabelText("Password")).toHaveValue("");
   });
 
   it("explains raw public API 401 responses as deployment access issues", async () => {
@@ -1411,6 +1656,23 @@ function mockUnauthorizedBashoFetch(
       },
       { status: 401 },
     );
+  }
+
+  return mockSuccessfulFetch(input);
+}
+
+function mockExistingNeonSessionFetch(
+  input: RequestInfo | URL,
+): Promise<Response> {
+  if (String(input) === "/api/session") {
+    return jsonResponse({
+      mode: "neon",
+      user: {
+        id: "existing-user",
+        email: "existing@example.com",
+        displayName: "Existing Player",
+      },
+    });
   }
 
   return mockSuccessfulFetch(input);

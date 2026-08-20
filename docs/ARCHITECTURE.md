@@ -41,7 +41,8 @@ The front end entry point is `apps/web/src/main.tsx`.
 Current behaviour:
 
 - Uses React Router for durable browser routes: public `/`, dedicated `/login`,
-  authenticated `/stable` and `/team`, and admin-only `/admin`.
+  Neon password recovery at `/reset-password`, authenticated `/stable` and
+  `/team`, and admin-only `/admin`.
 - Resolves the current session before rendering protected route content, safely
   returns authenticated players to allow-listed internal destinations, and
   redirects sign-out to the public home.
@@ -56,6 +57,10 @@ Current behaviour:
   current-user endpoint, cancel an unsaved draft, and see the saved line-up
   immediately.
 - Provides a local development sign-in panel that establishes the current user session.
+- Requests production password-reset email through Neon Auth with neutral
+  account-existence messaging, then completes valid provider tokens on the
+  dedicated route. Invalid, expired, and used links return to the same request
+  flow instead of leaving the player stranded; local auth remains passwordless.
 - Shows ordered team standings with the latest daily score, compact five-day
   team form, and expandable picked-rikishi tournament totals. Each rikishi row
   shows up to five recent outcomes and expands to the full result history.

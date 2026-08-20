@@ -5,7 +5,7 @@ import type {
   ReactNode,
   SetStateAction,
 } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   BrowserRouter,
   Link,
@@ -38,6 +38,8 @@ import {
   IncompleteSessionError,
   INCOMPLETE_SESSION_ERROR_MESSAGE,
   isNeonAuthConfigured,
+  requestPasswordResetWithNeon,
+  resetPasswordWithNeon,
   signInWithNeon,
   signOutNeon,
   signUpWithNeon,
@@ -49,11 +51,14 @@ import { BashoPanel } from "./components/BashoPanel";
 import { LeaderboardPanel } from "./components/LeaderboardPanel";
 import { MyStablePanel } from "./components/MyStablePanel";
 import { PageHeader } from "./components/PageHeader";
+import { ResetPasswordPanel } from "./components/ResetPasswordPanel";
 import { TeamSelection } from "./components/TeamSelection";
 import {
   appPaths,
   getActiveView,
   getLoginPath,
+  getPasswordResetPath,
+  getPasswordResetRedirectUrl,
   getSafeReturnPath,
 } from "./routing";
 import { waitForVerifiedSession } from "./sessionVerification";
@@ -72,6 +77,9 @@ import type {
   SessionUser,
 } from "./types";
 import { canEditFantasyPicks, getPickLockMessage } from "./lifecycle";
+
+const PASSWORD_RESET_SESSION_ERROR_MESSAGE =
+  "We could not securely end the current session. Check your connection and try again.";
 
 export function App() {
   return (
@@ -137,6 +145,25 @@ function RoutedApp() {
   const leaderboardRequestIdRef = useRef(0);
   const sessionOperationInFlightRef = useRef(false);
   const activeView = getActiveView(location.pathname);
+
+  useLayoutEffect(() => {
+    if (location.pathname !== appPaths.resetPassword) {
+      return;
+    }
+
+    const resetUrl = new URL(window.location.href);
+
+    if (!resetUrl.searchParams.has("token")) {
+      return;
+    }
+
+    resetUrl.searchParams.delete("token");
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${resetUrl.pathname}${resetUrl.search}${resetUrl.hash}`,
+    );
+  }, [location.pathname, location.search]);
 
   const selectedRikishi = useMemo(
     () =>
@@ -403,15 +430,7 @@ function RoutedApp() {
       }
       navigate(appPaths.home, { replace: true });
       await wait(0);
-      setSessionUser(null);
-      setAccountEmail("");
-      setAccountDisplayName("");
-      setCreatedTeam(null);
-      setLastSaveAction(null);
-      setMyTeam(null);
-      setOwnedTeamLockedAt(undefined);
-      setDisplayName("");
-      setSelectedIds([]);
+      clearAuthenticatedPlayerState();
 
       bashoReloadStarted = true;
       await loadBashoData(
@@ -427,6 +446,37 @@ function RoutedApp() {
       sessionOperationInFlightRef.current = false;
       setSessionState("ready");
     }
+  }
+
+  async function handlePasswordReset(newPassword: string, token: string) {
+    try {
+      await signOutNeon();
+    } catch {
+      // Do not consume the single-use reset token unless the previous provider
+      // session is confirmed closed. The player can safely retry this step.
+      throw new Error(PASSWORD_RESET_SESSION_ERROR_MESSAGE);
+    }
+
+    clearAuthenticatedPlayerState();
+    await resetPasswordWithNeon({ newPassword, token });
+  }
+
+  function clearAuthenticatedPlayerState() {
+    bashoRequestIdRef.current += 1;
+    leaderboardRequestIdRef.current += 1;
+    setSessionUser(null);
+    setAccountEmail("");
+    setAccountDisplayName("");
+    setAccountPassword("");
+    setCreatedTeam(null);
+    setLastSaveAction(null);
+    setMyTeam(null);
+    setOwnedTeamLockedAt(undefined);
+    setExpandedTeamId(null);
+    setPrivateTeamErrorMessage(null);
+    setPrivateTeamLoadState("ready");
+    setDisplayName("");
+    setSelectedIds([]);
   }
 
   async function loadBashoData(
@@ -724,6 +774,15 @@ function RoutedApp() {
 
   const safeLoginReturnPath =
     getSafeReturnPath(location.search) ?? appPaths.stable;
+  const passwordResetSearch = new URLSearchParams(location.search);
+  const passwordResetToken = getNonEmptySearchValue(
+    passwordResetSearch,
+    "token",
+  );
+  const passwordResetInvalid = passwordResetSearch.has("error");
+  const passwordResetInitialEmail = getPasswordResetInitialEmail(
+    location.state,
+  );
 
   return (
     <div className="site-shell">
@@ -819,6 +878,11 @@ function RoutedApp() {
                     mode={authMode}
                     onDisplayNameChange={setAccountDisplayName}
                     onEmailChange={setAccountEmail}
+                    onForgotPassword={() =>
+                      navigate(getPasswordResetPath(safeLoginReturnPath), {
+                        state: { passwordResetEmail: accountEmail },
+                      })
+                    }
                     onPasswordChange={setAccountPassword}
                     onSignIn={handleSignIn}
                     onSignOut={handleSignOut}
@@ -836,6 +900,29 @@ function RoutedApp() {
                   )}
                 </>
               )
+            }
+          />
+          <Route
+            path={appPaths.resetPassword}
+            element={
+              <ResetPasswordPanel
+                key={location.search}
+                initialEmail={passwordResetInitialEmail}
+                invalidLink={passwordResetInvalid}
+                mode={authMode}
+                onRequestReset={(email) =>
+                  requestPasswordResetWithNeon({
+                    email,
+                    redirectTo: getPasswordResetRedirectUrl(
+                      window.location.origin,
+                      safeLoginReturnPath,
+                    ),
+                  })
+                }
+                onResetPassword={handlePasswordReset}
+                returnTo={safeLoginReturnPath}
+                token={passwordResetToken}
+              />
             }
           />
           <Route
@@ -985,6 +1072,8 @@ function getPageTitle(activeView: ReturnType<typeof getActiveView>): string {
   switch (activeView) {
     case "login":
       return "Log in or join";
+    case "reset-password":
+      return "Reset password";
     case "stable":
       return "My stable";
     case "team":
@@ -994,6 +1083,25 @@ function getPageTitle(activeView: ReturnType<typeof getActiveView>): string {
     default:
       return "Leaderboard";
   }
+}
+
+function getNonEmptySearchValue(
+  search: URLSearchParams,
+  key: string,
+): string | null {
+  const value = search.get(key)?.trim();
+
+  return value === undefined || value.length === 0 ? null : value;
+}
+
+function getPasswordResetInitialEmail(state: unknown): string {
+  if (typeof state !== "object" || state === null) {
+    return "";
+  }
+
+  const email = Reflect.get(state, "passwordResetEmail");
+
+  return typeof email === "string" ? email : "";
 }
 
 function getPublicDataErrorMessage(error: unknown): string {
