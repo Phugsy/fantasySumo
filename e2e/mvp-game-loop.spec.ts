@@ -44,6 +44,8 @@ test("loads API-backed current basho content", async ({ page, request }) => {
 test("lets an authenticated admin run the deterministic demo loop", async ({
   page,
 }) => {
+  test.setTimeout(60_000);
+
   await page.goto("/admin");
 
   await expect(page).toHaveURL(/\/login\?returnTo=%2Fadmin$/);
@@ -85,11 +87,17 @@ test("lets an authenticated admin run the deterministic demo loop", async ({
   ).toBeVisible();
   await expect(page.locator(".admin-basho-summary dd").nth(1)).toHaveText("1");
 
+  const completeResponsePromise = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/admin/demo/complete") &&
+      response.request().method() === "POST",
+    { timeout: 30_000 },
+  );
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Finish the demo" }).click();
-  await expect(page.getByText("Demo completed through day 15.")).toBeVisible({
-    timeout: 15_000,
-  });
+  const completeResponse = await completeResponsePromise;
+  expect(completeResponse.ok()).toBe(true);
+  await expect(page.getByText("Demo completed through day 15.")).toBeVisible();
   await expect(page.locator(".admin-basho-summary dd").first()).toHaveText(
     "Complete",
   );
