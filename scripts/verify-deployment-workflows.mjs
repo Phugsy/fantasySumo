@@ -70,12 +70,17 @@ const playwrightImage = `mcr.microsoft.com/playwright:v${playwrightVersion}-nobl
 
 function requireContainerizedE2E(source, file, resolvedSha) {
   const e2eJob = getJob(source, file, "e2e");
+  const imagePattern = resolvedSha
+    ? /image: \$\{\{ needs\.resolve\.outputs\.playwright_image \}\}/
+    : new RegExp(`image: ${playwrightImage.replaceAll(".", "\\.")}`);
 
   requireText(
     e2eJob,
     file,
-    `use the matching pinned Playwright image ${playwrightImage}`,
-    new RegExp(`image: ${playwrightImage.replaceAll(".", "\\.")}`),
+    resolvedSha
+      ? "use the Playwright image resolved from the selected commit"
+      : `use the matching pinned Playwright image ${playwrightImage}`,
+    imagePattern,
   );
   requireText(
     e2eJob,
@@ -124,6 +129,12 @@ for (const [source, file, environment, concurrencyGroup] of [
   ],
 ]) {
   requireContainerizedE2E(source, file, true);
+  requireText(
+    getJob(source, file, "resolve"),
+    file,
+    "derive an exact Playwright image from the selected commit lockfile",
+    /playwright_version=\$\(awk .* pnpm-lock\.yaml\)[\s\S]*\[\[ ! "\$playwright_version" =~ \^\[0-9\]\+\\\.\[0-9\]\+\\\.\[0-9\]\+\$ \]\][\s\S]*playwright_image=mcr\.microsoft\.com\/playwright:v\$\{playwright_version\}-noble/,
+  );
   requireText(
     getJob(source, file, "e2e"),
     file,
