@@ -28,6 +28,7 @@ jobs:
     outputs:
       sha: ${{ steps.commit.outputs.sha }}
       branch: ${{ steps.commit.outputs.branch }}
+      playwright_image: ${{ steps.commit.outputs.playwright_image }}
     steps:
       - name: Check out requested commit
         uses: actions/checkout@v4
@@ -40,8 +41,14 @@ jobs:
         env:
           PREVIEW_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || '' }}
         run: |
+          playwright_version=$(awk '/@playwright\/test/{found=1; next} found && $1 == "version:" {version=$2; sub(/\(.*/, "", version); print version; exit}' pnpm-lock.yaml)
+          if [[ ! "$playwright_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Unable to resolve an exact Playwright version from pnpm-lock.yaml." >&2
+            exit 1
+          fi
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "branch=$PREVIEW_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "playwright_image=mcr.microsoft.com/playwright:v${playwright_version}-noble" >> "$GITHUB_OUTPUT"
 
   validate:
     needs: resolve
@@ -68,16 +75,41 @@ jobs:
       - name: Run main validation
         run: make check
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium webkit
+  e2e:
+    needs:
+      - resolve
+      - validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: ${{ needs.resolve.outputs.playwright_image }}
+      options: --ipc=host
+    steps:
+      - name: Check out resolved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Run browser E2E
-        run: make e2e
+        run: pnpm e2e
 
   deploy:
     needs:
       - resolve
       - validate
+      - e2e
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
