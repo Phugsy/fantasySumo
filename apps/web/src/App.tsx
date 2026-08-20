@@ -5,7 +5,7 @@ import type {
   ReactNode,
   SetStateAction,
 } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   BrowserRouter,
   Link,
@@ -142,6 +142,25 @@ function RoutedApp() {
   const leaderboardRequestIdRef = useRef(0);
   const sessionOperationInFlightRef = useRef(false);
   const activeView = getActiveView(location.pathname);
+
+  useLayoutEffect(() => {
+    if (location.pathname !== appPaths.resetPassword) {
+      return;
+    }
+
+    const resetUrl = new URL(window.location.href);
+
+    if (!resetUrl.searchParams.has("token")) {
+      return;
+    }
+
+    resetUrl.searchParams.delete("token");
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${resetUrl.pathname}${resetUrl.search}${resetUrl.hash}`,
+    );
+  }, [location.pathname, location.search]);
 
   const selectedRikishi = useMemo(
     () =>
@@ -408,15 +427,7 @@ function RoutedApp() {
       }
       navigate(appPaths.home, { replace: true });
       await wait(0);
-      setSessionUser(null);
-      setAccountEmail("");
-      setAccountDisplayName("");
-      setCreatedTeam(null);
-      setLastSaveAction(null);
-      setMyTeam(null);
-      setOwnedTeamLockedAt(undefined);
-      setDisplayName("");
-      setSelectedIds([]);
+      clearAuthenticatedPlayerState();
 
       bashoReloadStarted = true;
       await loadBashoData(
@@ -432,6 +443,38 @@ function RoutedApp() {
       sessionOperationInFlightRef.current = false;
       setSessionState("ready");
     }
+  }
+
+  async function handlePasswordReset(newPassword: string, token: string) {
+    await resetPasswordWithNeon({ newPassword, token });
+
+    try {
+      await signOutNeon();
+    } catch {
+      // Resetting a password may invalidate the current provider session before
+      // this cleanup request completes. The local session must still be cleared
+      // so the reset account can reach the promised sign-in form.
+    }
+
+    clearAuthenticatedPlayerState();
+  }
+
+  function clearAuthenticatedPlayerState() {
+    bashoRequestIdRef.current += 1;
+    leaderboardRequestIdRef.current += 1;
+    setSessionUser(null);
+    setAccountEmail("");
+    setAccountDisplayName("");
+    setAccountPassword("");
+    setCreatedTeam(null);
+    setLastSaveAction(null);
+    setMyTeam(null);
+    setOwnedTeamLockedAt(undefined);
+    setExpandedTeamId(null);
+    setPrivateTeamErrorMessage(null);
+    setPrivateTeamLoadState("ready");
+    setDisplayName("");
+    setSelectedIds([]);
   }
 
   async function loadBashoData(
@@ -874,9 +917,7 @@ function RoutedApp() {
                     ),
                   })
                 }
-                onResetPassword={(newPassword, token) =>
-                  resetPasswordWithNeon({ newPassword, token })
-                }
+                onResetPassword={handlePasswordReset}
                 returnTo={safeLoginReturnPath}
                 token={passwordResetToken}
               />

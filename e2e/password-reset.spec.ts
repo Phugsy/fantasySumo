@@ -52,6 +52,9 @@ test("completes a valid reset and recovers from an invalid link", async ({
   await page.goto(
     "/reset-password?token=browser-valid-token&returnTo=%2Fstable",
   );
+  await expect(page).toHaveURL(
+    "http://127.0.0.1:7867/reset-password?returnTo=%2Fstable",
+  );
   await page
     .getByLabel("New password", { exact: true })
     .fill("browser-strong-password");
@@ -83,6 +86,60 @@ test("completes a valid reset and recovers from an invalid link", async ({
   ).toBeVisible();
 });
 
+test("clears an existing account session before returning to login", async ({
+  page,
+}) => {
+  let signOutRequested = false;
+
+  await page.unroute("**/api/session");
+  await page.route("**/api/session", async (route) => {
+    await fulfillJson(route, {
+      mode: "neon",
+      user: {
+        id: "existing-user",
+        email: "existing@example.com",
+        displayName: "Existing Player",
+      },
+    });
+  });
+  await page.unroute("**/fake-neon-auth/get-session");
+  await page.route("**/fake-neon-auth/get-session", async (route) => {
+    await fulfillJson(route, {
+      session: { token: "existing-session-token" },
+      user: {
+        id: "existing-user",
+        email: "existing@example.com",
+        name: "Existing Player",
+      },
+    });
+  });
+  await page.unroute("**/fake-neon-auth/sign-out");
+  await page.route("**/fake-neon-auth/sign-out", async (route) => {
+    signOutRequested = true;
+    await fulfillJson(route, { success: true });
+  });
+  await page.route("**/fake-neon-auth/reset-password", async (route) => {
+    await fulfillJson(route, { status: true });
+  });
+
+  await page.goto(
+    "/reset-password?token=browser-valid-token&returnTo=%2Fstable",
+  );
+  await page
+    .getByLabel("New password", { exact: true })
+    .fill("browser-strong-password");
+  await page.getByLabel("Confirm new password").fill("browser-strong-password");
+  await page.getByRole("button", { name: "Reset password" }).click();
+
+  await page.getByRole("link", { name: "Continue to sign in" }).click();
+
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Fstable$/);
+  await expect(
+    page.getByRole("heading", { name: "Log in or join" }),
+  ).toBeVisible();
+  expect(signOutRequested).toBe(true);
+});
+
 async function stubNeonAuth(page: Page) {
   await page.route("**/api/session", async (route) => {
     if (route.request().method() === "GET") {
@@ -95,6 +152,10 @@ async function stubNeonAuth(page: Page) {
 
   await page.route("**/fake-neon-auth/get-session", async (route) => {
     await fulfillJson(route, null);
+  });
+
+  await page.route("**/fake-neon-auth/sign-out", async (route) => {
+    await fulfillJson(route, { success: true });
   });
 }
 
