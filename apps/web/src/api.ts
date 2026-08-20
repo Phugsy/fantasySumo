@@ -2,6 +2,8 @@ import type {
   AdminActionResponse,
   AdminBashoResponse,
   AdminDemoAction,
+  AdminGameConfigResponse,
+  AdminImportResponse,
   AdminLifecycleAction,
   Basho,
   BashoRikishiResponse,
@@ -103,6 +105,55 @@ export async function runAdminDemoAction(
   action: AdminDemoAction,
 ): Promise<AdminActionResponse> {
   return postJson<AdminActionResponse>(`/api/admin/demo/${action}`, {});
+}
+
+export async function fetchAdminGameConfig(
+  bashoId: string,
+): Promise<AdminGameConfigResponse> {
+  return getJson<AdminGameConfigResponse>(
+    `/api/admin/basho/${bashoId}/game-config`,
+  );
+}
+
+export async function updateAdminGameConfig(
+  bashoId: string,
+  teamSize: number,
+): Promise<AdminGameConfigResponse> {
+  return putJson<AdminGameConfigResponse>(
+    `/api/admin/basho/${bashoId}/game-config`,
+    { teamSize },
+  );
+}
+
+export async function runAdminBanzukeImport(
+  dryRun: boolean,
+): Promise<AdminImportResponse> {
+  return postJson<AdminImportResponse>(
+    `/api/admin/import-banzuke?dryRun=${String(dryRun)}`,
+    {},
+  );
+}
+
+export async function runAdminResultsImport(
+  bashoId: string,
+  day: number,
+  dryRun: boolean,
+): Promise<AdminImportResponse> {
+  return postJson<AdminImportResponse>(
+    `/api/admin/basho/${bashoId}/import-results?dryRun=${String(dryRun)}`,
+    { day, division: "Makuuchi" },
+  );
+}
+
+export async function runAdminScheduleImport(
+  bashoId: string,
+  day: number,
+  dryRun: boolean,
+): Promise<AdminImportResponse> {
+  return postJson<AdminImportResponse>(
+    `/api/admin/basho/${bashoId}/import-schedule?dryRun=${String(dryRun)}`,
+    { day, division: "Makuuchi" },
+  );
 }
 
 export function reportAuthClientTokenUnavailable(): void {

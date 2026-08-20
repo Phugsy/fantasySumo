@@ -55,6 +55,7 @@ describe("Postgres migration ledger", () => {
       "0001_team_owner_user.sql",
       "0002_basho_demo_flag.sql",
       "0003_scheduled_bouts.sql",
+      "0004_basho_game_config.sql",
     ]);
     const initialMigration = readFileSync(
       join(migrationsFolder, "0000_initial.sql"),

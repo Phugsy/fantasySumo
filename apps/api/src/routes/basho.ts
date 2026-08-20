@@ -3,6 +3,7 @@ import { z } from "zod";
 import { DEMO_BASHO_ID, type Repositories } from "@fantasy-sumo/db";
 import type { FantasyPick, FantasyTeam } from "@fantasy-sumo/domain";
 import type { AuthService } from "../auth.js";
+import { getEffectiveBashoGameConfig } from "../game-config.js";
 import {
   calculateLeaderboard,
   calculateTeamScore,
@@ -14,10 +15,10 @@ import {
 
 interface RouteContext {
   auth: AuthService;
+  defaultTeamSize: number;
   repositories: Repositories;
   now: () => Date;
   teamIdFactory: () => string;
-  teamSize: number;
 }
 
 const createTeamBodySchema = z.object({
@@ -61,9 +62,15 @@ export function registerBashoRoutes(
         });
       }
 
+      const gameConfig = await getEffectiveBashoGameConfig(
+        context.repositories,
+        currentBasho.id,
+        context.defaultTeamSize,
+      );
+
       return {
         ...currentBasho,
-        teamSize: context.teamSize,
+        teamSize: gameConfig.teamSize,
       };
     },
   );
@@ -214,11 +221,17 @@ export function registerBashoRoutes(
       currentUser.id,
     );
     const teamId = existingTeam?.id ?? `team-${context.teamIdFactory()}`;
+    const gameConfig = await getEffectiveBashoGameConfig(
+      context.repositories,
+      basho.id,
+      context.defaultTeamSize,
+    );
     const validatedRequest = await validateTeamRequest(
       request.body,
       basho.id,
       teamId,
-      context,
+      context.repositories,
+      gameConfig.teamSize,
       "Team creation request is invalid.",
     );
 
@@ -244,9 +257,10 @@ export function registerBashoRoutes(
       await context.repositories.saveOwnedFantasyTeamWithPicksIfBashoUpcoming(
         team,
         picks,
+        context.defaultTeamSize,
       );
 
-    if (savedTeamWithPicks === undefined) {
+    if (savedTeamWithPicks.status === "picks-locked") {
       return reply
         .code(409)
         .send(
@@ -258,10 +272,21 @@ export function registerBashoRoutes(
         );
     }
 
+    if (savedTeamWithPicks.status === "invalid-team-size") {
+      return reply.code(409).send({
+        error: "team-size-changed",
+        message: `Team size changed to ${savedTeamWithPicks.teamSize}. Refresh your picks and try again.`,
+        teamSize: savedTeamWithPicks.teamSize,
+      });
+    }
+
     const created =
       existingTeam === undefined && savedTeamWithPicks.team.id === team.id;
 
-    return reply.code(created ? 201 : 200).send(savedTeamWithPicks);
+    return reply.code(created ? 201 : 200).send({
+      team: savedTeamWithPicks.team,
+      picks: savedTeamWithPicks.picks,
+    });
   });
 
   app.get<{
@@ -402,11 +427,18 @@ export function registerBashoRoutes(
       });
     }
 
+    const gameConfig = await getEffectiveBashoGameConfig(
+      context.repositories,
+      basho.id,
+      context.defaultTeamSize,
+    );
+
     const validatedRequest = await validateTeamRequest(
       request.body,
       basho.id,
       existingTeam.id,
-      context,
+      context.repositories,
+      gameConfig.teamSize,
       "Team update request is invalid.",
     );
 
@@ -428,9 +460,10 @@ export function registerBashoRoutes(
             : { ownerName: currentUser.displayName }),
         },
         picks,
+        context.defaultTeamSize,
       );
 
-    if (updatedTeamWithPicks === undefined) {
+    if (updatedTeamWithPicks.status === "picks-locked") {
       return reply
         .code(409)
         .send(
@@ -442,7 +475,18 @@ export function registerBashoRoutes(
         );
     }
 
-    return updatedTeamWithPicks;
+    if (updatedTeamWithPicks.status === "invalid-team-size") {
+      return reply.code(409).send({
+        error: "team-size-changed",
+        message: `Team size changed to ${updatedTeamWithPicks.teamSize}. Refresh your picks and try again.`,
+        teamSize: updatedTeamWithPicks.teamSize,
+      });
+    }
+
+    return {
+      team: updatedTeamWithPicks.team,
+      picks: updatedTeamWithPicks.picks,
+    };
   });
 
   app.get<{
@@ -555,7 +599,8 @@ async function validateTeamRequest(
   body: unknown,
   bashoId: string,
   teamId: string,
-  context: Pick<RouteContext, "repositories" | "teamSize">,
+  repositories: Repositories,
+  teamSize: number,
   invalidRequestMessage: string,
 ) {
   const parsedBody = createTeamBodySchema.safeParse(body);
@@ -582,7 +627,7 @@ async function validateTeamRequest(
     }),
   );
   const pickErrors = validateFantasyPicks(picks, {
-    teamSize: context.teamSize,
+    teamSize,
   });
 
   if (pickErrors.length > 0) {
@@ -597,7 +642,7 @@ async function validateTeamRequest(
   }
 
   const validRikishiIds = new Set(
-    (await context.repositories.listBanzukeEntriesForBasho(bashoId)).map(
+    (await repositories.listBanzukeEntriesForBasho(bashoId)).map(
       (entry) => entry.rikishiId,
     ),
   );

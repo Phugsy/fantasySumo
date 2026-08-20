@@ -108,6 +108,90 @@ test("lets an authenticated admin run the deterministic demo loop", async ({
   );
 });
 
+test("lets an admin validate a live result import without contacting the source", async ({
+  page,
+}) => {
+  await page.goto("/admin");
+  await page.getByLabel("Email").fill("e2e-admin@example.com");
+  await page.getByLabel("Display name").fill("E2E Admin");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+  await expect(
+    page.getByRole("heading", { name: "Demo May Basho" }),
+  ).toBeVisible();
+
+  await page.route("**/api/admin/basho/current", async (route) => {
+    await route.fulfill({
+      json: {
+        basho: {
+          id: "2026-09",
+          isDemo: false,
+          name: "September 2026 Basho",
+          startDate: "2026-09-13",
+          endDate: "2026-09-27",
+          status: "upcoming",
+          currentDay: 0,
+        },
+      },
+    });
+  });
+  await page.route("**/api/admin/basho/2026-09/game-config", async (route) => {
+    await route.fulfill({
+      json: {
+        bashoId: "2026-09",
+        canChangeTeamSize: true,
+        gameConfig: {
+          teamSize: 2,
+          teamSizeSource: "default",
+          scoringMode: "wins-v0",
+        },
+      },
+    });
+  });
+  await page.route(
+    "**/api/admin/basho/2026-09/import-results?dryRun=true",
+    async (route) => {
+      await route.fulfill({
+        json: {
+          dryRun: true,
+          source: "sumo-api-results",
+          status: "complete",
+          summary: {
+            results: { created: 21, updated: 0, skipped: 0, deleted: 0 },
+          },
+          schedule: {
+            status: "imported",
+            day: 2,
+            import: {
+              dryRun: true,
+              source: "sumo-api-schedule",
+              summary: {
+                scheduledBouts: {
+                  created: 21,
+                  updated: 0,
+                  skipped: 0,
+                  deleted: 0,
+                },
+              },
+            },
+          },
+        },
+      });
+    },
+  );
+
+  await page.getByRole("button", { name: "Live basho" }).click();
+  await expect(
+    page.getByRole("heading", { name: "September 2026 Basho" }),
+  ).toBeVisible();
+  await expect(page.getByText("One point per win")).toBeVisible();
+  await page.getByRole("button", { name: "Validate results" }).click();
+  await expect(page.getByText("Dry-run result")).toBeVisible();
+  await expect(
+    page.getByText("Following day 2 schedule was also validated."),
+  ).toBeVisible();
+});
+
 test("creates a fantasy team and follows its My Stable score", async ({
   page,
   request,

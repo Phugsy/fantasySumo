@@ -1,9 +1,11 @@
 import {
+  check,
   integer,
   sqliteTable,
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 
 export const basho = sqliteTable("basho", {
   id: text("id").primaryKey(),
@@ -16,6 +18,19 @@ export const basho = sqliteTable("basho", {
   }).notNull(),
   currentDay: integer("current_day"),
 });
+
+export const bashoGameConfig = sqliteTable(
+  "basho_game_config",
+  {
+    bashoId: text("basho_id")
+      .primaryKey()
+      .references(() => basho.id, { onDelete: "cascade" }),
+    teamSize: integer("team_size").notNull().default(2),
+  },
+  (table) => [
+    check("basho_game_config_team_size_positive", sql`${table.teamSize} > 0`),
+  ],
+);
 
 export const rikishi = sqliteTable("rikishi", {
   id: text("id").primaryKey(),

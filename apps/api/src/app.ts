@@ -24,6 +24,7 @@ import {
   type NeonJwtVerificationFailureReporter,
 } from "./auth.js";
 import { registerAdminDemoRoutes } from "./routes/admin-demo.js";
+import { registerAdminGameConfigRoutes } from "./routes/admin-game-config.js";
 import { registerAdminImportRoutes } from "./routes/admin-imports.js";
 import { registerAdminLifecycleRoutes } from "./routes/admin-lifecycle.js";
 import { registerBashoRoutes } from "./routes/basho.js";
@@ -58,6 +59,7 @@ export function buildApp(options: AppOptions = {}) {
   });
   const db = options.db ?? ownedClient!;
   const repositories = createRepositories(db);
+  const defaultTeamSize = options.teamSize ?? getTeamSize();
   const auth = createAuthService({
     adminUserIds: options.adminUserIds ?? getAdminUserIds(),
     mode: options.authMode ?? getAuthMode(),
@@ -86,10 +88,15 @@ export function buildApp(options: AppOptions = {}) {
   });
   registerBashoRoutes(app, {
     auth,
+    defaultTeamSize,
     repositories,
     now: options.now ?? (() => new Date()),
     teamIdFactory: options.teamIdFactory ?? randomUUID,
-    teamSize: options.teamSize ?? getTeamSize(),
+  });
+  registerAdminGameConfigRoutes(app, {
+    auth,
+    defaultTeamSize,
+    repositories,
   });
   registerAdminImportRoutes(app, {
     adminImportToken: options.adminImportToken ?? getAdminImportToken(),

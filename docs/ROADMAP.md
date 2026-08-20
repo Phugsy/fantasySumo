@@ -49,9 +49,9 @@ Goal: make the core game loop work locally.
 
 Goal: make it usable by a small group of friends.
 
-- [ ] Add simple user identity or display-name-based teams.
+- [x] Add simple user identity or display-name-based teams.
 - [ ] Add private league concept if needed.
-- [ ] Add basic admin flow for importing data.
+- [x] Add basic admin flow for importing data.
 - [ ] Improve responsive UI.
 - [x] Add error/loading/empty states.
 
@@ -59,8 +59,8 @@ Goal: make it usable by a small group of friends.
 
 Goal: make it robust enough to share more widely.
 
-- [ ] Add proper authentication.
-- [ ] Add production database and migrations.
+- [x] Add proper authentication.
+- [x] Add production database and migrations.
 - [x] Add migration-gated preview and production deployment pipelines.
 - [ ] Add monitoring/logging.
 - [x] Protect admin endpoints.
@@ -78,3 +78,16 @@ Goal: make it robust enough to share more widely.
 - Auto-generated basho recap posts.
 - Player cards with form history.
 - Draft mode where rikishi can only be picked by one player per league.
+
+## Next product decisions
+
+Before display-preference work, make the game rules deliberate:
+
+1. Provide a separate shared demo/playtest environment without using the
+   production database (#91).
+2. Define one secondary scoring mode, including whether kinboshi and special
+   prizes award points and what source facts are required (#92).
+3. Select and specify one pick modifier or withdrawal mechanic, such as a
+   joker/captain or substitutes (#93).
+4. Fix the reported initial-focus and mobile-header regressions (#94).
+5. Continue with display preferences and theme work (#73).

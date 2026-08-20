@@ -108,6 +108,94 @@ describe("repositories", () => {
     ).toContain("team-north");
   });
 
+  it("persists basho game configuration and locks changes after a stable exists", async () => {
+    const repositories = createRepositories(client);
+    const configurableBasho = {
+      ...sampleBasho,
+      id: "2026-07",
+      name: "July 2026 Basho",
+    };
+    await repositories.insertBasho(configurableBasho);
+
+    expect(
+      await repositories.getBashoGameConfig(configurableBasho.id),
+    ).toBeUndefined();
+    await expect(
+      repositories.setBashoGameConfigIfConfigurable(
+        { bashoId: configurableBasho.id, teamSize: 3 },
+        2,
+      ),
+    ).resolves.toMatchObject({
+      status: "updated",
+      changed: true,
+      config: { teamSize: 3 },
+    });
+    expect(await repositories.getBashoGameConfig(configurableBasho.id)).toEqual(
+      { bashoId: configurableBasho.id, teamSize: 3 },
+    );
+
+    await repositories.insertFantasyTeam({
+      id: "configured-team",
+      bashoId: configurableBasho.id,
+      displayName: "Configured Stable",
+    });
+    await expect(
+      repositories.setBashoGameConfigIfConfigurable(
+        { bashoId: configurableBasho.id, teamSize: 4 },
+        2,
+      ),
+    ).resolves.toMatchObject({
+      status: "locked",
+      reason: "teams-exist",
+    });
+  });
+
+  it("rechecks persisted team size inside the team-and-picks transaction", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
+    const configurableBasho = {
+      ...sampleBasho,
+      id: "2026-07",
+      name: "July 2026 Basho",
+    };
+    await repositories.insertBasho(configurableBasho);
+    await repositories.setBashoGameConfigIfConfigurable(
+      { bashoId: configurableBasho.id, teamSize: 3 },
+      2,
+    );
+    const team = {
+      id: "team-config-race",
+      bashoId: configurableBasho.id,
+      displayName: "Config Race Stable",
+      ownerUserId: "config-race-user",
+    };
+
+    await expect(
+      repositories.saveOwnedFantasyTeamWithPicksIfBashoUpcoming(
+        team,
+        [
+          { teamId: team.id, rikishiId: "onosato" },
+          { teamId: team.id, rikishiId: "kotozakura" },
+        ],
+        2,
+      ),
+    ).resolves.toEqual({ status: "invalid-team-size", teamSize: 3 });
+    await expect(
+      repositories.saveOwnedFantasyTeamWithPicksIfBashoUpcoming(
+        team,
+        [
+          { teamId: team.id, rikishiId: "onosato" },
+          { teamId: team.id, rikishiId: "kotozakura" },
+          { teamId: team.id, rikishiId: "hoshoryu" },
+        ],
+        2,
+      ),
+    ).resolves.toMatchObject({
+      status: "saved",
+      picks: [{}, {}, {}],
+    });
+  });
+
   it("writes and replaces one owned fantasy team for a basho", async () => {
     await seedDatabase(createRepositories(client));
     const repositories = createRepositories(client);
@@ -245,7 +333,7 @@ describe("repositories", () => {
           { teamId: ownedTeam.id, rikishiId: "hoshoryu" },
         ],
       ),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ status: "picks-locked" });
     expect(await repositories.getFantasyTeam(ownedTeam.id)).toMatchObject({
       displayName: "Locked Stable",
       lockedAt: "2026-05-08T02:00:00.000Z",
