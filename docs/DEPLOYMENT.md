@@ -30,7 +30,7 @@ Hosted deployments are owned by GitHub Actions:
 
 - `.github/workflows/deploy-preview.yml` runs for same-repository pull request
   commits and can also be dispatched for a specific ref. It resolves the ref to
-  an immutable SHA, runs `make check`, runs `make e2e` in a pinned Playwright
+  an immutable SHA, runs `make check`, runs `pnpm e2e` in a pinned Playwright
   container, enters the `preview` environment, builds with Vercel CLI, migrates
   the preview database, deploys that same build, and smoke-tests `/`,
   `/api/health`, and the database-backed `/api/basho/current` route.

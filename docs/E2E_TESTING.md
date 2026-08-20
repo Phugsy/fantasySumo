@@ -213,7 +213,7 @@ pnpm exec playwright show-trace test-results/<result-directory>/trace.zip
 ```
 
 The GitHub Actions quality workflow runs `make check` first, then runs
-`make e2e` in an official Playwright container for pull requests and pushes to
+`pnpm e2e` in an official Playwright container for pull requests and pushes to
 `master`. The container tag and `@playwright/test` dependency are pinned to the
 same exact version. This avoids downloading browser operating-system packages
 from Ubuntu mirrors on every run; update both pins together when upgrading

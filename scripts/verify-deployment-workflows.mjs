@@ -87,7 +87,7 @@ function requireContainerizedE2E(source, file, resolvedSha) {
     e2eJob,
     file,
     "run browser E2E without downloading system dependencies",
-    /run: make e2e/,
+    /run: pnpm e2e/,
   );
   forbidText(
     source,
