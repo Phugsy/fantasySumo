@@ -481,6 +481,57 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
+  it("carries the login email and safe return path into password recovery", async () => {
+    window.history.replaceState({}, "", "/login?returnTo=%2Fteam");
+    vi.stubGlobal("fetch", vi.fn(mockUnauthorizedBashoFetch));
+    render(<App />);
+
+    const email = await screen.findByLabelText("Email");
+    fireEvent.change(email, { target: { value: "player@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+
+    expect(window.location.pathname).toBe("/reset-password");
+    expect(window.location.search).toBe("?returnTo=%2Fteam");
+    expect(
+      await screen.findByRole("heading", { name: "Request a reset link" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toHaveValue("player@example.com");
+    expect(screen.getByRole("link", { name: "Back to login" })).toHaveAttribute(
+      "href",
+      "/login?returnTo=%2Fteam",
+    );
+  });
+
+  it("renders provider token and invalid-link password reset states", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/reset-password?token=valid-token&returnTo=%2Fstable",
+    );
+    vi.stubGlobal("fetch", vi.fn(mockUnauthorizedBashoFetch));
+    const { unmount } = render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Complete password reset" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("New password")).toBeInTheDocument();
+
+    unmount();
+    window.history.replaceState(
+      {},
+      "",
+      "/reset-password?error=INVALID_TOKEN&returnTo=%2Fstable",
+    );
+    render(<App />);
+
+    expect(
+      await screen.findByText(
+        "This password reset link is invalid, expired, or has already been used. Request a new link to continue.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+  });
+
   it("explains raw public API 401 responses as deployment access issues", async () => {
     window.history.replaceState({}, "", "/");
     vi.stubGlobal("fetch", vi.fn(mockRawUnauthorizedBashoFetch));

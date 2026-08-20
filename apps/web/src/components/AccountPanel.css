@@ -22,6 +22,18 @@
   font-size: 0.86rem;
 }
 
+.forgot-password-button {
+  justify-self: start;
+  margin: -2px 0 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--indigo);
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .auth-mode-switch {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -79,6 +91,7 @@
 }
 
 .account-summary button:focus-visible,
+.forgot-password-button:focus-visible,
 .auth-mode-switch button:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 3px;

@@ -34,15 +34,26 @@ export default defineConfig({
   projects: [
     {
       name: "desktop-chromium",
+      testIgnore: /password-reset\.spec\.ts/,
       use: { ...devices["Desktop Chrome"] },
     },
     {
       name: "mobile-chromium",
+      testIgnore: /password-reset\.spec\.ts/,
       use: { ...devices["Pixel 5"] },
     },
     {
       name: "mobile-webkit",
+      testIgnore: /password-reset\.spec\.ts/,
       use: { ...devices["iPhone 13"] },
+    },
+    {
+      name: "auth-chromium",
+      testMatch: /password-reset\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        baseURL: "http://127.0.0.1:7867",
+      },
     },
   ],
   webServer: [
@@ -66,6 +77,18 @@ export default defineConfig({
         VITE_BASHO_MODE: "demo",
       },
       url: "http://127.0.0.1:7866",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      command:
+        "pnpm --filter @fantasy-sumo/web exec vite --host 0.0.0.0 --port 7867",
+      env: {
+        ...process.env,
+        VITE_BASHO_MODE: "demo",
+        VITE_NEON_AUTH_URL: "http://127.0.0.1:7867/fake-neon-auth",
+      },
+      url: "http://127.0.0.1:7867",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
     },

@@ -38,6 +38,8 @@ import {
   IncompleteSessionError,
   INCOMPLETE_SESSION_ERROR_MESSAGE,
   isNeonAuthConfigured,
+  requestPasswordResetWithNeon,
+  resetPasswordWithNeon,
   signInWithNeon,
   signOutNeon,
   signUpWithNeon,
@@ -49,11 +51,14 @@ import { BashoPanel } from "./components/BashoPanel";
 import { LeaderboardPanel } from "./components/LeaderboardPanel";
 import { MyStablePanel } from "./components/MyStablePanel";
 import { PageHeader } from "./components/PageHeader";
+import { ResetPasswordPanel } from "./components/ResetPasswordPanel";
 import { TeamSelection } from "./components/TeamSelection";
 import {
   appPaths,
   getActiveView,
   getLoginPath,
+  getPasswordResetPath,
+  getPasswordResetRedirectUrl,
   getSafeReturnPath,
 } from "./routing";
 import { waitForVerifiedSession } from "./sessionVerification";
@@ -724,6 +729,15 @@ function RoutedApp() {
 
   const safeLoginReturnPath =
     getSafeReturnPath(location.search) ?? appPaths.stable;
+  const passwordResetSearch = new URLSearchParams(location.search);
+  const passwordResetToken = getNonEmptySearchValue(
+    passwordResetSearch,
+    "token",
+  );
+  const passwordResetInvalid = passwordResetSearch.has("error");
+  const passwordResetInitialEmail = getPasswordResetInitialEmail(
+    location.state,
+  );
 
   return (
     <div className="site-shell">
@@ -819,6 +833,11 @@ function RoutedApp() {
                     mode={authMode}
                     onDisplayNameChange={setAccountDisplayName}
                     onEmailChange={setAccountEmail}
+                    onForgotPassword={() =>
+                      navigate(getPasswordResetPath(safeLoginReturnPath), {
+                        state: { passwordResetEmail: accountEmail },
+                      })
+                    }
                     onPasswordChange={setAccountPassword}
                     onSignIn={handleSignIn}
                     onSignOut={handleSignOut}
@@ -836,6 +855,31 @@ function RoutedApp() {
                   )}
                 </>
               )
+            }
+          />
+          <Route
+            path={appPaths.resetPassword}
+            element={
+              <ResetPasswordPanel
+                key={location.search}
+                initialEmail={passwordResetInitialEmail}
+                invalidLink={passwordResetInvalid}
+                mode={authMode}
+                onRequestReset={(email) =>
+                  requestPasswordResetWithNeon({
+                    email,
+                    redirectTo: getPasswordResetRedirectUrl(
+                      window.location.origin,
+                      safeLoginReturnPath,
+                    ),
+                  })
+                }
+                onResetPassword={(newPassword, token) =>
+                  resetPasswordWithNeon({ newPassword, token })
+                }
+                returnTo={safeLoginReturnPath}
+                token={passwordResetToken}
+              />
             }
           />
           <Route
@@ -985,6 +1029,8 @@ function getPageTitle(activeView: ReturnType<typeof getActiveView>): string {
   switch (activeView) {
     case "login":
       return "Log in or join";
+    case "reset-password":
+      return "Reset password";
     case "stable":
       return "My stable";
     case "team":
@@ -994,6 +1040,25 @@ function getPageTitle(activeView: ReturnType<typeof getActiveView>): string {
     default:
       return "Leaderboard";
   }
+}
+
+function getNonEmptySearchValue(
+  search: URLSearchParams,
+  key: string,
+): string | null {
+  const value = search.get(key)?.trim();
+
+  return value === undefined || value.length === 0 ? null : value;
+}
+
+function getPasswordResetInitialEmail(state: unknown): string {
+  if (typeof state !== "object" || state === null) {
+    return "";
+  }
+
+  const email = Reflect.get(state, "passwordResetEmail");
+
+  return typeof email === "string" ? email : "";
 }
 
 function getPublicDataErrorMessage(error: unknown): string {

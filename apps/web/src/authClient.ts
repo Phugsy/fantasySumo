@@ -3,6 +3,14 @@ import type { SessionResponse, SessionUser } from "./types";
 
 const PASSWORD_REQUIREMENTS_MESSAGE =
   "Choose a stronger password. Use at least 8 characters and avoid common passwords.";
+export const PASSWORD_RESET_CONFIRMATION_MESSAGE =
+  "If an account exists for that email, a password reset link is on its way.";
+export const INVALID_PASSWORD_RESET_LINK_MESSAGE =
+  "This password reset link is invalid, expired, or has already been used. Request a new link to continue.";
+const PASSWORD_RESET_REQUEST_ERROR_MESSAGE =
+  "We could not submit the password reset request. Check your connection and try again.";
+const PASSWORD_RESET_ERROR_MESSAGE =
+  "We could not reset your password. Request a new link and try again.";
 const FORCE_NEON_SESSION_FETCH_OPTIONS = {
   fetchOptions: {
     headers: {
@@ -19,6 +27,20 @@ interface NeonAccessTokenResponse {
 }
 
 type AccessTokenProvider = () => Promise<string | null>;
+
+interface AuthActionResponse {
+  error: { message?: string } | null;
+}
+
+type PasswordResetRequestAction = (input: {
+  email: string;
+  redirectTo: string;
+}) => Promise<AuthActionResponse>;
+
+type PasswordResetAction = (input: {
+  newPassword: string;
+  token: string;
+}) => Promise<AuthActionResponse>;
 
 const neonAuthUrl = import.meta.env.VITE_NEON_AUTH_URL as string | undefined;
 const neonAuthClient =
@@ -176,6 +198,71 @@ export async function signUpWithNeon(input: {
   return getNeonSession();
 }
 
+export async function requestPasswordResetWithNeon(input: {
+  email: string;
+  redirectTo: string;
+}): Promise<void> {
+  if (neonAuthClient === null) {
+    throw new Error("Neon Auth is not configured.");
+  }
+
+  await submitPasswordResetRequest(
+    (request) => neonAuthClient.requestPasswordReset(request),
+    input,
+  );
+}
+
+export async function resetPasswordWithNeon(input: {
+  newPassword: string;
+  token: string;
+}): Promise<void> {
+  if (neonAuthClient === null) {
+    throw new Error("Neon Auth is not configured.");
+  }
+
+  await submitPasswordReset(
+    (request) => neonAuthClient.resetPassword(request),
+    input,
+  );
+}
+
+export async function submitPasswordResetRequest(
+  requestPasswordReset: PasswordResetRequestAction,
+  input: { email: string; redirectTo: string },
+): Promise<void> {
+  let response: AuthActionResponse;
+
+  try {
+    response = await requestPasswordReset(input);
+  } catch {
+    throw new Error(PASSWORD_RESET_REQUEST_ERROR_MESSAGE);
+  }
+
+  // Better Auth returns the same successful response for registered and unknown
+  // addresses. A resolved SDK error therefore signals an operational failure,
+  // but its provider detail must not reach the account-recovery UI.
+  if (response.error !== null) {
+    throw new Error(PASSWORD_RESET_REQUEST_ERROR_MESSAGE);
+  }
+}
+
+export async function submitPasswordReset(
+  resetPassword: PasswordResetAction,
+  input: { newPassword: string; token: string },
+): Promise<void> {
+  let response: AuthActionResponse;
+
+  try {
+    response = await resetPassword(input);
+  } catch {
+    throw new Error(PASSWORD_RESET_ERROR_MESSAGE);
+  }
+
+  if (response.error !== null) {
+    throw new Error(getPasswordResetErrorMessage(response.error.message));
+  }
+}
+
 export async function signOutNeon(): Promise<void> {
   if (neonAuthClient === null) {
     return;
@@ -214,6 +301,27 @@ export function getNeonAuthErrorMessage(
   }
 
   return message;
+}
+
+export function getPasswordResetErrorMessage(
+  message: string | undefined,
+): string {
+  if (message === undefined || message.trim().length === 0) {
+    return PASSWORD_RESET_ERROR_MESSAGE;
+  }
+
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    normalizedMessage.includes("token") ||
+    normalizedMessage.includes("expired") ||
+    normalizedMessage.includes("verification") ||
+    normalizedMessage.includes("already used")
+  ) {
+    return INVALID_PASSWORD_RESET_LINK_MESSAGE;
+  }
+
+  return getNeonAuthErrorMessage(message, PASSWORD_RESET_ERROR_MESSAGE);
 }
 
 function toSessionUser(user: {

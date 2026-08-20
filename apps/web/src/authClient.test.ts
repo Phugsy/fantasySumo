@@ -2,9 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createNeonSessionCompletionTokenProvider,
   getNeonAuthErrorMessage,
+  getPasswordResetErrorMessage,
   IncompleteSessionError,
+  INVALID_PASSWORD_RESET_LINK_MESSAGE,
   requestFreshNeonAccessToken,
   requireNeonAccessToken,
+  submitPasswordReset,
+  submitPasswordResetRequest,
 } from "./authClient";
 
 describe("getNeonAuthErrorMessage", () => {
@@ -154,6 +158,104 @@ describe("createNeonSessionCompletionTokenProvider", () => {
     ).resolves.toEqual(["fresh-jwt", "fresh-jwt"]);
     await expect(getToken()).resolves.toBe("cached-jwt");
     expect(getCachedToken).toHaveBeenCalledOnce();
+  });
+});
+
+describe("password reset", () => {
+  it("keeps reset request confirmation neutral for the provider's unknown-account success", async () => {
+    const request = vi.fn(async () => ({
+      data: {
+        message:
+          "If this email exists in our system, check your email for the reset link",
+        status: true,
+      },
+      error: null,
+    }));
+
+    await expect(
+      submitPasswordResetRequest(request, {
+        email: "unknown@example.com",
+        redirectTo: "https://fantasy.example/reset-password",
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("reports resolved provider failures without exposing provider detail", async () => {
+    const request = vi.fn(async () => ({
+      data: null,
+      error: { message: "Reset password is not enabled" },
+    }));
+
+    await expect(
+      submitPasswordResetRequest(request, {
+        email: "player@example.com",
+        redirectTo: "https://fantasy.example/reset-password",
+      }),
+    ).rejects.toThrow(
+      "We could not submit the password reset request. Check your connection and try again.",
+    );
+  });
+
+  it("reports transport failures without exposing provider detail", async () => {
+    const request = vi.fn(async () => {
+      throw new Error("private provider failure");
+    });
+
+    await expect(
+      submitPasswordResetRequest(request, {
+        email: "player@example.com",
+        redirectTo: "https://fantasy.example/reset-password",
+      }),
+    ).rejects.toThrow(
+      "We could not submit the password reset request. Check your connection and try again.",
+    );
+  });
+
+  it("maps invalid, expired, and used links to one actionable error", async () => {
+    const reset = vi.fn(async () => ({
+      data: null,
+      error: { message: "Reset token has expired" },
+    }));
+
+    await expect(
+      submitPasswordReset(reset, {
+        newPassword: "strong-password",
+        token: "expired-token",
+      }),
+    ).rejects.toThrow(INVALID_PASSWORD_RESET_LINK_MESSAGE);
+    expect(getPasswordResetErrorMessage("Token already used")).toBe(
+      INVALID_PASSWORD_RESET_LINK_MESSAGE,
+    );
+  });
+
+  it("preserves the shared password policy guidance", async () => {
+    const reset = vi.fn(async () => ({
+      data: null,
+      error: { message: "Password does not meet security requirements" },
+    }));
+
+    await expect(
+      submitPasswordReset(reset, {
+        newPassword: "weakpass",
+        token: "valid-token",
+      }),
+    ).rejects.toThrow(
+      "Choose a stronger password. Use at least 8 characters and avoid common passwords.",
+    );
+  });
+
+  it("completes a valid reset", async () => {
+    const reset = vi.fn(async () => ({
+      data: { status: true },
+      error: null,
+    }));
+
+    await expect(
+      submitPasswordReset(reset, {
+        newPassword: "strong-password",
+        token: "valid-token",
+      }),
+    ).resolves.toBeUndefined();
   });
 });
 

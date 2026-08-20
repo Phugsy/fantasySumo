@@ -3,6 +3,7 @@ import type { ActiveView } from "./types";
 export const appPaths = {
   home: "/",
   login: "/login",
+  resetPassword: "/reset-password",
   stable: "/stable",
   team: "/team",
   admin: "/admin",
@@ -23,6 +24,8 @@ export function getActiveView(pathname: string): ActiveView {
   switch (pathname) {
     case appPaths.login:
       return "login";
+    case appPaths.resetPassword:
+      return "reset-password";
     case appPaths.stable:
       return "stable";
     case appPaths.team:
@@ -44,4 +47,15 @@ export function getSafeReturnPath(search: string): ProtectedAppPath | null {
 
 export function getLoginPath(returnTo: ProtectedAppPath): string {
   return `${appPaths.login}?${new URLSearchParams({ returnTo }).toString()}`;
+}
+
+export function getPasswordResetPath(returnTo: ProtectedAppPath): string {
+  return `${appPaths.resetPassword}?${new URLSearchParams({ returnTo }).toString()}`;
+}
+
+export function getPasswordResetRedirectUrl(
+  origin: string,
+  returnTo: ProtectedAppPath,
+): string {
+  return new URL(getPasswordResetPath(returnTo), origin).toString();
 }

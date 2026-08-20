@@ -21,6 +21,12 @@ const pageCopy: Record<
     description:
       "Sign in to create your basho team, manage your picks, and follow your stable.",
   },
+  "reset-password": {
+    eyebrow: "Player account",
+    title: "Reset your password",
+    description:
+      "Request a secure reset link or choose a new password from the link in your email.",
+  },
   stable: {
     eyebrow: "Your basho team",
     title: "My stable",
