@@ -355,6 +355,64 @@ describe("AdminPanel", () => {
     );
   });
 
+  it("lets a migrated basho persist its locked inherited team size", async () => {
+    const migratedBasho = {
+      id: "2026-07",
+      isDemo: false,
+      name: "July 2026 Basho",
+      startDate: "2026-07-12",
+      endDate: "2026-07-26",
+      status: "upcoming",
+      currentDay: 0,
+    };
+    const inheritedConfig = gameConfigResponse(migratedBasho.id, {
+      canChangeTeamSize: false,
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ basho: migratedBasho }))
+      .mockResolvedValueOnce(jsonResponse(inheritedConfig))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ...inheritedConfig,
+          changed: false,
+          gameConfig: {
+            ...inheritedConfig.gameConfig,
+            teamSizeSource: "basho",
+          },
+        }),
+      );
+    const onPlayerDataRefresh = vi.fn(() => Promise.resolve());
+
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminPanel onPlayerDataRefresh={onPlayerDataRefresh} />);
+
+    expect(await screen.findByLabelText("Rikishi per stable")).toBeDisabled();
+    expect(screen.getByText(/save this inherited value/i)).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Save inherited team size" }),
+    );
+
+    expect(
+      await screen.findByText("Team size saved as 2."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Saved for this basho")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Save team size" }),
+    ).toBeDisabled();
+    expect(onPlayerDataRefresh).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/admin/basho/2026-07/game-config",
+      {
+        body: JSON.stringify({ teamSize: 2 }),
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+    );
+  });
+
   it("dry-runs a partial results import without claiming data was written", async () => {
     const upcomingBasho = {
       id: "2026-09",

@@ -197,6 +197,7 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
     if (basho === null || gameConfig === null) return;
 
     const teamSize = Number(teamSizeDraft);
+    const wasInherited = gameConfig.gameConfig.teamSizeSource === "default";
 
     if (!Number.isInteger(teamSize) || teamSize < 1 || teamSize > 42) {
       setErrorMessage("Team size must be a whole number from 1 to 42.");
@@ -215,7 +216,7 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
       setGameConfig(response);
       setTeamSizeDraft(String(response.gameConfig.teamSize));
       setMessage(
-        response.changed
+        response.changed || wasInherited
           ? `Team size saved as ${response.gameConfig.teamSize}.`
           : `Team size is already ${response.gameConfig.teamSize}.`,
       );
@@ -346,6 +347,9 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
   }
 
   const pending = pendingAction !== null;
+  const canPersistInheritedTeamSize =
+    gameConfig?.gameConfig.teamSizeSource === "default" &&
+    teamSizeDraft === String(gameConfig.gameConfig.teamSize);
 
   return (
     <section className="admin-panel" aria-labelledby="admin-basho-title">
@@ -477,15 +481,23 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
                     <button
                       type="submit"
                       className="primary-button"
-                      disabled={pending || !gameConfig.canChangeTeamSize}
+                      disabled={
+                        pending ||
+                        (!gameConfig.canChangeTeamSize &&
+                          !canPersistInheritedTeamSize)
+                      }
                     >
-                      Save team size
+                      {canPersistInheritedTeamSize
+                        ? "Save inherited team size"
+                        : "Save team size"}
                     </button>
                   </div>
                   <p>
                     {gameConfig.canChangeTeamSize
                       ? "This locks after the first stable is submitted or picks close."
-                      : "Team size is locked because a stable exists or picks have closed."}
+                      : gameConfig.gameConfig.teamSizeSource === "default"
+                        ? "Team size is locked, but save this inherited value so a server-default change cannot alter it."
+                        : "Team size is locked because a stable exists or picks have closed."}
                   </p>
                   <p className="admin-config-source">
                     {gameConfig.gameConfig.teamSizeSource === "basho"

@@ -158,6 +158,8 @@ DEMO_ADMIN_TOKEN=<long random token, only if demo admin controls are needed>
 `TEAM_SIZE` is the fallback for a basho that has no saved game-configuration
 row. Once an administrator saves team size through `/admin`, that per-basho
 value is authoritative and survives redeploys or environment-variable changes.
+For a migrated basho that already has teams, `/admin` keeps size changes locked
+but allows the administrator to persist the unchanged inherited value.
 Set the intended fallback before importing a new basho, then save and verify the
 basho configuration before inviting players.
 

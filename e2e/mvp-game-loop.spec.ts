@@ -108,7 +108,7 @@ test("lets an authenticated admin run the deterministic demo loop", async ({
   );
 });
 
-test("lets an admin validate a live result import without contacting the source", async ({
+test("lets an admin persist inherited live config and validate a result import without contacting the source", async ({
   page,
 }) => {
   await page.goto("/admin");
@@ -135,14 +135,21 @@ test("lets an admin validate a live result import without contacting the source"
       },
     });
   });
+  let teamSizePersisted = false;
   await page.route("**/api/admin/basho/2026-09/game-config", async (route) => {
+    if (route.request().method() === "PUT") {
+      expect(route.request().postDataJSON()).toEqual({ teamSize: 2 });
+      teamSizePersisted = true;
+    }
+
     await route.fulfill({
       json: {
         bashoId: "2026-09",
-        canChangeTeamSize: true,
+        changed: false,
+        canChangeTeamSize: false,
         gameConfig: {
           teamSize: 2,
-          teamSizeSource: "default",
+          teamSizeSource: teamSizePersisted ? "basho" : "default",
           scoringMode: "wins-v0",
         },
       },
@@ -185,6 +192,13 @@ test("lets an admin validate a live result import without contacting the source"
     page.getByRole("heading", { name: "September 2026 Basho" }),
   ).toBeVisible();
   await expect(page.getByText("One point per win")).toBeVisible();
+  await expect(page.getByLabel("Rikishi per stable")).toBeDisabled();
+  await page.getByRole("button", { name: "Save inherited team size" }).click();
+  await expect(page.getByText("Team size saved as 2.")).toBeVisible();
+  await expect(page.getByText("Saved for this basho")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Save team size" }),
+  ).toBeDisabled();
   await page.getByRole("button", { name: "Validate results" }).click();
   await expect(page.getByText("Dry-run result")).toBeVisible();
   await expect(
