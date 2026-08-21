@@ -1,5 +1,6 @@
 import type {
   BanzukeEntry,
+  BashoStatus,
   BoutResult,
   Rikishi,
   RikishiTournamentAchievement,
@@ -10,9 +11,11 @@ import type {
 
 const WINNING_RECORD_THRESHOLD = 8;
 const LOSING_RECORD_THRESHOLD = 8;
+const FINAL_BASHO_DAY = 15;
 
 interface TournamentNotesInput {
   banzukeEntries: readonly BanzukeEntry[];
+  bashoStatus?: BashoStatus;
   boutResults: readonly BoutResult[];
   rikishiId: Rikishi["id"];
   scheduledBouts: readonly ScheduledBout[];
@@ -25,6 +28,7 @@ interface TournamentNotesInput {
  */
 export function deriveRikishiTournamentNotes({
   banzukeEntries,
+  bashoStatus,
   boutResults,
   rikishiId,
   scheduledBouts,
@@ -49,6 +53,8 @@ export function deriveRikishiTournamentNotes({
       rikishiId,
       applicableResults,
       banzukeEntries,
+      bashoStatus,
+      throughDay,
     ),
   };
 }
@@ -97,6 +103,8 @@ function deriveAchievements(
   rikishiId: Rikishi["id"],
   applicableResults: readonly BoutResult[],
   banzukeEntries: readonly BanzukeEntry[],
+  bashoStatus: BashoStatus | undefined,
+  throughDay: number | undefined,
 ): RikishiTournamentAchievement[] {
   const rankByRikishiId = new Map(
     banzukeEntries.map((entry) => [entry.rikishiId, entry.rank]),
@@ -144,6 +152,14 @@ function deriveAchievements(
       });
       recordSecured = true;
     }
+  }
+
+  if (!recordSecured && bashoStatus === "complete") {
+    achievements.push({
+      type: wins >= WINNING_RECORD_THRESHOLD ? "kachi-koshi" : "make-koshi",
+      day: throughDay ?? FINAL_BASHO_DAY,
+      provenance: "derived",
+    });
   }
 
   return achievements;

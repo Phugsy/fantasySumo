@@ -129,9 +129,9 @@ describe("MyStablePanel", () => {
     expect(screen.getByText("Nishonoseki")).toBeInTheDocument();
     expect(screen.getByText("3 wins")).toBeInTheDocument();
     expect(screen.getByText("Kachi-koshi")).toBeInTheDocument();
-    expect(screen.getByText("Day 8 · derived")).toBeInTheDocument();
     expect(screen.getByText("Withdrawn")).toBeInTheDocument();
-    expect(screen.getByText("Day 6 · source report")).toBeInTheDocument();
+    expect(screen.queryByText(/derived/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/source report/i)).not.toBeInTheDocument();
     expect(
       screen.getByText(
         "Tournament badges are informational and do not add fantasy points.",

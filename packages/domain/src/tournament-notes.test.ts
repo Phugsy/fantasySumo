@@ -38,10 +38,11 @@ describe("deriveRikishiTournamentNotes", () => {
     expect(
       deriveRikishiTournamentNotes({
         banzukeEntries,
+        bashoStatus: "complete",
         boutResults,
         rikishiId: "ura",
         scheduledBouts,
-        throughDay: 8,
+        throughDay: 15,
       }),
     ).toEqual({
       statuses: [{ type: "withdrawn", effectiveDay: 9, provenance: "source" }],
@@ -85,6 +86,32 @@ describe("deriveRikishiTournamentNotes", () => {
         scheduledBouts: [],
       }).achievements,
     ).toEqual([{ type: "make-koshi", day: 8, provenance: "derived" }]);
+  });
+
+  it("settles an incomplete withdrawn record as make-koshi when the basho completes", () => {
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries,
+        bashoStatus: "complete",
+        boutResults: makeRecord("ura", 7, 3),
+        rikishiId: "ura",
+        scheduledBouts: [
+          {
+            id: "day-11-withdrawal",
+            bashoId,
+            day: 11,
+            eastRikishiId: "ura",
+            westRikishiId: "onosato",
+            status: "cancelled",
+            withdrawnRikishiId: "ura",
+          },
+        ],
+        throughDay: 15,
+      }),
+    ).toEqual({
+      statuses: [{ type: "withdrawn", effectiveDay: 11, provenance: "source" }],
+      achievements: [{ type: "make-koshi", day: 15, provenance: "derived" }],
+    });
   });
 
   it("derives a gold star only from a recorded maegashira win over a yokozuna", () => {

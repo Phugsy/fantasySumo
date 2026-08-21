@@ -711,15 +711,15 @@ test("shows completed demo leaderboard entries in score order", async ({
   await leaderboardRows.filter({ hasText: "Salt Circle" }).click();
   const uraNotes = page.getByLabel("Ura tournament status and achievements");
   await expect(uraNotes.getByText("Gold star")).toBeVisible();
-  await expect(uraNotes.getByText("Day 13 · derived")).toBeVisible();
+  await expect(uraNotes.getByText(/derived/i)).toHaveCount(0);
 
   await leaderboardRows.filter({ hasText: "Dohyo Dreamers" }).click();
   const tobizaruNotes = page.getByLabel(
     "Tobizaru tournament status and achievements",
   );
   await expect(tobizaruNotes.getByText("Withdrawn")).toBeVisible();
-  await expect(tobizaruNotes.getByText("Day 15 · source report")).toBeVisible();
   await expect(tobizaruNotes.getByText("Make-koshi")).toBeVisible();
+  await expect(tobizaruNotes.getByText(/source report/i)).toHaveCount(0);
   await expect(
     page.getByText(
       "Tournament badges are informational and do not add fantasy points.",

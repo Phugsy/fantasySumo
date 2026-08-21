@@ -108,6 +108,7 @@ export function registerBashoRoutes(
         rankOrder: entry.rankOrder,
         tournamentNotes: deriveRikishiTournamentNotes({
           banzukeEntries,
+          bashoStatus: basho.status,
           boutResults,
           rikishiId: entry.rikishiId,
           scheduledBouts,
@@ -369,6 +370,7 @@ export function registerBashoRoutes(
             score: score?.score ?? 0,
             tournamentNotes: deriveRikishiTournamentNotes({
               banzukeEntries,
+              bashoStatus: basho.status,
               boutResults,
               rikishiId: pick.rikishiId,
               scheduledBouts,

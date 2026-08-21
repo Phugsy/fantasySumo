@@ -6,8 +6,7 @@
 }
 
 .rikishi-note-badge {
-  display: inline-grid;
-  gap: 1px;
+  display: inline-block;
   max-width: 100%;
   padding: 5px 8px;
   border: 1px solid #c8dad2;
@@ -30,8 +29,7 @@
   color: #57430b;
 }
 
-.rikishi-note-badge strong,
-.rikishi-note-badge small {
+.rikishi-note-badge strong {
   display: block;
   overflow-wrap: anywhere;
 }
@@ -39,12 +37,6 @@
 .rikishi-note-badge strong {
   font-size: 0.72rem;
   font-weight: 900;
-}
-
-.rikishi-note-badge small {
-  color: inherit;
-  font-size: 0.63rem;
-  font-weight: 700;
 }
 
 .tournament-notes-disclaimer {

@@ -310,11 +310,15 @@ withdrawal marker; a missing or merely unpublished card does not imply that a
 rikishi is unavailable. A later non-absence result can reliably derive that a
 rikishi returned.
 
-Kachi-koshi and make-koshi are derived when the eighth recorded win or loss is
-stored. A gold-star win is derived only when the stored banzuke identifies the
-winner as maegashira, the loser as yokozuna, and the stored result is not a
-default/absence win. These notes are informational and do not participate in
-fantasy scoring.
+Kachi-koshi and make-koshi are derived during a basho when the eighth recorded
+win or loss is stored. When the basho is complete, any rikishi without eight
+wins receives make-koshi, including a rikishi whose remaining days were
+absences; a rikishi who secured eight wins before withdrawing keeps
+kachi-koshi. A gold-star win is derived only when the stored banzuke identifies
+the winner as maegashira, the loser as yokozuna, and the stored result is not a
+default/absence win. The UI renders only the concise badge label, without day
+or provenance metadata. These notes are informational and do not participate
+in fantasy scoring.
 
 The current live source adapters do not import special-prize awards, and the
 Sumo API schedule adapter does not currently receive an explicit withdrawal

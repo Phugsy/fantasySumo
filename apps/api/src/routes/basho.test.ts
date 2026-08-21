@@ -270,6 +270,30 @@ describe("basho routes", () => {
         }),
       }),
     ]);
+
+    await repositories.updateBasho({
+      ...sampleBasho,
+      status: "complete",
+      currentDay: 15,
+    });
+    const completedRikishiResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/rikishi",
+    });
+
+    expect(completedRikishiResponse.statusCode).toBe(200);
+    expect(
+      completedRikishiResponse
+        .json()
+        .rikishi.find((entry: { id: string }) => entry.id === "kotozakura"),
+    ).toMatchObject({
+      tournamentNotes: {
+        statuses: [
+          { type: "withdrawn", effectiveDay: 9, provenance: "source" },
+        ],
+        achievements: [{ type: "make-koshi", day: 15, provenance: "derived" }],
+      },
+    });
   });
 
   it("creates and retrieves a fantasy team", async () => {
