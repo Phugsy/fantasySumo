@@ -153,7 +153,11 @@ describe("admin game configuration routes", () => {
       url: `/api/admin/basho/${sampleBasho.id}/game-config`,
     });
 
-    expect(tooSmallResponse.statusCode).toBe(400);
+    expect(tooSmallResponse.statusCode).toBe(409);
+    expect(tooSmallResponse.json()).toMatchObject({
+      error: "team-size-changed",
+      teamSize: 3,
+    });
     expect(createdResponse.statusCode).toBe(201);
     expect(createdResponse.json().picks).toHaveLength(3);
     expect(idempotentUpdateResponse.statusCode).toBe(200);

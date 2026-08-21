@@ -208,6 +208,12 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
           );
         }
 
+        const existingConfig = transaction
+          .select()
+          .from(sqlite.bashoGameConfig)
+          .where(eq(sqlite.bashoGameConfig.bashoId, resetData.basho.id))
+          .get();
+
         transaction
           .delete(sqlite.basho)
           .where(
@@ -230,6 +236,13 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
           .insert(sqlite.basho)
           .values(toBashoRow(resetData.basho))
           .run();
+
+        if (existingConfig !== undefined) {
+          transaction
+            .insert(sqlite.bashoGameConfig)
+            .values(existingConfig)
+            .run();
+        }
 
         for (const entry of resetData.banzukeEntries) {
           transaction.insert(sqlite.banzukeEntries).values(entry).run();
@@ -937,6 +950,13 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
           );
         }
 
+        const existingConfig = (
+          await transaction
+            .select()
+            .from(pg.bashoGameConfig)
+            .where(eq(pg.bashoGameConfig.bashoId, resetData.basho.id))
+        ).at(0);
+
         await transaction
           .delete(pg.basho)
           .where(
@@ -951,6 +971,10 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
         }
 
         await transaction.insert(pg.basho).values(toBashoRow(resetData.basho));
+
+        if (existingConfig !== undefined) {
+          await transaction.insert(pg.bashoGameConfig).values(existingConfig);
+        }
 
         for (const entry of resetData.banzukeEntries) {
           await transaction.insert(pg.banzukeEntries).values(entry);

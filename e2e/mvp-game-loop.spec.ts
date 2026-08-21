@@ -390,6 +390,80 @@ test("keeps a rolled-over banzuke selected while the previous basho remains acti
   ).toBeVisible();
 });
 
+test("refreshes a stale player team-size limit and preserves the draft", async ({
+  page,
+}) => {
+  let currentBashoRequestCount = 0;
+  let teamSaveRequestCount = 0;
+  let teamSizeChanged = false;
+
+  await page.route("**/api/basho/current?mode=demo", async (route) => {
+    currentBashoRequestCount += 1;
+    const response = await route.fetch();
+    const basho = (await response.json()) as Record<string, unknown>;
+
+    await route.fulfill({
+      response,
+      json: {
+        ...basho,
+        teamSize: teamSizeChanged ? 3 : 2,
+      },
+    });
+  });
+  await page.route("**/api/basho/*/teams", async (route) => {
+    teamSaveRequestCount += 1;
+
+    if (teamSaveRequestCount === 1) {
+      teamSizeChanged = true;
+      await route.fulfill({
+        json: {
+          error: "team-size-changed",
+          message: "Team size changed to 3. Review your picks and try again.",
+          teamSize: 3,
+        },
+        status: 409,
+      });
+      return;
+    }
+
+    await route.fulfill({
+      json: {
+        team: {
+          id: "team-stale-limit",
+          displayName: "Flexible Stable",
+        },
+        picks: [
+          { rikishiId: "wakatakakage" },
+          { rikishiId: "ura" },
+          { rikishiId: "hoshoryu" },
+        ],
+      },
+      status: 201,
+    });
+  });
+
+  await page.goto("/");
+  await signInAsDemoUser(page);
+  await page.getByLabel("Team name").fill("Flexible Stable");
+  await page.getByRole("button", { name: /Wakatakakage/ }).click();
+  await page.getByRole("button", { name: /Ura/ }).click();
+  await page.getByRole("button", { name: "Submit team" }).click();
+
+  await expect(
+    page.getByText("Team size changed to 3. Review your picks and try again."),
+  ).toBeVisible();
+  await expect(page.getByLabel("Team name")).toHaveValue("Flexible Stable");
+  await expect(page.getByText("2 of 3 selected")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Hoshoryu/ })).toBeEnabled();
+
+  await page.getByRole("button", { name: /Hoshoryu/ }).click();
+  await page.getByRole("button", { name: "Submit team" }).click();
+
+  await expect(page.getByText("Flexible Stable submitted.")).toBeVisible();
+  expect(currentBashoRequestCount).toBeGreaterThanOrEqual(3);
+  expect(teamSaveRequestCount).toBe(2);
+});
+
 test("creates a fantasy team and follows its My Stable score", async ({
   page,
   request,

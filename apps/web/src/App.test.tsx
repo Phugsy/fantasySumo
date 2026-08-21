@@ -1436,6 +1436,87 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
+  it("refreshes a stale team-size limit while preserving the unsaved draft", async () => {
+    let currentBashoRequestCount = 0;
+    let teamSaveRequestCount = 0;
+    const updatedBasho = { ...currentBasho, teamSize: 3 };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url === "/api/basho/current") {
+          currentBashoRequestCount += 1;
+          return jsonResponse(
+            currentBashoRequestCount === 1 ? currentBasho : updatedBasho,
+          );
+        }
+
+        if (url === "/api/basho/2026-05/teams") {
+          teamSaveRequestCount += 1;
+
+          if (teamSaveRequestCount === 1) {
+            return jsonResponse(
+              {
+                error: "team-size-changed",
+                message:
+                  "Team size changed to 3. Review your picks and try again.",
+                teamSize: 3,
+              },
+              { status: 409 },
+            );
+          }
+
+          return jsonResponse(
+            {
+              team: {
+                id: "team-east-stand",
+                displayName: "East Stand Heroes",
+              },
+              picks: rankedRikishi.map((rikishi) => ({
+                rikishiId: rikishi.id,
+              })),
+            },
+            { status: 201 },
+          );
+        }
+
+        return mockSuccessfulFetch(
+          input,
+          currentBashoRequestCount > 1 ? updatedBasho : currentBasho,
+        );
+      }),
+    );
+    render(<App />);
+
+    await openTeamEditor();
+    fireEvent.change(screen.getByLabelText("Team name"), {
+      target: { value: "East Stand Heroes" },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: /Onosato/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Kotozakura/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit team" }));
+
+    expect(
+      await screen.findByText(
+        "Team size changed to 3. Review your picks and try again.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Team name")).toHaveValue("East Stand Heroes");
+    expect(screen.getByText("2 of 3 selected")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Hoshoryu/ })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: /Hoshoryu/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit team" }));
+
+    expect(
+      await screen.findByText("East Stand Heroes submitted."),
+    ).toBeInTheDocument();
+    expect(currentBashoRequestCount).toBe(2);
+    expect(teamSaveRequestCount).toBe(2);
+  });
+
   it("shows an empty leaderboard state", async () => {
     vi.stubGlobal("fetch", vi.fn(mockEmptyLeaderboardFetch));
     render(<App />);

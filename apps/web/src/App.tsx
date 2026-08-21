@@ -323,6 +323,21 @@ function RoutedApp() {
           );
           navigate(appPaths.stable, { replace: true });
         }
+      } else if (
+        error instanceof ApiRequestError &&
+        error.status === 409 &&
+        error.code === "team-size-changed" &&
+        error.teamSize !== undefined
+      ) {
+        try {
+          await loadBashoData(
+            { mode: authMode ?? "local", user: sessionUser },
+            () => true,
+            true,
+          );
+        } catch {
+          // Keep the authoritative save error when the refresh also fails.
+        }
       }
 
       setErrorMessage(getErrorMessage(error));

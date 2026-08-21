@@ -669,6 +669,24 @@ describe("repositories", () => {
     ).toBe(true);
   });
 
+  it("preserves stored demo game configuration across fixture resets", async () => {
+    const repositories = createRepositories(client);
+    await seedDemoDatabase(repositories);
+    await expect(
+      repositories.setBashoGameConfigIfConfigurable(
+        { bashoId: demoBasho.id, teamSize: 2 },
+        2,
+      ),
+    ).resolves.toMatchObject({ status: "updated" });
+
+    await resetDemoProgression(repositories);
+
+    expect(await repositories.getBashoGameConfig(demoBasho.id)).toEqual({
+      bashoId: demoBasho.id,
+      teamSize: 2,
+    });
+  });
+
   it("starts and advances demo scoring one day at a time", async () => {
     await seedDemoDatabase(createRepositories(client));
     const repositories = createRepositories(client);

@@ -600,6 +600,34 @@ describe("basho routes", () => {
     });
   });
 
+  it("returns the authoritative team size when a stale client submits the old pick count", async () => {
+    await app.close();
+    app = buildApp({
+      db: client,
+      now: () => new Date("2026-05-02T09:00:00.000Z"),
+      teamIdFactory: () => "north",
+      teamSize: 3,
+    });
+    const headers = await signIn();
+
+    const response = await app.inject({
+      headers,
+      method: "POST",
+      url: "/api/basho/2026-05/teams",
+      payload: {
+        displayName: "Stale Stable",
+        rikishiIds: ["onosato", "kotozakura"],
+      },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      error: "team-size-changed",
+      message: "Team size changed to 3. Review your picks and try again.",
+      teamSize: 3,
+    });
+  });
+
   it("rejects invalid picks when updating a fantasy team", async () => {
     const headers = await signIn();
 

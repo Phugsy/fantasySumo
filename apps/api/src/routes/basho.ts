@@ -236,7 +236,9 @@ export function registerBashoRoutes(
     );
 
     if (!validatedRequest.success) {
-      return reply.code(400).send(validatedRequest.body);
+      return reply
+        .code(validatedRequest.statusCode)
+        .send(validatedRequest.body);
     }
 
     const { displayName, picks } = validatedRequest;
@@ -275,7 +277,7 @@ export function registerBashoRoutes(
     if (savedTeamWithPicks.status === "invalid-team-size") {
       return reply.code(409).send({
         error: "team-size-changed",
-        message: `Team size changed to ${savedTeamWithPicks.teamSize}. Refresh your picks and try again.`,
+        message: `Team size changed to ${savedTeamWithPicks.teamSize}. Review your picks and try again.`,
         teamSize: savedTeamWithPicks.teamSize,
       });
     }
@@ -443,7 +445,9 @@ export function registerBashoRoutes(
     );
 
     if (!validatedRequest.success) {
-      return reply.code(400).send(validatedRequest.body);
+      return reply
+        .code(validatedRequest.statusCode)
+        .send(validatedRequest.body);
     }
 
     const { displayName, picks } = validatedRequest;
@@ -478,7 +482,7 @@ export function registerBashoRoutes(
     if (updatedTeamWithPicks.status === "invalid-team-size") {
       return reply.code(409).send({
         error: "team-size-changed",
-        message: `Team size changed to ${updatedTeamWithPicks.teamSize}. Refresh your picks and try again.`,
+        message: `Team size changed to ${updatedTeamWithPicks.teamSize}. Review your picks and try again.`,
         teamSize: updatedTeamWithPicks.teamSize,
       });
     }
@@ -608,6 +612,7 @@ async function validateTeamRequest(
   if (!parsedBody.success) {
     return {
       success: false as const,
+      statusCode: 400 as const,
       body: {
         error: "invalid-request",
         message: invalidRequestMessage,
@@ -620,6 +625,19 @@ async function validateTeamRequest(
   }
 
   const { displayName, rikishiIds } = parsedBody.data;
+
+  if (rikishiIds.length !== teamSize) {
+    return {
+      success: false as const,
+      statusCode: 409 as const,
+      body: {
+        error: "team-size-changed",
+        message: `Team size changed to ${teamSize}. Review your picks and try again.`,
+        teamSize,
+      },
+    };
+  }
+
   const picks = rikishiIds.map(
     (rikishiId): FantasyPick => ({
       teamId,
@@ -633,6 +651,7 @@ async function validateTeamRequest(
   if (pickErrors.length > 0) {
     return {
       success: false as const,
+      statusCode: 400 as const,
       body: {
         error: "invalid-picks",
         message: "Fantasy team picks are invalid.",
@@ -653,6 +672,7 @@ async function validateTeamRequest(
   if (invalidRikishiIds.length > 0) {
     return {
       success: false as const,
+      statusCode: 400 as const,
       body: {
         error: "invalid-picks",
         message: "Fantasy team picks include rikishi outside this basho.",
