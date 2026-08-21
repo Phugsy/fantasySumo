@@ -126,12 +126,15 @@ export async function updateAdminGameConfig(
 }
 
 export async function runAdminBanzukeImport(
-  bashoId: string,
+  options: {
+    confirmedSourceBashoId?: string;
+    expectedBashoId?: string;
+  },
   dryRun: boolean,
 ): Promise<AdminImportResponse> {
   return postJson<AdminImportResponse>(
     `/api/admin/import-banzuke?dryRun=${String(dryRun)}`,
-    { expectedBashoId: bashoId },
+    options,
   );
 }
 

@@ -488,6 +488,7 @@ describe("AdminPanel", () => {
           dryRun: true,
           source: "jsa-banzuke",
           summary: {},
+          targetBashoId: "2026-09",
         }),
       );
 
@@ -503,6 +504,92 @@ describe("AdminPanel", () => {
       "/api/admin/import-banzuke?dryRun=true",
       {
         body: JSON.stringify({ expectedBashoId: "2026-09" }),
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+    );
+  });
+
+  it("bootstraps a missing live basho only after validating and confirming its source target", async () => {
+    const discoveredBasho = {
+      id: "2026-11",
+      isDemo: false,
+      name: "November 2026 Basho",
+      startDate: "2026-11-08",
+      endDate: "2026-11-22",
+      status: "upcoming",
+      currentDay: 0,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(
+          { error: "not-found", message: "No live basho is available." },
+          404,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          dryRun: true,
+          source: "jsa-banzuke",
+          summary: {
+            basho: { created: 1, updated: 0, skipped: 0, deleted: 0 },
+          },
+          targetBashoId: discoveredBasho.id,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          dryRun: false,
+          source: "jsa-banzuke",
+          summary: {
+            basho: { created: 1, updated: 0, skipped: 0, deleted: 0 },
+          },
+          targetBashoId: discoveredBasho.id,
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ basho: discoveredBasho }))
+      .mockResolvedValueOnce(
+        jsonResponse(gameConfigResponse(discoveredBasho.id)),
+      );
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminPanel onPlayerDataRefresh={() => Promise.resolve()} />);
+
+    expect(
+      await screen.findByText(/No live basho is stored/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Validate results" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Validate banzuke" }));
+    expect(
+      await screen.findByText(`Target basho: ${discoveredBasho.id}`),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "Dry run — validate without writing",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Import banzuke" }));
+
+    expect(confirm).toHaveBeenCalledWith(
+      `Import the validated ${discoveredBasho.id} banzuke and create it as the live basho?`,
+    );
+    expect(
+      await screen.findByRole("heading", { name: discoveredBasho.name }),
+    ).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/api/admin/import-banzuke?dryRun=false",
+      {
+        body: JSON.stringify({
+          confirmedSourceBashoId: discoveredBasho.id,
+        }),
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         method: "POST",

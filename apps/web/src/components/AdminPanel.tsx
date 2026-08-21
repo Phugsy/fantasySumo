@@ -44,6 +44,9 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
   const [importReport, setImportReport] = useState<AdminImportResponse | null>(
     null,
   );
+  const [validatedBanzukeTarget, setValidatedBanzukeTarget] = useState<
+    string | null
+  >(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">(
     "loading",
   );
@@ -78,6 +81,16 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
         if (!isCurrent) return;
         setBasho(null);
         setGameConfig(null);
+        if (
+          mode === "live" &&
+          error instanceof ApiRequestError &&
+          error.status === 404 &&
+          error.code === "not-found"
+        ) {
+          setErrorMessage(null);
+          setLoadState("ready");
+          return;
+        }
         setErrorMessage(getErrorMessage(error));
         setLoadState("error");
       });
@@ -94,6 +107,7 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
     setMessage(null);
     setErrorMessage(null);
     setImportReport(null);
+    setValidatedBanzukeTarget(null);
     setMode(nextMode);
   }
 
@@ -238,7 +252,7 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
   }
 
   async function runImport(action: AdminImportAction) {
-    if (basho === null || mode !== "live") return;
+    if (mode !== "live" || (basho === null && action !== "banzuke")) return;
 
     const day = Number(importDay);
 
@@ -250,13 +264,22 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
       return;
     }
 
-    if (
-      !dryRun &&
-      !window.confirm(
-        `Apply the ${formatAction(action)} import to live basho data?`,
-      )
-    ) {
-      return;
+    if (!dryRun) {
+      if (action === "banzuke" && validatedBanzukeTarget === null) {
+        setErrorMessage(
+          "Validate the current banzuke before importing it into live data.",
+        );
+        return;
+      }
+
+      const confirmation =
+        action === "banzuke" && validatedBanzukeTarget !== basho?.id
+          ? basho === null
+            ? `Import the validated ${validatedBanzukeTarget} banzuke and create it as the live basho?`
+            : `The validated source banzuke is for ${validatedBanzukeTarget}, not the selected ${basho.id} basho. Import ${validatedBanzukeTarget} as the new live basho?`
+          : `Apply the ${formatAction(action)} import to live basho data?`;
+
+      if (!window.confirm(confirmation)) return;
     }
 
     setPendingAction(`import-${action}`);
@@ -267,14 +290,25 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
     try {
       const response =
         action === "banzuke"
-          ? await runAdminBanzukeImport(basho.id, dryRun)
+          ? await runAdminBanzukeImport(
+              {
+                confirmedSourceBashoId: dryRun
+                  ? undefined
+                  : (validatedBanzukeTarget ?? undefined),
+                expectedBashoId: basho?.id,
+              },
+              dryRun,
+            )
           : action === "results"
-            ? await runAdminResultsImport(basho.id, day, dryRun)
-            : await runAdminScheduleImport(basho.id, day, dryRun);
+            ? await runAdminResultsImport(basho!.id, day, dryRun)
+            : await runAdminScheduleImport(basho!.id, day, dryRun);
 
       if (!isMountedRef.current) return;
 
       setImportReport(response);
+      if (action === "banzuke" && dryRun) {
+        setValidatedBanzukeTarget(response.targetBashoId ?? null);
+      }
       setMessage(
         `${dryRun ? "Validation" : "Import"} completed for ${formatAction(action)} data.`,
       );
@@ -361,6 +395,25 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
               />
             </div>
           )}
+        </>
+      )}
+
+      {loadState === "ready" && mode === "live" && basho === null && (
+        <>
+          <div className="state-panel">
+            No live basho is stored. Validate the current source banzuke, then
+            explicitly confirm creating its basho.
+          </div>
+          <AdminImportPanel
+            dryRun={dryRun}
+            importDay={importDay}
+            importReport={importReport}
+            pending={pending}
+            showDayImports={false}
+            onDryRunChange={setDryRun}
+            onImportDayChange={setImportDay}
+            onRunImport={(action) => void runImport(action)}
+          />
         </>
       )}
 
@@ -455,66 +508,16 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
           )}
 
           {mode === "live" && (
-            <section
-              className="admin-import-panel"
-              aria-labelledby="admin-import-title"
-            >
-              <div>
-                <p className="eyebrow">Source-backed data</p>
-                <h2 id="admin-import-title">Import basho data</h2>
-                <p>
-                  Validate source data first, then apply it deliberately to the
-                  selected live basho.
-                </p>
-              </div>
-              <div className="admin-import-options">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={dryRun}
-                    disabled={pending}
-                    onChange={(event) => setDryRun(event.currentTarget.checked)}
-                  />
-                  Dry run — validate without writing
-                </label>
-                <label htmlFor="admin-import-day">
-                  Basho day
-                  <input
-                    id="admin-import-day"
-                    type="number"
-                    min="1"
-                    max="15"
-                    step="1"
-                    value={importDay}
-                    disabled={pending}
-                    onChange={(event) =>
-                      setImportDay(event.currentTarget.value)
-                    }
-                  />
-                </label>
-              </div>
-              <div className="admin-action-grid">
-                <AdminImportAction
-                  description="Fetch the current Makuuchi banzuke from the Japan Sumo Association."
-                  disabled={pending}
-                  label={`${dryRun ? "Validate" : "Import"} banzuke`}
-                  onClick={() => void runImport("banzuke")}
-                />
-                <AdminImportAction
-                  description="Fetch one day of Makuuchi results and then attempt the following published schedule."
-                  disabled={pending}
-                  label={`${dryRun ? "Validate" : "Import"} results`}
-                  onClick={() => void runImport("results")}
-                />
-                <AdminImportAction
-                  description="Fetch or retry one published Makuuchi schedule without changing scores."
-                  disabled={pending}
-                  label={`${dryRun ? "Validate" : "Import"} schedule`}
-                  onClick={() => void runImport("schedule")}
-                />
-              </div>
-              {importReport !== null && <ImportReport report={importReport} />}
-            </section>
+            <AdminImportPanel
+              dryRun={dryRun}
+              importDay={importDay}
+              importReport={importReport}
+              pending={pending}
+              showDayImports
+              onDryRunChange={setDryRun}
+              onImportDayChange={setImportDay}
+              onRunImport={(action) => void runImport(action)}
+            />
           )}
 
           {basho.isDemo ? (
@@ -608,24 +611,111 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
               />
             </div>
           )}
-
-          {pendingAction !== null && (
-            <p className="form-message" role="status">
-              Applying {formatAction(pendingAction)}...
-            </p>
-          )}
-          {message !== null && (
-            <p className="confirmation" role="status">
-              {message}
-            </p>
-          )}
-          {errorMessage !== null && (
-            <p className="form-message error-state" role="alert">
-              {errorMessage}
-            </p>
-          )}
         </>
       )}
+
+      {loadState === "ready" && pendingAction !== null && (
+        <p className="form-message" role="status">
+          Applying {formatAction(pendingAction)}...
+        </p>
+      )}
+      {loadState === "ready" && message !== null && (
+        <p className="confirmation" role="status">
+          {message}
+        </p>
+      )}
+      {loadState === "ready" && errorMessage !== null && (
+        <p className="form-message error-state" role="alert">
+          {errorMessage}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function AdminImportPanel({
+  dryRun,
+  importDay,
+  importReport,
+  pending,
+  showDayImports,
+  onDryRunChange,
+  onImportDayChange,
+  onRunImport,
+}: {
+  dryRun: boolean;
+  importDay: string;
+  importReport: AdminImportResponse | null;
+  pending: boolean;
+  showDayImports: boolean;
+  onDryRunChange: (dryRun: boolean) => void;
+  onImportDayChange: (day: string) => void;
+  onRunImport: (action: AdminImportAction) => void;
+}) {
+  return (
+    <section
+      className="admin-import-panel"
+      aria-labelledby="admin-import-title"
+    >
+      <div>
+        <p className="eyebrow">Source-backed data</p>
+        <h2 id="admin-import-title">Import basho data</h2>
+        <p>
+          Validate source data first, then apply it deliberately to the
+          confirmed live basho.
+        </p>
+      </div>
+      <div className="admin-import-options">
+        <label>
+          <input
+            type="checkbox"
+            checked={dryRun}
+            disabled={pending}
+            onChange={(event) => onDryRunChange(event.currentTarget.checked)}
+          />
+          Dry run — validate without writing
+        </label>
+        {showDayImports && (
+          <label htmlFor="admin-import-day">
+            Basho day
+            <input
+              id="admin-import-day"
+              type="number"
+              min="1"
+              max="15"
+              step="1"
+              value={importDay}
+              disabled={pending}
+              onChange={(event) => onImportDayChange(event.currentTarget.value)}
+            />
+          </label>
+        )}
+      </div>
+      <div className="admin-action-grid">
+        <AdminImportAction
+          description="Fetch the current Makuuchi banzuke from the Japan Sumo Association."
+          disabled={pending}
+          label={`${dryRun ? "Validate" : "Import"} banzuke`}
+          onClick={() => onRunImport("banzuke")}
+        />
+        {showDayImports && (
+          <>
+            <AdminImportAction
+              description="Fetch one day of Makuuchi results and then attempt the following published schedule."
+              disabled={pending}
+              label={`${dryRun ? "Validate" : "Import"} results`}
+              onClick={() => onRunImport("results")}
+            />
+            <AdminImportAction
+              description="Fetch or retry one published Makuuchi schedule without changing scores."
+              disabled={pending}
+              label={`${dryRun ? "Validate" : "Import"} schedule`}
+              onClick={() => onRunImport("schedule")}
+            />
+          </>
+        )}
+      </div>
+      {importReport !== null && <ImportReport report={importReport} />}
     </section>
   );
 }
@@ -704,6 +794,9 @@ function ImportReport({ report }: { report: AdminImportResponse }) {
         <strong>{report.dryRun ? "Dry-run result" : "Applied import"}</strong>
         <span>{formatSource(report.source)}</span>
       </div>
+      {report.targetBashoId !== undefined && (
+        <p>Target basho: {report.targetBashoId}</p>
+      )}
       {rows.length === 0 ? (
         <p>No data changes were reported.</p>
       ) : (

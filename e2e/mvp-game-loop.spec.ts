@@ -197,6 +197,91 @@ test("lets an admin validate a live result import without contacting the source"
   ).toBeVisible();
 });
 
+test("lets an admin bootstrap a missing live basho from a confirmed banzuke", async ({
+  page,
+}) => {
+  await page.goto("/admin");
+  await page.getByLabel("Email").fill("e2e-admin@example.com");
+  await page.getByLabel("Display name").fill("E2E Admin");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+
+  let imported = false;
+  await page.route("**/api/admin/basho/current", async (route) => {
+    if (!imported) {
+      await route.fulfill({
+        json: { error: "not-found", message: "No live basho is available." },
+        status: 404,
+      });
+      return;
+    }
+
+    await route.fulfill({
+      json: {
+        basho: {
+          id: "2026-11",
+          isDemo: false,
+          name: "November 2026 Basho",
+          startDate: "2026-11-08",
+          endDate: "2026-11-22",
+          status: "upcoming",
+          currentDay: 0,
+        },
+      },
+    });
+  });
+  await page.route("**/api/admin/basho/2026-11/game-config", async (route) => {
+    await route.fulfill({
+      json: {
+        bashoId: "2026-11",
+        canChangeTeamSize: true,
+        gameConfig: {
+          teamSize: 2,
+          teamSizeSource: "default",
+          scoringMode: "wins-v0",
+        },
+      },
+    });
+  });
+  await page.route("**/api/admin/import-banzuke?dryRun=*", async (route) => {
+    const requestBody = route.request().postDataJSON() as {
+      confirmedSourceBashoId?: string;
+    };
+    const dryRun = route.request().url().endsWith("dryRun=true");
+
+    if (!dryRun) {
+      expect(requestBody.confirmedSourceBashoId).toBe("2026-11");
+      imported = true;
+    }
+
+    await route.fulfill({
+      json: {
+        dryRun,
+        source: "jsa-banzuke",
+        summary: {
+          basho: { created: 1, updated: 0, skipped: 0, deleted: 0 },
+        },
+        targetBashoId: "2026-11",
+      },
+    });
+  });
+
+  await page.getByRole("button", { name: "Live basho" }).click();
+  await expect(page.getByText(/No live basho is stored/)).toBeVisible();
+  await page.getByRole("button", { name: "Validate banzuke" }).click();
+  await expect(page.getByText("Target basho: 2026-11")).toBeVisible();
+
+  await page
+    .getByRole("checkbox", { name: "Dry run — validate without writing" })
+    .uncheck();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Import banzuke" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "November 2026 Basho" }),
+  ).toBeVisible();
+});
+
 test("creates a fantasy team and follows its My Stable score", async ({
   page,
   request,

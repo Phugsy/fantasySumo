@@ -133,13 +133,17 @@ describe("admin import routes", () => {
     const dryRunResponse = await app.inject({
       method: "POST",
       url: "/api/admin/import-banzuke?dryRun=true",
-      payload: { expectedBashoId: "2026-05" },
+      payload: {
+        confirmedSourceBashoId: "2026-05",
+        expectedBashoId: "2026-05",
+      },
     });
 
     expect(dryRunResponse.statusCode).toBe(200);
     expect(dryRunResponse.json()).toMatchObject({
       dryRun: true,
       source: "jsa-banzuke",
+      targetBashoId: "2026-05",
       summary: {
         basho: { created: 1 },
         rikishi: { created: 2 },
@@ -149,7 +153,10 @@ describe("admin import routes", () => {
     const applyResponse = await app.inject({
       method: "POST",
       url: "/api/admin/import-banzuke",
-      payload: { expectedBashoId: "2026-05" },
+      payload: {
+        confirmedSourceBashoId: "2026-05",
+        expectedBashoId: "2026-05",
+      },
     });
 
     expect(applyResponse.statusCode).toBe(200);
@@ -163,15 +170,45 @@ describe("admin import routes", () => {
     expect(rikishiResponse.json().rikishi).toHaveLength(2);
   });
 
-  it("rejects a banzuke import when the source does not match the selected basho", async () => {
-    const response = await app.inject({
+  it("discovers a new source basho but requires its exact target to be confirmed before applying", async () => {
+    const dryRunResponse = await app.inject({
+      method: "POST",
+      url: "/api/admin/import-banzuke?dryRun=true",
+      payload: { expectedBashoId: "2026-07" },
+    });
+
+    expect(dryRunResponse.statusCode).toBe(200);
+    expect(dryRunResponse.json()).toMatchObject({
+      dryRun: true,
+      targetBashoId: "2026-05",
+    });
+    expect(
+      await createRepositories(client).getBasho("2026-05"),
+    ).toBeUndefined();
+
+    const missingConfirmationResponse = await app.inject({
+      method: "POST",
+      url: "/api/admin/import-banzuke",
+      payload: {},
+    });
+
+    expect(missingConfirmationResponse.statusCode).toBe(409);
+    expect(missingConfirmationResponse.json()).toMatchObject({
+      error: "basho-target-mismatch",
+      sourceBashoId: "2026-05",
+    });
+    expect(
+      await createRepositories(client).getBasho("2026-05"),
+    ).toBeUndefined();
+
+    const unconfirmedResponse = await app.inject({
       method: "POST",
       url: "/api/admin/import-banzuke",
       payload: { expectedBashoId: "2026-07" },
     });
 
-    expect(response.statusCode).toBe(409);
-    expect(response.json()).toMatchObject({
+    expect(unconfirmedResponse.statusCode).toBe(409);
+    expect(unconfirmedResponse.json()).toMatchObject({
       error: "basho-target-mismatch",
       expectedBashoId: "2026-07",
       sourceBashoId: "2026-05",
@@ -179,13 +216,48 @@ describe("admin import routes", () => {
     expect(
       await createRepositories(client).getBasho("2026-05"),
     ).toBeUndefined();
+
+    const staleConfirmationResponse = await app.inject({
+      method: "POST",
+      url: "/api/admin/import-banzuke",
+      payload: {
+        confirmedSourceBashoId: "2026-03",
+        expectedBashoId: "2026-07",
+      },
+    });
+
+    expect(staleConfirmationResponse.statusCode).toBe(409);
+    expect(staleConfirmationResponse.json()).toMatchObject({
+      confirmedSourceBashoId: "2026-03",
+      error: "basho-target-mismatch",
+      sourceBashoId: "2026-05",
+    });
+    expect(
+      await createRepositories(client).getBasho("2026-05"),
+    ).toBeUndefined();
+
+    const confirmedResponse = await app.inject({
+      method: "POST",
+      url: "/api/admin/import-banzuke",
+      payload: {
+        confirmedSourceBashoId: "2026-05",
+        expectedBashoId: "2026-07",
+      },
+    });
+
+    expect(confirmedResponse.statusCode).toBe(200);
+    expect(confirmedResponse.json()).toMatchObject({
+      dryRun: false,
+      targetBashoId: "2026-05",
+    });
+    expect(await createRepositories(client).getBasho("2026-05")).toBeDefined();
   });
 
   it("imports source-backed daily results", async () => {
     await app.inject({
       method: "POST",
       url: "/api/admin/import-banzuke",
-      payload: {},
+      payload: { confirmedSourceBashoId: "2026-05" },
     });
 
     const response = await app.inject({
@@ -223,7 +295,7 @@ describe("admin import routes", () => {
     await app.inject({
       method: "POST",
       url: "/api/admin/import-banzuke",
-      payload: {},
+      payload: { confirmedSourceBashoId: "2026-05" },
     });
 
     await app.close();
@@ -283,7 +355,7 @@ describe("admin import routes", () => {
     await app.inject({
       method: "POST",
       url: "/api/admin/import-banzuke",
-      payload: {},
+      payload: { confirmedSourceBashoId: "2026-05" },
     });
 
     const response = await app.inject({
@@ -329,7 +401,7 @@ describe("admin import routes", () => {
     await app.inject({
       method: "POST",
       url: "/api/admin/import-banzuke",
-      payload: {},
+      payload: { confirmedSourceBashoId: "2026-05" },
     });
     await app.inject({
       method: "POST",

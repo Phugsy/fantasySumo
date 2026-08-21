@@ -172,6 +172,7 @@ export interface AdminImportResponse {
   dryRun: boolean;
   source: string;
   summary: Record<string, ImportEntitySummary>;
+  targetBashoId?: string;
   status?: "complete" | "partial";
   schedule?:
     | {
