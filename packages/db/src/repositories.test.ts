@@ -150,6 +150,56 @@ describe("repositories", () => {
     });
   });
 
+  it("snapshots the fallback team size when the first stable is saved", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
+    const configurableBasho = {
+      ...sampleBasho,
+      id: "2026-07",
+      name: "July 2026 Basho",
+    };
+    await repositories.insertBasho(configurableBasho);
+    const firstTeam = {
+      id: "fallback-team",
+      bashoId: configurableBasho.id,
+      displayName: "Fallback Stable",
+      ownerUserId: "fallback-user",
+    };
+
+    await expect(
+      repositories.saveOwnedFantasyTeamWithPicksIfBashoUpcoming(
+        firstTeam,
+        [
+          { teamId: firstTeam.id, rikishiId: "onosato" },
+          { teamId: firstTeam.id, rikishiId: "kotozakura" },
+          { teamId: firstTeam.id, rikishiId: "hoshoryu" },
+        ],
+        3,
+      ),
+    ).resolves.toMatchObject({ status: "saved" });
+    expect(await repositories.getBashoGameConfig(configurableBasho.id)).toEqual(
+      {
+        bashoId: configurableBasho.id,
+        teamSize: 3,
+      },
+    );
+
+    await expect(
+      repositories.saveOwnedFantasyTeamWithPicksIfBashoUpcoming(
+        {
+          ...firstTeam,
+          id: "later-team",
+          ownerUserId: "later-user",
+        },
+        [
+          { teamId: "later-team", rikishiId: "onosato" },
+          { teamId: "later-team", rikishiId: "kotozakura" },
+        ],
+        2,
+      ),
+    ).resolves.toEqual({ status: "invalid-team-size", teamSize: 3 });
+  });
+
   it("rechecks persisted team size inside the team-and-picks transaction", async () => {
     await seedDatabase(createRepositories(client));
     const repositories = createRepositories(client);

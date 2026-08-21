@@ -32,6 +32,7 @@ const dryRunQuerySchema = z.object({
 
 const importBanzukeBodySchema = z.object({
   divisionId: z.number().int().positive().optional(),
+  expectedBashoId: z.string().trim().min(1).optional(),
   page: z.number().int().positive().optional(),
 });
 
@@ -83,10 +84,23 @@ export function registerAdminImportRoutes(
     }
 
     try {
+      const { expectedBashoId, ...sourceOptions } = parsedBody.data;
       const command = await fetchJsaBanzukeImport(
         context.sourceFetch,
-        parsedBody.data,
+        sourceOptions,
       );
+
+      if (
+        expectedBashoId !== undefined &&
+        command.basho.id !== expectedBashoId
+      ) {
+        return reply.code(409).send({
+          error: "basho-target-mismatch",
+          message: `The source banzuke is for ${command.basho.id}, not the selected ${expectedBashoId} basho. No data was imported.`,
+          expectedBashoId,
+          sourceBashoId: command.basho.id,
+        });
+      }
 
       return await importBanzuke(context.repositories, command, {
         dryRun: parsedQuery.data.dryRun,

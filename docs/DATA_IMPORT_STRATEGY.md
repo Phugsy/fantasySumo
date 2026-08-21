@@ -32,9 +32,11 @@ Keep the import boundary source-agnostic:
 
 The protected `/admin` page now supplies that manual trigger. It defaults to a
 dry run, shows per-entity created/updated/skipped/deleted counts, reports
-following-schedule partial success explicitly, and requires confirmation before
-writing live data. Browser controls call the same adapter, validation, and
-transactional service boundaries as the CLI, manual API, and scheduled job.
+following-schedule counts and partial success explicitly, and requires
+confirmation before writing live data. Admin-triggered banzuke imports also
+verify that the source basho matches the selected live basho before applying
+data. Browser controls call the same adapter, validation, and transactional
+service boundaries as the CLI, manual API, and scheduled job.
 
 ## Source Investigation
 

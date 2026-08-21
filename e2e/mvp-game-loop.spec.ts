@@ -188,6 +188,11 @@ test("lets an admin validate a live result import without contacting the source"
   await page.getByRole("button", { name: "Validate results" }).click();
   await expect(page.getByText("Dry-run result")).toBeVisible();
   await expect(
+    page.getByRole("row", {
+      name: "Following schedule: Scheduled Bouts 21 0 0 0",
+    }),
+  ).toBeVisible();
+  await expect(
     page.getByText("Following day 2 schedule was also validated."),
   ).toBeVisible();
 });

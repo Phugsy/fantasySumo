@@ -494,6 +494,13 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
           return false;
         }
 
+        if (config === undefined) {
+          transaction
+            .insert(sqlite.bashoGameConfig)
+            .values({ bashoId: team.bashoId, teamSize: defaultTeamSize })
+            .run();
+        }
+
         transaction
           .insert(sqlite.fantasyTeams)
           .values(toFantasyTeamRow(team))
@@ -548,6 +555,13 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
 
         if (existingTeam !== undefined && existingTeam.lockedAt !== null) {
           return { status: "picks-locked" };
+        }
+
+        if (config === undefined) {
+          transaction
+            .insert(sqlite.bashoGameConfig)
+            .values({ bashoId: team.bashoId, teamSize: defaultTeamSize })
+            .run();
         }
 
         const savedTeam = transaction
@@ -1191,6 +1205,12 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
           return false;
         }
 
+        if (config === undefined) {
+          await transaction
+            .insert(pg.bashoGameConfig)
+            .values({ bashoId: team.bashoId, teamSize: defaultTeamSize });
+        }
+
         await transaction
           .insert(pg.fantasyTeams)
           .values(toFantasyTeamRow(team));
@@ -1248,6 +1268,12 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
 
         if (existingTeam !== undefined && existingTeam.lockedAt !== null) {
           return { status: "picks-locked" };
+        }
+
+        if (config === undefined) {
+          await transaction
+            .insert(pg.bashoGameConfig)
+            .values({ bashoId: team.bashoId, teamSize: defaultTeamSize });
         }
 
         const savedTeam = (

@@ -133,7 +133,7 @@ describe("admin import routes", () => {
     const dryRunResponse = await app.inject({
       method: "POST",
       url: "/api/admin/import-banzuke?dryRun=true",
-      payload: {},
+      payload: { expectedBashoId: "2026-05" },
     });
 
     expect(dryRunResponse.statusCode).toBe(200);
@@ -149,7 +149,7 @@ describe("admin import routes", () => {
     const applyResponse = await app.inject({
       method: "POST",
       url: "/api/admin/import-banzuke",
-      payload: {},
+      payload: { expectedBashoId: "2026-05" },
     });
 
     expect(applyResponse.statusCode).toBe(200);
@@ -161,6 +161,24 @@ describe("admin import routes", () => {
 
     expect(rikishiResponse.statusCode).toBe(200);
     expect(rikishiResponse.json().rikishi).toHaveLength(2);
+  });
+
+  it("rejects a banzuke import when the source does not match the selected basho", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/admin/import-banzuke",
+      payload: { expectedBashoId: "2026-07" },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      error: "basho-target-mismatch",
+      expectedBashoId: "2026-07",
+      sourceBashoId: "2026-05",
+    });
+    expect(
+      await createRepositories(client).getBasho("2026-05"),
+    ).toBeUndefined();
   });
 
   it("imports source-backed daily results", async () => {

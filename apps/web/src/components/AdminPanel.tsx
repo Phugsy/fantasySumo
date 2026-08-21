@@ -18,6 +18,7 @@ import type {
   AdminImportResponse,
   AdminLifecycleAction,
   Basho,
+  ImportEntitySummary,
 } from "../types";
 import "./AdminPanel.css";
 
@@ -158,6 +159,10 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
       setGameConfig(config);
       setTeamSizeDraft(String(config.gameConfig.teamSize));
     } catch (error) {
+      if (!isMountedRef.current) {
+        return;
+      }
+
       setErrorMessage(
         `The action succeeded, but game configuration could not be refreshed: ${getErrorMessage(error)}`,
       );
@@ -262,7 +267,7 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
     try {
       const response =
         action === "banzuke"
-          ? await runAdminBanzukeImport(dryRun)
+          ? await runAdminBanzukeImport(basho.id, dryRun)
           : action === "results"
             ? await runAdminResultsImport(basho.id, day, dryRun)
             : await runAdminScheduleImport(basho.id, day, dryRun);
@@ -682,13 +687,16 @@ function AdminImportAction({
 }
 
 function ImportReport({ report }: { report: AdminImportResponse }) {
-  const rows = Object.entries(report.summary).filter(
-    ([, summary]) =>
-      summary.created > 0 ||
-      summary.updated > 0 ||
-      summary.skipped > 0 ||
-      summary.deleted > 0,
-  );
+  const rows = [
+    ...toImportReportRows(report.summary, "primary"),
+    ...(report.schedule?.status === "imported"
+      ? toImportReportRows(
+          report.schedule.import.summary,
+          "following-schedule",
+          "Following schedule",
+        )
+      : []),
+  ];
 
   return (
     <div className="admin-import-report" role="status">
@@ -711,13 +719,13 @@ function ImportReport({ report }: { report: AdminImportResponse }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map(([entity, summary]) => (
-              <tr key={entity}>
-                <th scope="row">{formatEntity(entity)}</th>
-                <td>{summary.created}</td>
-                <td>{summary.updated}</td>
-                <td>{summary.skipped}</td>
-                <td>{summary.deleted}</td>
+            {rows.map((row) => (
+              <tr key={row.key}>
+                <th scope="row">{row.label}</th>
+                <td>{row.summary.created}</td>
+                <td>{row.summary.updated}</td>
+                <td>{row.summary.skipped}</td>
+                <td>{row.summary.deleted}</td>
               </tr>
             ))}
           </tbody>
@@ -741,6 +749,22 @@ function ImportReport({ report }: { report: AdminImportResponse }) {
       )}
     </div>
   );
+}
+
+function toImportReportRows(
+  summary: Record<string, ImportEntitySummary>,
+  keyPrefix: string,
+  labelPrefix?: string,
+) {
+  return Object.entries(summary)
+    .filter(([, entitySummary]) =>
+      Object.values(entitySummary).some((count) => count > 0),
+    )
+    .map(([entity, entitySummary]) => ({
+      key: `${keyPrefix}-${entity}`,
+      label: [labelPrefix, formatEntity(entity)].filter(Boolean).join(": "),
+      summary: entitySummary,
+    }));
 }
 
 function formatStatus(status: Basho["status"]): string {
