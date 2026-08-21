@@ -275,6 +275,17 @@ test("lets an admin bootstrap a missing live basho from a confirmed banzuke", as
         summary: {
           basho: { created: 1, updated: 0, skipped: 0, deleted: 0 },
         },
+        targetBasho: dryRun
+          ? undefined
+          : {
+              id: "2026-11",
+              isDemo: false,
+              name: "November 2026 Basho",
+              startDate: "2026-11-08",
+              endDate: "2026-11-22",
+              status: "upcoming",
+              currentDay: 0,
+            },
         targetBashoId: "2026-11",
       },
     });
@@ -293,6 +304,89 @@ test("lets an admin bootstrap a missing live basho from a confirmed banzuke", as
 
   await expect(
     page.getByRole("heading", { name: "November 2026 Basho" }),
+  ).toBeVisible();
+});
+
+test("keeps a rolled-over banzuke selected while the previous basho remains active", async ({
+  page,
+}) => {
+  await page.goto("/admin");
+  await page.getByLabel("Email").fill("e2e-admin@example.com");
+  await page.getByLabel("Display name").fill("E2E Admin");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+
+  const previousBasho = {
+    id: "2026-09",
+    isDemo: false,
+    name: "September 2026 Basho",
+    startDate: "2026-09-13",
+    endDate: "2026-09-27",
+    status: "active",
+    currentDay: 15,
+  };
+  const importedBasho = {
+    id: "2026-11",
+    isDemo: false,
+    name: "November 2026 Basho",
+    startDate: "2026-11-08",
+    endDate: "2026-11-22",
+    status: "upcoming",
+    currentDay: 0,
+  };
+
+  await page.route("**/api/admin/basho/current", async (route) => {
+    await route.fulfill({ json: { basho: previousBasho } });
+  });
+  await page.route("**/api/admin/basho/*/game-config", async (route) => {
+    const bashoId = route.request().url().includes(importedBasho.id)
+      ? importedBasho.id
+      : previousBasho.id;
+    await route.fulfill({
+      json: {
+        bashoId,
+        canChangeTeamSize: true,
+        gameConfig: {
+          teamSize: 2,
+          teamSizeSource: "default",
+          scoringMode: "wins-v0",
+        },
+      },
+    });
+  });
+  await page.route("**/api/admin/import-banzuke?dryRun=*", async (route) => {
+    const dryRun = route.request().url().endsWith("dryRun=true");
+    await route.fulfill({
+      json: {
+        dryRun,
+        source: "jsa-banzuke",
+        summary: {
+          basho: {
+            created: dryRun ? 0 : 1,
+            updated: 0,
+            skipped: 0,
+            deleted: 0,
+          },
+        },
+        targetBasho: dryRun ? undefined : importedBasho,
+        targetBashoId: importedBasho.id,
+      },
+    });
+  });
+
+  await page.getByRole("button", { name: "Live basho" }).click();
+  await expect(
+    page.getByRole("heading", { name: previousBasho.name }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Validate banzuke" }).click();
+  await page
+    .getByRole("checkbox", { name: "Dry run — validate without writing" })
+    .uncheck();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Import banzuke" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: importedBasho.name }),
   ).toBeVisible();
 });
 

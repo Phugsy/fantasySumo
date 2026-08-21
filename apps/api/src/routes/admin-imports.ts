@@ -108,9 +108,13 @@ export function registerAdminImportRoutes(
       const result = await importBanzuke(context.repositories, command, {
         dryRun: parsedQuery.data.dryRun,
       });
+      const targetBasho = parsedQuery.data.dryRun
+        ? undefined
+        : await context.repositories.getBasho(command.basho.id);
 
       return {
         ...result,
+        targetBasho,
         targetBashoId: command.basho.id,
       };
     } catch (error) {

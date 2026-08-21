@@ -604,10 +604,10 @@ describe("AdminPanel", () => {
           summary: {
             basho: { created: 1, updated: 0, skipped: 0, deleted: 0 },
           },
+          targetBasho: discoveredBasho,
           targetBashoId: discoveredBasho.id,
         }),
       )
-      .mockResolvedValueOnce(jsonResponse({ basho: discoveredBasho }))
       .mockResolvedValueOnce(
         jsonResponse(gameConfigResponse(discoveredBasho.id)),
       );
@@ -653,6 +653,77 @@ describe("AdminPanel", () => {
         method: "POST",
       },
     );
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("keeps a newly imported banzuke selected when an older basho is still active", async () => {
+    const activeBasho = {
+      id: "2026-09",
+      isDemo: false,
+      name: "September 2026 Basho",
+      startDate: "2026-09-13",
+      endDate: "2026-09-27",
+      status: "active",
+      currentDay: 15,
+    };
+    const importedBasho = {
+      id: "2026-11",
+      isDemo: false,
+      name: "November 2026 Basho",
+      startDate: "2026-11-08",
+      endDate: "2026-11-22",
+      status: "upcoming",
+      currentDay: 0,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ basho: activeBasho }))
+      .mockResolvedValueOnce(jsonResponse(gameConfigResponse(activeBasho.id)))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          dryRun: true,
+          source: "jsa-banzuke",
+          summary: {},
+          targetBashoId: importedBasho.id,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          dryRun: false,
+          source: "jsa-banzuke",
+          summary: {
+            basho: { created: 1, updated: 0, skipped: 0, deleted: 0 },
+          },
+          targetBasho: importedBasho,
+          targetBashoId: importedBasho.id,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(gameConfigResponse(importedBasho.id)),
+      );
+
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<AdminPanel onPlayerDataRefresh={() => Promise.resolve()} />);
+
+    await screen.findByRole("heading", { name: activeBasho.name });
+    fireEvent.click(screen.getByRole("button", { name: "Validate banzuke" }));
+    await screen.findByText(`Target basho: ${importedBasho.id}`);
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "Dry run — validate without writing",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Import banzuke" }));
+
+    expect(
+      await screen.findByRole("heading", { name: importedBasho.name }),
+    ).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      `/api/admin/basho/${importedBasho.id}/game-config`,
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(5);
   });
 });
 

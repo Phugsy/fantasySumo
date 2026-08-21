@@ -160,6 +160,14 @@ describe("admin import routes", () => {
     });
 
     expect(applyResponse.statusCode).toBe(200);
+    expect(applyResponse.json()).toMatchObject({
+      targetBasho: {
+        id: "2026-05",
+        name: "2026 May Grand Sumo Tournament",
+        status: "active",
+      },
+      targetBashoId: "2026-05",
+    });
 
     const rikishiResponse = await app.inject({
       method: "GET",

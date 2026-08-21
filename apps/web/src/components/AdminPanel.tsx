@@ -316,7 +316,10 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
 
       if (!dryRun) {
         try {
-          const refreshedBasho = await fetchAdminBasho("live");
+          const refreshedBasho =
+            action === "banzuke" && response.targetBasho !== undefined
+              ? { basho: response.targetBasho }
+              : await fetchAdminBasho("live");
           const refreshedConfig = await fetchAdminGameConfig(
             refreshedBasho.basho.id,
           );
