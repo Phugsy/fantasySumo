@@ -150,6 +150,48 @@ export interface AdminActionResponse extends AdminBashoResponse {
   appliedResults?: number;
 }
 
+export interface AdminGameConfigResponse {
+  bashoId: string;
+  changed?: boolean;
+  canChangeTeamSize: boolean;
+  gameConfig: {
+    teamSize: number;
+    teamSizeSource: "basho" | "default";
+    scoringMode: "wins-v0";
+  };
+}
+
+export interface ImportEntitySummary {
+  created: number;
+  updated: number;
+  skipped: number;
+  deleted: number;
+}
+
+export interface AdminImportResponse {
+  dryRun: boolean;
+  source: string;
+  summary: Record<string, ImportEntitySummary>;
+  targetBasho?: Omit<Basho, "teamSize">;
+  targetBashoId?: string;
+  status?: "complete" | "partial";
+  schedule?:
+    | {
+        status: "imported";
+        day: number;
+        import: AdminImportResponse;
+      }
+    | {
+        status: "unavailable" | "failed";
+        day: number;
+        message: string;
+      }
+    | {
+        status: "not-applicable";
+        reason: "final-basho-day";
+      };
+}
+
 export type ActiveView =
   | "home"
   | "login"

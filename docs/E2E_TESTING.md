@@ -211,6 +211,12 @@ enforcement.
 The suite also signs in as the configured local admin, resets and opens the demo
 fixture, starts it, advances results, completes it, and checks player-facing
 navigation and lifecycle state after those actions.
+It also exercises the live import-control UI with browser-level network stubs,
+proving the dry-run request and structured report, plus the no-live-basho
+validation, explicit target confirmation, import, and refresh flow, without
+contacting a live sumo source or writing live fixture data.
+The same stubbed live-admin flow verifies that a migrated basho can persist its
+unchanged inherited team size while the size input remains locked.
 Admin-route configuration is also covered at the Fastify boundary: missing or
 invalid credentials are rejected, disabled demo routes return `404`, and
 enabled routes drive the real browser lifecycle tests.

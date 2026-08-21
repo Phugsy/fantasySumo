@@ -155,6 +155,14 @@ DEMO_ADMIN_TOKEN=<long random token, only if demo admin controls are needed>
 
 `DATABASE_URL` must not be a `file:` or `:memory:` SQLite URL when `NODE_ENV=production`. SQLite is only supported for local development because serverless function storage is ephemeral and cannot be used as production state.
 
+`TEAM_SIZE` is the fallback for a basho that has no saved game-configuration
+row. Once an administrator saves team size through `/admin`, that per-basho
+value is authoritative and survives redeploys or environment-variable changes.
+For a migrated basho that already has teams, `/admin` keeps size changes locked
+but allows the administrator to persist the unchanged inherited value.
+Set the intended fallback before importing a new basho, then save and verify the
+basho configuration before inviting players.
+
 ## Production database and auth direction
 
 Production uses managed Neon Postgres. Keep the generic `DATABASE_URL` and
@@ -355,6 +363,12 @@ curl -X POST "https://<deployment>/api/admin/import-banzuke?dryRun=true" \
 ```
 
 The same token can also be supplied with `Authorization: Bearer <token>`.
+
+The browser admin page defaults imports to dry-run mode and shows structured
+entity counts. Applying live banzuke, results, or schedule data requires an
+explicit confirmation. Team-size changes are accepted only before the first
+stable exists and while the basho remains upcoming; the API and repository
+enforce this boundary even if the browser is bypassed.
 
 ### Lifecycle control safety
 

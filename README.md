@@ -16,12 +16,13 @@ At present, the app has the first local playable foundations:
 - A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.
 - A shared TypeScript domain package with MVP types, lifecycle rules, validation, scoring, and leaderboard logic.
 - A swappable Drizzle database package with local SQLite, production Postgres, repositories, migrations, sample seed data, and deterministic demo data.
-- Automated source-backed import commands and local admin endpoints for current banzuke and daily results.
-- A role-gated `/admin` page for explicit live basho lifecycle actions and safe deterministic demo progression.
+- Automated source-backed import commands and protected admin controls for current banzuke, daily results, and published schedules.
+- A role-gated `/admin` page for explicit live basho lifecycle actions, per-basho team-size configuration, and safe deterministic demo progression.
 - A minimal current-user/session boundary for local development and production auth integration.
 - Vitest, ESLint, and Prettier wired through pnpm scripts.
 
-It is close to a local playable loop; import and game-configuration controls remain follow-up admin work.
+It now supports the local playable and administrator loops; shared playtesting,
+secondary scoring rules, and pick modifiers remain deliberate follow-up work.
 
 ## Tech Stack
 
@@ -91,6 +92,12 @@ UI, database, and scoring logic as normal local development. The explicit
 `VITE_BASHO_MODE=demo` flag makes the browser request the fixed flagged demo;
 without it, current-basho selection remains live-first.
 
+`make demo` is local-only, so other people cannot reach it unless the process is
+deliberately exposed. For shared testing, prefer a dedicated preview/staging
+deployment with its own database, auth configuration, and resettable demo data.
+Do not point an initial playtest deployment at the production database. The
+tracked follow-up for that environment is GitHub issue #91.
+
 Progress the deterministic demo basho with:
 
 ```bash
@@ -144,8 +151,11 @@ Useful API endpoints:
 - `POST /api/admin/basho/:bashoId/open-picks`
 - `POST /api/admin/basho/:bashoId/start`
 - `POST /api/admin/basho/:bashoId/close`
+- `GET /api/admin/basho/:bashoId/game-config`
+- `PUT /api/admin/basho/:bashoId/game-config`
 - `POST /api/admin/import-banzuke`
 - `POST /api/admin/basho/:bashoId/import-results`
+- `POST /api/admin/basho/:bashoId/import-schedule`
 - `GET /api/cron/import-results`
 
 Browser admin endpoints require an authenticated user whose verified user ID is
@@ -205,7 +215,10 @@ DATABASE_URL=file:./data/dev.sqlite pnpm db:seed
 
 Use a `postgres:` or `postgresql:` `DATABASE_URL` for managed production persistence.
 
-The local team size defaults to `2`. Override it for the API with `TEAM_SIZE`.
+The effective team size defaults to `TEAM_SIZE` (or `2`) until an administrator
+saves a value for that basho. The persisted basho value then becomes
+authoritative. It can change only while picks are open and before the first
+stable is submitted.
 Set `DEMO_ADMIN_TOKEN` only when scripts need a separate machine credential for
 the protected demo admin API controls.
 Set `ADMIN_USER_IDS` to a comma-separated list of verified API user IDs that
@@ -337,6 +350,8 @@ schema in a later release.
 
 ## Recommended next steps
 
-1. Persist or retrieve the latest submitted team for follow-up views.
-2. Decide whether the configured team size should move into database-backed basho settings.
-3. Add a protected admin UI around the import service.
+1. Provide a safe shared demo/playtest environment without using production data (#91).
+2. Define the secondary scoring mode for kinboshi and special prizes (#92).
+3. Select a joker, substitute, or withdrawal-handling mechanic (#93).
+4. Fix the reported responsive header and initial focus regressions (#94).
+5. Add display preferences after the game-rule decisions above (#73).

@@ -2,15 +2,23 @@ import { useEffect, useRef, useState } from "react";
 import {
   ApiRequestError,
   fetchAdminBasho,
+  fetchAdminGameConfig,
   getErrorMessage,
+  runAdminBanzukeImport,
   runAdminDemoAction,
   runAdminLifecycleAction,
+  runAdminResultsImport,
+  runAdminScheduleImport,
+  updateAdminGameConfig,
 } from "../api";
 import type {
   AdminActionResponse,
   AdminDemoAction,
+  AdminGameConfigResponse,
+  AdminImportResponse,
   AdminLifecycleAction,
   Basho,
+  ImportEntitySummary,
 } from "../types";
 import "./AdminPanel.css";
 
@@ -19,6 +27,7 @@ interface AdminPanelProps {
 }
 
 type AdminMode = "live" | "demo";
+type AdminImportAction = "banzuke" | "results" | "schedule";
 
 export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
   const isMountedRef = useRef(false);
@@ -26,6 +35,18 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
     import.meta.env.VITE_BASHO_MODE === "demo" ? "demo" : "live",
   );
   const [basho, setBasho] = useState<Omit<Basho, "teamSize"> | null>(null);
+  const [gameConfig, setGameConfig] = useState<AdminGameConfigResponse | null>(
+    null,
+  );
+  const [teamSizeDraft, setTeamSizeDraft] = useState("2");
+  const [importDay, setImportDay] = useState("1");
+  const [dryRun, setDryRun] = useState(true);
+  const [importReport, setImportReport] = useState<AdminImportResponse | null>(
+    null,
+  );
+  const [validatedBanzukeTarget, setValidatedBanzukeTarget] = useState<
+    string | null
+  >(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">(
     "loading",
   );
@@ -45,14 +66,31 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
     let isCurrent = true;
 
     void fetchAdminBasho(mode)
-      .then((response) => {
+      .then(async (response) => ({
+        response,
+        config: await fetchAdminGameConfig(response.basho.id),
+      }))
+      .then(({ response, config }) => {
         if (!isCurrent) return;
         setBasho(response.basho);
+        setGameConfig(config);
+        setTeamSizeDraft(String(config.gameConfig.teamSize));
         setLoadState("ready");
       })
       .catch((error) => {
         if (!isCurrent) return;
         setBasho(null);
+        setGameConfig(null);
+        if (
+          mode === "live" &&
+          error instanceof ApiRequestError &&
+          error.status === 404 &&
+          error.code === "not-found"
+        ) {
+          setErrorMessage(null);
+          setLoadState("ready");
+          return;
+        }
         setErrorMessage(getErrorMessage(error));
         setLoadState("error");
       });
@@ -68,6 +106,8 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
     setLoadState("loading");
     setMessage(null);
     setErrorMessage(null);
+    setImportReport(null);
+    setValidatedBanzukeTarget(null);
     setMode(nextMode);
   }
 
@@ -124,6 +164,25 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
     setMessage(options.success);
 
     try {
+      const config = await fetchAdminGameConfig(response.basho.id);
+
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      setGameConfig(config);
+      setTeamSizeDraft(String(config.gameConfig.teamSize));
+    } catch (error) {
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      setErrorMessage(
+        `The action succeeded, but game configuration could not be refreshed: ${getErrorMessage(error)}`,
+      );
+    }
+
+    try {
       await onPlayerDataRefresh();
     } catch (error) {
       setErrorMessage(
@@ -134,7 +193,166 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
     setPendingAction(null);
   }
 
+  async function saveGameConfig() {
+    if (basho === null || gameConfig === null) return;
+
+    const teamSize = Number(teamSizeDraft);
+    const wasInherited = gameConfig.gameConfig.teamSizeSource === "default";
+
+    if (!Number.isInteger(teamSize) || teamSize < 1 || teamSize > 42) {
+      setErrorMessage("Team size must be a whole number from 1 to 42.");
+      return;
+    }
+
+    setPendingAction("save-game-config");
+    setMessage(null);
+    setErrorMessage(null);
+
+    try {
+      const response = await updateAdminGameConfig(basho.id, teamSize);
+
+      if (!isMountedRef.current) return;
+
+      setGameConfig(response);
+      setTeamSizeDraft(String(response.gameConfig.teamSize));
+      setMessage(
+        response.changed || wasInherited
+          ? `Team size saved as ${response.gameConfig.teamSize}.`
+          : `Team size is already ${response.gameConfig.teamSize}.`,
+      );
+
+      try {
+        await onPlayerDataRefresh();
+      } catch (error) {
+        if (isMountedRef.current) {
+          setErrorMessage(
+            `Team size was saved, but player data could not be refreshed: ${getErrorMessage(error)}`,
+          );
+        }
+      }
+    } catch (error) {
+      if (!isMountedRef.current) return;
+
+      setErrorMessage(getErrorMessage(error));
+
+      try {
+        const currentConfig = await fetchAdminGameConfig(basho.id);
+
+        if (isMountedRef.current) {
+          setGameConfig(currentConfig);
+          setTeamSizeDraft(String(currentConfig.gameConfig.teamSize));
+        }
+      } catch {
+        // Preserve the original update error when the refresh also fails.
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setPendingAction(null);
+      }
+    }
+  }
+
+  async function runImport(action: AdminImportAction) {
+    if (mode !== "live" || (basho === null && action !== "banzuke")) return;
+
+    const day = Number(importDay);
+
+    if (
+      action !== "banzuke" &&
+      (!Number.isInteger(day) || day < 1 || day > 15)
+    ) {
+      setErrorMessage("Import day must be a whole number from 1 to 15.");
+      return;
+    }
+
+    if (!dryRun) {
+      if (action === "banzuke" && validatedBanzukeTarget === null) {
+        setErrorMessage(
+          "Validate the current banzuke before importing it into live data.",
+        );
+        return;
+      }
+
+      const confirmation =
+        action === "banzuke" && validatedBanzukeTarget !== basho?.id
+          ? basho === null
+            ? `Import the validated ${validatedBanzukeTarget} banzuke and create it as the live basho?`
+            : `The validated source banzuke is for ${validatedBanzukeTarget}, not the selected ${basho.id} basho. Import ${validatedBanzukeTarget} as the new live basho?`
+          : `Apply the ${formatAction(action)} import to live basho data?`;
+
+      if (!window.confirm(confirmation)) return;
+    }
+
+    setPendingAction(`import-${action}`);
+    setMessage(null);
+    setErrorMessage(null);
+    setImportReport(null);
+
+    try {
+      const response =
+        action === "banzuke"
+          ? await runAdminBanzukeImport(
+              {
+                confirmedSourceBashoId: dryRun
+                  ? undefined
+                  : (validatedBanzukeTarget ?? undefined),
+                expectedBashoId: basho?.id,
+              },
+              dryRun,
+            )
+          : action === "results"
+            ? await runAdminResultsImport(basho!.id, day, dryRun)
+            : await runAdminScheduleImport(basho!.id, day, dryRun);
+
+      if (!isMountedRef.current) return;
+
+      setImportReport(response);
+      if (action === "banzuke" && dryRun) {
+        setValidatedBanzukeTarget(response.targetBashoId ?? null);
+      }
+      setMessage(
+        `${dryRun ? "Validation" : "Import"} completed for ${formatAction(action)} data.`,
+      );
+
+      if (!dryRun) {
+        try {
+          const refreshedBasho =
+            action === "banzuke" && response.targetBasho !== undefined
+              ? { basho: response.targetBasho }
+              : await fetchAdminBasho("live");
+          const refreshedConfig = await fetchAdminGameConfig(
+            refreshedBasho.basho.id,
+          );
+
+          if (!isMountedRef.current) return;
+
+          setBasho(refreshedBasho.basho);
+          setGameConfig(refreshedConfig);
+          setTeamSizeDraft(String(refreshedConfig.gameConfig.teamSize));
+          await onPlayerDataRefresh();
+        } catch (error) {
+          if (isMountedRef.current) {
+            setErrorMessage(
+              `The import completed, but app data could not be refreshed: ${getErrorMessage(error)}`,
+            );
+          }
+        }
+      }
+    } catch (error) {
+      if (isMountedRef.current) {
+        setErrorMessage(getErrorMessage(error));
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setPendingAction(null);
+      }
+    }
+  }
+
   const pending = pendingAction !== null;
+  const canPersistInheritedTeamSize =
+    gameConfig?.gameConfig.teamSizeSource === "default" &&
+    teamSizeDraft === String(gameConfig.gameConfig.teamSize);
 
   return (
     <section className="admin-panel" aria-labelledby="admin-basho-title">
@@ -187,6 +405,25 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
         </>
       )}
 
+      {loadState === "ready" && mode === "live" && basho === null && (
+        <>
+          <div className="state-panel">
+            No live basho is stored. Validate the current source banzuke, then
+            explicitly confirm creating its basho.
+          </div>
+          <AdminImportPanel
+            dryRun={dryRun}
+            importDay={importDay}
+            importReport={importReport}
+            pending={pending}
+            showDayImports={false}
+            onDryRunChange={setDryRun}
+            onImportDayChange={setImportDay}
+            onRunImport={(action) => void runImport(action)}
+          />
+        </>
+      )}
+
       {loadState === "ready" && basho !== null && (
         <>
           <div className="admin-basho-summary">
@@ -212,6 +449,91 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
               </div>
             </dl>
           </div>
+
+          {gameConfig !== null && (
+            <section
+              className="admin-config-panel"
+              aria-labelledby="admin-game-config-title"
+            >
+              <div>
+                <p className="eyebrow">Game configuration</p>
+                <h2 id="admin-game-config-title">Fantasy rules</h2>
+              </div>
+              <div className="admin-config-grid">
+                <form
+                  className="admin-config-card"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void saveGameConfig();
+                  }}
+                >
+                  <label htmlFor="admin-team-size">Rikishi per stable</label>
+                  <div className="admin-number-control">
+                    <input
+                      id="admin-team-size"
+                      type="number"
+                      min="1"
+                      max="42"
+                      step="1"
+                      value={teamSizeDraft}
+                      disabled={pending || !gameConfig.canChangeTeamSize}
+                      onChange={(event) =>
+                        setTeamSizeDraft(event.currentTarget.value)
+                      }
+                    />
+                    <button
+                      type="submit"
+                      className="primary-button"
+                      disabled={
+                        pending ||
+                        (!gameConfig.canChangeTeamSize &&
+                          !canPersistInheritedTeamSize)
+                      }
+                    >
+                      {canPersistInheritedTeamSize
+                        ? "Save inherited team size"
+                        : "Save team size"}
+                    </button>
+                  </div>
+                  <p>
+                    {gameConfig.canChangeTeamSize
+                      ? "This locks after the first stable is submitted or picks close."
+                      : gameConfig.gameConfig.teamSizeSource === "default"
+                        ? "Team size is locked, but save this inherited value so a server-default change cannot alter it."
+                        : "Team size is locked because a stable exists or picks have closed."}
+                  </p>
+                  <p className="admin-config-source">
+                    {gameConfig.gameConfig.teamSizeSource === "basho"
+                      ? "Saved for this basho"
+                      : "Using the server default until saved"}
+                  </p>
+                </form>
+                <article className="admin-config-card">
+                  <h3>Scoring mode</h3>
+                  <p className="admin-config-value">One point per win</p>
+                  <p>
+                    Kinboshi, special prizes, jokers, and substitutes are not
+                    scored yet. Their rules will be selected before another mode
+                    is enabled.
+                  </p>
+                  <span className="admin-config-source">wins-v0</span>
+                </article>
+              </div>
+            </section>
+          )}
+
+          {mode === "live" && (
+            <AdminImportPanel
+              dryRun={dryRun}
+              importDay={importDay}
+              importReport={importReport}
+              pending={pending}
+              showDayImports
+              onDryRunChange={setDryRun}
+              onImportDayChange={setImportDay}
+              onRunImport={(action) => void runImport(action)}
+            />
+          )}
 
           {basho.isDemo ? (
             <div className="admin-action-grid">
@@ -304,24 +626,111 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
               />
             </div>
           )}
-
-          {pendingAction !== null && (
-            <p className="form-message" role="status">
-              Applying {formatAction(pendingAction)}...
-            </p>
-          )}
-          {message !== null && (
-            <p className="confirmation" role="status">
-              {message}
-            </p>
-          )}
-          {errorMessage !== null && (
-            <p className="form-message error-state" role="alert">
-              {errorMessage}
-            </p>
-          )}
         </>
       )}
+
+      {loadState === "ready" && pendingAction !== null && (
+        <p className="form-message" role="status">
+          Applying {formatAction(pendingAction)}...
+        </p>
+      )}
+      {loadState === "ready" && message !== null && (
+        <p className="confirmation" role="status">
+          {message}
+        </p>
+      )}
+      {loadState === "ready" && errorMessage !== null && (
+        <p className="form-message error-state" role="alert">
+          {errorMessage}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function AdminImportPanel({
+  dryRun,
+  importDay,
+  importReport,
+  pending,
+  showDayImports,
+  onDryRunChange,
+  onImportDayChange,
+  onRunImport,
+}: {
+  dryRun: boolean;
+  importDay: string;
+  importReport: AdminImportResponse | null;
+  pending: boolean;
+  showDayImports: boolean;
+  onDryRunChange: (dryRun: boolean) => void;
+  onImportDayChange: (day: string) => void;
+  onRunImport: (action: AdminImportAction) => void;
+}) {
+  return (
+    <section
+      className="admin-import-panel"
+      aria-labelledby="admin-import-title"
+    >
+      <div>
+        <p className="eyebrow">Source-backed data</p>
+        <h2 id="admin-import-title">Import basho data</h2>
+        <p>
+          Validate source data first, then apply it deliberately to the
+          confirmed live basho.
+        </p>
+      </div>
+      <div className="admin-import-options">
+        <label>
+          <input
+            type="checkbox"
+            checked={dryRun}
+            disabled={pending}
+            onChange={(event) => onDryRunChange(event.currentTarget.checked)}
+          />
+          Dry run — validate without writing
+        </label>
+        {showDayImports && (
+          <label htmlFor="admin-import-day">
+            Basho day
+            <input
+              id="admin-import-day"
+              type="number"
+              min="1"
+              max="15"
+              step="1"
+              value={importDay}
+              disabled={pending}
+              onChange={(event) => onImportDayChange(event.currentTarget.value)}
+            />
+          </label>
+        )}
+      </div>
+      <div className="admin-action-grid">
+        <AdminImportAction
+          description="Fetch the current Makuuchi banzuke from the Japan Sumo Association."
+          disabled={pending}
+          label={`${dryRun ? "Validate" : "Import"} banzuke`}
+          onClick={() => onRunImport("banzuke")}
+        />
+        {showDayImports && (
+          <>
+            <AdminImportAction
+              description="Fetch one day of Makuuchi results and then attempt the following published schedule."
+              disabled={pending}
+              label={`${dryRun ? "Validate" : "Import"} results`}
+              onClick={() => onRunImport("results")}
+            />
+            <AdminImportAction
+              description="Fetch or retry one published Makuuchi schedule without changing scores."
+              disabled={pending}
+              label={`${dryRun ? "Validate" : "Import"} schedule`}
+              onClick={() => onRunImport("schedule")}
+            />
+          </>
+        )}
+      </div>
+      {importReport !== null && <ImportReport report={importReport} />}
     </section>
   );
 }
@@ -355,6 +764,117 @@ function AdminAction({
   );
 }
 
+function AdminImportAction({
+  description,
+  disabled,
+  label,
+  onClick,
+}: {
+  description: string;
+  disabled: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <article className="admin-action-card">
+      <h3>{label}</h3>
+      <p>{description}</p>
+      <button
+        type="button"
+        className="primary-button"
+        disabled={disabled}
+        onClick={onClick}
+      >
+        {label}
+      </button>
+    </article>
+  );
+}
+
+function ImportReport({ report }: { report: AdminImportResponse }) {
+  const rows = [
+    ...toImportReportRows(report.summary, "primary"),
+    ...(report.schedule?.status === "imported"
+      ? toImportReportRows(
+          report.schedule.import.summary,
+          "following-schedule",
+          "Following schedule",
+        )
+      : []),
+  ];
+
+  return (
+    <div className="admin-import-report" role="status">
+      <div>
+        <strong>{report.dryRun ? "Dry-run result" : "Applied import"}</strong>
+        <span>{formatSource(report.source)}</span>
+      </div>
+      {report.targetBashoId !== undefined && (
+        <p>Target basho: {report.targetBashoId}</p>
+      )}
+      {rows.length === 0 ? (
+        <p>No data changes were reported.</p>
+      ) : (
+        <table>
+          <caption>Import entity counts</caption>
+          <thead>
+            <tr>
+              <th scope="col">Data</th>
+              <th scope="col">Created</th>
+              <th scope="col">Updated</th>
+              <th scope="col">Skipped</th>
+              <th scope="col">Deleted</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key}>
+                <th scope="row">{row.label}</th>
+                <td>{row.summary.created}</td>
+                <td>{row.summary.updated}</td>
+                <td>{row.summary.skipped}</td>
+                <td>{row.summary.deleted}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {report.status === "partial" &&
+        report.schedule !== undefined &&
+        (report.schedule.status === "unavailable" ||
+          report.schedule.status === "failed") && (
+          <p className="admin-import-warning">
+            Results were {report.dryRun ? "validated" : "saved"}, but day{" "}
+            {report.schedule.day} schedule status is {report.schedule.status}
+            {`: ${report.schedule.message}`}
+          </p>
+        )}
+      {report.schedule?.status === "imported" && (
+        <p>
+          Following day {report.schedule.day} schedule was also{" "}
+          {report.dryRun ? "validated" : "imported"}.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function toImportReportRows(
+  summary: Record<string, ImportEntitySummary>,
+  keyPrefix: string,
+  labelPrefix?: string,
+) {
+  return Object.entries(summary)
+    .filter(([, entitySummary]) =>
+      Object.values(entitySummary).some((count) => count > 0),
+    )
+    .map(([entity, entitySummary]) => ({
+      key: `${keyPrefix}-${entity}`,
+      label: [labelPrefix, formatEntity(entity)].filter(Boolean).join(": "),
+      summary: entitySummary,
+    }));
+}
+
 function formatStatus(status: Basho["status"]): string {
   return status
     .replace("-", " ")
@@ -363,4 +883,14 @@ function formatStatus(status: Basho["status"]): string {
 
 function formatAction(action: string): string {
   return action.replaceAll("-", " ");
+}
+
+function formatSource(source: string): string {
+  return source.replaceAll("-", " ");
+}
+
+function formatEntity(entity: string): string {
+  return entity
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^./, (letter) => letter.toUpperCase());
 }

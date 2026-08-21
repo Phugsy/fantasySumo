@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdminPanel } from "./AdminPanel";
 
@@ -30,10 +36,13 @@ describe("AdminPanel", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse({ basho: liveBasho }))
+      .mockResolvedValueOnce(jsonResponse(gameConfigResponse(liveBasho.id)))
       .mockResolvedValueOnce(jsonResponse({ basho: demoBasho }))
+      .mockResolvedValueOnce(jsonResponse(gameConfigResponse(demoBasho.id)))
       .mockResolvedValueOnce(
         jsonResponse({ action: "reset", appliedResults: 0, basho: demoBasho }),
-      );
+      )
+      .mockResolvedValueOnce(jsonResponse(gameConfigResponse(demoBasho.id)));
     const onPlayerDataRefresh = vi.fn(() => Promise.resolve());
 
     vi.stubGlobal("fetch", fetchMock);
@@ -57,7 +66,7 @@ describe("AdminPanel", () => {
     expect(window.confirm).toHaveBeenCalledWith(
       expect.stringContaining("never live data"),
     );
-    expect(fetchMock).toHaveBeenLastCalledWith("/api/admin/demo/reset", {
+    expect(fetchMock).toHaveBeenCalledWith("/api/admin/demo/reset", {
       body: "{}",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
@@ -81,13 +90,15 @@ describe("AdminPanel", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse({ basho: activeBasho }))
+      .mockResolvedValueOnce(jsonResponse(gameConfigResponse(activeBasho.id)))
       .mockResolvedValueOnce(
         jsonResponse({
           action: "close",
           changed: true,
           basho: { ...activeBasho, status: "complete" },
         }),
-      );
+      )
+      .mockResolvedValueOnce(jsonResponse(gameConfigResponse(activeBasho.id)));
 
     vi.stubGlobal("fetch", fetchMock);
     vi.spyOn(window, "confirm").mockReturnValue(true);
@@ -116,13 +127,15 @@ describe("AdminPanel", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse({ basho: demoBasho }))
+      .mockResolvedValueOnce(jsonResponse(gameConfigResponse(demoBasho.id)))
       .mockResolvedValueOnce(
         jsonResponse({
           action: "advance-day",
           appliedResults: 1,
           basho: { ...demoBasho, currentDay: 1 },
         }),
-      );
+      )
+      .mockResolvedValueOnce(jsonResponse(gameConfigResponse(demoBasho.id)));
 
     vi.stubGlobal("fetch", fetchMock);
     render(
@@ -164,6 +177,7 @@ describe("AdminPanel", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse({ basho: demoBasho }))
+      .mockResolvedValueOnce(jsonResponse(gameConfigResponse(demoBasho.id)))
       .mockImplementationOnce(
         () =>
           new Promise<Response>((resolve) => {
@@ -180,7 +194,7 @@ describe("AdminPanel", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Advance one day" }),
     );
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     unmount();
 
     resolveAction!(
@@ -192,6 +206,55 @@ describe("AdminPanel", () => {
     );
 
     await Promise.resolve();
+    expect(onPlayerDataRefresh).not.toHaveBeenCalled();
+  });
+
+  it("does not refresh player data when config refresh fails post-unmount", async () => {
+    const demoBasho = {
+      id: "demo-2026-05",
+      isDemo: true,
+      name: "Demo Basho",
+      startDate: "2026-05-10",
+      endDate: "2026-05-24",
+      status: "active",
+      currentDay: 0,
+    };
+    let rejectConfigRefresh: (error: Error) => void;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ basho: demoBasho }))
+      .mockResolvedValueOnce(jsonResponse(gameConfigResponse(demoBasho.id)))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          action: "advance-day",
+          appliedResults: 1,
+          basho: { ...demoBasho, currentDay: 1 },
+        }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((_, reject) => {
+            rejectConfigRefresh = reject;
+          }),
+      );
+    const onPlayerDataRefresh = vi.fn(() => Promise.resolve());
+
+    vi.stubGlobal("fetch", fetchMock);
+    const { unmount } = render(
+      <AdminPanel onPlayerDataRefresh={onPlayerDataRefresh} />,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Advance one day" }),
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    unmount();
+
+    await act(async () => {
+      rejectConfigRefresh!(new Error("Config unavailable."));
+      await Promise.resolve();
+    });
+
     expect(onPlayerDataRefresh).not.toHaveBeenCalled();
   });
 
@@ -209,6 +272,11 @@ describe("AdminPanel", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse({ basho: lockedBasho }))
+      .mockResolvedValueOnce(
+        jsonResponse(
+          gameConfigResponse(lockedBasho.id, { canChangeTeamSize: false }),
+        ),
+      )
       .mockResolvedValueOnce(
         jsonResponse(
           {
@@ -235,6 +303,428 @@ describe("AdminPanel", () => {
       screen.getByRole("button", { name: "Close the basho" }),
     ).toBeEnabled();
   });
+
+  it("persists team size for the selected basho and refreshes player data", async () => {
+    const upcomingBasho = {
+      id: "2026-09",
+      isDemo: false,
+      name: "September 2026 Basho",
+      startDate: "2026-09-13",
+      endDate: "2026-09-27",
+      status: "upcoming",
+      currentDay: 0,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ basho: upcomingBasho }))
+      .mockResolvedValueOnce(jsonResponse(gameConfigResponse(upcomingBasho.id)))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ...gameConfigResponse(upcomingBasho.id, { teamSize: 3 }),
+          changed: true,
+          gameConfig: {
+            teamSize: 3,
+            teamSizeSource: "basho",
+            scoringMode: "wins-v0",
+          },
+        }),
+      );
+    const onPlayerDataRefresh = vi.fn(() => Promise.resolve());
+
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminPanel onPlayerDataRefresh={onPlayerDataRefresh} />);
+
+    const input = await screen.findByLabelText("Rikishi per stable");
+    fireEvent.change(input, { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save team size" }));
+
+    expect(
+      await screen.findByText("Team size saved as 3."),
+    ).toBeInTheDocument();
+    expect(input).toHaveValue(3);
+    expect(screen.getByText("Saved for this basho")).toBeInTheDocument();
+    expect(onPlayerDataRefresh).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/admin/basho/2026-09/game-config",
+      {
+        body: JSON.stringify({ teamSize: 3 }),
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+    );
+  });
+
+  it("lets a migrated basho persist its locked inherited team size", async () => {
+    const migratedBasho = {
+      id: "2026-07",
+      isDemo: false,
+      name: "July 2026 Basho",
+      startDate: "2026-07-12",
+      endDate: "2026-07-26",
+      status: "upcoming",
+      currentDay: 0,
+    };
+    const inheritedConfig = gameConfigResponse(migratedBasho.id, {
+      canChangeTeamSize: false,
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ basho: migratedBasho }))
+      .mockResolvedValueOnce(jsonResponse(inheritedConfig))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ...inheritedConfig,
+          changed: false,
+          gameConfig: {
+            ...inheritedConfig.gameConfig,
+            teamSizeSource: "basho",
+          },
+        }),
+      );
+    const onPlayerDataRefresh = vi.fn(() => Promise.resolve());
+
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminPanel onPlayerDataRefresh={onPlayerDataRefresh} />);
+
+    expect(await screen.findByLabelText("Rikishi per stable")).toBeDisabled();
+    expect(screen.getByText(/save this inherited value/i)).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Save inherited team size" }),
+    );
+
+    expect(
+      await screen.findByText("Team size saved as 2."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Saved for this basho")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Save team size" }),
+    ).toBeDisabled();
+    expect(onPlayerDataRefresh).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/admin/basho/2026-07/game-config",
+      {
+        body: JSON.stringify({ teamSize: 2 }),
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      },
+    );
+  });
+
+  it("dry-runs a partial results import without claiming data was written", async () => {
+    const upcomingBasho = {
+      id: "2026-09",
+      isDemo: false,
+      name: "September 2026 Basho",
+      startDate: "2026-09-13",
+      endDate: "2026-09-27",
+      status: "upcoming",
+      currentDay: 0,
+    };
+    const importResponse = {
+      dryRun: true,
+      source: "sumo-api-results",
+      status: "partial",
+      summary: {
+        results: { created: 21, updated: 0, skipped: 0, deleted: 0 },
+      },
+      schedule: {
+        status: "unavailable",
+        day: 2,
+        message: "Schedule has not been published.",
+      },
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ basho: upcomingBasho }))
+      .mockResolvedValueOnce(jsonResponse(gameConfigResponse(upcomingBasho.id)))
+      .mockResolvedValueOnce(jsonResponse(importResponse));
+
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminPanel onPlayerDataRefresh={() => Promise.resolve()} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Validate results" }),
+    );
+
+    expect(
+      await screen.findByText("Validation completed for results data."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Dry-run result")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Results were validated, but day 2 schedule status is unavailable: Schedule has not been published.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Results were saved/)).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/admin/basho/2026-09/import-results?dryRun=true",
+      {
+        body: JSON.stringify({ day: 1, division: "Makuuchi" }),
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+    );
+  });
+
+  it("shows following-schedule counts in a results import report", async () => {
+    const upcomingBasho = {
+      id: "2026-09",
+      isDemo: false,
+      name: "September 2026 Basho",
+      startDate: "2026-09-13",
+      endDate: "2026-09-27",
+      status: "upcoming",
+      currentDay: 0,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ basho: upcomingBasho }))
+      .mockResolvedValueOnce(jsonResponse(gameConfigResponse(upcomingBasho.id)))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          dryRun: true,
+          source: "sumo-api-results",
+          status: "complete",
+          summary: {
+            results: { created: 0, updated: 0, skipped: 0, deleted: 0 },
+          },
+          schedule: {
+            status: "imported",
+            day: 2,
+            import: {
+              dryRun: true,
+              source: "sumo-api-schedule",
+              summary: {
+                scheduledBouts: {
+                  created: 21,
+                  updated: 0,
+                  skipped: 0,
+                  deleted: 2,
+                },
+              },
+            },
+          },
+        }),
+      );
+
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminPanel onPlayerDataRefresh={() => Promise.resolve()} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Validate results" }),
+    );
+
+    const scheduleRow = await screen.findByRole("row", {
+      name: "Following schedule: Scheduled Bouts 21 0 0 2",
+    });
+    expect(scheduleRow).toBeInTheDocument();
+    expect(
+      screen.queryByText("No data changes were reported."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("targets the selected live basho when validating a banzuke", async () => {
+    const upcomingBasho = {
+      id: "2026-09",
+      isDemo: false,
+      name: "September 2026 Basho",
+      startDate: "2026-09-13",
+      endDate: "2026-09-27",
+      status: "upcoming",
+      currentDay: 0,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ basho: upcomingBasho }))
+      .mockResolvedValueOnce(jsonResponse(gameConfigResponse(upcomingBasho.id)))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          dryRun: true,
+          source: "jsa-banzuke",
+          summary: {},
+          targetBashoId: "2026-09",
+        }),
+      );
+
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminPanel onPlayerDataRefresh={() => Promise.resolve()} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Validate banzuke" }),
+    );
+
+    await screen.findByText("Validation completed for banzuke data.");
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/admin/import-banzuke?dryRun=true",
+      {
+        body: JSON.stringify({ expectedBashoId: "2026-09" }),
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+    );
+  });
+
+  it("bootstraps a missing live basho only after validating and confirming its source target", async () => {
+    const discoveredBasho = {
+      id: "2026-11",
+      isDemo: false,
+      name: "November 2026 Basho",
+      startDate: "2026-11-08",
+      endDate: "2026-11-22",
+      status: "upcoming",
+      currentDay: 0,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(
+          { error: "not-found", message: "No live basho is available." },
+          404,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          dryRun: true,
+          source: "jsa-banzuke",
+          summary: {
+            basho: { created: 1, updated: 0, skipped: 0, deleted: 0 },
+          },
+          targetBashoId: discoveredBasho.id,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          dryRun: false,
+          source: "jsa-banzuke",
+          summary: {
+            basho: { created: 1, updated: 0, skipped: 0, deleted: 0 },
+          },
+          targetBasho: discoveredBasho,
+          targetBashoId: discoveredBasho.id,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(gameConfigResponse(discoveredBasho.id)),
+      );
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AdminPanel onPlayerDataRefresh={() => Promise.resolve()} />);
+
+    expect(
+      await screen.findByText(/No live basho is stored/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Validate results" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Validate banzuke" }));
+    expect(
+      await screen.findByText(`Target basho: ${discoveredBasho.id}`),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "Dry run — validate without writing",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Import banzuke" }));
+
+    expect(confirm).toHaveBeenCalledWith(
+      `Import the validated ${discoveredBasho.id} banzuke and create it as the live basho?`,
+    );
+    expect(
+      await screen.findByRole("heading", { name: discoveredBasho.name }),
+    ).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/api/admin/import-banzuke?dryRun=false",
+      {
+        body: JSON.stringify({
+          confirmedSourceBashoId: discoveredBasho.id,
+        }),
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      },
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("keeps a newly imported banzuke selected when an older basho is still active", async () => {
+    const activeBasho = {
+      id: "2026-09",
+      isDemo: false,
+      name: "September 2026 Basho",
+      startDate: "2026-09-13",
+      endDate: "2026-09-27",
+      status: "active",
+      currentDay: 15,
+    };
+    const importedBasho = {
+      id: "2026-11",
+      isDemo: false,
+      name: "November 2026 Basho",
+      startDate: "2026-11-08",
+      endDate: "2026-11-22",
+      status: "upcoming",
+      currentDay: 0,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ basho: activeBasho }))
+      .mockResolvedValueOnce(jsonResponse(gameConfigResponse(activeBasho.id)))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          dryRun: true,
+          source: "jsa-banzuke",
+          summary: {},
+          targetBashoId: importedBasho.id,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          dryRun: false,
+          source: "jsa-banzuke",
+          summary: {
+            basho: { created: 1, updated: 0, skipped: 0, deleted: 0 },
+          },
+          targetBasho: importedBasho,
+          targetBashoId: importedBasho.id,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(gameConfigResponse(importedBasho.id)),
+      );
+
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<AdminPanel onPlayerDataRefresh={() => Promise.resolve()} />);
+
+    await screen.findByRole("heading", { name: activeBasho.name });
+    fireEvent.click(screen.getByRole("button", { name: "Validate banzuke" }));
+    await screen.findByText(`Target basho: ${importedBasho.id}`);
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "Dry run — validate without writing",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Import banzuke" }));
+
+    expect(
+      await screen.findByRole("heading", { name: importedBasho.name }),
+    ).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      `/api/admin/basho/${importedBasho.id}/game-config`,
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+  });
 });
 
 function jsonResponse(body: unknown, status = 200) {
@@ -242,4 +732,19 @@ function jsonResponse(body: unknown, status = 200) {
     headers: { "content-type": "application/json" },
     status,
   });
+}
+
+function gameConfigResponse(
+  bashoId: string,
+  overrides: { canChangeTeamSize?: boolean; teamSize?: number } = {},
+) {
+  return {
+    bashoId,
+    canChangeTeamSize: overrides.canChangeTeamSize ?? true,
+    gameConfig: {
+      teamSize: overrides.teamSize ?? 2,
+      teamSizeSource: "default",
+      scoringMode: "wins-v0",
+    },
+  };
 }

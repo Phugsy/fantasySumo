@@ -108,6 +108,362 @@ test("lets an authenticated admin run the deterministic demo loop", async ({
   );
 });
 
+test("lets an admin persist inherited live config and validate a result import without contacting the source", async ({
+  page,
+}) => {
+  await page.goto("/admin");
+  await page.getByLabel("Email").fill("e2e-admin@example.com");
+  await page.getByLabel("Display name").fill("E2E Admin");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+  await expect(
+    page.getByRole("heading", { name: "Demo May Basho" }),
+  ).toBeVisible();
+
+  await page.route("**/api/admin/basho/current", async (route) => {
+    await route.fulfill({
+      json: {
+        basho: {
+          id: "2026-09",
+          isDemo: false,
+          name: "September 2026 Basho",
+          startDate: "2026-09-13",
+          endDate: "2026-09-27",
+          status: "upcoming",
+          currentDay: 0,
+        },
+      },
+    });
+  });
+  let teamSizePersisted = false;
+  await page.route("**/api/admin/basho/2026-09/game-config", async (route) => {
+    if (route.request().method() === "PUT") {
+      expect(route.request().postDataJSON()).toEqual({ teamSize: 2 });
+      teamSizePersisted = true;
+    }
+
+    await route.fulfill({
+      json: {
+        bashoId: "2026-09",
+        changed: false,
+        canChangeTeamSize: false,
+        gameConfig: {
+          teamSize: 2,
+          teamSizeSource: teamSizePersisted ? "basho" : "default",
+          scoringMode: "wins-v0",
+        },
+      },
+    });
+  });
+  await page.route(
+    "**/api/admin/basho/2026-09/import-results?dryRun=true",
+    async (route) => {
+      await route.fulfill({
+        json: {
+          dryRun: true,
+          source: "sumo-api-results",
+          status: "complete",
+          summary: {
+            results: { created: 21, updated: 0, skipped: 0, deleted: 0 },
+          },
+          schedule: {
+            status: "imported",
+            day: 2,
+            import: {
+              dryRun: true,
+              source: "sumo-api-schedule",
+              summary: {
+                scheduledBouts: {
+                  created: 21,
+                  updated: 0,
+                  skipped: 0,
+                  deleted: 0,
+                },
+              },
+            },
+          },
+        },
+      });
+    },
+  );
+
+  await page.getByRole("button", { name: "Live basho" }).click();
+  await expect(
+    page.getByRole("heading", { name: "September 2026 Basho" }),
+  ).toBeVisible();
+  await expect(page.getByText("One point per win")).toBeVisible();
+  await expect(page.getByLabel("Rikishi per stable")).toBeDisabled();
+  await page.getByRole("button", { name: "Save inherited team size" }).click();
+  await expect(page.getByText("Team size saved as 2.")).toBeVisible();
+  await expect(page.getByText("Saved for this basho")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Save team size" }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Validate results" }).click();
+  await expect(page.getByText("Dry-run result")).toBeVisible();
+  await expect(
+    page.getByRole("row", {
+      name: "Following schedule: Scheduled Bouts 21 0 0 0",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Following day 2 schedule was also validated."),
+  ).toBeVisible();
+});
+
+test("lets an admin bootstrap a missing live basho from a confirmed banzuke", async ({
+  page,
+}) => {
+  await page.goto("/admin");
+  await page.getByLabel("Email").fill("e2e-admin@example.com");
+  await page.getByLabel("Display name").fill("E2E Admin");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+
+  let imported = false;
+  await page.route("**/api/admin/basho/current", async (route) => {
+    if (!imported) {
+      await route.fulfill({
+        json: { error: "not-found", message: "No live basho is available." },
+        status: 404,
+      });
+      return;
+    }
+
+    await route.fulfill({
+      json: {
+        basho: {
+          id: "2026-11",
+          isDemo: false,
+          name: "November 2026 Basho",
+          startDate: "2026-11-08",
+          endDate: "2026-11-22",
+          status: "upcoming",
+          currentDay: 0,
+        },
+      },
+    });
+  });
+  await page.route("**/api/admin/basho/2026-11/game-config", async (route) => {
+    await route.fulfill({
+      json: {
+        bashoId: "2026-11",
+        canChangeTeamSize: true,
+        gameConfig: {
+          teamSize: 2,
+          teamSizeSource: "default",
+          scoringMode: "wins-v0",
+        },
+      },
+    });
+  });
+  await page.route("**/api/admin/import-banzuke?dryRun=*", async (route) => {
+    const requestBody = route.request().postDataJSON() as {
+      confirmedSourceBashoId?: string;
+    };
+    const dryRun = route.request().url().endsWith("dryRun=true");
+
+    if (!dryRun) {
+      expect(requestBody.confirmedSourceBashoId).toBe("2026-11");
+      imported = true;
+    }
+
+    await route.fulfill({
+      json: {
+        dryRun,
+        source: "jsa-banzuke",
+        summary: {
+          basho: { created: 1, updated: 0, skipped: 0, deleted: 0 },
+        },
+        targetBasho: dryRun
+          ? undefined
+          : {
+              id: "2026-11",
+              isDemo: false,
+              name: "November 2026 Basho",
+              startDate: "2026-11-08",
+              endDate: "2026-11-22",
+              status: "upcoming",
+              currentDay: 0,
+            },
+        targetBashoId: "2026-11",
+      },
+    });
+  });
+
+  await page.getByRole("button", { name: "Live basho" }).click();
+  await expect(page.getByText(/No live basho is stored/)).toBeVisible();
+  await page.getByRole("button", { name: "Validate banzuke" }).click();
+  await expect(page.getByText("Target basho: 2026-11")).toBeVisible();
+
+  await page
+    .getByRole("checkbox", { name: "Dry run — validate without writing" })
+    .uncheck();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Import banzuke" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "November 2026 Basho" }),
+  ).toBeVisible();
+});
+
+test("keeps a rolled-over banzuke selected while the previous basho remains active", async ({
+  page,
+}) => {
+  await page.goto("/admin");
+  await page.getByLabel("Email").fill("e2e-admin@example.com");
+  await page.getByLabel("Display name").fill("E2E Admin");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+
+  const previousBasho = {
+    id: "2026-09",
+    isDemo: false,
+    name: "September 2026 Basho",
+    startDate: "2026-09-13",
+    endDate: "2026-09-27",
+    status: "active",
+    currentDay: 15,
+  };
+  const importedBasho = {
+    id: "2026-11",
+    isDemo: false,
+    name: "November 2026 Basho",
+    startDate: "2026-11-08",
+    endDate: "2026-11-22",
+    status: "upcoming",
+    currentDay: 0,
+  };
+
+  await page.route("**/api/admin/basho/current", async (route) => {
+    await route.fulfill({ json: { basho: previousBasho } });
+  });
+  await page.route("**/api/admin/basho/*/game-config", async (route) => {
+    const bashoId = route.request().url().includes(importedBasho.id)
+      ? importedBasho.id
+      : previousBasho.id;
+    await route.fulfill({
+      json: {
+        bashoId,
+        canChangeTeamSize: true,
+        gameConfig: {
+          teamSize: 2,
+          teamSizeSource: "default",
+          scoringMode: "wins-v0",
+        },
+      },
+    });
+  });
+  await page.route("**/api/admin/import-banzuke?dryRun=*", async (route) => {
+    const dryRun = route.request().url().endsWith("dryRun=true");
+    await route.fulfill({
+      json: {
+        dryRun,
+        source: "jsa-banzuke",
+        summary: {
+          basho: {
+            created: dryRun ? 0 : 1,
+            updated: 0,
+            skipped: 0,
+            deleted: 0,
+          },
+        },
+        targetBasho: dryRun ? undefined : importedBasho,
+        targetBashoId: importedBasho.id,
+      },
+    });
+  });
+
+  await page.getByRole("button", { name: "Live basho" }).click();
+  await expect(
+    page.getByRole("heading", { name: previousBasho.name }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Validate banzuke" }).click();
+  await page
+    .getByRole("checkbox", { name: "Dry run — validate without writing" })
+    .uncheck();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Import banzuke" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: importedBasho.name }),
+  ).toBeVisible();
+});
+
+test("refreshes a stale player team-size limit and preserves the draft", async ({
+  page,
+}) => {
+  let currentBashoRequestCount = 0;
+  let teamSaveRequestCount = 0;
+  let teamSizeChanged = false;
+
+  await page.route("**/api/basho/current?mode=demo", async (route) => {
+    currentBashoRequestCount += 1;
+    const response = await route.fetch();
+    const basho = (await response.json()) as Record<string, unknown>;
+
+    await route.fulfill({
+      response,
+      json: {
+        ...basho,
+        teamSize: teamSizeChanged ? 3 : 2,
+      },
+    });
+  });
+  await page.route("**/api/basho/*/teams", async (route) => {
+    teamSaveRequestCount += 1;
+
+    if (teamSaveRequestCount === 1) {
+      teamSizeChanged = true;
+      await route.fulfill({
+        json: {
+          error: "team-size-changed",
+          message: "Team size changed to 3. Review your picks and try again.",
+          teamSize: 3,
+        },
+        status: 409,
+      });
+      return;
+    }
+
+    await route.fulfill({
+      json: {
+        team: {
+          id: "team-stale-limit",
+          displayName: "Flexible Stable",
+        },
+        picks: [
+          { rikishiId: "wakatakakage" },
+          { rikishiId: "ura" },
+          { rikishiId: "hoshoryu" },
+        ],
+      },
+      status: 201,
+    });
+  });
+
+  await page.goto("/");
+  await signInAsDemoUser(page);
+  await page.getByLabel("Team name").fill("Flexible Stable");
+  await page.getByRole("button", { name: /Wakatakakage/ }).click();
+  await page.getByRole("button", { name: /Ura/ }).click();
+  await page.getByRole("button", { name: "Submit team" }).click();
+
+  await expect(
+    page.getByText("Team size changed to 3. Review your picks and try again."),
+  ).toBeVisible();
+  await expect(page.getByLabel("Team name")).toHaveValue("Flexible Stable");
+  await expect(page.getByText("2 of 3 selected")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Hoshoryu/ })).toBeEnabled();
+
+  await page.getByRole("button", { name: /Hoshoryu/ }).click();
+  await page.getByRole("button", { name: "Submit team" }).click();
+
+  await expect(page.getByText("Flexible Stable submitted.")).toBeVisible();
+  expect(currentBashoRequestCount).toBeGreaterThanOrEqual(3);
+  expect(teamSaveRequestCount).toBe(2);
+});
+
 test("creates a fantasy team and follows its My Stable score", async ({
   page,
   request,

@@ -57,6 +57,41 @@ export interface BashoLifecycleUpdateResult {
   transition: BashoLifecycleTransition;
 }
 
+export interface BashoGameConfig {
+  bashoId: Basho["id"];
+  teamSize: number;
+}
+
+export type BashoGameConfigUpdateResult =
+  | {
+      status: "updated";
+      changed: boolean;
+      canChangeTeamSize: boolean;
+      config: BashoGameConfig;
+    }
+  | {
+      status: "not-found";
+    }
+  | {
+      status: "locked";
+      reason: "basho-not-upcoming" | "teams-exist";
+      basho: Basho;
+    };
+
+export type OwnedFantasyTeamSaveResult =
+  | {
+      status: "saved";
+      team: FantasyTeam;
+      picks: FantasyPick[];
+    }
+  | {
+      status: "picks-locked";
+    }
+  | {
+      status: "invalid-team-size";
+      teamSize: number;
+    };
+
 export interface Repositories {
   /** Clears every game record. Production and admin paths must never call this. */
   resetAllDataForLocalFixtures: () => Promise<void>;
@@ -67,6 +102,13 @@ export interface Repositories {
   listBashos: () => Promise<Basho[]>;
   getBasho: (id: Basho["id"]) => Promise<Basho | undefined>;
   updateBasho: (entry: Basho) => Promise<void>;
+  getBashoGameConfig: (
+    bashoId: Basho["id"],
+  ) => Promise<BashoGameConfig | undefined>;
+  setBashoGameConfigIfConfigurable: (
+    config: BashoGameConfig,
+    defaultTeamSize: number,
+  ) => Promise<BashoGameConfigUpdateResult>;
   transitionBashoLifecycle: (
     bashoId: Basho["id"],
     action: BashoLifecycleAction,
@@ -85,17 +127,13 @@ export interface Repositories {
   insertFantasyTeamWithPicksIfBashoUpcoming: (
     team: FantasyTeam,
     picks: readonly FantasyPick[],
+    defaultTeamSize?: number,
   ) => Promise<boolean>;
   saveOwnedFantasyTeamWithPicksIfBashoUpcoming: (
     team: FantasyTeam & { ownerUserId: string },
     picks: readonly FantasyPick[],
-  ) => Promise<
-    | {
-        team: FantasyTeam;
-        picks: FantasyPick[];
-      }
-    | undefined
-  >;
+    defaultTeamSize?: number,
+  ) => Promise<OwnedFantasyTeamSaveResult>;
   getFantasyTeam: (id: FantasyTeam["id"]) => Promise<FantasyTeam | undefined>;
   getFantasyTeamForOwner: (
     bashoId: Basho["id"],
@@ -170,6 +208,12 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
           );
         }
 
+        const existingConfig = transaction
+          .select()
+          .from(sqlite.bashoGameConfig)
+          .where(eq(sqlite.bashoGameConfig.bashoId, resetData.basho.id))
+          .get();
+
         transaction
           .delete(sqlite.basho)
           .where(
@@ -192,6 +236,13 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
           .insert(sqlite.basho)
           .values(toBashoRow(resetData.basho))
           .run();
+
+        if (existingConfig !== undefined) {
+          transaction
+            .insert(sqlite.bashoGameConfig)
+            .values(existingConfig)
+            .run();
+        }
 
         for (const entry of resetData.banzukeEntries) {
           transaction.insert(sqlite.banzukeEntries).values(entry).run();
@@ -262,6 +313,72 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
         .where(eq(sqlite.basho.id, entry.id))
         .run();
     },
+    getBashoGameConfig: async (bashoId) =>
+      db
+        .select()
+        .from(sqlite.bashoGameConfig)
+        .where(eq(sqlite.bashoGameConfig.bashoId, bashoId))
+        .get(),
+    setBashoGameConfigIfConfigurable: async (config, defaultTeamSize) =>
+      db.transaction((transaction) => {
+        const row = transaction
+          .select()
+          .from(sqlite.basho)
+          .where(eq(sqlite.basho.id, config.bashoId))
+          .get();
+
+        if (row === undefined) {
+          return { status: "not-found" };
+        }
+
+        const existingConfig = transaction
+          .select()
+          .from(sqlite.bashoGameConfig)
+          .where(eq(sqlite.bashoGameConfig.bashoId, config.bashoId))
+          .get();
+        const currentTeamSize = existingConfig?.teamSize ?? defaultTeamSize;
+        const changed = currentTeamSize !== config.teamSize;
+
+        if (changed && row.status !== "upcoming") {
+          return {
+            status: "locked",
+            reason: "basho-not-upcoming",
+            basho: toBasho(row),
+          };
+        }
+
+        const hasTeams =
+          transaction
+            .select({ id: sqlite.fantasyTeams.id })
+            .from(sqlite.fantasyTeams)
+            .where(eq(sqlite.fantasyTeams.bashoId, config.bashoId))
+            .limit(1)
+            .get() !== undefined;
+
+        if (changed && hasTeams) {
+          return {
+            status: "locked",
+            reason: "teams-exist",
+            basho: toBasho(row),
+          };
+        }
+
+        transaction
+          .insert(sqlite.bashoGameConfig)
+          .values(config)
+          .onConflictDoUpdate({
+            target: sqlite.bashoGameConfig.bashoId,
+            set: { teamSize: config.teamSize },
+          })
+          .run();
+
+        return {
+          status: "updated",
+          changed,
+          canChangeTeamSize: row.status === "upcoming" && !hasTeams,
+          config,
+        };
+      }),
     transitionBashoLifecycle: async (bashoId, action, changedAt) =>
       db.transaction((transaction) => {
         const row = transaction
@@ -364,7 +481,11 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
     insertFantasyTeam: async (entry) => {
       db.insert(sqlite.fantasyTeams).values(toFantasyTeamRow(entry)).run();
     },
-    insertFantasyTeamWithPicksIfBashoUpcoming: async (team, picks) =>
+    insertFantasyTeamWithPicksIfBashoUpcoming: async (
+      team,
+      picks,
+      defaultTeamSize = 2,
+    ) =>
       db.transaction((transaction) => {
         const basho = transaction
           .select({ status: sqlite.basho.status })
@@ -374,6 +495,23 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
 
         if (basho?.status !== "upcoming") {
           return false;
+        }
+
+        const config = transaction
+          .select({ teamSize: sqlite.bashoGameConfig.teamSize })
+          .from(sqlite.bashoGameConfig)
+          .where(eq(sqlite.bashoGameConfig.bashoId, team.bashoId))
+          .get();
+
+        if (picks.length !== (config?.teamSize ?? defaultTeamSize)) {
+          return false;
+        }
+
+        if (config === undefined) {
+          transaction
+            .insert(sqlite.bashoGameConfig)
+            .values({ bashoId: team.bashoId, teamSize: defaultTeamSize })
+            .run();
         }
 
         transaction
@@ -390,7 +528,11 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
 
         return true;
       }),
-    saveOwnedFantasyTeamWithPicksIfBashoUpcoming: async (team, picks) =>
+    saveOwnedFantasyTeamWithPicksIfBashoUpcoming: async (
+      team,
+      picks,
+      defaultTeamSize = 2,
+    ) =>
       db.transaction((transaction) => {
         const basho = transaction
           .select({ status: sqlite.basho.status })
@@ -399,7 +541,18 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
           .get();
 
         if (basho?.status !== "upcoming") {
-          return undefined;
+          return { status: "picks-locked" };
+        }
+
+        const config = transaction
+          .select({ teamSize: sqlite.bashoGameConfig.teamSize })
+          .from(sqlite.bashoGameConfig)
+          .where(eq(sqlite.bashoGameConfig.bashoId, team.bashoId))
+          .get();
+        const teamSize = config?.teamSize ?? defaultTeamSize;
+
+        if (picks.length !== teamSize) {
+          return { status: "invalid-team-size", teamSize };
         }
 
         const existingTeam = transaction
@@ -414,7 +567,14 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
           .get();
 
         if (existingTeam !== undefined && existingTeam.lockedAt !== null) {
-          return undefined;
+          return { status: "picks-locked" };
+        }
+
+        if (config === undefined) {
+          transaction
+            .insert(sqlite.bashoGameConfig)
+            .values({ bashoId: team.bashoId, teamSize: defaultTeamSize })
+            .run();
         }
 
         const savedTeam = transaction
@@ -446,6 +606,7 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
         }
 
         return {
+          status: "saved",
           team: toFantasyTeam(savedTeam),
           picks: toSavedFantasyPicks(picks, savedTeam.id),
         };
@@ -789,6 +950,13 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
           );
         }
 
+        const existingConfig = (
+          await transaction
+            .select()
+            .from(pg.bashoGameConfig)
+            .where(eq(pg.bashoGameConfig.bashoId, resetData.basho.id))
+        ).at(0);
+
         await transaction
           .delete(pg.basho)
           .where(
@@ -803,6 +971,10 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
         }
 
         await transaction.insert(pg.basho).values(toBashoRow(resetData.basho));
+
+        if (existingConfig !== undefined) {
+          await transaction.insert(pg.bashoGameConfig).values(existingConfig);
+        }
 
         for (const entry of resetData.banzukeEntries) {
           await transaction.insert(pg.banzukeEntries).values(entry);
@@ -863,6 +1035,76 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
         .set(toBashoRow(entry))
         .where(eq(pg.basho.id, entry.id));
     },
+    getBashoGameConfig: async (bashoId) =>
+      (
+        await db
+          .select()
+          .from(pg.bashoGameConfig)
+          .where(eq(pg.bashoGameConfig.bashoId, bashoId))
+      ).at(0),
+    setBashoGameConfigIfConfigurable: async (config, defaultTeamSize) =>
+      db.transaction(async (transaction) => {
+        const row = (
+          await transaction
+            .select()
+            .from(pg.basho)
+            .where(eq(pg.basho.id, config.bashoId))
+            .for("update")
+        ).at(0);
+
+        if (row === undefined) {
+          return { status: "not-found" };
+        }
+
+        const existingConfig = (
+          await transaction
+            .select()
+            .from(pg.bashoGameConfig)
+            .where(eq(pg.bashoGameConfig.bashoId, config.bashoId))
+        ).at(0);
+        const currentTeamSize = existingConfig?.teamSize ?? defaultTeamSize;
+        const changed = currentTeamSize !== config.teamSize;
+
+        if (changed && row.status !== "upcoming") {
+          return {
+            status: "locked",
+            reason: "basho-not-upcoming",
+            basho: toBasho(row),
+          };
+        }
+
+        const hasTeams =
+          (
+            await transaction
+              .select({ id: pg.fantasyTeams.id })
+              .from(pg.fantasyTeams)
+              .where(eq(pg.fantasyTeams.bashoId, config.bashoId))
+              .limit(1)
+          ).length > 0;
+
+        if (changed && hasTeams) {
+          return {
+            status: "locked",
+            reason: "teams-exist",
+            basho: toBasho(row),
+          };
+        }
+
+        await transaction
+          .insert(pg.bashoGameConfig)
+          .values(config)
+          .onConflictDoUpdate({
+            target: pg.bashoGameConfig.bashoId,
+            set: { teamSize: config.teamSize },
+          });
+
+        return {
+          status: "updated",
+          changed,
+          canChangeTeamSize: row.status === "upcoming" && !hasTeams,
+          config,
+        };
+      }),
     transitionBashoLifecycle: async (bashoId, action, changedAt) =>
       db.transaction(async (transaction) => {
         const row = (
@@ -958,7 +1200,11 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
     insertFantasyTeam: async (entry) => {
       await db.insert(pg.fantasyTeams).values(toFantasyTeamRow(entry));
     },
-    insertFantasyTeamWithPicksIfBashoUpcoming: async (team, picks) =>
+    insertFantasyTeamWithPicksIfBashoUpcoming: async (
+      team,
+      picks,
+      defaultTeamSize = 2,
+    ) =>
       db.transaction(async (transaction) => {
         const basho = (
           await transaction
@@ -970,6 +1216,23 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
 
         if (basho?.status !== "upcoming") {
           return false;
+        }
+
+        const config = (
+          await transaction
+            .select({ teamSize: pg.bashoGameConfig.teamSize })
+            .from(pg.bashoGameConfig)
+            .where(eq(pg.bashoGameConfig.bashoId, team.bashoId))
+        ).at(0);
+
+        if (picks.length !== (config?.teamSize ?? defaultTeamSize)) {
+          return false;
+        }
+
+        if (config === undefined) {
+          await transaction
+            .insert(pg.bashoGameConfig)
+            .values({ bashoId: team.bashoId, teamSize: defaultTeamSize });
         }
 
         await transaction
@@ -984,7 +1247,11 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
 
         return true;
       }),
-    saveOwnedFantasyTeamWithPicksIfBashoUpcoming: async (team, picks) =>
+    saveOwnedFantasyTeamWithPicksIfBashoUpcoming: async (
+      team,
+      picks,
+      defaultTeamSize = 2,
+    ) =>
       db.transaction(async (transaction) => {
         const basho = (
           await transaction
@@ -995,7 +1262,19 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
         ).at(0);
 
         if (basho?.status !== "upcoming") {
-          return undefined;
+          return { status: "picks-locked" };
+        }
+
+        const config = (
+          await transaction
+            .select({ teamSize: pg.bashoGameConfig.teamSize })
+            .from(pg.bashoGameConfig)
+            .where(eq(pg.bashoGameConfig.bashoId, team.bashoId))
+        ).at(0);
+        const teamSize = config?.teamSize ?? defaultTeamSize;
+
+        if (picks.length !== teamSize) {
+          return { status: "invalid-team-size", teamSize };
         }
 
         const existingTeam = (
@@ -1012,7 +1291,13 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
         ).at(0);
 
         if (existingTeam !== undefined && existingTeam.lockedAt !== null) {
-          return undefined;
+          return { status: "picks-locked" };
+        }
+
+        if (config === undefined) {
+          await transaction
+            .insert(pg.bashoGameConfig)
+            .values({ bashoId: team.bashoId, teamSize: defaultTeamSize });
         }
 
         const savedTeam = (
@@ -1040,6 +1325,7 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
         }
 
         return {
+          status: "saved",
           team: toFantasyTeam(savedTeam),
           picks: toSavedFantasyPicks(picks, savedTeam.id),
         };

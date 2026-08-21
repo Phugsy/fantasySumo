@@ -30,6 +30,16 @@ Keep the import boundary source-agnostic:
 - support dry-run validation before writing to the database;
 - allow fallback between sources where practical.
 
+The protected `/admin` page now supplies that manual trigger. It defaults to a
+dry run, shows per-entity created/updated/skipped/deleted counts, reports
+following-schedule counts and partial success explicitly, and requires
+confirmation before writing live data. A banzuke dry run discovers the source
+basho even when it differs from the selected live basho or no live basho is
+stored. Applying that discovered target requires explicit confirmation, and the
+API rejects the write if the source changes between validation and application.
+Browser controls call the same adapter, validation, and transactional service
+boundaries as the CLI, manual API, and scheduled job.
+
 ## Source Investigation
 
 ### Japan Sumo Association banzuke endpoint

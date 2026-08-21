@@ -2,6 +2,8 @@ import type {
   AdminActionResponse,
   AdminBashoResponse,
   AdminDemoAction,
+  AdminGameConfigResponse,
+  AdminImportResponse,
   AdminLifecycleAction,
   Basho,
   BashoRikishiResponse,
@@ -18,6 +20,7 @@ interface ApiErrorBody {
   basho?: Omit<Basho, "teamSize">;
   bashoStatus?: Basho["status"];
   teamLockedAt?: string;
+  teamSize?: number;
   details?: Array<{
     message?: string;
   }>;
@@ -31,6 +34,7 @@ export class ApiRequestError extends Error {
     readonly bashoStatus: Basho["status"] | undefined = undefined,
     readonly teamLockedAt: string | undefined = undefined,
     readonly basho: Omit<Basho, "teamSize"> | undefined = undefined,
+    readonly teamSize: number | undefined = undefined,
   ) {
     super(message);
     this.name = "ApiRequestError";
@@ -103,6 +107,59 @@ export async function runAdminDemoAction(
   action: AdminDemoAction,
 ): Promise<AdminActionResponse> {
   return postJson<AdminActionResponse>(`/api/admin/demo/${action}`, {});
+}
+
+export async function fetchAdminGameConfig(
+  bashoId: string,
+): Promise<AdminGameConfigResponse> {
+  return getJson<AdminGameConfigResponse>(
+    `/api/admin/basho/${bashoId}/game-config`,
+  );
+}
+
+export async function updateAdminGameConfig(
+  bashoId: string,
+  teamSize: number,
+): Promise<AdminGameConfigResponse> {
+  return putJson<AdminGameConfigResponse>(
+    `/api/admin/basho/${bashoId}/game-config`,
+    { teamSize },
+  );
+}
+
+export async function runAdminBanzukeImport(
+  options: {
+    confirmedSourceBashoId?: string;
+    expectedBashoId?: string;
+  },
+  dryRun: boolean,
+): Promise<AdminImportResponse> {
+  return postJson<AdminImportResponse>(
+    `/api/admin/import-banzuke?dryRun=${String(dryRun)}`,
+    options,
+  );
+}
+
+export async function runAdminResultsImport(
+  bashoId: string,
+  day: number,
+  dryRun: boolean,
+): Promise<AdminImportResponse> {
+  return postJson<AdminImportResponse>(
+    `/api/admin/basho/${bashoId}/import-results?dryRun=${String(dryRun)}`,
+    { day, division: "Makuuchi" },
+  );
+}
+
+export async function runAdminScheduleImport(
+  bashoId: string,
+  day: number,
+  dryRun: boolean,
+): Promise<AdminImportResponse> {
+  return postJson<AdminImportResponse>(
+    `/api/admin/basho/${bashoId}/import-schedule?dryRun=${String(dryRun)}`,
+    { day, division: "Makuuchi" },
+  );
 }
 
 export function reportAuthClientTokenUnavailable(): void {
@@ -240,6 +297,7 @@ async function createApiRequestError(
     error.bashoStatus,
     error.teamLockedAt,
     error.basho,
+    error.teamSize,
   );
 }
 
@@ -249,6 +307,7 @@ async function readApiError(response: Response): Promise<{
   basho?: Omit<Basho, "teamSize">;
   bashoStatus?: Basho["status"];
   teamLockedAt?: string;
+  teamSize?: number;
 }> {
   try {
     const body = (await response.json()) as ApiErrorBody;
@@ -267,6 +326,7 @@ async function readApiError(response: Response): Promise<{
         ...(body.teamLockedAt === undefined
           ? {}
           : { teamLockedAt: body.teamLockedAt }),
+        ...(body.teamSize === undefined ? {} : { teamSize: body.teamSize }),
       };
     }
 
@@ -280,6 +340,7 @@ async function readApiError(response: Response): Promise<{
       ...(body.teamLockedAt === undefined
         ? {}
         : { teamLockedAt: body.teamLockedAt }),
+      ...(body.teamSize === undefined ? {} : { teamSize: body.teamSize }),
     };
   } catch {
     return { message: `Request failed with status ${response.status}.` };

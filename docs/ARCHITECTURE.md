@@ -70,13 +70,14 @@ Current behaviour:
 - Charts cumulative team scores across scored days with team filters,
   inspectable points, and an accessible exact-value table.
 - Exposes a dedicated `/admin` route only for sessions the API marks as admin,
-  with live lifecycle controls and isolated deterministic demo progression.
+  with live lifecycle controls, source-backed import controls, per-basho team
+  size, and isolated deterministic demo progression.
 - Shows loading, empty, success, and API error states.
 - Has Vitest coverage through React Testing Library.
 
 Current limitations:
 
-- No result import or game-configuration UI yet.
+- Secondary scoring modes and pick modifiers are not yet defined.
 - No persistence of the last created team in browser storage yet.
 
 ## Back end
@@ -104,7 +105,8 @@ Current routes:
 - `POST /api/basho/:bashoId/teams`
   - Creates or updates the signed-in user's fantasy team for the basho.
   - Request body: `displayName` and `rikishiIds`.
-  - The current team size defaults to 2 rikishi and can be changed with `TEAM_SIZE`.
+  - The team size comes from persisted per-basho game configuration, falling
+    back to `TEAM_SIZE` or 2 until an administrator saves it.
   - Validates duplicate picks, exact team size, and whether each picked rikishi is on that basho's banzuke.
   - Enforces one owned team per user per basho and preserves basho pick-locking rules.
 - `GET /api/basho/:bashoId/my-team`
@@ -162,6 +164,16 @@ Current routes:
   - Supports empty, partial, amended, cancelled, and withdrawal-annotated
     internal cards without allowing any scheduled row into scoring.
   - Supports `?dryRun=true`.
+- `GET /api/admin/basho/:bashoId/game-config`
+  - Returns the effective team size, whether it is persisted or inherited from
+    the server default, the fixed `wins-v0` scoring mode, and whether team size
+    can still change.
+- `PUT /api/admin/basho/:bashoId/game-config`
+  - Persists team size for one basho.
+  - Allows a changed value only while the basho is upcoming and before any
+    stable exists; idempotently persisting the effective value remains safe.
+  - Serializes on the basho row with team creation in Postgres, while the final
+    team write rechecks the persisted size inside the same transaction.
 - `POST /api/admin/demo/reset`
   - Requires an authenticated admin session or `DEMO_ADMIN_TOKEN`.
   - Resets deterministic demo data to day 0 with picks open and no applied results.
@@ -210,7 +222,8 @@ Current limitations:
 
 - Auth remains intentionally small. Local development uses a cookie-based development session, while production identity comes from Neon Auth JWTs verified by the API auth boundary.
 - No dedicated API client package.
-- Import and game-configuration controls remain outside the first admin UI slice.
+- Scoring-mode and pick-modifier configuration remain deferred until their
+  product rules are defined.
 
 ## Domain package
 
@@ -272,6 +285,10 @@ Current behaviour:
   demo data cannot silently change which environment the browser displays.
 - Provides demo progression API routes and commands that reset to day 0, start/lock picks, advance one day at a time, and complete the basho.
 - Stores basho lifecycle status and current day progress.
+- Stores optional per-basho game configuration separately from imported basho
+  facts. This keeps source-backed banzuke refreshes from overwriting fantasy
+  rules and lets existing deployments retain `TEAM_SIZE` as a fallback until a
+  value is explicitly saved.
 
 Current scripts:
 
@@ -300,8 +317,8 @@ local/test-only helper used by the separate sample seed command.
 
 Current limitations:
 
-- No banzuke/results import UI yet.
-- No hosted production database has been provisioned in the repo.
+- Live special-prize facts and secondary scoring configuration are not yet
+  modeled.
 
 ## Release boundary
 
