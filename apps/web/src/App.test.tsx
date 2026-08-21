@@ -189,7 +189,30 @@ describe("App", () => {
     expect(window.location.pathname).toBe("/stable");
     expect(document.title).toBe("My stable | Fantasy Sumo");
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "My stable" })).toHaveFocus();
+      const pageTitle = screen.getByRole("heading", { name: "My stable" });
+
+      expect(pageTitle).toHaveFocus();
+      expect(pageTitle).toHaveAttribute("data-focus-visible", "false");
+    });
+  });
+
+  it("marks route-heading focus as visible after keyboard navigation", async () => {
+    render(<App />);
+
+    const leaderboardLink = await screen.findByRole("link", {
+      name: "Leaderboard",
+    });
+    leaderboardLink.focus();
+    fireEvent.keyDown(leaderboardLink, { key: "Enter" });
+    fireEvent.click(leaderboardLink);
+
+    await waitFor(() => {
+      const pageTitle = screen.getByRole("heading", {
+        name: "Follow the leaderboard",
+      });
+
+      expect(pageTitle).toHaveFocus();
+      expect(pageTitle).toHaveAttribute("data-focus-visible", "true");
     });
   });
 

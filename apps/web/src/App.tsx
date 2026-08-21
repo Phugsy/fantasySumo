@@ -143,6 +143,7 @@ function RoutedApp() {
   >(undefined);
   const bashoRequestIdRef = useRef(0);
   const leaderboardRequestIdRef = useRef(0);
+  const routeFocusVisibleRef = useRef(false);
   const sessionOperationInFlightRef = useRef(false);
   const activeView = getActiveView(location.pathname);
 
@@ -729,10 +730,36 @@ function RoutedApp() {
   }, []);
 
   useEffect(() => {
+    const showRouteFocus = (event: KeyboardEvent) => {
+      if (!["Alt", "Control", "Meta", "Shift"].includes(event.key)) {
+        routeFocusVisibleRef.current = true;
+      }
+    };
+    const hideRouteFocus = () => {
+      routeFocusVisibleRef.current = false;
+    };
+
+    window.addEventListener("keydown", showRouteFocus, true);
+    window.addEventListener("pointerdown", hideRouteFocus, true);
+
+    return () => {
+      window.removeEventListener("keydown", showRouteFocus, true);
+      window.removeEventListener("pointerdown", hideRouteFocus, true);
+    };
+  }, []);
+
+  useEffect(() => {
     document.title = `${getPageTitle(activeView)} | Fantasy Sumo`;
 
     const focusTimer = window.setTimeout(() => {
-      document.getElementById("page-title")?.focus();
+      const pageTitle = document.getElementById("page-title");
+
+      if (pageTitle === null) {
+        return;
+      }
+
+      pageTitle.dataset.focusVisible = String(routeFocusVisibleRef.current);
+      pageTitle.focus({ preventScroll: true });
     }, 0);
 
     return () => window.clearTimeout(focusTimer);

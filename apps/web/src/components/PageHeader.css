@@ -10,6 +10,20 @@
   padding-top: 7px;
 }
 
+.page-header h1 {
+  width: fit-content;
+  max-width: 100%;
+}
+
+#page-title:focus {
+  outline: none;
+}
+
+#page-title[data-focus-visible="true"]:focus {
+  outline: 3px solid var(--focus);
+  outline-offset: 4px;
+}
+
 .lede {
   max-width: 670px;
   margin-bottom: 0;
