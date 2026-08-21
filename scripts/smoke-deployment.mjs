@@ -6,6 +6,11 @@ if (deploymentUrl === undefined) {
 
 const baseUrl = new URL(deploymentUrl);
 const protectionBypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+const bashoMode = process.env.SMOKE_BASHO_MODE;
+
+if (bashoMode !== undefined && bashoMode !== "demo") {
+  throw new Error('SMOKE_BASHO_MODE must be unset or "demo"');
+}
 
 if (!protectionBypassSecret) {
   throw new Error(
@@ -71,7 +76,12 @@ await waitFor("API health", async () => {
 });
 
 await waitFor("API database", async () => {
-  const response = await fetch(new URL("/api/basho/current", baseUrl), {
+  const currentBashoUrl = new URL("/api/basho/current", baseUrl);
+  if (bashoMode === "demo") {
+    currentBashoUrl.searchParams.set("mode", "demo");
+  }
+
+  const response = await fetch(currentBashoUrl, {
     headers: requestHeaders,
     redirect: "follow",
     signal: AbortSignal.timeout(requestTimeoutMs),
@@ -84,6 +94,9 @@ await waitFor("API database", async () => {
   const payload = await response.json();
 
   if (response.status === 404) {
+    if (bashoMode === "demo") {
+      throw new Error("GET /api/basho/current did not find the demo fixture");
+    }
     if (payload.error !== "not-found") {
       throw new Error("GET /api/basho/current returned an unexpected payload");
     }
@@ -92,5 +105,9 @@ await waitFor("API database", async () => {
 
   if (typeof payload.id !== "string" || typeof payload.name !== "string") {
     throw new Error("GET /api/basho/current returned an unexpected payload");
+  }
+
+  if (bashoMode === "demo" && payload.isDemo !== true) {
+    throw new Error("GET /api/basho/current did not return demo data");
   }
 });

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 const previewPath = ".github/workflows/deploy-preview.yml";
+const playtestPath = ".github/workflows/deploy-playtest.yml";
 const productionPath = ".github/workflows/deploy-production.yml";
 const qualityPath = ".github/workflows/quality.yml";
 const smokePath = "scripts/smoke-deployment.mjs";
@@ -8,6 +9,7 @@ const packagePath = "package.json";
 const tsconfigPath = "tsconfig.json";
 const vercelPath = "vercel.json";
 const preview = readFileSync(previewPath, "utf8");
+const playtest = readFileSync(playtestPath, "utf8");
 const production = readFileSync(productionPath, "utf8");
 const quality = readFileSync(qualityPath, "utf8");
 const smoke = readFileSync(smokePath, "utf8");
@@ -121,6 +123,7 @@ requireText(
 
 for (const [source, file, environment, concurrencyGroup] of [
   [preview, previewPath, "Preview", "fantasy-sumo-preview-database"],
+  [playtest, playtestPath, "Playtest", "fantasy-sumo-playtest-database"],
   [
     production,
     productionPath,
@@ -278,6 +281,119 @@ requireText(
   /gh api "repos\/\$GITHUB_REPOSITORY\/pulls\/\$PR_NUMBER" --jq \.head\.sha/,
 );
 requireText(
+  playtest,
+  playtestPath,
+  "be manually dispatched rather than deploy on repository events",
+  /on:\s*\n\s*workflow_dispatch:/,
+);
+forbidText(
+  playtest,
+  playtestPath,
+  "deploy automatically for pull requests, pushes, or releases",
+  /\n\s+(pull_request|push|release):/,
+);
+requireText(
+  playtest,
+  playtestPath,
+  "require a full commit SHA for playtest deployments",
+  /\^\[0-9a-fA-F\]\{40\}\$/,
+);
+requireText(
+  playtest,
+  playtestPath,
+  "restrict playtests to commits from master",
+  /merge-base --is-ancestor.*origin\/master/,
+);
+const playtestDeployJob = getJob(playtest, playtestPath, "deploy");
+requireText(
+  playtest,
+  playtestPath,
+  "grant only read access to Actions metadata used for stale-run checks",
+  /permissions:\s*\n\s*actions: read\s*\n\s*contents: read/,
+);
+requireText(
+  playtestDeployJob,
+  playtestPath,
+  "build the client in deterministic demo mode",
+  /Build prepared playtest deployment[\s\S]*?VITE_BASHO_MODE: demo[\s\S]*?vercel@56\.3\.2 build/,
+);
+requireText(
+  playtestDeployJob,
+  playtestPath,
+  "make demo reset an explicit manual choice",
+  /Reset deterministic demo for a new round[\s\S]*?if: inputs\.reset_demo[\s\S]*?pnpm db:seed:demo/,
+);
+const playtestResetStep = playtestDeployJob.match(
+  /- name: Reset deterministic demo for a new round[\s\S]*?(?=\n\s+- name:)/,
+)?.[0];
+if (playtestResetStep === undefined) {
+  throw new Error(
+    `${playtestPath} must define the deterministic demo reset step.`,
+  );
+}
+requireOrder(
+  playtestResetStep,
+  playtestPath,
+  "actions/workflows/deploy-playtest.yml/runs?event=workflow_dispatch&per_page=100",
+  "pnpm db:seed:demo",
+);
+requireOrder(
+  playtestDeployJob,
+  playtestPath,
+  "Require latest playtest dispatch before database changes",
+  "Apply playtest database migrations",
+);
+requireOrder(
+  playtestDeployJob,
+  playtestPath,
+  "Apply playtest database migrations",
+  "Reset deterministic demo for a new round",
+);
+requireOrder(
+  playtestDeployJob,
+  playtestPath,
+  "Reset deterministic demo for a new round",
+  "Require latest playtest dispatch before deployment",
+);
+requireOrder(
+  playtestDeployJob,
+  playtestPath,
+  "Require latest playtest dispatch before deployment",
+  "Deploy tested playtest build",
+);
+requireOccurrenceCount(
+  playtestDeployJob,
+  playtestPath,
+  "reject stale dispatches before migration, immediately before reset, and before deployment",
+  "actions/workflows/deploy-playtest.yml/runs?event=workflow_dispatch&per_page=100",
+  3,
+);
+requireOccurrenceCount(
+  playtestDeployJob,
+  playtestPath,
+  "compare every stale-run check with the current run number",
+  'latest_run_number" != "$GITHUB_RUN_NUMBER',
+  3,
+);
+requireText(
+  playtestDeployJob,
+  playtestPath,
+  "smoke-test the flagged deterministic demo",
+  /SMOKE_BASHO_MODE: demo/,
+);
+requireText(
+  playtestDeployJob,
+  playtestPath,
+  "record the playtest round in deployment metadata",
+  /--meta playtestRound="\$PLAYTEST_ROUND"/,
+);
+forbidText(
+  playtestDeployJob,
+  playtestPath,
+  "publish the playtest through a production deployment",
+  /vercel@56\.3\.2 deploy[^\n]*--prod/,
+);
+requireText(
   production,
   productionPath,
   "support manually approved releases",
@@ -332,6 +448,12 @@ requireText(
   smokePath,
   "send the Vercel automation protection bypass header",
   /"x-vercel-protection-bypass": protectionBypassSecret/,
+);
+requireText(
+  smoke,
+  smokePath,
+  "support asserting the flagged deterministic demo for playtests",
+  /SMOKE_BASHO_MODE[\s\S]*searchParams\.set\("mode", "demo"\)[\s\S]*payload\.isDemo !== true/,
 );
 
 if (vercelConfig.git?.deploymentEnabled !== false) {
