@@ -110,10 +110,10 @@ The workflow validates and runs browser E2E against the immutable SHA, builds
 the client in demo mode, migrates the playtest database, optionally resets only
 the flagged demo, deploys the prepared preview artifact, and verifies that the
 hosted API returns `isDemo: true`. Migration, reset, deployment, and smoke-test
-results appear in the workflow summary. It rejects a run that became stale
-behind a newer playtest dispatch before touching the database and checks again
-before deployment; dispatch rounds one at a time rather than relying on those
-guards as an operating queue.
+results appear in the workflow summary. Workflow-level queued concurrency keeps
+every round's validation, migration, optional reset, and deployment together;
+only one playtest run executes at a time, and pending runs wait instead of
+overtaking an in-progress reset. Cancel an unwanted pending run explicitly.
 
 For the first deployment, select `reset_demo: true`. If the database is empty
 and reset is false, the demo smoke test fails instead of publishing an

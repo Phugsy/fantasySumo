@@ -18,8 +18,12 @@ on:
         type: boolean
 
 permissions:
-  actions: read
   contents: read
+
+concurrency:
+  group: fantasy-sumo-playtest-database
+  cancel-in-progress: false
+  queue: max
 
 jobs:
   resolve:
@@ -125,9 +129,6 @@ jobs:
       - e2e
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    concurrency:
-      group: fantasy-sumo-playtest-database
-      cancel-in-progress: false
     environment:
       name: Playtest
       url: ${{ steps.deploy.outputs.url }}
@@ -175,16 +176,6 @@ jobs:
       - name: Type-check Vercel function entrypoint
         run: pnpm exec tsc -p tsconfig.json
 
-      - name: Require latest playtest dispatch before database changes
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          latest_run_number=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy-playtest.yml/runs?event=workflow_dispatch&per_page=100" --jq '[.workflow_runs[].run_number] | max')
-          if [[ "$latest_run_number" != "$GITHUB_RUN_NUMBER" ]]; then
-            echo "Refusing stale playtest run $GITHUB_RUN_NUMBER; latest dispatch is $latest_run_number." >&2
-            exit 1
-          fi
-
       - name: Apply playtest database migrations
         id: migrate
         env:
@@ -199,25 +190,8 @@ jobs:
         if: inputs.reset_demo
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GH_TOKEN: ${{ github.token }}
           NODE_ENV: production
-        run: |
-          latest_run_number=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy-playtest.yml/runs?event=workflow_dispatch&per_page=100" --jq '[.workflow_runs[].run_number] | max')
-          if [[ "$latest_run_number" != "$GITHUB_RUN_NUMBER" ]]; then
-            echo "Refusing stale playtest reset from run $GITHUB_RUN_NUMBER; latest dispatch is $latest_run_number." >&2
-            exit 1
-          fi
-          pnpm db:seed:demo
-
-      - name: Require latest playtest dispatch before deployment
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          latest_run_number=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy-playtest.yml/runs?event=workflow_dispatch&per_page=100" --jq '[.workflow_runs[].run_number] | max')
-          if [[ "$latest_run_number" != "$GITHUB_RUN_NUMBER" ]]; then
-            echo "Refusing stale playtest run $GITHUB_RUN_NUMBER; latest dispatch is $latest_run_number." >&2
-            exit 1
-          fi
+        run: pnpm db:seed:demo
 
       - name: Deploy tested playtest build
         id: deploy

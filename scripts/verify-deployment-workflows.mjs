@@ -121,14 +121,21 @@ requireText(
   /needs: validate/,
 );
 
-for (const [source, file, environment, concurrencyGroup] of [
-  [preview, previewPath, "Preview", "fantasy-sumo-preview-database"],
-  [playtest, playtestPath, "Playtest", "fantasy-sumo-playtest-database"],
+for (const [source, file, environment, concurrencyGroup, concurrencyScope] of [
+  [preview, previewPath, "Preview", "fantasy-sumo-preview-database", "job"],
+  [
+    playtest,
+    playtestPath,
+    "Playtest",
+    "fantasy-sumo-playtest-database",
+    "workflow",
+  ],
   [
     production,
     productionPath,
     "Production",
     "fantasy-sumo-production-database",
+    "job",
   ],
 ]) {
   requireContainerizedE2E(source, file, true);
@@ -149,6 +156,10 @@ for (const [source, file, environment, concurrencyGroup] of [
     0,
     deployJob.indexOf("\n    steps:"),
   );
+  const concurrencyConfig =
+    concurrencyScope === "workflow"
+      ? source.slice(0, source.indexOf("\njobs:"))
+      : deployJobPreamble;
 
   requireText(
     deployJob,
@@ -157,7 +168,7 @@ for (const [source, file, environment, concurrencyGroup] of [
     new RegExp(`name: ${environment}`),
   );
   requireText(
-    deployJob,
+    concurrencyConfig,
     file,
     "serialize database migrations and deployments",
     new RegExp(`group: ${concurrencyGroup}`),
@@ -169,7 +180,7 @@ for (const [source, file, environment, concurrencyGroup] of [
     /needs:\s*\n\s+- resolve\s*\n\s+- validate\s*\n\s+- e2e/,
   );
   requireText(
-    deployJob,
+    concurrencyConfig,
     file,
     "avoid interrupting an in-flight migration or deployment",
     /cancel-in-progress: false/,
@@ -308,8 +319,27 @@ const playtestDeployJob = getJob(playtest, playtestPath, "deploy");
 requireText(
   playtest,
   playtestPath,
-  "grant only read access to Actions metadata used for stale-run checks",
-  /permissions:\s*\n\s*actions: read\s*\n\s*contents: read/,
+  "grant only read access to repository contents",
+  /permissions:\s*\n\s*contents: read/,
+);
+forbidText(
+  playtest,
+  playtestPath,
+  "request Actions metadata permissions",
+  /permissions:\s*\n\s*actions:/,
+);
+const playtestWorkflowPreamble = playtest.slice(0, playtest.indexOf("\njobs:"));
+requireText(
+  playtestWorkflowPreamble,
+  playtestPath,
+  "queue all playtest runs at the workflow boundary",
+  /concurrency:\s*\n\s*group: fantasy-sumo-playtest-database\s*\n\s*cancel-in-progress: false\s*\n\s*queue: max/,
+);
+forbidText(
+  playtestDeployJob,
+  playtestPath,
+  "add a redundant job-level concurrency boundary",
+  /\n\s{4}concurrency:/,
 );
 requireText(
   playtestDeployJob,
@@ -323,26 +353,6 @@ requireText(
   "make demo reset an explicit manual choice",
   /Reset deterministic demo for a new round[\s\S]*?if: inputs\.reset_demo[\s\S]*?pnpm db:seed:demo/,
 );
-const playtestResetStep = playtestDeployJob.match(
-  /- name: Reset deterministic demo for a new round[\s\S]*?(?=\n\s+- name:)/,
-)?.[0];
-if (playtestResetStep === undefined) {
-  throw new Error(
-    `${playtestPath} must define the deterministic demo reset step.`,
-  );
-}
-requireOrder(
-  playtestResetStep,
-  playtestPath,
-  "actions/workflows/deploy-playtest.yml/runs?event=workflow_dispatch&per_page=100",
-  "pnpm db:seed:demo",
-);
-requireOrder(
-  playtestDeployJob,
-  playtestPath,
-  "Require latest playtest dispatch before database changes",
-  "Apply playtest database migrations",
-);
 requireOrder(
   playtestDeployJob,
   playtestPath,
@@ -353,27 +363,13 @@ requireOrder(
   playtestDeployJob,
   playtestPath,
   "Reset deterministic demo for a new round",
-  "Require latest playtest dispatch before deployment",
-);
-requireOrder(
-  playtestDeployJob,
-  playtestPath,
-  "Require latest playtest dispatch before deployment",
   "Deploy tested playtest build",
 );
-requireOccurrenceCount(
-  playtestDeployJob,
+forbidText(
+  playtest,
   playtestPath,
-  "reject stale dispatches before migration, immediately before reset, and before deployment",
-  "actions/workflows/deploy-playtest.yml/runs?event=workflow_dispatch&per_page=100",
-  3,
-);
-requireOccurrenceCount(
-  playtestDeployJob,
-  playtestPath,
-  "compare every stale-run check with the current run number",
-  'latest_run_number" != "$GITHUB_RUN_NUMBER',
-  3,
+  "use racy Actions-API freshness checks instead of workflow serialization",
+  /actions\/workflows\/deploy-playtest\.yml\/runs/,
 );
 requireText(
   playtestDeployJob,

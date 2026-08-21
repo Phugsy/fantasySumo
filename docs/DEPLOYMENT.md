@@ -68,11 +68,13 @@ binaries plus their operating-system libraries, so validation does not run
 Main validation and browser E2E remain separate jobs, and deployments require
 both jobs for the same immutable SHA.
 
-The deploy jobs use constant, environment-specific concurrency groups. Only one
-migration/deployment per Preview, Playtest, or Production database can run at a
-time. Validation jobs may overlap because they do not touch a shared hosted
-database. `cancel-in-progress` is disabled so an in-flight migration or release
-is never interrupted by a newer run.
+The release paths use constant, environment-specific concurrency groups. Only
+one migration/deployment per Preview, Playtest, or Production database can run
+at a time. Preview and production validation jobs may overlap because they do
+not touch a shared hosted database. Playtest serializes the entire workflow and
+queues pending rounds so a later validation run cannot overtake an earlier
+explicit reset. `cancel-in-progress` is disabled so an in-flight migration or
+release is never interrupted by a newer run.
 
 Immediately before an automatic release can migrate production, the deploy job
 also verifies that its GitHub Release is still the latest published full
