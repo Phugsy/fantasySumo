@@ -312,3 +312,9 @@ browser project covers the app/provider contract with a stubbed Neon endpoint;
 preview smoke testing must still prove delivery and a real single-use token.
 The role-gated deterministic demo admin loop is covered locally; add hosted
 admin journeys only when a safe isolated production-auth boundary exists.
+
+The manual playtest path in [Shared Demo Playtests](PLAYTEST.md) supplies that
+isolated hosted boundary. Its deploy workflow still runs the deterministic
+local Playwright suite before deployment, then uses a demo-aware hosted smoke
+test. The first real multi-user Neon Auth round remains manual evidence because
+CI must not store tester passwords or administrator browser sessions.

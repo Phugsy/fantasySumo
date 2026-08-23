@@ -1,0 +1,236 @@
+name: Deploy Playtest
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Exact commit SHA from master to deploy
+        required: true
+        type: string
+      round_id:
+        description: Short playtest round ID, for example 2026-08-a
+        required: true
+        type: string
+      reset_demo:
+        description: Delete and recreate only the deterministic demo before deployment
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fantasy-sumo-playtest-database
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+      playwright_image: ${{ steps.commit.outputs.playwright_image }}
+    steps:
+      - name: Check out requested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+          fetch-depth: 0
+
+      - name: Require a commit from master and a safe round ID
+        id: commit
+        env:
+          PLAYTEST_ROUND: ${{ inputs.round_id }}
+          REQUESTED_SHA: ${{ inputs.sha }}
+        run: |
+          if [[ ! "$REQUESTED_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "Playtest deployments require a full 40-character commit SHA." >&2
+            exit 1
+          fi
+          deploy_sha=$(git rev-parse HEAD)
+          if [[ "${deploy_sha,,}" != "${REQUESTED_SHA,,}" ]]; then
+            echo "Checked-out commit does not match the requested playtest SHA." >&2
+            exit 1
+          fi
+          git fetch origin master
+          git merge-base --is-ancestor "$deploy_sha" origin/master
+          if [[ ! "$PLAYTEST_ROUND" =~ ^[0-9A-Za-z][0-9A-Za-z._-]{0,39}$ ]]; then
+            echo "Round ID must be 1-40 letters, numbers, dots, underscores, or hyphens." >&2
+            exit 1
+          fi
+          playwright_version=$(awk '/@playwright\/test/{found=1; next} found && $1 == "version:" {version=$2; sub(/\(.*/, "", version); print version; exit}' pnpm-lock.yaml)
+          if [[ ! "$playwright_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Unable to resolve an exact Playwright version from pnpm-lock.yaml." >&2
+            exit 1
+          fi
+          echo "sha=$deploy_sha" >> "$GITHUB_OUTPUT"
+          echo "playwright_image=mcr.microsoft.com/playwright:v${playwright_version}-noble" >> "$GITHUB_OUTPUT"
+
+  validate:
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out resolved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run main validation
+        run: make check
+
+  e2e:
+    needs:
+      - resolve
+      - validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: ${{ needs.resolve.outputs.playwright_image }}
+      options: --ipc=host
+    steps:
+      - name: Check out resolved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run browser E2E
+        run: pnpm e2e
+
+  deploy:
+    needs:
+      - resolve
+      - validate
+      - e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: Playtest
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      DEPLOY_SHA: ${{ needs.resolve.outputs.sha }}
+      PLAYTEST_ROUND: ${{ inputs.round_id }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Check out tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - name: Check out workflow smoke tooling
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .workflow-tools
+          sparse-checkout: scripts/smoke-deployment.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Pull dedicated Vercel playtest configuration
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: pnpm dlx vercel@56.3.2 pull --yes --environment=preview --token="$VERCEL_TOKEN"
+
+      - name: Build prepared playtest deployment
+        env:
+          VITE_BASHO_MODE: demo
+        run: pnpm dlx vercel@56.3.2 build
+
+      - name: Type-check Vercel function entrypoint
+        run: pnpm exec tsc -p tsconfig.json
+
+      - name: Apply playtest database migrations
+        id: migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_ENV: production
+        run: |
+          pnpm db:migrate
+          echo "result=success" >> "$GITHUB_OUTPUT"
+
+      - name: Reset deterministic demo for a new round
+        id: reset
+        if: inputs.reset_demo
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_ENV: production
+        run: pnpm db:seed:demo
+
+      - name: Deploy tested playtest build
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          deployment_url=$(pnpm dlx vercel@56.3.2 deploy --prebuilt --token="$VERCEL_TOKEN" --meta githubCommitSha="$DEPLOY_SHA" --meta playtestRound="$PLAYTEST_ROUND" | tail -n 1)
+          case "$deployment_url" in
+            https://*) ;;
+            *) echo "Vercel returned an invalid deployment URL" >&2; exit 1 ;;
+          esac
+          echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke-test playtest deployment
+        id: smoke
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+          SMOKE_BASHO_MODE: demo
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: node .workflow-tools/scripts/smoke-deployment.mjs "$DEPLOYMENT_URL"
+
+      - name: Write playtest deployment summary
+        if: always()
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+          MIGRATION_RESULT: ${{ steps.migrate.outcome }}
+          RESET_REQUESTED: ${{ inputs.reset_demo }}
+          RESET_RESULT: ${{ steps.reset.outcome }}
+          SMOKE_RESULT: ${{ steps.smoke.outcome }}
+        run: |
+          echo "## Playtest deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Environment: playtest" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Round ID: \`$PLAYTEST_ROUND\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit SHA: \`$DEPLOY_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Migration result: ${MIGRATION_RESULT:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Demo reset requested: $RESET_REQUESTED" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Demo reset result: ${RESET_RESULT:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deployment URL: ${DEPLOYMENT_URL:-not-created}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Demo smoke-test result: ${SMOKE_RESULT:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$MIGRATION_RESULT" == "success" && "$SMOKE_RESULT" != "success" ]]; then
+            echo "- Recovery: the database may already be ahead; fix forward or redeploy code compatible with the advanced schema. Do not run down migrations automatically." >> "$GITHUB_STEP_SUMMARY"
+          fi

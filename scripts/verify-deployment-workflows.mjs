@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 const previewPath = ".github/workflows/deploy-preview.yml";
+const playtestPath = ".github/workflows/deploy-playtest.yml";
 const productionPath = ".github/workflows/deploy-production.yml";
 const qualityPath = ".github/workflows/quality.yml";
 const smokePath = "scripts/smoke-deployment.mjs";
@@ -8,6 +9,7 @@ const packagePath = "package.json";
 const tsconfigPath = "tsconfig.json";
 const vercelPath = "vercel.json";
 const preview = readFileSync(previewPath, "utf8");
+const playtest = readFileSync(playtestPath, "utf8");
 const production = readFileSync(productionPath, "utf8");
 const quality = readFileSync(qualityPath, "utf8");
 const smoke = readFileSync(smokePath, "utf8");
@@ -119,13 +121,21 @@ requireText(
   /needs: validate/,
 );
 
-for (const [source, file, environment, concurrencyGroup] of [
-  [preview, previewPath, "Preview", "fantasy-sumo-preview-database"],
+for (const [source, file, environment, concurrencyGroup, concurrencyScope] of [
+  [preview, previewPath, "Preview", "fantasy-sumo-preview-database", "job"],
+  [
+    playtest,
+    playtestPath,
+    "Playtest",
+    "fantasy-sumo-playtest-database",
+    "workflow",
+  ],
   [
     production,
     productionPath,
     "Production",
     "fantasy-sumo-production-database",
+    "job",
   ],
 ]) {
   requireContainerizedE2E(source, file, true);
@@ -146,6 +156,10 @@ for (const [source, file, environment, concurrencyGroup] of [
     0,
     deployJob.indexOf("\n    steps:"),
   );
+  const concurrencyConfig =
+    concurrencyScope === "workflow"
+      ? source.slice(0, source.indexOf("\njobs:"))
+      : deployJobPreamble;
 
   requireText(
     deployJob,
@@ -154,7 +168,7 @@ for (const [source, file, environment, concurrencyGroup] of [
     new RegExp(`name: ${environment}`),
   );
   requireText(
-    deployJob,
+    concurrencyConfig,
     file,
     "serialize database migrations and deployments",
     new RegExp(`group: ${concurrencyGroup}`),
@@ -166,7 +180,7 @@ for (const [source, file, environment, concurrencyGroup] of [
     /needs:\s*\n\s+- resolve\s*\n\s+- validate\s*\n\s+- e2e/,
   );
   requireText(
-    deployJob,
+    concurrencyConfig,
     file,
     "avoid interrupting an in-flight migration or deployment",
     /cancel-in-progress: false/,
@@ -278,6 +292,104 @@ requireText(
   /gh api "repos\/\$GITHUB_REPOSITORY\/pulls\/\$PR_NUMBER" --jq \.head\.sha/,
 );
 requireText(
+  playtest,
+  playtestPath,
+  "be manually dispatched rather than deploy on repository events",
+  /on:\s*\n\s*workflow_dispatch:/,
+);
+forbidText(
+  playtest,
+  playtestPath,
+  "deploy automatically for pull requests, pushes, or releases",
+  /\n\s+(pull_request|push|release):/,
+);
+requireText(
+  playtest,
+  playtestPath,
+  "require a full commit SHA for playtest deployments",
+  /\^\[0-9a-fA-F\]\{40\}\$/,
+);
+requireText(
+  playtest,
+  playtestPath,
+  "restrict playtests to commits from master",
+  /merge-base --is-ancestor.*origin\/master/,
+);
+const playtestDeployJob = getJob(playtest, playtestPath, "deploy");
+requireText(
+  playtest,
+  playtestPath,
+  "grant only read access to repository contents",
+  /permissions:\s*\n\s*contents: read/,
+);
+forbidText(
+  playtest,
+  playtestPath,
+  "request Actions metadata permissions",
+  /permissions:\s*\n\s*actions:/,
+);
+const playtestWorkflowPreamble = playtest.slice(0, playtest.indexOf("\njobs:"));
+requireText(
+  playtestWorkflowPreamble,
+  playtestPath,
+  "queue all playtest runs at the workflow boundary",
+  /concurrency:\s*\n\s*group: fantasy-sumo-playtest-database\s*\n\s*cancel-in-progress: false\s*\n\s*queue: max/,
+);
+forbidText(
+  playtestDeployJob,
+  playtestPath,
+  "add a redundant job-level concurrency boundary",
+  /\n\s{4}concurrency:/,
+);
+requireText(
+  playtestDeployJob,
+  playtestPath,
+  "build the client in deterministic demo mode",
+  /Build prepared playtest deployment[\s\S]*?VITE_BASHO_MODE: demo[\s\S]*?vercel@56\.3\.2 build/,
+);
+requireText(
+  playtestDeployJob,
+  playtestPath,
+  "make demo reset an explicit manual choice",
+  /Reset deterministic demo for a new round[\s\S]*?if: inputs\.reset_demo[\s\S]*?pnpm db:seed:demo/,
+);
+requireOrder(
+  playtestDeployJob,
+  playtestPath,
+  "Apply playtest database migrations",
+  "Reset deterministic demo for a new round",
+);
+requireOrder(
+  playtestDeployJob,
+  playtestPath,
+  "Reset deterministic demo for a new round",
+  "Deploy tested playtest build",
+);
+forbidText(
+  playtest,
+  playtestPath,
+  "use racy Actions-API freshness checks instead of workflow serialization",
+  /actions\/workflows\/deploy-playtest\.yml\/runs/,
+);
+requireText(
+  playtestDeployJob,
+  playtestPath,
+  "smoke-test the flagged deterministic demo",
+  /SMOKE_BASHO_MODE: demo/,
+);
+requireText(
+  playtestDeployJob,
+  playtestPath,
+  "record the playtest round in deployment metadata",
+  /--meta playtestRound="\$PLAYTEST_ROUND"/,
+);
+forbidText(
+  playtestDeployJob,
+  playtestPath,
+  "publish the playtest through a production deployment",
+  /vercel@56\.3\.2 deploy[^\n]*--prod/,
+);
+requireText(
   production,
   productionPath,
   "support manually approved releases",
@@ -332,6 +444,12 @@ requireText(
   smokePath,
   "send the Vercel automation protection bypass header",
   /"x-vercel-protection-bypass": protectionBypassSecret/,
+);
+requireText(
+  smoke,
+  smokePath,
+  "support asserting the flagged deterministic demo for playtests",
+  /SMOKE_BASHO_MODE[\s\S]*searchParams\.set\("mode", "demo"\)[\s\S]*payload\.isDemo !== true/,
 );
 
 if (vercelConfig.git?.deploymentEnabled !== false) {
