@@ -39,12 +39,24 @@ Hosted deployments are owned by GitHub Actions:
   outside `master`, validates the resolved SHA, waits at the protected
   `production` environment, prepares the production build, migrates, deploys
   that same SHA, and runs the same smoke tests.
+- `.github/workflows/deploy-playtest.yml` is manual-only and accepts an exact
+  `master` SHA plus a named playtest round. It uses a dedicated `Playtest`
+  GitHub environment and Vercel project, builds the deterministic demo client,
+  migrates a separate Neon database, optionally performs an explicit demo-only
+  reset, deploys a protected preview artifact, and verifies `isDemo: true`.
 
 The workflows remain separate because their trust boundaries and release
 inputs differ: preview accepts same-repository PR heads and manual refs, while
 production accepts only exact `master` ancestors behind the protected
 `Production` environment. Keeping those policies explicit is more valuable
 than sharing the comparatively small setup/deploy sequence.
+
+The playtest path is intentionally separate from ordinary PR previews. Its
+database is shared by invited testers across deployments, so it never resets
+unless the operator selects `reset_demo`. It also never uses `--prod`; this
+keeps the deployment within Vercel Standard Protection. See
+[Shared Demo Playtests](PLAYTEST.md) for the access model, environment setup,
+reset cadence, round evidence, and teardown.
 
 Browser E2E runs in the official Playwright image pinned to the exact installed
 `@playwright/test` version. Quality keeps the dependency and image tag in
@@ -56,11 +68,13 @@ binaries plus their operating-system libraries, so validation does not run
 Main validation and browser E2E remain separate jobs, and deployments require
 both jobs for the same immutable SHA.
 
-The deploy jobs use constant, environment-specific concurrency groups. Only one
-preview migration/deployment and one production migration/deployment can run at
-a time. Validation jobs may overlap because they do not touch a shared hosted
-database. `cancel-in-progress` is disabled so an in-flight migration or release
-is never interrupted by a newer run.
+The release paths use constant, environment-specific concurrency groups. Only
+one migration/deployment per Preview, Playtest, or Production database can run
+at a time. Preview and production validation jobs may overlap because they do
+not touch a shared hosted database. Playtest serializes the entire workflow and
+queues pending rounds so a later validation run cannot overtake an earlier
+explicit reset. `cancel-in-progress` is disabled so an in-flight migration or
+release is never interrupted by a newer run.
 
 Immediately before an automatic release can migrate production, the deploy job
 also verifies that its GitHub Release is still the latest published full
@@ -80,10 +94,12 @@ summary records the environment, immutable commit SHA, migration result,
 deployment URL, smoke-test result, and the recovery warning when the database
 may have advanced before a later failure.
 
-Both deployment workflows load the smoke-test script from the workflow
+All deployment workflows load the smoke-test script from the workflow
 revision rather than the selected application SHA. This keeps post-deployment
 verification available when an operator intentionally selects an older preview
-or production commit that predates the smoke tooling.
+or production commit that predates the smoke tooling. The playtest supplies a
+demo-only smoke mode so an empty or incorrectly classified fixture fails the
+deployment check.
 
 ### One-time GitHub and Vercel setup
 
@@ -128,6 +144,12 @@ Without it, the Vercel Git integration creates a second deployment for every
 push and can publish code before GitHub's blocking migration job. Keep the
 Vercel project itself and its separate preview/production runtime variables;
 only Actions should initiate releases.
+
+The separate `Playtest` environment uses the same variable and secret names but
+must point to a third database/auth tenant and a second, dedicated Vercel
+project. Do not copy the Preview or Production `DATABASE_URL` or the existing
+deployment project's `VERCEL_PROJECT_ID`. Its complete setup checklist is in
+[Shared Demo Playtests](PLAYTEST.md).
 
 Before enabling pull-request deployment, run the preview workflow manually for
 a known commit and confirm the workflow summary points at the preview Neon

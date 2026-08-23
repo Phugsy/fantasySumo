@@ -323,12 +323,18 @@ Current limitations:
 ## Release boundary
 
 `.github/workflows/deploy-preview.yml` and
-`.github/workflows/deploy-production.yml` own hosted release ordering. They
-serialize each shared `Preview` and `Production` database environment
-independently and keep migrations
-out of serverless startup. The production workflow accepts an exact commit from
-`master` or the commit behind a published GitHub Release, then builds, migrates,
-deploys, and smoke-tests that same SHA.
+`.github/workflows/deploy-production.yml` own normal hosted release ordering.
+They serialize each shared `Preview` and `Production` database environment
+independently and keep migrations out of serverless startup. The production
+workflow accepts an exact commit from `master` or the commit behind a published
+GitHub Release, then builds, migrates, deploys, and smoke-tests that same SHA.
+
+`.github/workflows/deploy-playtest.yml` is a third, manual-only boundary. It
+accepts an exact `master` SHA, builds a demo-only client, and serializes
+migration, optional demo reset, preview deployment, and demo-aware smoke testing
+against dedicated Playtest infrastructure. It does not promote or share data
+with either normal environment. Operational details live in
+[Shared Demo Playtests](PLAYTEST.md).
 
 The migration ledger and transactional Postgres runner remain in
 `packages/db`; the workflows only invoke the existing `pnpm db:migrate`
