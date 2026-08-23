@@ -84,7 +84,7 @@ Goal: make it robust enough to share more widely.
 Before display-preference work, make the game rules deliberate:
 
 1. Provide a separate shared demo/playtest environment without using the
-   production database (#91).
+   production database, then record the first multi-user round (#91).
 2. Define one secondary scoring mode, including whether kinboshi and special
    prizes award points and what source facts are required (#92).
 3. Select and specify one pick modifier or withdrawal mechanic, such as a

@@ -21,8 +21,10 @@ At present, the app has the first local playable foundations:
 - A minimal current-user/session boundary for local development and production auth integration.
 - Vitest, ESLint, and Prettier wired through pnpm scripts.
 
-It now supports the local playable and administrator loops; shared playtesting,
-secondary scoring rules, and pick modifiers remain deliberate follow-up work.
+It now supports the local playable and administrator loops and includes a
+manual, isolated shared-playtest deployment path. Running the first hosted
+multi-user round, secondary scoring rules, and pick modifiers remain deliberate
+follow-up work.
 
 ## Tech Stack
 
@@ -49,6 +51,7 @@ Start here:
 - `docs/adr/0001-rebuild-architecture.md` - accepted rebuild architecture decision.
 - `docs/DATA_IMPORT_STRATEGY.md` - MVP data-source investigation and import recommendation.
 - `docs/DEPLOYMENT.md` - Vercel and managed database deployment notes.
+- `docs/PLAYTEST.md` - isolated shared-demo setup, round operation, and teardown.
 - `docs/E2E_TESTING.md` - intended Playwright E2E strategy for the MVP game loop.
 - `docs/MODERNISATION_PLAN.md` - safe path for updating or rebuilding the app.
 - `docs/ROADMAP.md` - staged product/engineering roadmap.
@@ -93,10 +96,10 @@ UI, database, and scoring logic as normal local development. The explicit
 without it, current-basho selection remains live-first.
 
 `make demo` is local-only, so other people cannot reach it unless the process is
-deliberately exposed. For shared testing, prefer a dedicated preview/staging
-deployment with its own database, auth configuration, and resettable demo data.
-Do not point an initial playtest deployment at the production database. The
-tracked follow-up for that environment is GitHub issue #91.
+deliberately exposed. For shared testing, use the manual `Deploy Playtest`
+workflow and the isolated environment runbook in `docs/PLAYTEST.md`. The
+playtest must have its own Neon project, auth tenant, Vercel project, and GitHub
+environment; it must not point at Preview or Production data.
 
 Progress the deterministic demo basho with:
 
@@ -202,10 +205,11 @@ make check
 make deployment-verify
 ```
 
-`make deployment-verify` checks that the preview and production workflows
-retain their environment, concurrency, migration-before-deploy, exact-SHA,
-database-backed smoke-test, stale-preview, Vercel Git-disable, and reporting
-gates. `make check` includes this contract check.
+`make deployment-verify` checks that the preview, playtest, and production
+workflows retain their environment, concurrency, migration-before-deploy,
+exact-SHA, database-backed smoke-test, Vercel Git-disable, and reporting gates.
+It also checks the playtest-only demo build, explicit reset, and demo smoke-test
+contracts. `make check` includes this contract check.
 
 By default, the database package writes local SQLite data to `packages/db/data/fantasy-sumo.sqlite` when run through the pnpm scripts. Override this with `DATABASE_URL` using a `file:` SQLite URL, for example:
 
