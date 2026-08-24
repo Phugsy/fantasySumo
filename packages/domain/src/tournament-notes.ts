@@ -34,6 +34,9 @@ export function deriveRikishiTournamentNotes({
   scheduledBouts,
   throughDay,
 }: TournamentNotesInput): RikishiTournamentNotes {
+  const hasFinalDayResult = boutResults.some(
+    (result) => result.day === FINAL_BASHO_DAY,
+  );
   const applicableResults = boutResults
     .filter(
       (result) =>
@@ -55,6 +58,7 @@ export function deriveRikishiTournamentNotes({
       banzukeEntries,
       bashoStatus,
       throughDay,
+      hasFinalDayResult,
     ),
   };
 }
@@ -105,6 +109,7 @@ function deriveAchievements(
   banzukeEntries: readonly BanzukeEntry[],
   bashoStatus: BashoStatus | undefined,
   throughDay: number | undefined,
+  hasFinalDayResult: boolean,
 ): RikishiTournamentAchievement[] {
   const rankByRikishiId = new Map(
     banzukeEntries.map((entry) => [entry.rikishiId, entry.rank]),
@@ -157,7 +162,8 @@ function deriveAchievements(
   if (
     !recordSecured &&
     bashoStatus === "complete" &&
-    throughDay === FINAL_BASHO_DAY
+    throughDay === FINAL_BASHO_DAY &&
+    hasFinalDayResult
   ) {
     achievements.push({
       type: wins >= WINNING_RECORD_THRESHOLD ? "kachi-koshi" : "make-koshi",

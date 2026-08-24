@@ -93,7 +93,10 @@ describe("deriveRikishiTournamentNotes", () => {
       deriveRikishiTournamentNotes({
         banzukeEntries,
         bashoStatus: "complete",
-        boutResults: makeRecord("ura", 7, 3),
+        boutResults: [
+          ...makeRecord("ura", 7, 3),
+          result(15, "onosato", "other"),
+        ],
         rikishiId: "ura",
         scheduledBouts: [
           {
@@ -123,6 +126,19 @@ describe("deriveRikishiTournamentNotes", () => {
         rikishiId: "ura",
         scheduledBouts: [],
         throughDay: 2,
+      }).achievements,
+    ).toEqual([]);
+  });
+
+  it("does not settle a record without an imported final-day result", () => {
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries,
+        bashoStatus: "complete",
+        boutResults: makeRecord("ura", 7, 3),
+        rikishiId: "ura",
+        scheduledBouts: [],
+        throughDay: 15,
       }).achievements,
     ).toEqual([]);
   });

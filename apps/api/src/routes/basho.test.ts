@@ -297,6 +297,25 @@ describe("basho routes", () => {
       status: "complete",
       currentDay: 15,
     });
+    const missingFinalResultsResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/rikishi",
+    });
+
+    expect(
+      missingFinalResultsResponse
+        .json()
+        .rikishi.find((entry: { id: string }) => entry.id === "kotozakura")
+        .tournamentNotes.achievements,
+    ).toEqual([]);
+
+    await repositories.insertBoutResult({
+      id: "2026-05-day-15-final-status-test",
+      bashoId: "2026-05",
+      day: 15,
+      winnerRikishiId: "onosato",
+      loserRikishiId: "hoshoryu",
+    });
     const completedRikishiResponse = await app.inject({
       method: "GET",
       url: "/api/basho/2026-05/rikishi",
