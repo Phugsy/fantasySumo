@@ -114,6 +114,19 @@ describe("deriveRikishiTournamentNotes", () => {
     });
   });
 
+  it("does not settle a record when a basho is closed before day 15", () => {
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries,
+        bashoStatus: "complete",
+        boutResults: makeRecord("ura", 1, 1),
+        rikishiId: "ura",
+        scheduledBouts: [],
+        throughDay: 2,
+      }).achievements,
+    ).toEqual([]);
+  });
+
   it("derives a gold star only from a recorded maegashira win over a yokozuna", () => {
     const qualifying = deriveRikishiTournamentNotes({
       banzukeEntries,

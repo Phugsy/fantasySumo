@@ -187,8 +187,8 @@ describe("App", () => {
       screen.getByRole("button", { name: "Sign out" }),
     ).toBeInTheDocument();
     expect(window.location.pathname).toBe("/stable");
-    expect(document.title).toBe("My stable | Fantasy Sumo");
     await waitFor(() => {
+      expect(document.title).toBe("My stable | Fantasy Sumo");
       expect(screen.getByRole("heading", { name: "My stable" })).toHaveFocus();
     });
   });

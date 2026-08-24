@@ -274,6 +274,27 @@ describe("basho routes", () => {
     await repositories.updateBasho({
       ...sampleBasho,
       status: "complete",
+      currentDay: 8,
+    });
+    const earlyClosedRikishiResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/rikishi",
+    });
+
+    expect(
+      earlyClosedRikishiResponse
+        .json()
+        .rikishi.find((entry: { id: string }) => entry.id === "kotozakura")
+        .tournamentNotes.achievements,
+    ).toEqual([]);
+
+    await repositories.upsertBasho({
+      ...sampleBasho,
+      status: "complete",
+      currentDay: 15,
+    });
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "complete",
       currentDay: 15,
     });
     const completedRikishiResponse = await app.inject({

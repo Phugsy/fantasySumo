@@ -154,7 +154,11 @@ function deriveAchievements(
     }
   }
 
-  if (!recordSecured && bashoStatus === "complete") {
+  if (
+    !recordSecured &&
+    bashoStatus === "complete" &&
+    throughDay === FINAL_BASHO_DAY
+  ) {
     achievements.push({
       type: wins >= WINNING_RECORD_THRESHOLD ? "kachi-koshi" : "make-koshi",
       day: throughDay ?? FINAL_BASHO_DAY,

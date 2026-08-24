@@ -311,10 +311,11 @@ rikishi is unavailable. A later non-absence result can reliably derive that a
 rikishi returned.
 
 Kachi-koshi and make-koshi are derived during a basho when the eighth recorded
-win or loss is stored. When the basho is complete, any rikishi without eight
-wins receives make-koshi, including a rikishi whose remaining days were
-absences; a rikishi who secured eight wins before withdrawing keeps
-kachi-koshi. A gold-star win is derived only when the stored banzuke identifies
+win or loss is stored. When the basho is complete at day 15, any rikishi
+without eight wins receives make-koshi, including a rikishi whose remaining
+days were absences; an administrative close before day 15 does not settle the
+record. A rikishi who secured eight wins before withdrawing keeps kachi-koshi.
+A gold-star win is derived only when the stored banzuke identifies
 the winner as maegashira, the loser as yokozuna, and the stored result is not a
 default/absence win. The UI renders only the concise badge label, without day
 or provenance metadata. These notes are informational and do not participate
