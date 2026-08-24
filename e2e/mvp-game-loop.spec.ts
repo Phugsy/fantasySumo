@@ -81,6 +81,7 @@ test("lets an authenticated admin run the deterministic demo loop", async ({
     compactHeader!.navigationBottom,
   );
   expect(new Set(compactHeader!.linkTops.map(Math.round)).size).toBe(1);
+  expect(compactHeader!.linkHeights.every((height) => height >= 44)).toBe(true);
 
   const pointerFocusedTitle = page.getByRole("heading", {
     name: "Admin controls",
@@ -94,8 +95,14 @@ test("lets an authenticated admin run the deterministic demo loop", async ({
     page.getByText("Demo fixture reset. Picks are open at day 0."),
   ).toBeVisible();
 
+  const previousScrollY = await page.evaluate(() => {
+    window.scrollTo(0, document.body.scrollHeight);
+    return window.scrollY;
+  });
+  expect(previousScrollY).toBeGreaterThan(0);
   await page.getByRole("link", { name: "My stable" }).click();
   await expect(page).toHaveURL(/\/stable$/);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   await expect(page.locator(".lifecycle-state")).toHaveText("Picks open");
 
   await page.getByRole("link", { name: "Admin" }).click();
@@ -1026,6 +1033,7 @@ async function measureHeaderControls(page: Page) {
       signOutTop: signOutBox.top,
       navigationBottom: navigationBox.bottom,
       linkTops: links.map((link) => link.getBoundingClientRect().top),
+      linkHeights: links.map((link) => link.getBoundingClientRect().height),
     };
   });
 }

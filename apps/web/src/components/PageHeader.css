@@ -19,7 +19,7 @@
   outline: none;
 }
 
-#page-title[data-focus-visible="true"]:focus {
+#page-title:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 4px;
 }

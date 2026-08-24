@@ -192,11 +192,10 @@ describe("App", () => {
       const pageTitle = screen.getByRole("heading", { name: "My stable" });
 
       expect(pageTitle).toHaveFocus();
-      expect(pageTitle).toHaveAttribute("data-focus-visible", "false");
     });
   });
 
-  it("marks route-heading focus as visible after keyboard navigation", async () => {
+  it("focuses the route heading after keyboard navigation", async () => {
     render(<App />);
 
     const leaderboardLink = await screen.findByRole("link", {
@@ -212,7 +211,6 @@ describe("App", () => {
       });
 
       expect(pageTitle).toHaveFocus();
-      expect(pageTitle).toHaveAttribute("data-focus-visible", "true");
     });
   });
 
