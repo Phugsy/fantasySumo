@@ -8,6 +8,7 @@ import type {
   RikishiTournamentStatus,
   ScheduledBout,
 } from "./types.js";
+import { hasCompleteBoutResultsForScheduledDay } from "./bout-result-completeness.js";
 
 const WINNING_RECORD_THRESHOLD = 8;
 const LOSING_RECORD_THRESHOLD = 8;
@@ -34,9 +35,11 @@ export function deriveRikishiTournamentNotes({
   scheduledBouts,
   throughDay,
 }: TournamentNotesInput): RikishiTournamentNotes {
-  const hasFinalDayResult = boutResults.some(
-    (result) => result.day === FINAL_BASHO_DAY,
-  );
+  const hasCompleteFinalDayResults = hasCompleteBoutResultsForScheduledDay({
+    boutResults,
+    day: FINAL_BASHO_DAY,
+    scheduledBouts,
+  });
   const applicableResults = boutResults
     .filter(
       (result) =>
@@ -58,7 +61,7 @@ export function deriveRikishiTournamentNotes({
       banzukeEntries,
       bashoStatus,
       throughDay,
-      hasFinalDayResult,
+      hasCompleteFinalDayResults,
     ),
   };
 }
@@ -109,7 +112,7 @@ function deriveAchievements(
   banzukeEntries: readonly BanzukeEntry[],
   bashoStatus: BashoStatus | undefined,
   throughDay: number | undefined,
-  hasFinalDayResult: boolean,
+  hasCompleteFinalDayResults: boolean,
 ): RikishiTournamentAchievement[] {
   const rankByRikishiId = new Map(
     banzukeEntries.map((entry) => [entry.rikishiId, entry.rank]),
@@ -163,7 +166,7 @@ function deriveAchievements(
     !recordSecured &&
     bashoStatus === "complete" &&
     throughDay === FINAL_BASHO_DAY &&
-    hasFinalDayResult
+    hasCompleteFinalDayResults
   ) {
     achievements.push({
       type: wins >= WINNING_RECORD_THRESHOLD ? "kachi-koshi" : "make-koshi",

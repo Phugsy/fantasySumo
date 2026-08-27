@@ -108,6 +108,7 @@ describe("deriveRikishiTournamentNotes", () => {
             status: "cancelled",
             withdrawnRikishiId: "ura",
           },
+          scheduledBout(15, "onosato", "other"),
         ],
         throughDay: 15,
       }),
@@ -138,6 +139,25 @@ describe("deriveRikishiTournamentNotes", () => {
         boutResults: makeRecord("ura", 7, 3),
         rikishiId: "ura",
         scheduledBouts: [],
+        throughDay: 15,
+      }).achievements,
+    ).toEqual([]);
+  });
+
+  it("does not settle a record from a partial final-day result import", () => {
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries,
+        bashoStatus: "complete",
+        boutResults: [
+          ...makeRecord("ura", 7, 3),
+          result(15, "onosato", "other"),
+        ],
+        rikishiId: "ura",
+        scheduledBouts: [
+          scheduledBout(15, "onosato", "other"),
+          scheduledBout(15, "ura", "remaining-opponent"),
+        ],
         throughDay: 15,
       }).achievements,
     ).toEqual([]);
@@ -210,5 +230,20 @@ function result(
     winnerRikishiId,
     loserRikishiId,
     ...details,
+  };
+}
+
+function scheduledBout(
+  day: number,
+  eastRikishiId: string,
+  westRikishiId: string,
+): ScheduledBout {
+  return {
+    id: `day-${day}-${eastRikishiId}-${westRikishiId}-schedule`,
+    bashoId,
+    day,
+    eastRikishiId,
+    westRikishiId,
+    status: "scheduled",
   };
 }

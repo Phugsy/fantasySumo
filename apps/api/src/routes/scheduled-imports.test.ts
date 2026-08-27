@@ -337,6 +337,7 @@ describe("scheduled result import route", () => {
       currentDay: 14,
       importedDays: Array.from({ length: 14 }, (_value, index) => index + 1),
     });
+    await seedPublishedSchedule("2026-05", 15);
     app = createApp(
       async () => resultsResponse(15),
       new Date("2026-05-24T02:00:00.000Z"),
@@ -371,6 +372,7 @@ describe("scheduled result import route", () => {
       currentDay: 14,
       importedDays: Array.from({ length: 14 }, (_value, index) => index + 1),
     });
+    await seedPublishedSchedule("2026-05", 15);
     const requestedDays: number[] = [];
     app = createApp(async (url) => {
       const day = Number(String(url).split("/").at(-1));
@@ -611,6 +613,28 @@ async function seedLiveBasho(
       ],
     );
   }
+}
+
+async function seedPublishedSchedule(bashoId: string, day: number) {
+  await createRepositories(client).applyScheduledBoutsImport({
+    publication: {
+      id: `${bashoId}-day-${day}-schedule`,
+      bashoId,
+      day,
+      source: "test-source",
+      publishedAt: "2026-05-23T09:00:00.000Z",
+    },
+    bouts: [
+      {
+        id: `${bashoId}-day-${day}-match-1`,
+        bashoId,
+        day,
+        eastRikishiId: "onosato",
+        westRikishiId: "kotozakura",
+        status: "scheduled",
+      },
+    ],
+  });
 }
 
 function resultsResponse(day = 3) {

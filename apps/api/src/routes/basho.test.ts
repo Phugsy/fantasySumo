@@ -309,12 +309,62 @@ describe("basho routes", () => {
         .tournamentNotes.achievements,
     ).toEqual([]);
 
+    await repositories.upsertRikishi({
+      id: "juryo-visitor",
+      shikona: "Juryo Visitor",
+    });
+    await repositories.applyScheduledBoutsImport({
+      publication: {
+        id: "2026-05-day-15-status-test",
+        bashoId: "2026-05",
+        day: 15,
+        source: "test-source",
+        publishedAt: "2026-05-24T08:00:00.000Z",
+      },
+      bouts: [
+        {
+          id: "2026-05-day-15-status-match-1",
+          bashoId: "2026-05",
+          day: 15,
+          eastRikishiId: "onosato",
+          westRikishiId: "hoshoryu",
+          status: "scheduled",
+        },
+        {
+          id: "2026-05-day-15-status-match-2",
+          bashoId: "2026-05",
+          day: 15,
+          eastRikishiId: "kirishima",
+          westRikishiId: "juryo-visitor",
+          status: "scheduled",
+        },
+      ],
+    });
     await repositories.insertBoutResult({
-      id: "2026-05-day-15-final-status-test",
+      id: "2026-05-day-15-final-status-test-1",
       bashoId: "2026-05",
       day: 15,
       winnerRikishiId: "onosato",
       loserRikishiId: "hoshoryu",
+    });
+    const partialFinalResultsResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/rikishi",
+    });
+
+    expect(
+      partialFinalResultsResponse
+        .json()
+        .rikishi.find((entry: { id: string }) => entry.id === "kotozakura")
+        .tournamentNotes.achievements,
+    ).toEqual([]);
+
+    await repositories.insertBoutResult({
+      id: "2026-05-day-15-final-status-test-2",
+      bashoId: "2026-05",
+      day: 15,
+      winnerRikishiId: "kirishima",
+      loserRikishiId: "juryo-visitor",
     });
     const completedRikishiResponse = await app.inject({
       method: "GET",

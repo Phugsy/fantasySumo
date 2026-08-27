@@ -5,7 +5,10 @@ import type {
   Rikishi,
   ScheduledBout,
 } from "@fantasy-sumo/domain";
-import { preserveBashoLifecycleProgress } from "@fantasy-sumo/domain";
+import {
+  hasCompleteBoutResultsForScheduledDay,
+  preserveBashoLifecycleProgress,
+} from "@fantasy-sumo/domain";
 import type { Repositories } from "@fantasy-sumo/db";
 import type {
   BanzukeImportCommand,
@@ -86,6 +89,16 @@ export async function importBoutResults(
 
   const summary = createEmptySummary();
   const existingBasho = await repositories.getBasho(command.bashoId);
+  const importedDay = command.results[0]?.day;
+  const completesImportedDay =
+    importedDay === 15 &&
+    hasCompleteBoutResultsForScheduledDay({
+      boutResults: command.results,
+      day: importedDay,
+      scheduledBouts: await repositories.listScheduledBoutsForBasho(
+        command.bashoId,
+      ),
+    });
   const existingRikishi = await repositories.listRikishi();
   const existingRikishiIds = new Set(
     existingRikishi.map((rikishi) => rikishi.id),
@@ -96,7 +109,11 @@ export async function importBoutResults(
   const nextBasho =
     existingBasho === undefined
       ? undefined
-      : advanceBashoForResults(existingBasho, command.results[0]?.day);
+      : advanceBashoForResults(
+          existingBasho,
+          importedDay,
+          completesImportedDay,
+        );
 
   if (nextBasho !== undefined) {
     summary.basho = summarizeOne(existingBasho, nextBasho, isEqualBasho);
@@ -488,6 +505,7 @@ function createEmptyEntitySummary(): ImportEntitySummary {
 function advanceBashoForResults(
   basho: Basho,
   importedDay: BoutResult["day"] | undefined,
+  completesImportedDay: boolean,
 ): Basho {
   if (importedDay === undefined) {
     return basho;
@@ -496,7 +514,10 @@ function advanceBashoForResults(
   return {
     ...basho,
     status:
-      basho.status === "complete" || importedDay === 15 ? "complete" : "active",
+      basho.status === "complete" ||
+      (importedDay === 15 && completesImportedDay)
+        ? "complete"
+        : "active",
     currentDay: Math.max(basho.currentDay ?? 0, importedDay),
   };
 }

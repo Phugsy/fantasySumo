@@ -208,6 +208,107 @@ describe("import service", () => {
     });
   });
 
+  it("completes day 15 only after results cover the published card", async () => {
+    const repositories = createRepositories(client);
+    const crossDivisionRikishi = [
+      { id: "juryo-east", shikona: "Juryo East" },
+      { id: "juryo-west", shikona: "Juryo West" },
+    ];
+    const finalResults = [
+      {
+        id: "2026-05-day-15-match-1",
+        bashoId: "2026-05",
+        day: 15,
+        winnerRikishiId: "onosato",
+        loserRikishiId: "juryo-east",
+      },
+      {
+        id: "2026-05-day-15-match-2",
+        bashoId: "2026-05",
+        day: 15,
+        winnerRikishiId: "kotozakura",
+        loserRikishiId: "juryo-west",
+      },
+    ];
+
+    await importBanzuke(repositories, {
+      ...banzukeCommand,
+      basho: {
+        ...banzukeCommand.basho,
+        currentDay: 14,
+        status: "active",
+      },
+    });
+
+    await importBoutResults(repositories, {
+      source: "test",
+      bashoId: "2026-05",
+      results: [
+        {
+          id: "2026-05-day-15-unverified-match",
+          bashoId: "2026-05",
+          day: 15,
+          winnerRikishiId: "onosato",
+          loserRikishiId: "kotozakura",
+        },
+      ],
+    });
+
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 15,
+    });
+
+    await importScheduledBouts(repositories, {
+      source: "test-schedule",
+      bashoId: "2026-05",
+      day: 15,
+      rikishi: crossDivisionRikishi,
+      bouts: [
+        {
+          id: "2026-05-day-15-match-1",
+          bashoId: "2026-05",
+          day: 15,
+          eastRikishiId: "onosato",
+          westRikishiId: "juryo-east",
+          status: "scheduled",
+        },
+        {
+          id: "2026-05-day-15-match-2",
+          bashoId: "2026-05",
+          day: 15,
+          eastRikishiId: "kotozakura",
+          westRikishiId: "juryo-west",
+          status: "scheduled",
+        },
+      ],
+    });
+
+    await importBoutResults(repositories, {
+      source: "test",
+      bashoId: "2026-05",
+      rikishi: crossDivisionRikishi,
+      results: [finalResults[0]!],
+    });
+
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 15,
+    });
+
+    await importBoutResults(repositories, {
+      source: "test",
+      bashoId: "2026-05",
+      rikishi: crossDivisionRikishi,
+      results: finalResults,
+    });
+
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "complete",
+      currentDay: 15,
+    });
+  });
+
   it("imports source-provided cross-division opponents without adding them to the banzuke", async () => {
     const repositories = createRepositories(client);
     await importBanzuke(repositories, banzukeCommand);

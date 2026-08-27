@@ -27,6 +27,7 @@ export type {
   TeamScoreHistoryEntry,
 } from "./types.js";
 export { deriveRikishiTournamentNotes } from "./tournament-notes.js";
+export { hasCompleteBoutResultsForScheduledDay } from "./bout-result-completeness.js";
 export {
   canEditFantasyPicks,
   getBashoLifecycleTransition,
