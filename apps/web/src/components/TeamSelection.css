@@ -62,7 +62,9 @@
 
 .rank-pill {
   display: inline-flex;
+  flex: 0 0 auto;
   justify-content: center;
+  max-width: 100%;
   min-width: 108px;
   padding: 6px 9px;
   border: 1px solid rgb(255 255 255 / 12%);

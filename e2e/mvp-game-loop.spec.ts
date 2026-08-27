@@ -61,14 +61,48 @@ test("lets an authenticated admin run the deterministic demo loop", async ({
     page.getByRole("heading", { name: "Demo May Basho" }),
   ).toBeVisible();
 
+  const initialHeader = await measureHeaderControls(page);
+  expect(initialHeader).not.toBeNull();
+  expect(
+    Math.abs(initialHeader!.navigationHeight - initialHeader!.signOutHeight),
+  ).toBeLessThanOrEqual(1);
+
+  await page.setViewportSize({ width: 416, height: 918 });
+  const compactHeader = await measureHeaderControls(page);
+
+  expect(compactHeader).not.toBeNull();
+  expect(
+    Math.abs(compactHeader!.navigationHeight - compactHeader!.signOutHeight),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(compactHeader!.navigationWidth - compactHeader!.signOutWidth),
+  ).toBeLessThanOrEqual(1);
+  expect(compactHeader!.signOutTop).toBeGreaterThanOrEqual(
+    compactHeader!.navigationBottom,
+  );
+  expect(new Set(compactHeader!.linkTops.map(Math.round)).size).toBe(1);
+  expect(compactHeader!.linkHeights.every((height) => height >= 44)).toBe(true);
+
+  const pointerFocusedTitle = page.getByRole("heading", {
+    name: "Admin controls",
+  });
+  await expect(pointerFocusedTitle).toBeFocused();
+  await expect(pointerFocusedTitle).toHaveCSS("outline-style", "none");
+
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Reset and open picks" }).click();
   await expect(
     page.getByText("Demo fixture reset. Picks are open at day 0."),
   ).toBeVisible();
 
+  const previousScrollY = await page.evaluate(() => {
+    window.scrollTo(0, document.body.scrollHeight);
+    return window.scrollY;
+  });
+  expect(previousScrollY).toBeGreaterThan(0);
   await page.getByRole("link", { name: "My stable" }).click();
   await expect(page).toHaveURL(/\/stable$/);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   await expect(page.locator(".lifecycle-state")).toHaveText("Picks open");
 
   await page.getByRole("link", { name: "Admin" }).click();
@@ -106,6 +140,19 @@ test("lets an authenticated admin run the deterministic demo loop", async ({
   await expect(page.locator(".lifecycle-state")).toHaveText(
     "Final scores - Day 15",
   );
+
+  const stableTitle = page.getByRole("heading", { name: "My stable" });
+  await expect(stableTitle).toBeFocused();
+  await expect(stableTitle).toHaveCSS("outline-style", "none");
+
+  const leaderboardLink = page.getByRole("link", { name: "Leaderboard" });
+  await leaderboardLink.focus();
+  await page.keyboard.press("Enter");
+  const leaderboardTitle = page.getByRole("heading", {
+    name: "Follow the leaderboard",
+  });
+  await expect(leaderboardTitle).toBeFocused();
+  await expect(leaderboardTitle).toHaveCSS("outline-style", "solid");
 });
 
 test("lets an admin persist inherited live config and validate a result import without contacting the source", async ({
@@ -486,7 +533,13 @@ test("creates a fantasy team and follows its My Stable score", async ({
   ).toBeVisible();
   await expect(page.getByLabel("0 total points")).toBeVisible();
   await expect(page.getByText("Wakatakakage")).toBeVisible();
-  await expect(page.getByText("Maegashira #1")).toBeVisible();
+  const numberedRank = page.getByText("Maegashira #10", { exact: true });
+  await expect(numberedRank).toBeVisible();
+  expect(
+    await numberedRank.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
   await expect(page.getByText("Day 1 · vs Tobizaru")).toBeVisible();
   await expect(page.getByText("Day 1 · vs Takayasu")).toBeVisible();
   await expect(page.getByRole("button", { name: "Edit picks" })).toBeVisible();
@@ -953,6 +1006,36 @@ async function resetDemo(request: APIRequestContext) {
   });
 
   await expect(response).toBeOK();
+}
+
+async function measureHeaderControls(page: Page) {
+  return page.evaluate(() => {
+    const navigation = document.querySelector<HTMLElement>(".view-switch");
+    const signOut = document.querySelector<HTMLButtonElement>(
+      ".session-actions button",
+    );
+    const links = Array.from(
+      document.querySelectorAll<HTMLElement>(".view-switch a"),
+    );
+
+    if (navigation === null || signOut === null) {
+      return null;
+    }
+
+    const navigationBox = navigation.getBoundingClientRect();
+    const signOutBox = signOut.getBoundingClientRect();
+
+    return {
+      navigationHeight: navigationBox.height,
+      navigationWidth: navigationBox.width,
+      signOutHeight: signOutBox.height,
+      signOutWidth: signOutBox.width,
+      signOutTop: signOutBox.top,
+      navigationBottom: navigationBox.bottom,
+      linkTops: links.map((link) => link.getBoundingClientRect().top),
+      linkHeights: links.map((link) => link.getBoundingClientRect().height),
+    };
+  });
 }
 
 async function signInAsDemoUser(page: Page) {

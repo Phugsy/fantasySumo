@@ -110,14 +110,14 @@ export const demoBanzukeEntries: BanzukeEntry[] = [
     id: "demo-2026-05-ura",
     bashoId: demoBasho.id,
     rikishiId: "ura",
-    rank: "Maegashira #1",
+    rank: "Maegashira #10",
     rankOrder: 7,
   },
   {
     id: "demo-2026-05-tobizaru",
     bashoId: demoBasho.id,
     rikishiId: "tobizaru",
-    rank: "Maegashira #2",
+    rank: "Maegashira #12",
     rankOrder: 8,
   },
 ];
