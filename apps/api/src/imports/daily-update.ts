@@ -42,7 +42,7 @@ export async function importDailyResultsAndFollowingSchedule(
   sourceFetch: SourceFetch,
   options: DailyUpdateImportOptions,
 ): Promise<DailyUpdateImportResult> {
-  const recoveredFinalDaySchedule = await recoverFinalDayScheduleIfMissing(
+  const refreshedFinalDaySchedule = await refreshFinalDaySchedule(
     repositories,
     sourceFetch,
     options,
@@ -50,9 +50,9 @@ export async function importDailyResultsAndFollowingSchedule(
   const resultsCommand = await fetchSumoApiResultsImport(sourceFetch, options);
   const resultsImport = await importBoutResults(repositories, resultsCommand, {
     dryRun: options.dryRun,
-    ...(recoveredFinalDaySchedule === undefined
+    ...(refreshedFinalDaySchedule === undefined
       ? {}
-      : { completionScheduledBouts: recoveredFinalDaySchedule.bouts }),
+      : { completionSchedule: refreshedFinalDaySchedule }),
   });
   const schedule = await attemptFollowingDayScheduleImport(
     repositories,
@@ -70,20 +70,12 @@ export async function importDailyResultsAndFollowingSchedule(
   };
 }
 
-async function recoverFinalDayScheduleIfMissing(
+async function refreshFinalDaySchedule(
   repositories: Repositories,
   sourceFetch: SourceFetch,
   options: DailyUpdateImportOptions,
 ): Promise<ScheduledBoutsImportCommand | undefined> {
   if (options.day !== 15) {
-    return undefined;
-  }
-
-  const hasPublishedFinalDaySchedule = (
-    await repositories.listScheduledBoutPublicationsForBasho(options.bashoId)
-  ).some((publication) => publication.day === options.day);
-
-  if (hasPublishedFinalDaySchedule) {
     return undefined;
   }
 

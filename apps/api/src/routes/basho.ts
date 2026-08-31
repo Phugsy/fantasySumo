@@ -1,9 +1,15 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { DEMO_BASHO_ID, type Repositories } from "@fantasy-sumo/db";
-import type { FantasyPick, FantasyTeam } from "@fantasy-sumo/domain";
+import type {
+  Basho,
+  FantasyPick,
+  FantasyTeam,
+  ScheduledBoutPublication,
+} from "@fantasy-sumo/domain";
 import type { AuthService } from "../auth.js";
 import { getEffectiveBashoGameConfig } from "../game-config.js";
+import { isCompleteScheduledBoutPublicationSource } from "../imports/types.js";
 import {
   calculateLeaderboard,
   calculateTeamScore,
@@ -87,13 +93,23 @@ export function registerBashoRoutes(
       });
     }
 
-    const [allRikishi, banzukeEntries, boutResults, scheduledBouts] =
-      await Promise.all([
-        context.repositories.listRikishi(),
-        context.repositories.listBanzukeEntriesForBasho(basho.id),
-        context.repositories.listBoutResultsForBasho(basho.id),
-        context.repositories.listScheduledBoutsForBasho(basho.id),
-      ]);
+    const [
+      allRikishi,
+      banzukeEntries,
+      boutResults,
+      scheduledBouts,
+      scheduledBoutPublications,
+    ] = await Promise.all([
+      context.repositories.listRikishi(),
+      context.repositories.listBanzukeEntriesForBasho(basho.id),
+      context.repositories.listBoutResultsForBasho(basho.id),
+      context.repositories.listScheduledBoutsForBasho(basho.id),
+      context.repositories.listScheduledBoutPublicationsForBasho(basho.id),
+    ]);
+    const finalDayScheduleComplete = hasCompleteFinalDaySchedulePublication(
+      basho,
+      scheduledBoutPublications,
+    );
     const rikishiById = new Map(
       allRikishi.map((rikishi) => [rikishi.id, rikishi]),
     );
@@ -110,6 +126,7 @@ export function registerBashoRoutes(
           banzukeEntries,
           bashoStatus: basho.status,
           boutResults,
+          finalDayScheduleComplete,
           rikishiId: entry.rikishiId,
           scheduledBouts,
           throughDay: basho.currentDay,
@@ -325,14 +342,25 @@ export function registerBashoRoutes(
       });
     }
 
-    const [picks, boutResults, banzukeEntries, allRikishi, scheduledBouts] =
-      await Promise.all([
-        context.repositories.listFantasyPicksForTeam(team.id),
-        context.repositories.listBoutResultsForBasho(basho.id),
-        context.repositories.listBanzukeEntriesForBasho(basho.id),
-        context.repositories.listRikishi(),
-        context.repositories.listScheduledBoutsForBasho(basho.id),
-      ]);
+    const [
+      picks,
+      boutResults,
+      banzukeEntries,
+      allRikishi,
+      scheduledBouts,
+      scheduledBoutPublications,
+    ] = await Promise.all([
+      context.repositories.listFantasyPicksForTeam(team.id),
+      context.repositories.listBoutResultsForBasho(basho.id),
+      context.repositories.listBanzukeEntriesForBasho(basho.id),
+      context.repositories.listRikishi(),
+      context.repositories.listScheduledBoutsForBasho(basho.id),
+      context.repositories.listScheduledBoutPublicationsForBasho(basho.id),
+    ]);
+    const finalDayScheduleComplete = hasCompleteFinalDaySchedulePublication(
+      basho,
+      scheduledBoutPublications,
+    );
     const teamScore = calculateTeamScore(team, picks, boutResults, {
       throughDay: basho.currentDay,
     });
@@ -372,6 +400,7 @@ export function registerBashoRoutes(
               banzukeEntries,
               bashoStatus: basho.status,
               boutResults,
+              finalDayScheduleComplete,
               rikishiId: pick.rikishiId,
               scheduledBouts,
               throughDay: basho.currentDay,
@@ -574,6 +603,20 @@ export function registerBashoRoutes(
           : leaderboard,
     };
   });
+}
+
+function hasCompleteFinalDaySchedulePublication(
+  basho: Basho,
+  publications: readonly ScheduledBoutPublication[],
+): boolean {
+  return (
+    basho.isDemo ||
+    publications.some(
+      (publication) =>
+        publication.day === 15 &&
+        isCompleteScheduledBoutPublicationSource(publication.source),
+    )
+  );
 }
 
 async function getPicksLockedResponse(

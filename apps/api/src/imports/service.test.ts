@@ -9,7 +9,10 @@ import {
   type DatabaseClient,
 } from "@fantasy-sumo/db";
 import { calculateTeamScore } from "@fantasy-sumo/domain";
-import type { BanzukeImportCommand } from "./types.js";
+import type {
+  BanzukeImportCommand,
+  ScheduledBoutsImportCommand,
+} from "./types.js";
 import {
   importBanzuke,
   importBoutResults,
@@ -208,7 +211,7 @@ describe("import service", () => {
     });
   });
 
-  it("completes day 15 only after results cover the published card", async () => {
+  it("completes day 15 only after results cover a confirmed complete card", async () => {
     const repositories = createRepositories(client);
     const crossDivisionRikishi = [
       { id: "juryo-east", shikona: "Juryo East" },
@@ -230,6 +233,31 @@ describe("import service", () => {
         loserRikishiId: "juryo-west",
       },
     ];
+    const finalSchedule: ScheduledBoutsImportCommand = {
+      source: "test-schedule",
+      bashoId: "2026-05",
+      day: 15,
+      isComplete: true,
+      rikishi: crossDivisionRikishi,
+      bouts: [
+        {
+          id: "2026-05-day-15-match-1",
+          bashoId: "2026-05",
+          day: 15,
+          eastRikishiId: "onosato",
+          westRikishiId: "juryo-east",
+          status: "scheduled",
+        },
+        {
+          id: "2026-05-day-15-match-2",
+          bashoId: "2026-05",
+          day: 15,
+          eastRikishiId: "kotozakura",
+          westRikishiId: "juryo-west",
+          status: "scheduled",
+        },
+      ],
+    };
 
     await importBanzuke(repositories, {
       ...banzukeCommand,
@@ -256,52 +284,56 @@ describe("import service", () => {
 
     expect(await repositories.getBasho("2026-05")).toMatchObject({
       status: "active",
-      currentDay: 15,
+      currentDay: 14,
     });
 
-    await importScheduledBouts(repositories, {
-      source: "test-schedule",
-      bashoId: "2026-05",
-      day: 15,
-      rikishi: crossDivisionRikishi,
-      bouts: [
-        {
-          id: "2026-05-day-15-match-1",
-          bashoId: "2026-05",
-          day: 15,
-          eastRikishiId: "onosato",
-          westRikishiId: "juryo-east",
-          status: "scheduled",
-        },
-        {
-          id: "2026-05-day-15-match-2",
-          bashoId: "2026-05",
-          day: 15,
-          eastRikishiId: "kotozakura",
-          westRikishiId: "juryo-west",
-          status: "scheduled",
-        },
-      ],
-    });
+    await importScheduledBouts(repositories, finalSchedule);
+    expect(
+      await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
+    ).toEqual([expect.objectContaining({ source: "test-schedule:complete" })]);
 
-    await importBoutResults(repositories, {
-      source: "test",
-      bashoId: "2026-05",
-      rikishi: crossDivisionRikishi,
-      results: [finalResults[0]!],
-    });
+    await importBoutResults(
+      repositories,
+      {
+        source: "test",
+        bashoId: "2026-05",
+        rikishi: crossDivisionRikishi,
+        results: finalResults,
+      },
+      { completionSchedule: { ...finalSchedule, isComplete: false } },
+    );
 
     expect(await repositories.getBasho("2026-05")).toMatchObject({
       status: "active",
-      currentDay: 15,
+      currentDay: 14,
     });
 
-    await importBoutResults(repositories, {
-      source: "test",
-      bashoId: "2026-05",
-      rikishi: crossDivisionRikishi,
-      results: finalResults,
+    await importBoutResults(
+      repositories,
+      {
+        source: "test",
+        bashoId: "2026-05",
+        rikishi: crossDivisionRikishi,
+        results: [finalResults[0]!],
+      },
+      { completionSchedule: finalSchedule },
+    );
+
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 14,
     });
+
+    await importBoutResults(
+      repositories,
+      {
+        source: "test",
+        bashoId: "2026-05",
+        rikishi: crossDivisionRikishi,
+        results: finalResults,
+      },
+      { completionSchedule: finalSchedule },
+    );
 
     expect(await repositories.getBasho("2026-05")).toMatchObject({
       status: "complete",

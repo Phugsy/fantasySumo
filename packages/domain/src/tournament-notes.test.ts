@@ -97,6 +97,7 @@ describe("deriveRikishiTournamentNotes", () => {
           ...makeRecord("ura", 7, 3),
           result(15, "onosato", "other"),
         ],
+        finalDayScheduleComplete: true,
         rikishiId: "ura",
         scheduledBouts: [
           {
@@ -153,11 +154,28 @@ describe("deriveRikishiTournamentNotes", () => {
           ...makeRecord("ura", 7, 3),
           result(15, "onosato", "other"),
         ],
+        finalDayScheduleComplete: true,
         rikishiId: "ura",
         scheduledBouts: [
           scheduledBout(15, "onosato", "other"),
           scheduledBout(15, "ura", "remaining-opponent"),
         ],
+        throughDay: 15,
+      }).achievements,
+    ).toEqual([]);
+  });
+
+  it("does not settle a record from a matching but unconfirmed final-day card", () => {
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries,
+        bashoStatus: "complete",
+        boutResults: [
+          ...makeRecord("ura", 7, 3),
+          result(15, "onosato", "other"),
+        ],
+        rikishiId: "ura",
+        scheduledBouts: [scheduledBout(15, "onosato", "other")],
         throughDay: 15,
       }).achievements,
     ).toEqual([]);

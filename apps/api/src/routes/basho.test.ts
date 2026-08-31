@@ -318,7 +318,7 @@ describe("basho routes", () => {
         id: "2026-05-day-15-status-test",
         bashoId: "2026-05",
         day: 15,
-        source: "test-source",
+        source: "test-source:complete",
         publishedAt: "2026-05-24T08:00:00.000Z",
       },
       bouts: [

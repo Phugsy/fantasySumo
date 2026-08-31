@@ -20,6 +20,7 @@ import type {
   ImportValidationIssue,
   ScheduledBoutsImportCommand,
 } from "./types.js";
+import { toScheduledBoutPublicationSource } from "./types.js";
 
 export class ImportValidationError extends Error {
   constructor(readonly issues: ImportValidationIssue[]) {
@@ -28,7 +29,10 @@ export class ImportValidationError extends Error {
 }
 
 interface BoutResultsImportOptions extends ImportOptions {
-  completionScheduledBouts?: readonly ScheduledBout[];
+  completionSchedule?: Pick<
+    ScheduledBoutsImportCommand,
+    "bouts" | "isComplete"
+  >;
 }
 
 export async function importBanzuke(
@@ -94,14 +98,15 @@ export async function importBoutResults(
   const summary = createEmptySummary();
   const existingBasho = await repositories.getBasho(command.bashoId);
   const importedDay = command.results[0]?.day;
+  const completionSchedule = options.completionSchedule;
   const completesImportedDay =
     importedDay === 15 &&
+    completionSchedule?.isComplete === true &&
     hasCompleteBoutResultsForScheduledDay({
       boutResults: command.results,
       day: importedDay,
-      scheduledBouts:
-        options.completionScheduledBouts ??
-        (await repositories.listScheduledBoutsForBasho(command.bashoId)),
+      scheduledBouts: completionSchedule.bouts,
+      scheduledDayComplete: true,
     });
   const existingRikishi = await repositories.listRikishi();
   const existingRikishiIds = new Set(
@@ -193,7 +198,7 @@ export async function importScheduledBouts(
         id: `${command.bashoId}-day-${command.day}-schedule`,
         bashoId: command.bashoId,
         day: command.day,
-        source: command.source,
+        source: toScheduledBoutPublicationSource(command),
         publishedAt: new Date().toISOString(),
       },
       rikishi: missingSourceRikishi,
@@ -522,7 +527,10 @@ function advanceBashoForResults(
       (importedDay === 15 && completesImportedDay)
         ? "complete"
         : "active",
-    currentDay: Math.max(basho.currentDay ?? 0, importedDay),
+    currentDay:
+      importedDay === 15 && !completesImportedDay
+        ? (basho.currentDay ?? 0)
+        : Math.max(basho.currentDay ?? 0, importedDay),
   };
 }
 

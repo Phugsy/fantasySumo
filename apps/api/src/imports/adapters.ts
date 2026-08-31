@@ -36,6 +36,9 @@ interface JsaBanzukeRow {
 
 interface SumoApiTorikumiPayload {
   torikumi?: SumoApiTorikumiRow[];
+  yusho?: Array<{
+    type?: string;
+  }>;
 }
 
 interface SumoApiTorikumiRow {
@@ -154,7 +157,7 @@ export async function fetchSumoApiScheduleImport(
 
 export function mapSumoApiSchedulePayload(
   payload: SumoApiTorikumiPayload,
-  options: { bashoId: string; day: number },
+  options: { bashoId: string; day: number; division?: string },
 ): ScheduledBoutsImportCommand {
   const rows = payload.torikumi ?? [];
 
@@ -166,11 +169,19 @@ export function mapSumoApiSchedulePayload(
     toSourceRikishi(requiredString(row.eastShikona, "eastShikona")),
     toSourceRikishi(requiredString(row.westShikona, "westShikona")),
   ]);
+  const division = options.division ?? "Makuuchi";
+  const isComplete =
+    options.day === 15 &&
+    payload.yusho?.some(
+      (winner) => winner.type?.toLowerCase() === division.toLowerCase(),
+    ) === true &&
+    rows.every(hasResolvedWinner);
 
   return {
     source: "sumo-api-schedule",
     bashoId: options.bashoId,
     day: options.day,
+    ...(isComplete ? { isComplete: true } : {}),
     rikishi: uniqueRikishi(participants),
     bouts: rows.map((row, index) => {
       const matchNo = row.matchNo ?? index + 1;
@@ -189,6 +200,13 @@ export function mapSumoApiSchedulePayload(
       };
     }),
   };
+}
+
+function hasResolvedWinner(row: SumoApiTorikumiRow): boolean {
+  return (
+    row.winnerId !== undefined ||
+    (row.winnerEn !== undefined && row.winnerEn.trim() !== "")
+  );
 }
 
 export function mapSumoApiTorikumiPayload(

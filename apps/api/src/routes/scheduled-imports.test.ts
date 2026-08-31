@@ -337,11 +337,12 @@ describe("scheduled result import route", () => {
       currentDay: 14,
       importedDays: Array.from({ length: 14 }, (_value, index) => index + 1),
     });
-    await seedPublishedSchedule("2026-05", 15);
-    app = createApp(
-      async () => resultsResponse(15),
-      new Date("2026-05-24T02:00:00.000Z"),
-    );
+    await seedPublishedSchedule("2026-05", 15, "cancelled");
+    const requestedDays: number[] = [];
+    app = createApp(async (url) => {
+      requestedDays.push(dayFromUrl(url));
+      return resultsResponse(15);
+    }, new Date("2026-05-24T02:00:00.000Z"));
 
     const response = await injectCron(app);
 
@@ -365,6 +366,58 @@ describe("scheduled result import route", () => {
       status: "complete",
       currentDay: 15,
     });
+    expect(requestedDays).toEqual([15, 15]);
+    const repositories = createRepositories(client);
+    expect(
+      await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
+    ).toEqual([
+      expect.objectContaining({ source: "sumo-api-schedule:complete" }),
+    ]);
+    expect(await repositories.listScheduledBoutsForBasho("2026-05")).toEqual([
+      expect.objectContaining({ status: "scheduled" }),
+    ]);
+  });
+
+  it("keeps an unconfirmed partial final-day card retryable", async () => {
+    await seedLiveBasho("2026-05", {
+      currentDay: 14,
+      importedDays: Array.from({ length: 14 }, (_value, index) => index + 1),
+    });
+    app = createApp(
+      async () =>
+        jsonResponse({
+          torikumi: [
+            {
+              bashoId: "202605",
+              day: 15,
+              matchNo: 1,
+              eastId: 4227,
+              eastShikona: "Onosato",
+              westId: 3661,
+              westShikona: "Kotozakura",
+              winnerId: 4227,
+              winnerEn: "Onosato",
+            },
+          ],
+        }),
+      new Date("2026-05-24T02:00:00.000Z"),
+    );
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ status: "imported", day: 15 });
+    const repositories = createRepositories(client);
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 14,
+    });
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toEqual(
+      expect.arrayContaining([expect.objectContaining({ day: 15 })]),
+    );
+    expect(
+      await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
+    ).toEqual([expect.objectContaining({ source: "sumo-api-schedule" })]);
   });
 
   it("retries a missing final day after the basho end date", async () => {
@@ -399,7 +452,7 @@ describe("scheduled result import route", () => {
       expect.objectContaining({
         bashoId: "2026-05",
         day: 15,
-        source: "sumo-api-schedule",
+        source: "sumo-api-schedule:complete",
       }),
     ]);
   });
@@ -624,7 +677,11 @@ async function seedLiveBasho(
   }
 }
 
-async function seedPublishedSchedule(bashoId: string, day: number) {
+async function seedPublishedSchedule(
+  bashoId: string,
+  day: number,
+  status: "scheduled" | "cancelled" = "scheduled",
+) {
   await createRepositories(client).applyScheduledBoutsImport({
     publication: {
       id: `${bashoId}-day-${day}-schedule`,
@@ -640,7 +697,7 @@ async function seedPublishedSchedule(bashoId: string, day: number) {
         day,
         eastRikishiId: "onosato",
         westRikishiId: "kotozakura",
-        status: "scheduled",
+        status,
       },
     ],
   });
@@ -648,6 +705,7 @@ async function seedPublishedSchedule(bashoId: string, day: number) {
 
 function resultsResponse(day = 3) {
   return jsonResponse({
+    ...(day === 15 ? { yusho: [{ type: "Makuuchi" }] } : {}),
     torikumi: [
       {
         id: `202605-${day}-1-4227-3661`,

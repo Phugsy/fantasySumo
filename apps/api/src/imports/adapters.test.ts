@@ -274,6 +274,41 @@ describe("source import adapters", () => {
     expect(JSON.stringify(command)).not.toContain("winner");
   });
 
+  it("marks only a resolved final-day card with a division yusho as complete", () => {
+    const incomplete = mapSumoApiSchedulePayload(
+      {
+        torikumi: [
+          {
+            bashoId: "202605",
+            day: 15,
+            eastShikona: "Onosato",
+            westShikona: "Kotozakura",
+            winnerEn: "Onosato",
+          },
+        ],
+      },
+      { bashoId: "2026-05", day: 15 },
+    );
+    const complete = mapSumoApiSchedulePayload(
+      {
+        torikumi: [
+          {
+            bashoId: "202605",
+            day: 15,
+            eastShikona: "Onosato",
+            westShikona: "Kotozakura",
+            winnerEn: "Onosato",
+          },
+        ],
+        yusho: [{ type: "Makuuchi" }],
+      },
+      { bashoId: "2026-05", day: 15 },
+    );
+
+    expect(incomplete.isComplete).toBeUndefined();
+    expect(complete.isComplete).toBe(true);
+  });
+
   it("rejects an empty source schedule instead of claiming it was published", () => {
     expect(() =>
       mapSumoApiSchedulePayload(

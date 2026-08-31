@@ -57,6 +57,7 @@ beforeEach(async () => {
       const day = Number(sourceUrl.split("/").at(-1));
 
       return jsonResponse({
+        ...(day === 15 ? { yusho: [{ type: "Makuuchi" }] } : {}),
         torikumi: [
           {
             id: "202605-1-1-4227-3661",
@@ -348,7 +349,7 @@ describe("admin import routes", () => {
       expect.objectContaining({
         bashoId: "2026-05",
         day: 15,
-        source: "sumo-api-schedule",
+        source: "sumo-api-schedule:complete",
       }),
     ]);
   });

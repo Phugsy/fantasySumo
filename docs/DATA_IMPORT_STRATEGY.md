@@ -301,9 +301,12 @@ unavailability or a schedule-only error is returned as explicit partial
 success because completed results must not be rolled back, hidden, or fetched
 again merely because the independent next-day card is late. The rejected empty
 source response cannot delete an existing published card. Before importing day
-15 results, these paths recover and persist the current final-day schedule when
-the day-14 following-card fetch did not publish it. This keeps final-day
-completion retryable without weakening the full-card completeness check.
+15 results, these paths always refresh and atomically replace the current
+final-day schedule so a missing or amended day-14 publication cannot strand the
+basho. The Sumo API adapter marks that refreshed card complete only when the
+final-day response contains resolved winners and the division yusho published
+when the basho concludes. Until that source attestation arrives, stored day-15
+results remain retryable but do not advance lifecycle progress beyond day 14.
 
 ### Tournament status and achievement visibility
 
@@ -314,14 +317,16 @@ rikishi is unavailable. A later non-absence result can reliably derive that a
 rikishi returned.
 
 Kachi-koshi and make-koshi are derived during a basho when the eighth recorded
-win or loss is stored. When the basho is complete at day 15 and every matchup
-on the stored final-day schedule has a corresponding result, any rikishi
+win or loss is stored. When the basho is complete at day 15, the final-day card
+has source-backed completion attestation, and every matchup on that card has a
+corresponding result, any rikishi
 without eight wins receives make-koshi, including a rikishi whose remaining
 days were absences. An administrative close before day 15, a post-tournament
 banzuke import without final-day results, or a partial final-day result import
 does not settle the record. A rikishi who secured eight wins before withdrawing
 keeps kachi-koshi. The result importer likewise completes an active basho only
-when the imported final-day payload covers the stored final-day card.
+when the imported final-day payload covers the freshly refreshed,
+source-attested final-day card.
 A gold-star win is derived only when the stored banzuke identifies
 the winner as maegashira, the loser as yokozuna, and the stored result is not a
 default/absence win. The UI renders only the concise badge label, without day

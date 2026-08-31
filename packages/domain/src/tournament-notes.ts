@@ -20,6 +20,7 @@ interface TournamentNotesInput {
   boutResults: readonly BoutResult[];
   rikishiId: Rikishi["id"];
   scheduledBouts: readonly ScheduledBout[];
+  finalDayScheduleComplete?: boolean;
   throughDay?: number;
 }
 
@@ -33,12 +34,14 @@ export function deriveRikishiTournamentNotes({
   boutResults,
   rikishiId,
   scheduledBouts,
+  finalDayScheduleComplete,
   throughDay,
 }: TournamentNotesInput): RikishiTournamentNotes {
   const hasCompleteFinalDayResults = hasCompleteBoutResultsForScheduledDay({
     boutResults,
     day: FINAL_BASHO_DAY,
     scheduledBouts,
+    scheduledDayComplete: finalDayScheduleComplete,
   });
   const applicableResults = boutResults
     .filter(
