@@ -300,7 +300,10 @@ manual admin result endpoint, and result CLI all use this workflow. Schedule
 unavailability or a schedule-only error is returned as explicit partial
 success because completed results must not be rolled back, hidden, or fetched
 again merely because the independent next-day card is late. The rejected empty
-source response cannot delete an existing published card.
+source response cannot delete an existing published card. Before importing day
+15 results, these paths recover and persist the current final-day schedule when
+the day-14 following-card fetch did not publish it. This keeps final-day
+completion retryable without weakening the full-card completeness check.
 
 ### Tournament status and achievement visibility
 

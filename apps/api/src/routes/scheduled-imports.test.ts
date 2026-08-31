@@ -372,7 +372,6 @@ describe("scheduled result import route", () => {
       currentDay: 14,
       importedDays: Array.from({ length: 14 }, (_value, index) => index + 1),
     });
-    await seedPublishedSchedule("2026-05", 15);
     const requestedDays: number[] = [];
     app = createApp(async (url) => {
       const day = Number(String(url).split("/").at(-1));
@@ -388,11 +387,21 @@ describe("scheduled result import route", () => {
       day: 15,
       importedDays: [15],
     });
-    expect(requestedDays).toEqual([15]);
-    expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
+    expect(requestedDays).toEqual([15, 15]);
+    const repositories = createRepositories(client);
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
       status: "complete",
       currentDay: 15,
     });
+    expect(
+      await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
+    ).toEqual([
+      expect.objectContaining({
+        bashoId: "2026-05",
+        day: 15,
+        source: "sumo-api-schedule",
+      }),
+    ]);
   });
 
   it("skips cleanly when there is no eligible live basho", async () => {

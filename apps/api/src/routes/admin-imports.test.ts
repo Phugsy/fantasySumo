@@ -299,6 +299,60 @@ describe("admin import routes", () => {
     expect(leaderboardResponse.statusCode).toBe(200);
   });
 
+  it("recovers a missing final-day schedule for dry-run and applied result imports", async () => {
+    await app.inject({
+      method: "POST",
+      url: "/api/admin/import-banzuke",
+      payload: { confirmedSourceBashoId: "2026-05" },
+    });
+
+    const dryRunResponse = await app.inject({
+      method: "POST",
+      url: "/api/admin/basho/2026-05/import-results?dryRun=true",
+      payload: { day: 15 },
+    });
+
+    expect(dryRunResponse.statusCode).toBe(200);
+    expect(dryRunResponse.json()).toMatchObject({
+      dryRun: true,
+      summary: {
+        basho: { updated: 1 },
+        results: { created: 1 },
+      },
+    });
+
+    const repositories = createRepositories(client);
+    expect(
+      await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
+    ).toEqual([]);
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toEqual([]);
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 3,
+    });
+
+    const applyResponse = await app.inject({
+      method: "POST",
+      url: "/api/admin/basho/2026-05/import-results",
+      payload: { day: 15 },
+    });
+
+    expect(applyResponse.statusCode).toBe(200);
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "complete",
+      currentDay: 15,
+    });
+    expect(
+      await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
+    ).toEqual([
+      expect.objectContaining({
+        bashoId: "2026-05",
+        day: 15,
+        source: "sumo-api-schedule",
+      }),
+    ]);
+  });
+
   it("keeps imported results and reports partial success when the next schedule is unavailable", async () => {
     await app.inject({
       method: "POST",

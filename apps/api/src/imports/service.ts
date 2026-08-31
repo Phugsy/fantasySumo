@@ -27,6 +27,10 @@ export class ImportValidationError extends Error {
   }
 }
 
+interface BoutResultsImportOptions extends ImportOptions {
+  completionScheduledBouts?: readonly ScheduledBout[];
+}
+
 export async function importBanzuke(
   repositories: Repositories,
   command: BanzukeImportCommand,
@@ -77,7 +81,7 @@ export async function importBanzuke(
 export async function importBoutResults(
   repositories: Repositories,
   command: BoutResultsImportCommand,
-  options: ImportOptions = {},
+  options: BoutResultsImportOptions = {},
 ): Promise<ImportResult> {
   // Result imports are scoped to one basho/day. Reimporting that day should
   // correct stale wins rather than append duplicate or outdated scoring rows.
@@ -95,9 +99,9 @@ export async function importBoutResults(
     hasCompleteBoutResultsForScheduledDay({
       boutResults: command.results,
       day: importedDay,
-      scheduledBouts: await repositories.listScheduledBoutsForBasho(
-        command.bashoId,
-      ),
+      scheduledBouts:
+        options.completionScheduledBouts ??
+        (await repositories.listScheduledBoutsForBasho(command.bashoId)),
     });
   const existingRikishi = await repositories.listRikishi();
   const existingRikishiIds = new Set(
