@@ -244,7 +244,7 @@ export async function importScheduledBouts(
   if (options.dryRun !== true) {
     const outcome = await repositories.applyScheduledBoutsImport(prepared.data);
 
-    if (outcome === "preserved-existing-complete") {
+    if (outcome !== "applied") {
       return (await prepareScheduledBoutsImport(repositories, command, options))
         .result;
     }
@@ -275,14 +275,24 @@ async function prepareScheduledBoutsImport(
     existingPublication !== undefined &&
     isCompleteScheduledBoutPublicationSource(existingPublication.source) &&
     command.isComplete !== true;
-  const importedBouts = preserveExistingCompleteCard
+  const existingScheduledBoutIds = new Set(
+    existingScheduledBouts.map((bout) => bout.id),
+  );
+  const preserveExistingSchedule =
+    preserveExistingCompleteCard ||
+    (existingPublication !== undefined &&
+      command.isComplete !== true &&
+      command.bouts.length > 0 &&
+      existingScheduledBouts.length > command.bouts.length &&
+      command.bouts.every((bout) => existingScheduledBoutIds.has(bout.id)));
+  const importedBouts = preserveExistingSchedule
     ? existingScheduledBouts
     : command.bouts;
   const existingRikishi = await repositories.listRikishi();
   const existingRikishiIds = new Set(
     existingRikishi.map((rikishi) => rikishi.id),
   );
-  const missingSourceRikishi = preserveExistingCompleteCard
+  const missingSourceRikishi = preserveExistingSchedule
     ? []
     : (command.rikishi ?? []).filter(
         (rikishi) => !existingRikishiIds.has(rikishi.id),
@@ -307,7 +317,7 @@ async function prepareScheduledBoutsImport(
       source: toScheduledBoutPublicationSource(command),
       publishedAt: new Date().toISOString(),
     },
-    rikishi: preserveExistingCompleteCard ? [] : missingSourceRikishi,
+    rikishi: preserveExistingSchedule ? [] : missingSourceRikishi,
     bouts: command.bouts,
   };
 
@@ -373,7 +383,7 @@ export async function importScheduledBoutsAndBoutResults(
       boutResults: results.data,
     });
 
-    if (outcome === "preserved-existing-complete") {
+    if (outcome !== "applied") {
       schedule = await prepareScheduledBoutsImport(
         repositories,
         scheduleCommand,
@@ -382,7 +392,7 @@ export async function importScheduledBoutsAndBoutResults(
       results = await prepareBoutResultsImport(repositories, resultsCommand, {
         ...options,
         completionSchedule: scheduleCommand,
-        preserveExistingSnapshot: true,
+        preserveExistingSnapshot: outcome === "preserved-existing-complete",
       });
     }
   }

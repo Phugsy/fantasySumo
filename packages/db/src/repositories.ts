@@ -52,7 +52,8 @@ export interface ScheduledBoutsAndBoutResultsImportData {
 
 export type ScheduledBoutsImportOutcome =
   | "applied"
-  | "preserved-existing-complete";
+  | "preserved-existing-complete"
+  | "preserved-existing-fuller-schedule";
 
 export interface DemoBashoResetData extends BanzukeImportData {
   fantasyTeams: readonly FantasyTeam[];
@@ -897,6 +898,28 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
           return "preserved-existing-complete";
         }
 
+        const existingBoutIds = transaction
+          .select({ id: sqlite.scheduledBouts.id })
+          .from(sqlite.scheduledBouts)
+          .where(
+            and(
+              eq(sqlite.scheduledBouts.bashoId, importData.publication.bashoId),
+              eq(sqlite.scheduledBouts.day, importData.publication.day),
+            ),
+          )
+          .all()
+          .map((bout) => bout.id);
+
+        if (
+          shouldPreserveExistingFullerSchedule(
+            existingBoutIds,
+            importData.bouts.map((bout) => bout.id),
+            importData.publication.source,
+          )
+        ) {
+          return "preserved-existing-fuller-schedule";
+        }
+
         for (const entry of importData.rikishi ?? []) {
           transaction
             .insert(sqlite.rikishi)
@@ -986,6 +1009,24 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
           return "preserved-existing-complete";
         }
 
+        const existingBoutIds = transaction
+          .select({ id: sqlite.scheduledBouts.id })
+          .from(sqlite.scheduledBouts)
+          .where(
+            and(
+              eq(sqlite.scheduledBouts.bashoId, schedule.publication.bashoId),
+              eq(sqlite.scheduledBouts.day, schedule.publication.day),
+            ),
+          )
+          .all()
+          .map((bout) => bout.id);
+        const preserveExistingFullerSchedule =
+          shouldPreserveExistingFullerSchedule(
+            existingBoutIds,
+            schedule.bouts.map((bout) => bout.id),
+            schedule.publication.source,
+          );
+
         for (const entry of [
           ...(schedule.rikishi ?? []),
           ...(results.rikishi ?? []),
@@ -997,52 +1038,54 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
             .run();
         }
 
-        transaction
-          .insert(sqlite.scheduledBoutPublications)
-          .values(schedule.publication)
-          .onConflictDoUpdate({
-            target: [
-              sqlite.scheduledBoutPublications.bashoId,
-              sqlite.scheduledBoutPublications.day,
-            ],
-            set: schedule.publication,
-          })
-          .run();
-
-        for (const entry of schedule.bouts) {
+        if (!preserveExistingFullerSchedule) {
           transaction
-            .insert(sqlite.scheduledBouts)
-            .values(toScheduledBoutRow(entry))
+            .insert(sqlite.scheduledBoutPublications)
+            .values(schedule.publication)
             .onConflictDoUpdate({
-              target: sqlite.scheduledBouts.id,
-              set: toScheduledBoutRow(entry),
+              target: [
+                sqlite.scheduledBoutPublications.bashoId,
+                sqlite.scheduledBoutPublications.day,
+              ],
+              set: schedule.publication,
             })
             .run();
-        }
 
-        const importedScheduleDayFilter = and(
-          eq(sqlite.scheduledBouts.bashoId, schedule.publication.bashoId),
-          eq(sqlite.scheduledBouts.day, schedule.publication.day),
-        );
+          for (const entry of schedule.bouts) {
+            transaction
+              .insert(sqlite.scheduledBouts)
+              .values(toScheduledBoutRow(entry))
+              .onConflictDoUpdate({
+                target: sqlite.scheduledBouts.id,
+                set: toScheduledBoutRow(entry),
+              })
+              .run();
+          }
 
-        if (schedule.bouts.length === 0) {
-          transaction
-            .delete(sqlite.scheduledBouts)
-            .where(importedScheduleDayFilter)
-            .run();
-        } else {
-          transaction
-            .delete(sqlite.scheduledBouts)
-            .where(
-              and(
-                importedScheduleDayFilter,
-                notInArray(
-                  sqlite.scheduledBouts.id,
-                  schedule.bouts.map((entry) => entry.id),
+          const importedScheduleDayFilter = and(
+            eq(sqlite.scheduledBouts.bashoId, schedule.publication.bashoId),
+            eq(sqlite.scheduledBouts.day, schedule.publication.day),
+          );
+
+          if (schedule.bouts.length === 0) {
+            transaction
+              .delete(sqlite.scheduledBouts)
+              .where(importedScheduleDayFilter)
+              .run();
+          } else {
+            transaction
+              .delete(sqlite.scheduledBouts)
+              .where(
+                and(
+                  importedScheduleDayFilter,
+                  notInArray(
+                    sqlite.scheduledBouts.id,
+                    schedule.bouts.map((entry) => entry.id),
+                  ),
                 ),
-              ),
-            )
-            .run();
+              )
+              .run();
+          }
         }
 
         if (results.basho !== undefined) {
@@ -1093,7 +1136,9 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
             .run();
         }
 
-        return "applied";
+        return preserveExistingFullerSchedule
+          ? "preserved-existing-fuller-schedule"
+          : "applied";
       });
     },
   };
@@ -1778,6 +1823,28 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
           return "preserved-existing-complete";
         }
 
+        const existingBoutIds = (
+          await transaction
+            .select({ id: pg.scheduledBouts.id })
+            .from(pg.scheduledBouts)
+            .where(
+              and(
+                eq(pg.scheduledBouts.bashoId, importData.publication.bashoId),
+                eq(pg.scheduledBouts.day, importData.publication.day),
+              ),
+            )
+        ).map((bout) => bout.id);
+
+        if (
+          shouldPreserveExistingFullerSchedule(
+            existingBoutIds,
+            importData.bouts.map((bout) => bout.id),
+            importData.publication.source,
+          )
+        ) {
+          return "preserved-existing-fuller-schedule";
+        }
+
         for (const entry of importData.rikishi ?? []) {
           await transaction
             .insert(pg.rikishi)
@@ -1861,6 +1928,24 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
           return "preserved-existing-complete";
         }
 
+        const existingBoutIds = (
+          await transaction
+            .select({ id: pg.scheduledBouts.id })
+            .from(pg.scheduledBouts)
+            .where(
+              and(
+                eq(pg.scheduledBouts.bashoId, schedule.publication.bashoId),
+                eq(pg.scheduledBouts.day, schedule.publication.day),
+              ),
+            )
+        ).map((bout) => bout.id);
+        const preserveExistingFullerSchedule =
+          shouldPreserveExistingFullerSchedule(
+            existingBoutIds,
+            schedule.bouts.map((bout) => bout.id),
+            schedule.publication.source,
+          );
+
         for (const entry of [
           ...(schedule.rikishi ?? []),
           ...(results.rikishi ?? []),
@@ -1871,46 +1956,48 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
             .onConflictDoNothing({ target: pg.rikishi.id });
         }
 
-        await transaction
-          .insert(pg.scheduledBoutPublications)
-          .values(schedule.publication)
-          .onConflictDoUpdate({
-            target: [
-              pg.scheduledBoutPublications.bashoId,
-              pg.scheduledBoutPublications.day,
-            ],
-            set: schedule.publication,
-          });
-
-        for (const entry of schedule.bouts) {
+        if (!preserveExistingFullerSchedule) {
           await transaction
-            .insert(pg.scheduledBouts)
-            .values(toScheduledBoutRow(entry))
+            .insert(pg.scheduledBoutPublications)
+            .values(schedule.publication)
             .onConflictDoUpdate({
-              target: pg.scheduledBouts.id,
-              set: toScheduledBoutRow(entry),
+              target: [
+                pg.scheduledBoutPublications.bashoId,
+                pg.scheduledBoutPublications.day,
+              ],
+              set: schedule.publication,
             });
-        }
 
-        const importedScheduleDayFilter = and(
-          eq(pg.scheduledBouts.bashoId, schedule.publication.bashoId),
-          eq(pg.scheduledBouts.day, schedule.publication.day),
-        );
+          for (const entry of schedule.bouts) {
+            await transaction
+              .insert(pg.scheduledBouts)
+              .values(toScheduledBoutRow(entry))
+              .onConflictDoUpdate({
+                target: pg.scheduledBouts.id,
+                set: toScheduledBoutRow(entry),
+              });
+          }
 
-        if (schedule.bouts.length === 0) {
-          await transaction
-            .delete(pg.scheduledBouts)
-            .where(importedScheduleDayFilter);
-        } else {
-          await transaction.delete(pg.scheduledBouts).where(
-            and(
-              importedScheduleDayFilter,
-              notInArray(
-                pg.scheduledBouts.id,
-                schedule.bouts.map((entry) => entry.id),
-              ),
-            ),
+          const importedScheduleDayFilter = and(
+            eq(pg.scheduledBouts.bashoId, schedule.publication.bashoId),
+            eq(pg.scheduledBouts.day, schedule.publication.day),
           );
+
+          if (schedule.bouts.length === 0) {
+            await transaction
+              .delete(pg.scheduledBouts)
+              .where(importedScheduleDayFilter);
+          } else {
+            await transaction.delete(pg.scheduledBouts).where(
+              and(
+                importedScheduleDayFilter,
+                notInArray(
+                  pg.scheduledBouts.id,
+                  schedule.bouts.map((entry) => entry.id),
+                ),
+              ),
+            );
+          }
         }
 
         if (results.basho !== undefined) {
@@ -1958,7 +2045,9 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
           );
         }
 
-        return "applied";
+        return preserveExistingFullerSchedule
+          ? "preserved-existing-fuller-schedule"
+          : "applied";
       });
     },
   };
@@ -1974,6 +2063,21 @@ function shouldPreserveExistingCompleteSnapshot(
     existingSource !== undefined &&
     isCompleteScheduledBoutPublicationSource(existingSource) &&
     !isCompleteScheduledBoutPublicationSource(incomingSource)
+  );
+}
+
+function shouldPreserveExistingFullerSchedule(
+  existingBoutIds: readonly string[],
+  incomingBoutIds: readonly string[],
+  incomingSource: string,
+): boolean {
+  const existingBoutIdSet = new Set(existingBoutIds);
+
+  return (
+    !isCompleteScheduledBoutPublicationSource(incomingSource) &&
+    incomingBoutIds.length > 0 &&
+    existingBoutIds.length > incomingBoutIds.length &&
+    incomingBoutIds.every((boutId) => existingBoutIdSet.has(boutId))
   );
 }
 

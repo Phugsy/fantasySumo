@@ -594,6 +594,83 @@ describe("repositories", () => {
     ]);
   });
 
+  it("preserves a fuller unattested schedule while applying partial results", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
+    const fullerSchedule = {
+      publication: {
+        id: "2026-05-day-4-early-schedule",
+        bashoId: sampleBasho.id,
+        day: 4,
+        source: "sumo-api-schedule",
+        publishedAt: "2026-05-13T09:00:00.000Z",
+      },
+      bouts: [
+        {
+          id: "2026-05-day-4-match-1",
+          bashoId: sampleBasho.id,
+          day: 4,
+          eastRikishiId: "onosato",
+          westRikishiId: "kotozakura",
+          status: "scheduled" as const,
+        },
+        {
+          id: "2026-05-day-4-match-2",
+          bashoId: sampleBasho.id,
+          day: 4,
+          eastRikishiId: "hoshoryu",
+          westRikishiId: "kirishima",
+          status: "scheduled" as const,
+        },
+      ],
+    };
+    await repositories.applyScheduledBoutsImport(fullerSchedule);
+
+    const outcome = await repositories.applyScheduledBoutsAndBoutResultsImport({
+      scheduledBouts: {
+        publication: {
+          ...fullerSchedule.publication,
+          id: "2026-05-day-4-current-schedule",
+          publishedAt: "2026-05-14T09:00:00.000Z",
+        },
+        bouts: [fullerSchedule.bouts[0]!],
+      },
+      boutResults: {
+        bashoId: sampleBasho.id,
+        day: 4,
+        results: [
+          {
+            id: "2026-05-day-4-match-1",
+            bashoId: sampleBasho.id,
+            day: 4,
+            winnerRikishiId: "onosato",
+            loserRikishiId: "kotozakura",
+          },
+        ],
+      },
+    });
+
+    expect(outcome).toBe("preserved-existing-fuller-schedule");
+    expect(
+      await repositories.listScheduledBoutsForBasho(sampleBasho.id),
+    ).toHaveLength(2);
+    expect(
+      (await repositories.listBoutResultsForBasho(sampleBasho.id)).filter(
+        (result) => result.day === 4,
+      ),
+    ).toEqual([
+      expect.objectContaining({ id: "2026-05-day-4-match-1", day: 4 }),
+    ]);
+    expect(
+      await repositories.listScheduledBoutPublicationsForBasho(sampleBasho.id),
+    ).toEqual([
+      expect.objectContaining({
+        id: "2026-05-day-4-early-schedule",
+        publishedAt: "2026-05-13T09:00:00.000Z",
+      }),
+    ]);
+  });
+
   it("loads deterministic demo data for local demos and E2E fixtures", async () => {
     await seedDemoDatabase(createRepositories(client));
     const repositories = createRepositories(client);

@@ -277,7 +277,9 @@ Current behaviour:
   separately from completed results so they cannot affect scores.
   Complete daily schedule/result snapshots take precedence over weaker retries,
   with the check performed under the same SQLite transaction or Postgres basho
-  row lock as the replacement write.
+  row lock as the replacement write. A non-empty unattested partial response
+  likewise cannot truncate a fuller stored schedule, although its available
+  results still commit.
   banzuke writes preserve the furthest stored lifecycle state inside the
   transaction so concurrent refreshes cannot reopen picks.
 - Saves owned teams and replacement picks atomically while rechecking the

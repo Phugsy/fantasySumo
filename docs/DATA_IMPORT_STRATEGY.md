@@ -297,6 +297,11 @@ Validation and replacement rules:
   so concurrent retries cannot overwrite a stronger snapshot, and a
   transactionally preserved write is returned as skipped in the operator
   summary;
+- a non-empty unattested response also cannot shrink a fuller stored card. The
+  fuller schedule and its publication metadata are retained while any available
+  matching results still commit; equal-size corrections, larger cards, and
+  explicit empty schedule replacements continue through the normal replacement
+  path;
 - publication metadata and scheduled bouts never advance basho lifecycle or
   participate in fantasy scoring.
 
