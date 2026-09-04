@@ -158,7 +158,9 @@ export async function fetchSumoApiResultsImport(
 
 export async function fetchSumoApiDailyImport(
   fetchFn: SourceFetch,
-  options: SumoApiResultsImportOptions,
+  options: SumoApiResultsImportOptions & {
+    expectedRikishiIds: readonly string[];
+  },
 ): Promise<{
   scheduleCommand: ScheduledBoutsImportCommand;
   resultsCommand: BoutResultsImportCommand;
@@ -173,7 +175,7 @@ export async function fetchSumoApiDailyImport(
     fetchJson<SumoApiBanzukePayload>(
       fetchFn,
       `${SUMO_API_BASE_URL}/basho/${sourceBashoId}/banzuke/${division}`,
-    ),
+    ).catch(() => undefined),
   ]);
 
   return {
@@ -202,7 +204,12 @@ export async function fetchSumoApiScheduleImport(
 
 export function mapSumoApiSchedulePayload(
   payload: SumoApiTorikumiPayload,
-  options: { bashoId: string; day: number; division?: string },
+  options: {
+    bashoId: string;
+    day: number;
+    division?: string;
+    expectedRikishiIds?: readonly string[];
+  },
   banzukePayload?: SumoApiBanzukePayload,
 ): ScheduledBoutsImportCommand {
   const rows = payload.torikumi ?? [];
@@ -218,7 +225,12 @@ export function mapSumoApiSchedulePayload(
   const division = options.division ?? "Makuuchi";
   const isComplete =
     banzukePayload !== undefined &&
-    hasAttestedCompleteCard(rows, banzukePayload, options.day) &&
+    hasAttestedCompleteCard(
+      rows,
+      banzukePayload,
+      options.day,
+      options.expectedRikishiIds ?? [],
+    ) &&
     (options.day < 15 ||
       payload.yusho?.some(
         (winner) => winner.type?.toLowerCase() === division.toLowerCase(),
@@ -253,6 +265,7 @@ function hasAttestedCompleteCard(
   rows: readonly SumoApiTorikumiRow[],
   banzukePayload: SumoApiBanzukePayload,
   day: number,
+  expectedRikishiIds: readonly string[],
 ): boolean {
   if (!rows.every(hasResolvedWinner)) {
     return false;
@@ -271,9 +284,16 @@ function hasAttestedCompleteCard(
       .filter(isString)
       .map(normalizeShikona),
   );
+  const banzukeRikishiIds = new Set(
+    banzukeRows
+      .map((rikishi) => rikishi.shikonaEn)
+      .filter(isString)
+      .map(toLocalRikishiId),
+  );
 
   return (
-    banzukeRows.length > 0 &&
+    expectedRikishiIds.length > 0 &&
+    expectedRikishiIds.every((rikishiId) => banzukeRikishiIds.has(rikishiId)) &&
     banzukeRows.every((rikishi) => {
       const dayRecord = rikishi.record?.[day - 1];
       const result = dayRecord?.result?.trim().toLowerCase();

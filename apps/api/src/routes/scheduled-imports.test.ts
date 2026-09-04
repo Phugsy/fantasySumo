@@ -579,6 +579,41 @@ describe("scheduled result import route", () => {
     ).toEqual([]);
   });
 
+  it("imports results without attesting the card when banzuke evidence fails", async () => {
+    await seedLiveBasho("2026-05", { importedDays: [1, 2] });
+    app = createApp(async (url) => {
+      const sourceUrl = String(url);
+
+      return sourceUrl.includes("/banzuke/")
+        ? new Response(null, { status: 503 })
+        : resultsResponse(dayFromUrl(url));
+    });
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "imported",
+      day: 3,
+      importedDays: [3],
+    });
+    const repositories = createRepositories(client);
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 3,
+    });
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toHaveLength(
+      3,
+    );
+    expect(
+      await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ day: 3, source: "sumo-api-schedule" }),
+      ]),
+    );
+  });
+
   it("reports partial success when the following-day schedule is unavailable", async () => {
     await seedLiveBasho("2026-05", { importedDays: [1, 2] });
     app = createApp(async (url) => {

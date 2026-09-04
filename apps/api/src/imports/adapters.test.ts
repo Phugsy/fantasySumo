@@ -304,7 +304,30 @@ describe("source import adapters", () => {
           },
         ],
       },
-      { bashoId: "2026-05", day: 14 },
+      {
+        bashoId: "2026-05",
+        day: 14,
+        expectedRikishiIds: ["onosato", "kotozakura"],
+      },
+      completeDay14Banzuke,
+    );
+    const mutuallyTruncatedEarlierDay = mapSumoApiSchedulePayload(
+      {
+        torikumi: [
+          {
+            bashoId: "202605",
+            day: 14,
+            eastShikona: "Onosato",
+            westShikona: "Kotozakura",
+            winnerEn: "Onosato",
+          },
+        ],
+      },
+      {
+        bashoId: "2026-05",
+        day: 14,
+        expectedRikishiIds: ["onosato", "kotozakura", "hoshoryu"],
+      },
       completeDay14Banzuke,
     );
     const truncatedEarlierDay = mapSumoApiSchedulePayload(
@@ -319,7 +342,11 @@ describe("source import adapters", () => {
           },
         ],
       },
-      { bashoId: "2026-05", day: 14 },
+      {
+        bashoId: "2026-05",
+        day: 14,
+        expectedRikishiIds: ["onosato", "kotozakura", "hoshoryu"],
+      },
       {
         ...completeDay14Banzuke,
         east: [
@@ -344,7 +371,11 @@ describe("source import adapters", () => {
           },
         ],
       },
-      { bashoId: "2026-05", day: 15 },
+      {
+        bashoId: "2026-05",
+        day: 15,
+        expectedRikishiIds: ["onosato", "kotozakura"],
+      },
       {
         east: [
           {
@@ -373,7 +404,11 @@ describe("source import adapters", () => {
         ],
         yusho: [{ type: "Makuuchi" }],
       },
-      { bashoId: "2026-05", day: 15 },
+      {
+        bashoId: "2026-05",
+        day: 15,
+        expectedRikishiIds: ["onosato", "kotozakura"],
+      },
       {
         east: [
           {
@@ -391,6 +426,7 @@ describe("source import adapters", () => {
     );
 
     expect(resolvedEarlierDay.isComplete).toBe(true);
+    expect(mutuallyTruncatedEarlierDay.isComplete).toBeUndefined();
     expect(truncatedEarlierDay.isComplete).toBeUndefined();
     expect(incomplete.isComplete).toBeUndefined();
     expect(complete.isComplete).toBe(true);
@@ -423,6 +459,7 @@ describe("source import adapters", () => {
                   east: [
                     {
                       rikishiID: 4227,
+                      shikonaEn: "Onosato",
                       record: Array.from({ length: 4 }, () => ({
                         result: "win",
                       })),
@@ -431,6 +468,7 @@ describe("source import adapters", () => {
                   west: [
                     {
                       rikishiID: 3661,
+                      shikonaEn: "Kotozakura",
                       record: Array.from({ length: 4 }, () => ({
                         result: "loss",
                       })),
@@ -441,7 +479,11 @@ describe("source import adapters", () => {
           ),
         );
       },
-      { bashoId: "2026-05", day: 4 },
+      {
+        bashoId: "2026-05",
+        day: 4,
+        expectedRikishiIds: ["onosato", "kotozakura"],
+      },
     );
 
     expect(
@@ -456,6 +498,35 @@ describe("source import adapters", () => {
       loserRikishiId: "kotozakura",
     });
     expect(commands.scheduleCommand.isComplete).toBe(true);
+  });
+
+  it("imports matching torikumi without attestation when banzuke fetching fails", async () => {
+    const commands = await fetchSumoApiDailyImport(
+      async (url) =>
+        String(url).includes("/banzuke/")
+          ? new Response(null, { status: 503 })
+          : new Response(
+              JSON.stringify({
+                torikumi: [
+                  {
+                    bashoId: "202605",
+                    day: 4,
+                    eastShikona: "Onosato",
+                    westShikona: "Kotozakura",
+                    winnerEn: "Onosato",
+                  },
+                ],
+              }),
+            ),
+      {
+        bashoId: "2026-05",
+        day: 4,
+        expectedRikishiIds: ["onosato", "kotozakura"],
+      },
+    );
+
+    expect(commands.scheduleCommand.isComplete).toBeUndefined();
+    expect(commands.resultsCommand.results).toHaveLength(1);
   });
 
   it("rejects an empty source schedule instead of claiming it was published", () => {

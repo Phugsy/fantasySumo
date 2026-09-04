@@ -304,8 +304,12 @@ Every daily result operation fetches the day N torikumi once and maps both the
 card and results from that same response. It also fetches the division banzuke
 as independent completeness evidence: every banzuke rikishi must have a record
 for day N and must either appear in the torikumi or be explicitly recorded as
-absent. The card is attested only when that coverage check passes and every bout
-has a resolved winner; day 15 additionally requires the division yusho signal
+absent. The fetched roster must also contain every rikishi on the persisted
+division banzuke, preventing matching truncated source responses from attesting
+each other. If the banzuke evidence request fails, the matching torikumi card
+and results remain importable but the card stays unattested for a later retry.
+The card is attested only when the coverage checks pass and every bout has a
+resolved winner; day 15 additionally requires the division yusho signal
 described below. The service rejects schedule/result command pairs whose
 matchups differ, then writes the matching card and results in one transaction.
 After the current day commits, days 1-14 independently attempt the published

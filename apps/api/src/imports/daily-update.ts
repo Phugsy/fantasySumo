@@ -70,9 +70,12 @@ export async function importCurrentDayScheduleAndResults(
   sourceFetch: SourceFetch,
   options: DailyUpdateImportOptions,
 ): Promise<ImportResult> {
+  const expectedRikishiIds = (
+    await repositories.listBanzukeEntriesForBasho(options.bashoId)
+  ).map((entry) => entry.rikishiId);
   const { scheduleCommand, resultsCommand } = await fetchSumoApiDailyImport(
     sourceFetch,
-    options,
+    { ...options, expectedRikishiIds },
   );
 
   return importScheduledBoutsAndBoutResults(
