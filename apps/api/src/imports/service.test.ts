@@ -17,6 +17,7 @@ import {
   importBanzuke,
   importBoutResults,
   importScheduledBouts,
+  importScheduledBoutsAndBoutResults,
   ImportValidationError,
 } from "./service.js";
 
@@ -837,6 +838,151 @@ describe("import service", () => {
     expect(await repositories.listScheduledBoutsForBasho("2026-05")).toEqual([
       expect.objectContaining({ id: "2026-05-day-4-confirmed-match" }),
     ]);
+  });
+
+  it("preserves a confirmed schedule and its results as one snapshot", async () => {
+    const repositories = createRepositories(client);
+    const additionalRikishi = [
+      { id: "hoshoryu", shikona: "Hoshoryu" },
+      { id: "kirishima", shikona: "Kirishima" },
+    ];
+    await importBanzuke(repositories, {
+      ...banzukeCommand,
+      rikishi: [...banzukeCommand.rikishi, ...additionalRikishi],
+      banzukeEntries: [
+        ...banzukeCommand.banzukeEntries,
+        ...additionalRikishi.map((rikishi, index) => ({
+          id: `2026-05-${rikishi.id}`,
+          bashoId: "2026-05",
+          rikishiId: rikishi.id,
+          rank: "Maegashira",
+          rankOrder: index + 3,
+        })),
+      ],
+    });
+    const completeSchedule: ScheduledBoutsImportCommand = {
+      source: "test-schedule",
+      bashoId: "2026-05",
+      day: 4,
+      isComplete: true,
+      bouts: [
+        {
+          id: "2026-05-day-4-match-1",
+          bashoId: "2026-05",
+          day: 4,
+          eastRikishiId: "onosato",
+          westRikishiId: "kotozakura",
+          status: "scheduled",
+        },
+        {
+          id: "2026-05-day-4-match-2",
+          bashoId: "2026-05",
+          day: 4,
+          eastRikishiId: "hoshoryu",
+          westRikishiId: "kirishima",
+          status: "scheduled",
+        },
+      ],
+    };
+    const completeResults = {
+      source: "test-results",
+      bashoId: "2026-05",
+      results: [
+        {
+          id: "2026-05-day-4-match-1",
+          bashoId: "2026-05",
+          day: 4,
+          winnerRikishiId: "onosato",
+          loserRikishiId: "kotozakura",
+        },
+        {
+          id: "2026-05-day-4-match-2",
+          bashoId: "2026-05",
+          day: 4,
+          winnerRikishiId: "hoshoryu",
+          loserRikishiId: "kirishima",
+        },
+      ],
+    };
+
+    await importScheduledBoutsAndBoutResults(
+      repositories,
+      completeSchedule,
+      completeResults,
+    );
+    const retry = await importScheduledBoutsAndBoutResults(
+      repositories,
+      {
+        ...completeSchedule,
+        isComplete: false,
+        bouts: [completeSchedule.bouts[0]!],
+      },
+      {
+        ...completeResults,
+        results: [completeResults.results[0]!],
+      },
+    );
+
+    expect(retry.summary.scheduledBouts).toMatchObject({ skipped: 2 });
+    expect(retry.summary.results).toMatchObject({ skipped: 2 });
+    expect(
+      await repositories.listScheduledBoutsForBasho("2026-05"),
+    ).toHaveLength(2);
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toHaveLength(
+      2,
+    );
+  });
+
+  it("rejects schedule and result snapshots with different matchups", async () => {
+    const repositories = createRepositories(client);
+    await importBanzuke(repositories, banzukeCommand);
+
+    await expect(
+      importScheduledBoutsAndBoutResults(
+        repositories,
+        {
+          source: "test-schedule",
+          bashoId: "2026-05",
+          day: 4,
+          bouts: [
+            {
+              id: "schedule-match",
+              bashoId: "2026-05",
+              day: 4,
+              eastRikishiId: "onosato",
+              westRikishiId: "kotozakura",
+              status: "scheduled",
+            },
+          ],
+        },
+        {
+          source: "test-results",
+          bashoId: "2026-05",
+          rikishi: [{ id: "juryo-east", shikona: "Juryo East" }],
+          results: [
+            {
+              id: "different-match",
+              bashoId: "2026-05",
+              day: 4,
+              winnerRikishiId: "onosato",
+              loserRikishiId: "juryo-east",
+            },
+          ],
+        },
+      ),
+    ).rejects.toMatchObject({
+      issues: [
+        {
+          path: "schedule.bouts",
+          message:
+            "Schedule and result imports must describe the same set of matchups.",
+        },
+      ],
+    });
+    expect(await repositories.listScheduledBoutsForBasho("2026-05")).toEqual(
+      [],
+    );
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toEqual([]);
   });
 
   it("rejects duplicate rikishi and invalid withdrawal markers", async () => {

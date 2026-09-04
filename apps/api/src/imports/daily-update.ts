@@ -1,6 +1,6 @@
 import type { Repositories } from "@fantasy-sumo/db";
 import {
-  fetchSumoApiResultsImport,
+  fetchSumoApiDailyImport,
   fetchSumoApiScheduleImport,
   ScheduleUnavailableError,
 } from "./adapters.js";
@@ -70,11 +70,10 @@ export async function importCurrentDayScheduleAndResults(
   sourceFetch: SourceFetch,
   options: DailyUpdateImportOptions,
 ): Promise<ImportResult> {
-  const scheduleCommand = await fetchSumoApiScheduleImport(
+  const { scheduleCommand, resultsCommand } = await fetchSumoApiDailyImport(
     sourceFetch,
     options,
   );
-  const resultsCommand = await fetchSumoApiResultsImport(sourceFetch, options);
 
   return importScheduledBoutsAndBoutResults(
     repositories,

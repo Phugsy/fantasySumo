@@ -147,7 +147,11 @@ Current routes:
     cannot reopen picks after locking.
   - Supports `?dryRun=true`.
 - `POST /api/admin/basho/:bashoId/import-results`
-  - Fetches one day of Makuuchi results from Sumo API by default.
+  - Fetches one day of Makuuchi torikumi once from Sumo API and maps both its
+    schedule and results from that snapshot.
+  - Uses the division banzuke's per-day records to attest that every rikishi is
+    represented by a matchup or explicit absence before marking the card
+    complete.
   - Request body: `day` and optional `division`.
   - Maps source payloads into local `BoutResult` records using local shikona-based rikishi ids.
   - Replaces stale result rows only for the imported basho/day.
@@ -269,6 +273,9 @@ Current behaviour:
 - Provides transactional replacement helpers for banzuke, bout result, and
   scheduled-bout imports; scheduled cards and publication metadata are stored
   separately from completed results so they cannot affect scores.
+  Complete daily schedule/result snapshots take precedence over weaker retries,
+  with the check performed under the same SQLite transaction or Postgres basho
+  row lock as the replacement write.
   banzuke writes preserve the furthest stored lifecycle state inside the
   transaction so concurrent refreshes cannot reopen picks.
 - Saves owned teams and replacement picks atomically while rechecking the

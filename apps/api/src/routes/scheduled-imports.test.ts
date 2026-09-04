@@ -51,7 +51,7 @@ describe("scheduled result import route", () => {
     const requestedDays: number[] = [];
     app = createApp(async (url) => {
       const requestedDay = dayFromUrl(url);
-      requestedDays.push(requestedDay);
+      if (Number.isFinite(requestedDay)) requestedDays.push(requestedDay);
       return resultsResponse(requestedDay);
     });
 
@@ -77,7 +77,7 @@ describe("scheduled result import route", () => {
         },
       },
     });
-    expect(requestedDays).toEqual([3, 3, 4]);
+    expect(requestedDays).toEqual([3, 4]);
 
     const secondResponse = await injectCron(app);
 
@@ -99,7 +99,7 @@ describe("scheduled result import route", () => {
         },
       },
     });
-    expect(requestedDays).toEqual([3, 3, 4, 3, 3, 4]);
+    expect(requestedDays).toEqual([3, 4, 3, 4]);
 
     const repositories = createRepositories(client);
     expect(await repositories.listBoutResultsForBasho("2026-05")).toHaveLength(
@@ -230,7 +230,7 @@ describe("scheduled result import route", () => {
     const requestedDays: number[] = [];
     app = createApp(async (url) => {
       const day = Number(String(url).split("/").at(-1));
-      requestedDays.push(day);
+      if (Number.isFinite(day)) requestedDays.push(day);
       return resultsResponse(day);
     }, new Date("2026-05-12T02:00:00.000Z"));
 
@@ -243,7 +243,7 @@ describe("scheduled result import route", () => {
       day: 3,
       importedDays: [1, 2, 3],
     });
-    expect(requestedDays).toEqual([1, 1, 2, 2, 3, 3, 4]);
+    expect(requestedDays).toEqual([1, 2, 3, 4]);
 
     const repositories = createRepositories(client);
     expect(await repositories.getBasho("2026-05")).toMatchObject({
@@ -264,7 +264,7 @@ describe("scheduled result import route", () => {
     const requestedDays: number[] = [];
     app = createApp(async (url) => {
       const day = Number(String(url).split("/").at(-1));
-      requestedDays.push(day);
+      if (Number.isFinite(day)) requestedDays.push(day);
       return resultsResponse(day);
     }, new Date("2026-05-16T02:00:00.000Z"));
 
@@ -277,7 +277,7 @@ describe("scheduled result import route", () => {
       day: 7,
       importedDays: [4, 5, 6, 7],
     });
-    expect(requestedDays).toEqual([4, 4, 5, 5, 6, 6, 7, 7, 8]);
+    expect(requestedDays).toEqual([4, 5, 6, 7, 8]);
     expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
       status: "active",
       currentDay: 7,
@@ -329,7 +329,7 @@ describe("scheduled result import route", () => {
     const requestedDays: number[] = [];
     app = createApp(async (url) => {
       const day = dayFromUrl(url);
-      requestedDays.push(day);
+      if (Number.isFinite(day)) requestedDays.push(day);
       return resultsResponse(day);
     });
 
@@ -341,7 +341,7 @@ describe("scheduled result import route", () => {
       day: 3,
       importedDays: [2, 3],
     });
-    expect(requestedDays).toEqual([2, 2, 3, 3, 4]);
+    expect(requestedDays).toEqual([2, 3, 4]);
   });
 
   it("does not treat banzuke currentDay as imported results progress", async () => {
@@ -349,7 +349,7 @@ describe("scheduled result import route", () => {
     const requestedDays: number[] = [];
     app = createApp(async (url) => {
       const day = Number(String(url).split("/").at(-1));
-      requestedDays.push(day);
+      if (Number.isFinite(day)) requestedDays.push(day);
       return resultsResponse(day);
     }, new Date("2026-05-12T02:00:00.000Z"));
 
@@ -361,7 +361,7 @@ describe("scheduled result import route", () => {
       day: 3,
       importedDays: [1, 2, 3],
     });
-    expect(requestedDays).toEqual([1, 1, 2, 2, 3, 3, 4]);
+    expect(requestedDays).toEqual([1, 2, 3, 4]);
   });
 
   it("imports day one for an upcoming basho created by an early banzuke import", async () => {
@@ -400,8 +400,9 @@ describe("scheduled result import route", () => {
     await seedPublishedSchedule("2026-05", 15, "cancelled");
     const requestedDays: number[] = [];
     app = createApp(async (url) => {
-      requestedDays.push(dayFromUrl(url));
-      return resultsResponse(15);
+      const day = dayFromUrl(url);
+      if (Number.isFinite(day)) requestedDays.push(day);
+      return resultsResponse(day);
     }, new Date("2026-05-24T02:00:00.000Z"));
 
     const response = await injectCron(app);
@@ -426,7 +427,7 @@ describe("scheduled result import route", () => {
       status: "complete",
       currentDay: 15,
     });
-    expect(requestedDays).toEqual([15, 15]);
+    expect(requestedDays).toEqual([15]);
     const repositories = createRepositories(client);
     expect(
       await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
@@ -499,7 +500,7 @@ describe("scheduled result import route", () => {
     const requestedDays: number[] = [];
     app = createApp(async (url) => {
       const day = Number(String(url).split("/").at(-1));
-      requestedDays.push(day);
+      if (Number.isFinite(day)) requestedDays.push(day);
       return resultsResponse(day);
     }, new Date("2026-05-25T02:00:00.000Z"));
 
@@ -511,7 +512,7 @@ describe("scheduled result import route", () => {
       day: 15,
       importedDays: [15],
     });
-    expect(requestedDays).toEqual([15, 15]);
+    expect(requestedDays).toEqual([15]);
     const repositories = createRepositories(client);
     expect(await repositories.getBasho("2026-05")).toMatchObject({
       status: "complete",
@@ -582,6 +583,7 @@ describe("scheduled result import route", () => {
     await seedLiveBasho("2026-05", { importedDays: [1, 2] });
     app = createApp(async (url) => {
       const day = dayFromUrl(url);
+      if (!Number.isFinite(day)) return resultsResponse(day);
       return day === 3 ? resultsResponse(day) : jsonResponse({ torikumi: [] });
     });
 
@@ -625,6 +627,7 @@ describe("scheduled result import route", () => {
     await seedLiveBasho("2026-05", { importedDays: [1, 2] });
     app = createApp(async (url) => {
       const day = dayFromUrl(url);
+      if (!Number.isFinite(day)) return resultsResponse(day);
       return day === 3
         ? resultsResponse(day)
         : new Response(null, { status: 503 });
@@ -805,6 +808,25 @@ async function seedPublishedSchedule(
 }
 
 function resultsResponse(day = 3) {
+  if (!Number.isFinite(day)) {
+    return jsonResponse({
+      east: [
+        {
+          rikishiID: 4227,
+          shikonaEn: "Onosato",
+          record: Array.from({ length: 15 }, () => ({ result: "win" })),
+        },
+      ],
+      west: [
+        {
+          rikishiID: 3661,
+          shikonaEn: "Kotozakura",
+          record: Array.from({ length: 15 }, () => ({ result: "loss" })),
+        },
+      ],
+    });
+  }
+
   return jsonResponse({
     ...(day === 15 ? { yusho: [{ type: "Makuuchi" }] } : {}),
     torikumi: [

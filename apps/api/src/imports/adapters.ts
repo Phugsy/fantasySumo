@@ -55,6 +55,21 @@ interface SumoApiTorikumiRow {
   winnerEn?: string;
 }
 
+interface SumoApiBanzukePayload {
+  bashoId?: string;
+  division?: string;
+  east?: SumoApiBanzukeRow[];
+  west?: SumoApiBanzukeRow[];
+}
+
+interface SumoApiBanzukeRow {
+  rikishiID?: number;
+  shikonaEn?: string;
+  record?: Array<{
+    result?: string;
+  }>;
+}
+
 export class ScheduleUnavailableError extends Error {
   constructor(bashoId: string, day: number) {
     super(
@@ -141,6 +156,36 @@ export async function fetchSumoApiResultsImport(
   });
 }
 
+export async function fetchSumoApiDailyImport(
+  fetchFn: SourceFetch,
+  options: SumoApiResultsImportOptions,
+): Promise<{
+  scheduleCommand: ScheduledBoutsImportCommand;
+  resultsCommand: BoutResultsImportCommand;
+}> {
+  const division = options.division ?? "Makuuchi";
+  const sourceBashoId = toCompactBashoId(options.bashoId);
+  const [torikumiPayload, banzukePayload] = await Promise.all([
+    fetchJson<SumoApiTorikumiPayload>(
+      fetchFn,
+      `${SUMO_API_BASE_URL}/basho/${sourceBashoId}/torikumi/${division}/${options.day}`,
+    ),
+    fetchJson<SumoApiBanzukePayload>(
+      fetchFn,
+      `${SUMO_API_BASE_URL}/basho/${sourceBashoId}/banzuke/${division}`,
+    ),
+  ]);
+
+  return {
+    scheduleCommand: mapSumoApiSchedulePayload(
+      torikumiPayload,
+      options,
+      banzukePayload,
+    ),
+    resultsCommand: mapSumoApiTorikumiPayload(torikumiPayload, options),
+  };
+}
+
 export async function fetchSumoApiScheduleImport(
   fetchFn: SourceFetch,
   options: SumoApiScheduleImportOptions,
@@ -158,6 +203,7 @@ export async function fetchSumoApiScheduleImport(
 export function mapSumoApiSchedulePayload(
   payload: SumoApiTorikumiPayload,
   options: { bashoId: string; day: number; division?: string },
+  banzukePayload?: SumoApiBanzukePayload,
 ): ScheduledBoutsImportCommand {
   const rows = payload.torikumi ?? [];
 
@@ -170,9 +216,9 @@ export function mapSumoApiSchedulePayload(
     toSourceRikishi(requiredString(row.westShikona, "westShikona")),
   ]);
   const division = options.division ?? "Makuuchi";
-  const hasResolvedCard = rows.every(hasResolvedWinner);
   const isComplete =
-    hasResolvedCard &&
+    banzukePayload !== undefined &&
+    hasAttestedCompleteCard(rows, banzukePayload, options.day) &&
     (options.day < 15 ||
       payload.yusho?.some(
         (winner) => winner.type?.toLowerCase() === division.toLowerCase(),
@@ -201,6 +247,65 @@ export function mapSumoApiSchedulePayload(
       };
     }),
   };
+}
+
+function hasAttestedCompleteCard(
+  rows: readonly SumoApiTorikumiRow[],
+  banzukePayload: SumoApiBanzukePayload,
+  day: number,
+): boolean {
+  if (!rows.every(hasResolvedWinner)) {
+    return false;
+  }
+
+  const banzukeRows = [
+    ...(banzukePayload.east ?? []),
+    ...(banzukePayload.west ?? []),
+  ];
+  const torikumiRikishiIds = new Set(
+    rows.flatMap((row) => [row.eastId, row.westId]).filter(isNumber),
+  );
+  const torikumiShikona = new Set(
+    rows
+      .flatMap((row) => [row.eastShikona, row.westShikona])
+      .filter(isString)
+      .map(normalizeShikona),
+  );
+
+  return (
+    banzukeRows.length > 0 &&
+    banzukeRows.every((rikishi) => {
+      const dayRecord = rikishi.record?.[day - 1];
+      const result = dayRecord?.result?.trim().toLowerCase();
+
+      if (result === undefined || result === "") {
+        return false;
+      }
+
+      if (result === "absent") {
+        return true;
+      }
+
+      return (
+        (rikishi.rikishiID !== undefined &&
+          torikumiRikishiIds.has(rikishi.rikishiID)) ||
+        (rikishi.shikonaEn !== undefined &&
+          torikumiShikona.has(normalizeShikona(rikishi.shikonaEn)))
+      );
+    })
+  );
+}
+
+function isNumber(value: number | undefined): value is number {
+  return value !== undefined;
+}
+
+function isString(value: string | undefined): value is string {
+  return value !== undefined && value.trim() !== "";
+}
+
+function normalizeShikona(value: string): string {
+  return value.trim().toLowerCase();
 }
 
 function hasResolvedWinner(row: SumoApiTorikumiRow): boolean {

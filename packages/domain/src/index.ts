@@ -28,6 +28,10 @@ export type {
 } from "./types.js";
 export { deriveRikishiTournamentNotes } from "./tournament-notes.js";
 export {
+  isCompleteScheduledBoutPublicationSource,
+  toCompleteScheduledBoutPublicationSource,
+} from "./scheduled-bout-publication.js";
+export {
   hasBoutResultForScheduledBout,
   hasCompleteBoutResultsForScheduledDay,
   hasCompleteBoutResultsForEveryDayThrough,

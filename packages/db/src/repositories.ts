@@ -13,6 +13,7 @@ import type {
 } from "@fantasy-sumo/domain";
 import {
   getBashoLifecycleTransition,
+  isCompleteScheduledBoutPublicationSource,
   preserveBashoLifecycleProgress,
 } from "@fantasy-sumo/domain";
 import type {
@@ -866,6 +867,32 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
     },
     applyScheduledBoutsImport: async (importData) => {
       db.transaction((transaction) => {
+        const existingPublication = transaction
+          .select({ source: sqlite.scheduledBoutPublications.source })
+          .from(sqlite.scheduledBoutPublications)
+          .where(
+            and(
+              eq(
+                sqlite.scheduledBoutPublications.bashoId,
+                importData.publication.bashoId,
+              ),
+              eq(
+                sqlite.scheduledBoutPublications.day,
+                importData.publication.day,
+              ),
+            ),
+          )
+          .get();
+
+        if (
+          shouldPreserveExistingCompleteSnapshot(
+            existingPublication?.source,
+            importData.publication.source,
+          )
+        ) {
+          return;
+        }
+
         for (const entry of importData.rikishi ?? []) {
           transaction
             .insert(sqlite.rikishi)
@@ -927,6 +954,31 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
       db.transaction((transaction) => {
         const schedule = importData.scheduledBouts;
         const results = importData.boutResults;
+        const existingPublication = transaction
+          .select({ source: sqlite.scheduledBoutPublications.source })
+          .from(sqlite.scheduledBoutPublications)
+          .where(
+            and(
+              eq(
+                sqlite.scheduledBoutPublications.bashoId,
+                schedule.publication.bashoId,
+              ),
+              eq(
+                sqlite.scheduledBoutPublications.day,
+                schedule.publication.day,
+              ),
+            ),
+          )
+          .get();
+
+        if (
+          shouldPreserveExistingCompleteSnapshot(
+            existingPublication?.source,
+            schedule.publication.source,
+          )
+        ) {
+          return;
+        }
 
         for (const entry of [
           ...(schedule.rikishi ?? []),
@@ -1686,6 +1738,38 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
     },
     applyScheduledBoutsImport: async (importData) => {
       await db.transaction(async (transaction) => {
+        await transaction
+          .select({ id: pg.basho.id })
+          .from(pg.basho)
+          .where(eq(pg.basho.id, importData.publication.bashoId))
+          .for("update");
+        const existingPublication = (
+          await transaction
+            .select({ source: pg.scheduledBoutPublications.source })
+            .from(pg.scheduledBoutPublications)
+            .where(
+              and(
+                eq(
+                  pg.scheduledBoutPublications.bashoId,
+                  importData.publication.bashoId,
+                ),
+                eq(
+                  pg.scheduledBoutPublications.day,
+                  importData.publication.day,
+                ),
+              ),
+            )
+        ).at(0);
+
+        if (
+          shouldPreserveExistingCompleteSnapshot(
+            existingPublication?.source,
+            importData.publication.source,
+          )
+        ) {
+          return;
+        }
+
         for (const entry of importData.rikishi ?? []) {
           await transaction
             .insert(pg.rikishi)
@@ -1738,6 +1822,34 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
       await db.transaction(async (transaction) => {
         const schedule = importData.scheduledBouts;
         const results = importData.boutResults;
+        await transaction
+          .select({ id: pg.basho.id })
+          .from(pg.basho)
+          .where(eq(pg.basho.id, schedule.publication.bashoId))
+          .for("update");
+        const existingPublication = (
+          await transaction
+            .select({ source: pg.scheduledBoutPublications.source })
+            .from(pg.scheduledBoutPublications)
+            .where(
+              and(
+                eq(
+                  pg.scheduledBoutPublications.bashoId,
+                  schedule.publication.bashoId,
+                ),
+                eq(pg.scheduledBoutPublications.day, schedule.publication.day),
+              ),
+            )
+        ).at(0);
+
+        if (
+          shouldPreserveExistingCompleteSnapshot(
+            existingPublication?.source,
+            schedule.publication.source,
+          )
+        ) {
+          return;
+        }
 
         for (const entry of [
           ...(schedule.rikishi ?? []),
@@ -1840,6 +1952,17 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
   };
 
   return repositories;
+}
+
+function shouldPreserveExistingCompleteSnapshot(
+  existingSource: string | undefined,
+  incomingSource: string,
+): boolean {
+  return (
+    existingSource !== undefined &&
+    isCompleteScheduledBoutPublicationSource(existingSource) &&
+    !isCompleteScheduledBoutPublicationSource(incomingSource)
+  );
 }
 
 function toBashoRow(entry: Basho) {

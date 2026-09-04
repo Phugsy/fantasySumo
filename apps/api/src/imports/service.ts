@@ -41,6 +41,7 @@ interface BoutResultsImportOptions extends ImportOptions {
     ScheduledBoutsImportCommand,
     "bouts" | "isComplete"
   >;
+  preserveExistingSnapshot?: boolean;
 }
 
 interface PreparedBoutResultsImport {
@@ -50,6 +51,7 @@ interface PreparedBoutResultsImport {
 
 interface PreparedScheduledBoutsImport {
   data: ScheduledBoutsImportData;
+  preserveExistingCompleteCard: boolean;
   result: ImportResult;
 }
 
@@ -136,6 +138,12 @@ async function prepareBoutResultsImport(
   const existingBoutResults = await repositories.listBoutResultsForBasho(
     command.bashoId,
   );
+  const existingImportedDayResults = existingBoutResults.filter(
+    (result) => result.day === command.results[0]?.day,
+  );
+  const importedResults = options.preserveExistingSnapshot
+    ? existingImportedDayResults
+    : command.results;
   const existingScheduledBouts = await repositories.listScheduledBoutsForBasho(
     command.bashoId,
   );
@@ -150,6 +158,7 @@ async function prepareBoutResultsImport(
   const completionSchedule = options.completionSchedule;
   const completesImportedDay =
     importedDay === 15 &&
+    options.preserveExistingSnapshot !== true &&
     completionSchedule?.isComplete === true &&
     hasCompleteBoutResultsForScheduledDay({
       boutResults: command.results,
@@ -173,30 +182,33 @@ async function prepareBoutResultsImport(
   const missingSourceRikishi = (command.rikishi ?? []).filter(
     (rikishi) => !existingRikishiIds.has(rikishi.id),
   );
+  const importedRikishi = options.preserveExistingSnapshot
+    ? []
+    : missingSourceRikishi;
   const nextBasho =
     existingBasho === undefined
       ? undefined
-      : advanceBashoForResults(
-          existingBasho,
-          importedDay,
-          completesImportedDay,
-        );
+      : options.preserveExistingSnapshot
+        ? existingBasho
+        : advanceBashoForResults(
+            existingBasho,
+            importedDay,
+            completesImportedDay,
+          );
 
   if (nextBasho !== undefined) {
     summary.basho = summarizeOne(existingBasho, nextBasho, isEqualBasho);
   }
 
   summary.results = summarizeMany(
-    existingBoutResults.filter(
-      (result) => result.day === command.results[0]?.day,
-    ),
-    command.results,
+    existingImportedDayResults,
+    importedResults,
     isEqualBoutResult,
     { countDeleted: true },
   );
   summary.rikishi = summarizeMany(
     existingRikishi,
-    missingSourceRikishi,
+    importedRikishi,
     isEqualRikishi,
   );
 
@@ -204,8 +216,8 @@ async function prepareBoutResultsImport(
     ...(nextBasho === undefined ? {} : { basho: nextBasho }),
     bashoId: command.bashoId,
     day: command.results[0]!.day,
-    rikishi: missingSourceRikishi,
-    results: command.results,
+    rikishi: importedRikishi,
+    results: importedResults,
   };
 
   return {
@@ -283,21 +295,20 @@ async function prepareScheduledBoutsImport(
   );
 
   const data: ScheduledBoutsImportData = {
-    publication: preserveExistingCompleteCard
-      ? existingPublication
-      : {
-          id: `${command.bashoId}-day-${command.day}-schedule`,
-          bashoId: command.bashoId,
-          day: command.day,
-          source: toScheduledBoutPublicationSource(command),
-          publishedAt: new Date().toISOString(),
-        },
-    rikishi: missingSourceRikishi,
-    bouts: importedBouts,
+    publication: {
+      id: `${command.bashoId}-day-${command.day}-schedule`,
+      bashoId: command.bashoId,
+      day: command.day,
+      source: toScheduledBoutPublicationSource(command),
+      publishedAt: new Date().toISOString(),
+    },
+    rikishi: preserveExistingCompleteCard ? [] : missingSourceRikishi,
+    bouts: command.bouts,
   };
 
   return {
     data,
+    preserveExistingCompleteCard,
     result: {
       dryRun: options.dryRun === true,
       source: command.source,
@@ -316,16 +327,28 @@ export async function importScheduledBoutsAndBoutResults(
   resultsCommand: BoutResultsImportCommand,
   options: ImportOptions = {},
 ): Promise<ImportResult> {
+  const commandPairIssues: ImportValidationIssue[] = [];
+
   if (
     scheduleCommand.bashoId !== resultsCommand.bashoId ||
     scheduleCommand.day !== resultsCommand.results[0]?.day
   ) {
-    throw new ImportValidationError([
-      {
-        path: "schedule",
-        message: "Schedule and result imports must target the same basho day.",
-      },
-    ]);
+    commandPairIssues.push({
+      path: "schedule",
+      message: "Schedule and result imports must target the same basho day.",
+    });
+  } else if (
+    !hasMatchingScheduledBoutsAndResults(scheduleCommand, resultsCommand)
+  ) {
+    commandPairIssues.push({
+      path: "schedule.bouts",
+      message:
+        "Schedule and result imports must describe the same set of matchups.",
+    });
+  }
+
+  if (commandPairIssues.length > 0) {
+    throw new ImportValidationError(commandPairIssues);
   }
 
   const schedule = await prepareScheduledBoutsImport(
@@ -336,6 +359,7 @@ export async function importScheduledBoutsAndBoutResults(
   const results = await prepareBoutResultsImport(repositories, resultsCommand, {
     ...options,
     completionSchedule: scheduleCommand,
+    preserveExistingSnapshot: schedule.preserveExistingCompleteCard,
   });
 
   if (options.dryRun !== true) {
@@ -352,6 +376,30 @@ export async function importScheduledBoutsAndBoutResults(
       scheduledBouts: schedule.result.summary.scheduledBouts,
     },
   };
+}
+
+function hasMatchingScheduledBoutsAndResults(
+  scheduleCommand: ScheduledBoutsImportCommand,
+  resultsCommand: BoutResultsImportCommand,
+): boolean {
+  const scheduledMatchups = scheduleCommand.bouts
+    .filter((bout) => bout.status === "scheduled")
+    .map((bout) => matchupKey(bout.eastRikishiId, bout.westRikishiId))
+    .sort();
+  const resultMatchups = resultsCommand.results
+    .map((result) => matchupKey(result.winnerRikishiId, result.loserRikishiId))
+    .sort();
+
+  return (
+    scheduledMatchups.length === resultMatchups.length &&
+    scheduledMatchups.every(
+      (matchup, index) => matchup === resultMatchups[index],
+    )
+  );
+}
+
+function matchupKey(firstRikishiId: string, secondRikishiId: string): string {
+  return [firstRikishiId, secondRikishiId].sort().join("\u0000");
 }
 
 function validateBanzukeImport(

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { deriveRikishiTournamentNotes } from "@fantasy-sumo/domain";
 import {
+  fetchSumoApiDailyImport,
   mapJsaBanzukePayload,
   mapSumoApiSchedulePayload,
   mapSumoApiTorikumiPayload,
@@ -274,7 +275,23 @@ describe("source import adapters", () => {
     expect(JSON.stringify(command)).not.toContain("winner");
   });
 
-  it("marks resolved cards complete and requires a yusho on the final day", () => {
+  it("requires banzuke record coverage before attesting a resolved card", () => {
+    const completeDay14Banzuke = {
+      east: [
+        {
+          rikishiID: 4227,
+          shikonaEn: "Onosato",
+          record: Array.from({ length: 14 }, () => ({ result: "win" })),
+        },
+      ],
+      west: [
+        {
+          rikishiID: 3661,
+          shikonaEn: "Kotozakura",
+          record: Array.from({ length: 14 }, () => ({ result: "loss" })),
+        },
+      ],
+    };
     const resolvedEarlierDay = mapSumoApiSchedulePayload(
       {
         torikumi: [
@@ -288,6 +305,32 @@ describe("source import adapters", () => {
         ],
       },
       { bashoId: "2026-05", day: 14 },
+      completeDay14Banzuke,
+    );
+    const truncatedEarlierDay = mapSumoApiSchedulePayload(
+      {
+        torikumi: [
+          {
+            bashoId: "202605",
+            day: 14,
+            eastShikona: "Onosato",
+            westShikona: "Kotozakura",
+            winnerEn: "Onosato",
+          },
+        ],
+      },
+      { bashoId: "2026-05", day: 14 },
+      {
+        ...completeDay14Banzuke,
+        east: [
+          ...completeDay14Banzuke.east,
+          {
+            rikishiID: 99,
+            shikonaEn: "Hoshoryu",
+            record: Array.from({ length: 14 }, () => ({ result: "win" })),
+          },
+        ],
+      },
     );
     const incomplete = mapSumoApiSchedulePayload(
       {
@@ -302,6 +345,20 @@ describe("source import adapters", () => {
         ],
       },
       { bashoId: "2026-05", day: 15 },
+      {
+        east: [
+          {
+            shikonaEn: "Onosato",
+            record: Array.from({ length: 15 }, () => ({ result: "win" })),
+          },
+        ],
+        west: [
+          {
+            shikonaEn: "Kotozakura",
+            record: Array.from({ length: 15 }, () => ({ result: "loss" })),
+          },
+        ],
+      },
     );
     const complete = mapSumoApiSchedulePayload(
       {
@@ -317,11 +374,88 @@ describe("source import adapters", () => {
         yusho: [{ type: "Makuuchi" }],
       },
       { bashoId: "2026-05", day: 15 },
+      {
+        east: [
+          {
+            shikonaEn: "Onosato",
+            record: Array.from({ length: 15 }, () => ({ result: "win" })),
+          },
+        ],
+        west: [
+          {
+            shikonaEn: "Kotozakura",
+            record: Array.from({ length: 15 }, () => ({ result: "loss" })),
+          },
+        ],
+      },
     );
 
     expect(resolvedEarlierDay.isComplete).toBe(true);
+    expect(truncatedEarlierDay.isComplete).toBeUndefined();
     expect(incomplete.isComplete).toBeUndefined();
     expect(complete.isComplete).toBe(true);
+  });
+
+  it("maps the current schedule and results from one torikumi response", async () => {
+    const requestedUrls: string[] = [];
+    const torikumiPayload = {
+      torikumi: [
+        {
+          bashoId: "202605",
+          day: 4,
+          eastId: 4227,
+          eastShikona: "Onosato",
+          westId: 3661,
+          westShikona: "Kotozakura",
+          winnerId: 4227,
+          winnerEn: "Onosato",
+        },
+      ],
+    };
+
+    const commands = await fetchSumoApiDailyImport(
+      async (url) => {
+        requestedUrls.push(String(url));
+        return new Response(
+          JSON.stringify(
+            String(url).includes("/banzuke/")
+              ? {
+                  east: [
+                    {
+                      rikishiID: 4227,
+                      record: Array.from({ length: 4 }, () => ({
+                        result: "win",
+                      })),
+                    },
+                  ],
+                  west: [
+                    {
+                      rikishiID: 3661,
+                      record: Array.from({ length: 4 }, () => ({
+                        result: "loss",
+                      })),
+                    },
+                  ],
+                }
+              : torikumiPayload,
+          ),
+        );
+      },
+      { bashoId: "2026-05", day: 4 },
+    );
+
+    expect(
+      requestedUrls.filter((url) => url.includes("/torikumi/")),
+    ).toHaveLength(1);
+    expect(commands.scheduleCommand.bouts[0]).toMatchObject({
+      eastRikishiId: "onosato",
+      westRikishiId: "kotozakura",
+    });
+    expect(commands.resultsCommand.results[0]).toMatchObject({
+      winnerRikishiId: "onosato",
+      loserRikishiId: "kotozakura",
+    });
+    expect(commands.scheduleCommand.isComplete).toBe(true);
   });
 
   it("rejects an empty source schedule instead of claiming it was published", () => {

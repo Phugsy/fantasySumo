@@ -5,6 +5,9 @@ import type {
   Rikishi,
   ScheduledBout,
 } from "@fantasy-sumo/domain";
+import { toCompleteScheduledBoutPublicationSource } from "@fantasy-sumo/domain";
+
+export { isCompleteScheduledBoutPublicationSource } from "@fantasy-sumo/domain";
 
 export type ImportEntityName =
   | "basho"
@@ -50,21 +53,12 @@ export interface ScheduledBoutsImportCommand {
   source: string;
 }
 
-const COMPLETE_SCHEDULE_SOURCE_SUFFIX = ":complete";
-
 export function toScheduledBoutPublicationSource(
   command: Pick<ScheduledBoutsImportCommand, "isComplete" | "source">,
 ): string {
-  return command.isComplete === true &&
-    !isCompleteScheduledBoutPublicationSource(command.source)
-    ? `${command.source}${COMPLETE_SCHEDULE_SOURCE_SUFFIX}`
+  return command.isComplete === true
+    ? toCompleteScheduledBoutPublicationSource(command.source)
     : command.source;
-}
-
-export function isCompleteScheduledBoutPublicationSource(
-  source: string,
-): boolean {
-  return source.endsWith(COMPLETE_SCHEDULE_SOURCE_SUFFIX);
 }
 
 export interface ImportOptions {

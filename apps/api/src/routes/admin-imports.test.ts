@@ -54,6 +54,10 @@ beforeEach(async () => {
         });
       }
 
+      if (sourceUrl.includes("/banzuke/")) {
+        return sumoApiBanzukeResponse();
+      }
+
       const day = Number(sourceUrl.split("/").at(-1));
 
       return jsonResponse({
@@ -358,7 +362,7 @@ describe("admin import routes", () => {
     ]);
   });
 
-  it("keeps the existing final schedule when result fetching fails", async () => {
+  it("keeps the existing final schedule when snapshot fetching fails", async () => {
     await app.inject({
       method: "POST",
       url: "/api/admin/import-banzuke",
@@ -386,33 +390,13 @@ describe("admin import routes", () => {
     });
 
     await app.close();
-    let requestCount = 0;
     app = buildApp({
       allowUnprotectedAdminImports: true,
       db: client,
-      sourceFetch: async () => {
-        requestCount += 1;
-
-        if (requestCount === 1) {
-          return jsonResponse({
-            yusho: [{ type: "Makuuchi" }],
-            torikumi: [
-              {
-                bashoId: "202605",
-                day: 15,
-                matchNo: 1,
-                eastId: 4227,
-                eastShikona: "Onosato",
-                westId: 3661,
-                westShikona: "Kotozakura",
-                winnerId: 4227,
-                winnerEn: "Onosato",
-              },
-            ],
-          });
-        }
-
-        return jsonResponse({});
+      sourceFetch: async (url) => {
+        return String(url).includes("/banzuke/")
+          ? sumoApiBanzukeResponse()
+          : new Response(null, { status: 503 });
       },
     });
 
@@ -422,7 +406,7 @@ describe("admin import routes", () => {
       payload: { day: 15 },
     });
 
-    expect(response.statusCode).toBe(400);
+    expect(response.statusCode).toBe(502);
     expect(
       await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
     ).toEqual([expect.objectContaining({ source: "existing-schedule" })]);
@@ -447,7 +431,13 @@ describe("admin import routes", () => {
       allowUnprotectedAdminImports: true,
       db: client,
       sourceFetch: async (url) => {
-        const day = Number(String(url).split("/").at(-1));
+        const sourceUrl = String(url);
+
+        if (sourceUrl.includes("/banzuke/")) {
+          return sumoApiBanzukeResponse();
+        }
+
+        const day = Number(sourceUrl.split("/").at(-1));
 
         return day === 1
           ? jsonResponse({
@@ -600,5 +590,24 @@ function jsonResponse(payload: unknown) {
     headers: {
       "content-type": "application/json",
     },
+  });
+}
+
+function sumoApiBanzukeResponse() {
+  return jsonResponse({
+    east: [
+      {
+        rikishiID: 4227,
+        shikonaEn: "Onosato",
+        record: Array.from({ length: 15 }, () => ({ result: "win" })),
+      },
+    ],
+    west: [
+      {
+        rikishiID: 3661,
+        shikonaEn: "Kotozakura",
+        record: Array.from({ length: 15 }, () => ({ result: "loss" })),
+      },
+    ],
   });
 }

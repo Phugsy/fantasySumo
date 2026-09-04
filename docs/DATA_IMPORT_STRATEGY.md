@@ -292,15 +292,22 @@ Validation and replacement rules:
   that basho/day, so amendments and explicit trusted empty replacements leave
   no duplicates;
 - once a card carries source-backed completion attestation, a weaker retry
-  without that attestation cannot replace the card or downgrade its marker;
+  without that attestation cannot replace the card, its results, or downgrade
+  its marker; this precedence check is repeated inside the database transaction
+  so concurrent retries cannot overwrite a stronger snapshot;
 - publication metadata and scheduled bouts never advance basho lifecycle or
   participate in fantasy scoring.
 
-Every daily result operation first fetches both the day N card and day N
-results, then writes that card and those results in one transaction. A resolved
-source card is stored with completion attestation on days 1-14; day 15 also
-requires the division yusho signal described below. After the current day
-commits, days 1-14 independently attempt the published day N+1 schedule. The
+Every daily result operation fetches the day N torikumi once and maps both the
+card and results from that same response. It also fetches the division banzuke
+as independent completeness evidence: every banzuke rikishi must have a record
+for day N and must either appear in the torikumi or be explicitly recorded as
+absent. The card is attested only when that coverage check passes and every bout
+has a resolved winner; day 15 additionally requires the division yusho signal
+described below. The service rejects schedule/result command pairs whose
+matchups differ, then writes the matching card and results in one transaction.
+After the current day commits, days 1-14 independently attempt the published
+day N+1 schedule. The
 cron route, manual admin result endpoint, and result CLI all use this workflow.
 Following-day schedule
 unavailability or a schedule-only error is returned as explicit partial
@@ -308,9 +315,10 @@ success because completed results must not be rolled back, hidden, or fetched
 again merely because the independent next-day card is late. The rejected empty
 source response cannot delete an existing published card. A current-day result
 failure likewise leaves the previous card intact.
-The Sumo API adapter marks the refreshed card complete only when the final-day
-response contains resolved winners and the division yusho published when the
-basho concludes. Until that source attestation arrives, or until stored results
+The Sumo API adapter marks the refreshed final-day card complete only when its
+banzuke coverage is proven, its response contains resolved winners, and the
+division yusho is published when the basho concludes. Until that source
+attestation arrives, or until stored results
 cover every matchup on every source-attested card for days 1-14, stored day-15
 results remain retryable without advancing lifecycle progress to complete. The
 cron backfills any earlier day whose card is absent, unattested, or only
