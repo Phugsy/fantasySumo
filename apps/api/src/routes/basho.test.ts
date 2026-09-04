@@ -1242,6 +1242,154 @@ describe("basho routes", () => {
       message: "Team unknown was not found for basho 2026-05.",
     });
   });
+
+  it("aggregates cross-tournament scores and preserves personal pick history", async () => {
+    const repositories = createRepositories(client);
+    const { cookie } = await signIn("history@example.com", "History Player");
+    const createdTeamResponse = await app.inject({
+      method: "POST",
+      url: "/api/basho/2026-05/teams",
+      headers: { cookie },
+      payload: {
+        displayName: "History Stable",
+        rikishiIds: ["onosato", "kotozakura"],
+      },
+    });
+    const ownerUserId = createdTeamResponse.json().team.ownerUserId as string;
+
+    expect(createdTeamResponse.statusCode).toBe(201);
+    await repositories.updateBasho({
+      ...sampleBasho,
+      status: "complete",
+      currentDay: 15,
+    });
+    await repositories.upsertBanzukeEntry({
+      id: "2026-05-onosato",
+      bashoId: "2026-05",
+      rikishiId: "onosato",
+      shikona: "Historic Onosato",
+      heya: "Historic Heya",
+      rank: "Ozeki",
+      rankOrder: 1,
+    });
+    await repositories.insertBasho({
+      id: "2026-07",
+      isDemo: false,
+      name: "July 2026 Basho",
+      startDate: "2026-07-12",
+      endDate: "2026-07-26",
+      status: "active",
+      currentDay: 1,
+    });
+    await repositories.insertBanzukeEntry({
+      id: "2026-07-onosato",
+      bashoId: "2026-07",
+      rikishiId: "onosato",
+      shikona: "Modern Onosato",
+      heya: "Modern Heya",
+      rank: "Yokozuna",
+      rankOrder: 1,
+    });
+    await repositories.insertBanzukeEntry({
+      id: "2026-07-kirishima",
+      bashoId: "2026-07",
+      rikishiId: "kirishima",
+      shikona: "Kirishima",
+      heya: "Otowayama",
+      rank: "Maegashira",
+      rankOrder: 2,
+    });
+    await repositories.upsertRikishi({
+      id: "onosato",
+      shikona: "Future Onosato",
+      heya: "Future Heya",
+    });
+    await repositories.insertFantasyTeam({
+      id: "team-history-july",
+      bashoId: "2026-07",
+      displayName: "History Stable II",
+      ownerUserId,
+    });
+    await repositories.insertFantasyPick({
+      teamId: "team-history-july",
+      rikishiId: "onosato",
+    });
+    await repositories.insertFantasyPick({
+      teamId: "team-history-july",
+      rikishiId: "kirishima",
+    });
+    await repositories.insertBoutResult({
+      id: "2026-07-day-1-bout-1",
+      bashoId: "2026-07",
+      day: 1,
+      winnerRikishiId: "onosato",
+      loserRikishiId: "hoshoryu",
+    });
+    await repositories.insertBoutResult({
+      id: "2026-07-day-1-bout-2",
+      bashoId: "2026-07",
+      day: 1,
+      winnerRikishiId: "kirishima",
+      loserRikishiId: "kotozakura",
+    });
+
+    const [bashosResponse, leaderboardResponse, unauthenticatedHistory] =
+      await Promise.all([
+        app.inject({ method: "GET", url: "/api/bashos" }),
+        app.inject({ method: "GET", url: "/api/leaderboard/all-time" }),
+        app.inject({ method: "GET", url: "/api/my-history" }),
+      ]);
+    const historyResponse = await app.inject({
+      method: "GET",
+      url: "/api/my-history",
+      headers: { cookie },
+    });
+
+    expect(
+      bashosResponse.json().bashos.map((basho: { id: string }) => basho.id),
+    ).toEqual(["2026-07", "2026-05"]);
+    expect(leaderboardResponse.statusCode).toBe(200);
+    expect(leaderboardResponse.json().bashoCount).toBe(2);
+    expect(leaderboardResponse.json().leaderboard[0]).toMatchObject({
+      rank: 1,
+      displayName: "History Stable II",
+      score: 4,
+      tournamentsPlayed: 2,
+      bashos: [
+        { bashoId: "2026-07", score: 2 },
+        { bashoId: "2026-05", score: 2 },
+      ],
+    });
+    expect(unauthenticatedHistory.statusCode).toBe(401);
+    expect(historyResponse.statusCode).toBe(200);
+    const historyBody = historyResponse.json();
+    expect(historyBody.score).toBe(4);
+    expect(
+      historyBody.history.map(
+        (entry: { basho: { id: string } }) => entry.basho.id,
+      ),
+    ).toEqual(["2026-07", "2026-05"]);
+    expect(historyBody.history[0]).toMatchObject({
+      basho: { id: "2026-07" },
+      score: 2,
+    });
+    expect(historyBody.history[0].picks[0]).toMatchObject({
+      rikishiId: "onosato",
+      shikona: "Modern Onosato",
+      heya: "Modern Heya",
+      wins: 1,
+    });
+    expect(historyBody.history[1]).toMatchObject({
+      basho: { id: "2026-05" },
+      score: 2,
+    });
+    expect(historyBody.history[1].picks[0]).toMatchObject({
+      rikishiId: "onosato",
+      shikona: "Historic Onosato",
+      heya: "Historic Heya",
+      wins: 1,
+    });
+  });
 });
 
 async function signIn(

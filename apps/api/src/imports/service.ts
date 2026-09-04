@@ -910,6 +910,8 @@ function isEqualBanzukeEntry(left: BanzukeEntry, right: BanzukeEntry) {
     left.id === right.id &&
     left.bashoId === right.bashoId &&
     left.rikishiId === right.rikishiId &&
+    left.shikona === right.shikona &&
+    left.heya === right.heya &&
     left.rank === right.rank &&
     left.rankOrder === right.rankOrder
   );

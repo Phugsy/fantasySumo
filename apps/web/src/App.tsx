@@ -49,6 +49,7 @@ import { AdminPanel } from "./components/AdminPanel";
 import { AppHeader } from "./components/AppHeader";
 import { BashoPanel } from "./components/BashoPanel";
 import { LeaderboardPanel } from "./components/LeaderboardPanel";
+import { HistoryPanel } from "./components/HistoryPanel";
 import { MyStablePanel } from "./components/MyStablePanel";
 import { PageHeader } from "./components/PageHeader";
 import { ResetPasswordPanel } from "./components/ResetPasswordPanel";
@@ -925,6 +926,10 @@ function RoutedApp() {
             }
           />
           <Route
+            path={appPaths.history}
+            element={<HistoryPanel signedIn={sessionUser !== null} />}
+          />
+          <Route
             path={appPaths.resetPassword}
             element={
               <ResetPasswordPanel
@@ -1096,6 +1101,8 @@ function getPageTitle(activeView: ReturnType<typeof getActiveView>): string {
       return "Log in or join";
     case "reset-password":
       return "Reset password";
+    case "history":
+      return "Basho history";
     case "stable":
       return "My stable";
     case "team":

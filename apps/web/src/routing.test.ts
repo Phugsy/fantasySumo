@@ -11,6 +11,7 @@ import {
 describe("routing", () => {
   it("maps known paths to their page view", () => {
     expect(getActiveView(appPaths.home)).toBe("home");
+    expect(getActiveView(appPaths.history)).toBe("history");
     expect(getActiveView(appPaths.login)).toBe("login");
     expect(getActiveView(appPaths.resetPassword)).toBe("reset-password");
     expect(getActiveView(appPaths.stable)).toBe("stable");

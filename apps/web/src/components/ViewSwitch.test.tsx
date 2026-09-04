@@ -18,6 +18,7 @@ describe("ViewSwitch", () => {
     expect(
       screen.getByRole("link", { name: "Log in / Join" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "History" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "My stable" })).toBeNull();
   });
 

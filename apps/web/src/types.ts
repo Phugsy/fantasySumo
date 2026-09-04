@@ -105,6 +105,47 @@ export interface LeaderboardResponse {
   leaderboard: LeaderboardEntry[];
 }
 
+export interface BashoArchiveResponse {
+  bashos: Array<Omit<Basho, "teamSize">>;
+}
+
+export interface AllTimeLeaderboardResponse {
+  bashoCount: number;
+  leaderboard: Array<{
+    rank: number;
+    displayName: string;
+    score: number;
+    tournamentsPlayed: number;
+    bashos: Array<{
+      bashoId: string;
+      bashoName: string;
+      score: number;
+    }>;
+  }>;
+}
+
+export interface MyHistoryResponse {
+  score: number;
+  history: Array<{
+    basho: Omit<Basho, "teamSize">;
+    team: {
+      id: string;
+      displayName: string;
+      lockedAt?: string;
+    };
+    score: number;
+    picks: Array<{
+      rikishiId: string;
+      shikona: string;
+      heya?: string;
+      rank?: string;
+      rankOrder?: number;
+      wins: number;
+      score: number;
+    }>;
+  }>;
+}
+
 export interface LeaderboardEntry {
   rank: number;
   teamId: string;
@@ -194,6 +235,7 @@ export interface AdminImportResponse {
 
 export type ActiveView =
   | "home"
+  | "history"
   | "login"
   | "reset-password"
   | "stable"

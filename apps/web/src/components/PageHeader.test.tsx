@@ -22,6 +22,15 @@ describe("PageHeader", () => {
     expect(screen.getByText("Current basho")).toBeInTheDocument();
   });
 
+  it("shows tournament history copy", () => {
+    render(<PageHeader activeView="history" />);
+
+    expect(
+      screen.getByRole("heading", { name: "Basho history" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Across tournaments")).toBeInTheDocument();
+  });
+
   it("shows password recovery copy", () => {
     render(<PageHeader activeView="reset-password" />);
 

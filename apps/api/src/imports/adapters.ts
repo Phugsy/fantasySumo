@@ -132,6 +132,10 @@ export function mapJsaBanzukePayload(
         id: `${bashoId}-${rikishiId}`,
         bashoId,
         rikishiId,
+        shikona: String(row.shikona),
+        ...(row.heya_name === undefined || row.heya_name === ""
+          ? {}
+          : { heya: String(row.heya_name) }),
         rank: String(row.banzuke_name),
         rankOrder,
       };

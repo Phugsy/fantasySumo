@@ -5,11 +5,14 @@ import type {
   AdminGameConfigResponse,
   AdminImportResponse,
   AdminLifecycleAction,
+  AllTimeLeaderboardResponse,
   Basho,
+  BashoArchiveResponse,
   BashoRikishiResponse,
   CreatedTeamResponse,
   LeaderboardResponse,
   MyTeamResponse,
+  MyHistoryResponse,
   ScheduleResponse,
   SessionResponse,
 } from "./types";
@@ -77,6 +80,21 @@ export async function fetchLeaderboard(
     `/api/basho/${bashoId}/leaderboard`,
     false,
   );
+}
+
+export async function fetchBashoArchive(): Promise<BashoArchiveResponse> {
+  return getJson<BashoArchiveResponse>("/api/bashos", false);
+}
+
+export async function fetchAllTimeLeaderboard(): Promise<AllTimeLeaderboardResponse> {
+  return getJson<AllTimeLeaderboardResponse>(
+    "/api/leaderboard/all-time",
+    false,
+  );
+}
+
+export async function fetchMyHistory(): Promise<MyHistoryResponse> {
+  return getJson<MyHistoryResponse>("/api/my-history");
 }
 
 export async function fetchSession(): Promise<SessionResponse> {
