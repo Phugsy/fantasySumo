@@ -107,7 +107,7 @@ export function registerBashoRoutes(
       context.repositories.listScheduledBoutsForBasho(basho.id),
       context.repositories.listScheduledBoutPublicationsForBasho(basho.id),
     ]);
-    const finalDayScheduleComplete = hasCompleteFinalDaySchedulePublication(
+    const completeScheduleDays = getCompleteScheduleDays(
       basho,
       scheduledBoutPublications,
     );
@@ -127,7 +127,8 @@ export function registerBashoRoutes(
           banzukeEntries,
           bashoStatus: basho.status,
           boutResults,
-          finalDayScheduleComplete,
+          completeScheduleDays: [...completeScheduleDays],
+          finalDayScheduleComplete: completeScheduleDays.has(15),
           rikishiId: entry.rikishiId,
           scheduledBouts,
           throughDay: basho.currentDay,
@@ -368,7 +369,7 @@ export function registerBashoRoutes(
       context.repositories.listScheduledBoutsForBasho(basho.id),
       context.repositories.listScheduledBoutPublicationsForBasho(basho.id),
     ]);
-    const finalDayScheduleComplete = hasCompleteFinalDaySchedulePublication(
+    const completeScheduleDays = getCompleteScheduleDays(
       basho,
       scheduledBoutPublications,
     );
@@ -411,7 +412,8 @@ export function registerBashoRoutes(
               banzukeEntries,
               bashoStatus: basho.status,
               boutResults,
-              finalDayScheduleComplete,
+              completeScheduleDays: [...completeScheduleDays],
+              finalDayScheduleComplete: completeScheduleDays.has(15),
               rikishiId: pick.rikishiId,
               scheduledBouts,
               throughDay: basho.currentDay,
@@ -595,6 +597,7 @@ export function registerBashoRoutes(
       await context.repositories.listFantasyTeamsForBasho(basho.id),
       await context.repositories.listFantasyPicksForBasho(basho.id),
       boutResults,
+      { throughDay: basho.currentDay },
     );
 
     return {
@@ -616,17 +619,18 @@ export function registerBashoRoutes(
   });
 }
 
-function hasCompleteFinalDaySchedulePublication(
+function getCompleteScheduleDays(
   basho: Basho,
   publications: readonly ScheduledBoutPublication[],
-): boolean {
-  return (
-    basho.isDemo ||
-    publications.some(
-      (publication) =>
-        publication.day === 15 &&
-        isCompleteScheduledBoutPublicationSource(publication.source),
-    )
+): ReadonlySet<number> {
+  return new Set(
+    basho.isDemo
+      ? Array.from({ length: 15 }, (_value, index) => index + 1)
+      : publications
+          .filter((publication) =>
+            isCompleteScheduledBoutPublicationSource(publication.source),
+          )
+          .map((publication) => publication.day),
   );
 }
 

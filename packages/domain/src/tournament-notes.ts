@@ -9,7 +9,7 @@ import type {
   ScheduledBout,
 } from "./types.js";
 import {
-  hasBoutResultsForEveryDayThrough,
+  hasCompleteBoutResultsForEveryDayThrough,
   hasCompleteBoutResultsForScheduledDay,
 } from "./bout-result-completeness.js";
 
@@ -21,6 +21,7 @@ interface TournamentNotesInput {
   banzukeEntries: readonly BanzukeEntry[];
   bashoStatus?: BashoStatus;
   boutResults: readonly BoutResult[];
+  completeScheduleDays?: readonly number[];
   rikishiId: Rikishi["id"];
   scheduledBouts: readonly ScheduledBout[];
   finalDayScheduleComplete?: boolean;
@@ -35,6 +36,7 @@ export function deriveRikishiTournamentNotes({
   banzukeEntries,
   bashoStatus,
   boutResults,
+  completeScheduleDays = [],
   rikishiId,
   scheduledBouts,
   finalDayScheduleComplete,
@@ -46,10 +48,12 @@ export function deriveRikishiTournamentNotes({
     scheduledBouts,
     scheduledDayComplete: finalDayScheduleComplete,
   });
-  const hasCompleteEarlierResults = hasBoutResultsForEveryDayThrough(
+  const hasCompleteEarlierResults = hasCompleteBoutResultsForEveryDayThrough({
     boutResults,
-    FINAL_BASHO_DAY - 1,
-  );
+    completeScheduleDays: new Set(completeScheduleDays),
+    scheduledBouts,
+    throughDay: FINAL_BASHO_DAY - 1,
+  });
   const applicableResults = boutResults
     .filter(
       (result) =>

@@ -274,7 +274,21 @@ describe("source import adapters", () => {
     expect(JSON.stringify(command)).not.toContain("winner");
   });
 
-  it("marks only a resolved final-day card with a division yusho as complete", () => {
+  it("marks resolved cards complete and requires a yusho on the final day", () => {
+    const resolvedEarlierDay = mapSumoApiSchedulePayload(
+      {
+        torikumi: [
+          {
+            bashoId: "202605",
+            day: 14,
+            eastShikona: "Onosato",
+            westShikona: "Kotozakura",
+            winnerEn: "Onosato",
+          },
+        ],
+      },
+      { bashoId: "2026-05", day: 14 },
+    );
     const incomplete = mapSumoApiSchedulePayload(
       {
         torikumi: [
@@ -305,6 +319,7 @@ describe("source import adapters", () => {
       { bashoId: "2026-05", day: 15 },
     );
 
+    expect(resolvedEarlierDay.isComplete).toBe(true);
     expect(incomplete.isComplete).toBeUndefined();
     expect(complete.isComplete).toBe(true);
   });

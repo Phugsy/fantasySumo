@@ -1,10 +1,17 @@
 import type { BoutResult, ScheduledBout } from "./types.js";
 
-interface BoutResultCompletenessInput {
+export interface BoutResultCompletenessInput {
   boutResults: readonly BoutResult[];
   day: number;
   scheduledBouts: readonly ScheduledBout[];
   scheduledDayComplete?: boolean;
+}
+
+interface BashoResultCompletenessInput {
+  boutResults: readonly BoutResult[];
+  completeScheduleDays: ReadonlySet<number>;
+  scheduledBouts: readonly ScheduledBout[];
+  throughDay: number;
 }
 
 interface ScheduledBoutResultInput {
@@ -28,7 +35,7 @@ export function hasCompleteBoutResultsForScheduledDay({
   }
 
   const expectedMatchups = scheduledBouts
-    .filter((bout) => bout.day === day)
+    .filter((bout) => bout.day === day && bout.status === "scheduled")
     .map((bout) => matchupKey(bout.eastRikishiId, bout.westRikishiId));
 
   if (expectedMatchups.length === 0) {
@@ -47,14 +54,21 @@ export function hasCompleteBoutResultsForScheduledDay({
 }
 
 /** Confirms that every basho day through the supplied day has stored results. */
-export function hasBoutResultsForEveryDayThrough(
-  boutResults: readonly BoutResult[],
-  throughDay: number,
-): boolean {
-  const importedDays = new Set(boutResults.map((result) => result.day));
-
+export function hasCompleteBoutResultsForEveryDayThrough({
+  boutResults,
+  completeScheduleDays,
+  scheduledBouts,
+  throughDay,
+}: BashoResultCompletenessInput): boolean {
   for (let day = 1; day <= throughDay; day += 1) {
-    if (!importedDays.has(day)) {
+    if (
+      !hasCompleteBoutResultsForScheduledDay({
+        boutResults,
+        day,
+        scheduledBouts,
+        scheduledDayComplete: completeScheduleDays.has(day),
+      })
+    ) {
       return false;
     }
   }

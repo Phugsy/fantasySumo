@@ -369,6 +369,38 @@ describe("basho routes", () => {
       });
     }
 
+    const earlierResults = (
+      await repositories.listBoutResultsForBasho("2026-05")
+    ).filter((result) => result.day <= 14);
+    const withdrawal = (
+      await repositories.listScheduledBoutsForBasho("2026-05")
+    ).find((bout) => bout.status === "cancelled");
+    for (let day = 1; day <= 14; day += 1) {
+      const scheduledResults = earlierResults
+        .filter((result) => result.day === day)
+        .map((result) => ({
+          id: `${result.id}-schedule`,
+          bashoId: result.bashoId,
+          day: result.day,
+          eastRikishiId: result.winnerRikishiId,
+          westRikishiId: result.loserRikishiId,
+          status: "scheduled" as const,
+        }));
+      await repositories.applyScheduledBoutsImport({
+        publication: {
+          id: `2026-05-day-${day}-complete-status-test`,
+          bashoId: "2026-05",
+          day,
+          source: "test-source:complete",
+          publishedAt: "2026-05-24T08:00:00.000Z",
+        },
+        bouts: [
+          ...scheduledResults,
+          ...(day === 9 && withdrawal !== undefined ? [withdrawal] : []),
+        ],
+      });
+    }
+
     await repositories.insertBoutResult({
       id: "2026-05-day-15-final-status-test-2",
       bashoId: "2026-05",
@@ -1146,6 +1178,23 @@ describe("basho routes", () => {
         },
       ],
     });
+
+    await repositories.insertBoutResult({
+      id: "2026-05-day-15-pending-leaderboard-result",
+      bashoId: "2026-05",
+      day: 15,
+      winnerRikishiId: "onosato",
+      loserRikishiId: "kotozakura",
+    });
+    const pendingFinalDayResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/leaderboard",
+    });
+
+    expect(pendingFinalDayResponse.statusCode).toBe(200);
+    expect(pendingFinalDayResponse.json().leaderboard).toEqual(
+      response.json().leaderboard,
+    );
   });
 
   it("returns clear 404 errors for unknown basho and teams", async () => {

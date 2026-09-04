@@ -29,8 +29,8 @@ export type {
 export { deriveRikishiTournamentNotes } from "./tournament-notes.js";
 export {
   hasBoutResultForScheduledBout,
-  hasBoutResultsForEveryDayThrough,
   hasCompleteBoutResultsForScheduledDay,
+  hasCompleteBoutResultsForEveryDayThrough,
 } from "./bout-result-completeness.js";
 export {
   canEditFantasyPicks,

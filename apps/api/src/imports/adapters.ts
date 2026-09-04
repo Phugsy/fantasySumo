@@ -170,12 +170,13 @@ export function mapSumoApiSchedulePayload(
     toSourceRikishi(requiredString(row.westShikona, "westShikona")),
   ]);
   const division = options.division ?? "Makuuchi";
+  const hasResolvedCard = rows.every(hasResolvedWinner);
   const isComplete =
-    options.day === 15 &&
-    payload.yusho?.some(
-      (winner) => winner.type?.toLowerCase() === division.toLowerCase(),
-    ) === true &&
-    rows.every(hasResolvedWinner);
+    hasResolvedCard &&
+    (options.day < 15 ||
+      payload.yusho?.some(
+        (winner) => winner.type?.toLowerCase() === division.toLowerCase(),
+      ) === true);
 
   return {
     source: "sumo-api-schedule",

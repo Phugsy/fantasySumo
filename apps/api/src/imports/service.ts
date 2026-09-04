@@ -6,7 +6,7 @@ import type {
   ScheduledBout,
 } from "@fantasy-sumo/domain";
 import {
-  hasBoutResultsForEveryDayThrough,
+  hasCompleteBoutResultsForEveryDayThrough,
   hasCompleteBoutResultsForScheduledDay,
   preserveBashoLifecycleProgress,
 } from "@fantasy-sumo/domain";
@@ -25,7 +25,10 @@ import type {
   ImportValidationIssue,
   ScheduledBoutsImportCommand,
 } from "./types.js";
-import { toScheduledBoutPublicationSource } from "./types.js";
+import {
+  isCompleteScheduledBoutPublicationSource,
+  toScheduledBoutPublicationSource,
+} from "./types.js";
 
 export class ImportValidationError extends Error {
   constructor(readonly issues: ImportValidationIssue[]) {
@@ -133,6 +136,16 @@ async function prepareBoutResultsImport(
   const existingBoutResults = await repositories.listBoutResultsForBasho(
     command.bashoId,
   );
+  const existingScheduledBouts = await repositories.listScheduledBoutsForBasho(
+    command.bashoId,
+  );
+  const completeScheduleDays = new Set(
+    (await repositories.listScheduledBoutPublicationsForBasho(command.bashoId))
+      .filter((publication) =>
+        isCompleteScheduledBoutPublicationSource(publication.source),
+      )
+      .map((publication) => publication.day),
+  );
   const importedDay = command.results[0]?.day;
   const completionSchedule = options.completionSchedule;
   const completesImportedDay =
@@ -144,13 +157,15 @@ async function prepareBoutResultsImport(
       scheduledBouts: completionSchedule.bouts,
       scheduledDayComplete: true,
     }) &&
-    hasBoutResultsForEveryDayThrough(
-      [
+    hasCompleteBoutResultsForEveryDayThrough({
+      boutResults: [
         ...existingBoutResults.filter((result) => result.day !== importedDay),
         ...command.results,
       ],
-      14,
-    );
+      completeScheduleDays,
+      scheduledBouts: existingScheduledBouts,
+      throughDay: 14,
+    });
   const existingRikishi = await repositories.listRikishi();
   const existingRikishiIds = new Set(
     existingRikishi.map((rikishi) => rikishi.id),
@@ -233,18 +248,31 @@ async function prepareScheduledBoutsImport(
   }
 
   const summary = createEmptySummary();
+  const existingScheduledBouts = (
+    await repositories.listScheduledBoutsForBasho(command.bashoId)
+  ).filter((bout) => bout.day === command.day);
+  const existingPublication = (
+    await repositories.listScheduledBoutPublicationsForBasho(command.bashoId)
+  ).find((publication) => publication.day === command.day);
+  const preserveExistingCompleteCard =
+    existingPublication !== undefined &&
+    isCompleteScheduledBoutPublicationSource(existingPublication.source) &&
+    command.isComplete !== true;
+  const importedBouts = preserveExistingCompleteCard
+    ? existingScheduledBouts
+    : command.bouts;
   const existingRikishi = await repositories.listRikishi();
   const existingRikishiIds = new Set(
     existingRikishi.map((rikishi) => rikishi.id),
   );
-  const missingSourceRikishi = (command.rikishi ?? []).filter(
-    (rikishi) => !existingRikishiIds.has(rikishi.id),
-  );
+  const missingSourceRikishi = preserveExistingCompleteCard
+    ? []
+    : (command.rikishi ?? []).filter(
+        (rikishi) => !existingRikishiIds.has(rikishi.id),
+      );
   summary.scheduledBouts = summarizeMany(
-    (await repositories.listScheduledBoutsForBasho(command.bashoId)).filter(
-      (bout) => bout.day === command.day,
-    ),
-    command.bouts,
+    existingScheduledBouts,
+    importedBouts,
     isEqualScheduledBout,
     { countDeleted: true },
   );
@@ -255,15 +283,17 @@ async function prepareScheduledBoutsImport(
   );
 
   const data: ScheduledBoutsImportData = {
-    publication: {
-      id: `${command.bashoId}-day-${command.day}-schedule`,
-      bashoId: command.bashoId,
-      day: command.day,
-      source: toScheduledBoutPublicationSource(command),
-      publishedAt: new Date().toISOString(),
-    },
+    publication: preserveExistingCompleteCard
+      ? existingPublication
+      : {
+          id: `${command.bashoId}-day-${command.day}-schedule`,
+          bashoId: command.bashoId,
+          day: command.day,
+          source: toScheduledBoutPublicationSource(command),
+          publishedAt: new Date().toISOString(),
+        },
     rikishi: missingSourceRikishi,
-    bouts: command.bouts,
+    bouts: importedBouts,
   };
 
   return {
@@ -286,6 +316,18 @@ export async function importScheduledBoutsAndBoutResults(
   resultsCommand: BoutResultsImportCommand,
   options: ImportOptions = {},
 ): Promise<ImportResult> {
+  if (
+    scheduleCommand.bashoId !== resultsCommand.bashoId ||
+    scheduleCommand.day !== resultsCommand.results[0]?.day
+  ) {
+    throw new ImportValidationError([
+      {
+        path: "schedule",
+        message: "Schedule and result imports must target the same basho day.",
+      },
+    ]);
+  }
+
   const schedule = await prepareScheduledBoutsImport(
     repositories,
     scheduleCommand,
@@ -303,7 +345,13 @@ export async function importScheduledBoutsAndBoutResults(
     });
   }
 
-  return results.result;
+  return {
+    ...results.result,
+    summary: {
+      ...results.result.summary,
+      scheduledBouts: schedule.result.summary.scheduledBouts,
+    },
+  };
 }
 
 function validateBanzukeImport(

@@ -319,6 +319,7 @@ describe("admin import routes", () => {
       summary: {
         basho: { skipped: 1 },
         results: { created: 1 },
+        scheduledBouts: { created: 1 },
       },
     });
 
@@ -491,7 +492,12 @@ describe("admin import routes", () => {
     );
     expect(
       await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
-    ).toEqual([]);
+    ).toEqual([
+      expect.objectContaining({
+        day: 1,
+        source: "sumo-api-schedule:complete",
+      }),
+    ]);
   });
 
   it("imports future schedules without creating scored results", async () => {

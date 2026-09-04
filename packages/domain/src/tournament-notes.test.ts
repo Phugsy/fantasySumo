@@ -89,18 +89,25 @@ describe("deriveRikishiTournamentNotes", () => {
   });
 
   it("settles an incomplete withdrawn record as make-koshi when the basho completes", () => {
+    const boutResults = [
+      ...makeRecord("ura", 7, 3),
+      ...otherResultsForDays(11, 14),
+      result(15, "onosato", "other"),
+    ];
+
     expect(
       deriveRikishiTournamentNotes({
         banzukeEntries,
         bashoStatus: "complete",
-        boutResults: [
-          ...makeRecord("ura", 7, 3),
-          ...otherResultsForDays(11, 14),
-          result(15, "onosato", "other"),
-        ],
+        boutResults,
+        completeScheduleDays: Array.from(
+          { length: 15 },
+          (_value, index) => index + 1,
+        ),
         finalDayScheduleComplete: true,
         rikishiId: "ura",
         scheduledBouts: [
+          ...boutResults.map(scheduledBoutForResult),
           {
             id: "day-11-withdrawal",
             bashoId,
@@ -110,7 +117,6 @@ describe("deriveRikishiTournamentNotes", () => {
             status: "cancelled",
             withdrawnRikishiId: "ura",
           },
-          scheduledBout(15, "onosato", "other"),
         ],
         throughDay: 15,
       }),
@@ -121,18 +127,24 @@ describe("deriveRikishiTournamentNotes", () => {
   });
 
   it("does not settle a record when an earlier result day is missing", () => {
+    const completeResults = [
+      ...makeRecord("ura", 7, 3),
+      ...otherResultsForDays(11, 14),
+      result(15, "onosato", "other"),
+    ];
+
     expect(
       deriveRikishiTournamentNotes({
         banzukeEntries,
         bashoStatus: "complete",
-        boutResults: [
-          ...makeRecord("ura", 7, 3),
-          ...otherResultsForDays(12, 14),
-          result(15, "onosato", "other"),
-        ],
+        boutResults: completeResults.filter((entry) => entry.day !== 11),
+        completeScheduleDays: Array.from(
+          { length: 15 },
+          (_value, index) => index + 1,
+        ),
         finalDayScheduleComplete: true,
         rikishiId: "ura",
-        scheduledBouts: [scheduledBout(15, "onosato", "other")],
+        scheduledBouts: completeResults.map(scheduledBoutForResult),
         throughDay: 15,
       }).achievements,
     ).toEqual([]);
@@ -293,4 +305,8 @@ function otherResultsForDays(
     const day = fromDay + index;
     return result(day, `other-winner-${day}`, `other-loser-${day}`);
   });
+}
+
+function scheduledBoutForResult(entry: BoutResult): ScheduledBout {
+  return scheduledBout(entry.day, entry.winnerRikishiId, entry.loserRikishiId);
 }

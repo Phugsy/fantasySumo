@@ -1,12 +1,18 @@
-import type { Basho } from "@fantasy-sumo/domain";
-import type { Repositories } from "@fantasy-sumo/db";
-import { fetchSumoApiResultsImport } from "./adapters.js";
 import {
+  hasCompleteBoutResultsForScheduledDay,
+  type Basho,
+} from "@fantasy-sumo/domain";
+import type { Repositories } from "@fantasy-sumo/db";
+import {
+  importCurrentDayScheduleAndResults,
   importDailyResultsAndFollowingSchedule,
   type FollowingDayScheduleImportResult,
 } from "./daily-update.js";
-import { importBoutResults } from "./service.js";
-import type { ImportResult, SourceFetch } from "./types.js";
+import {
+  isCompleteScheduledBoutPublicationSource,
+  type ImportResult,
+  type SourceFetch,
+} from "./types.js";
 import { formatJapanDate } from "../time.js";
 
 const MILLISECONDS_PER_DAY = 86_400_000;
@@ -108,23 +114,35 @@ export async function runScheduledResultsImport(
     await repositories.lockBashoAndFantasyTeams(basho.id, now.toISOString());
   }
 
-  const storedResultDays = new Set(
-    (await repositories.listBoutResultsForBasho(basho.id)).map(
-      (result) => result.day,
-    ),
+  const storedResults = await repositories.listBoutResultsForBasho(basho.id);
+  const storedScheduledBouts = await repositories.listScheduledBoutsForBasho(
+    basho.id,
+  );
+  const verifiedResultDays = new Set(
+    (await repositories.listScheduledBoutPublicationsForBasho(basho.id))
+      .filter(
+        (publication) =>
+          isCompleteScheduledBoutPublicationSource(publication.source) &&
+          hasCompleteBoutResultsForScheduledDay({
+            boutResults: storedResults,
+            day: publication.day,
+            scheduledBouts: storedScheduledBouts,
+            scheduledDayComplete: true,
+          }),
+      )
+      .map((publication) => publication.day),
   );
   const importedDays = Array.from(
     { length: day },
     (_value, index) => index + 1,
   ).filter(
-    (importDay) => importDay === day || !storedResultDays.has(importDay),
+    (importDay) => importDay === day || !verifiedResultDays.has(importDay),
   );
   for (const importDay of importedDays.slice(0, -1)) {
-    const command = await fetchSumoApiResultsImport(sourceFetch, {
+    await importCurrentDayScheduleAndResults(repositories, sourceFetch, {
       bashoId: basho.id,
       day: importDay,
     });
-    await importBoutResults(repositories, command);
   }
 
   const dailyUpdate = await importDailyResultsAndFollowingSchedule(

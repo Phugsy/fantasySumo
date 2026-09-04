@@ -5,7 +5,6 @@ import {
   ScheduleUnavailableError,
 } from "./adapters.js";
 import {
-  importBoutResults,
   importScheduledBouts,
   importScheduledBoutsAndBoutResults,
 } from "./service.js";
@@ -45,18 +44,11 @@ export async function importDailyResultsAndFollowingSchedule(
   sourceFetch: SourceFetch,
   options: DailyUpdateImportOptions,
 ): Promise<DailyUpdateImportResult> {
-  const resultsImport =
-    options.day === 15
-      ? await importFinalDayScheduleAndResults(
-          repositories,
-          sourceFetch,
-          options,
-        )
-      : await importBoutResults(
-          repositories,
-          await fetchSumoApiResultsImport(sourceFetch, options),
-          { dryRun: options.dryRun },
-        );
+  const resultsImport = await importCurrentDayScheduleAndResults(
+    repositories,
+    sourceFetch,
+    options,
+  );
   const schedule = await attemptFollowingDayScheduleImport(
     repositories,
     sourceFetch,
@@ -73,7 +65,7 @@ export async function importDailyResultsAndFollowingSchedule(
   };
 }
 
-async function importFinalDayScheduleAndResults(
+export async function importCurrentDayScheduleAndResults(
   repositories: Repositories,
   sourceFetch: SourceFetch,
   options: DailyUpdateImportOptions,
