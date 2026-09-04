@@ -8,7 +8,10 @@ import type {
   RikishiTournamentStatus,
   ScheduledBout,
 } from "./types.js";
-import { hasCompleteBoutResultsForScheduledDay } from "./bout-result-completeness.js";
+import {
+  hasBoutResultsForEveryDayThrough,
+  hasCompleteBoutResultsForScheduledDay,
+} from "./bout-result-completeness.js";
 
 const WINNING_RECORD_THRESHOLD = 8;
 const LOSING_RECORD_THRESHOLD = 8;
@@ -43,6 +46,10 @@ export function deriveRikishiTournamentNotes({
     scheduledBouts,
     scheduledDayComplete: finalDayScheduleComplete,
   });
+  const hasCompleteEarlierResults = hasBoutResultsForEveryDayThrough(
+    boutResults,
+    FINAL_BASHO_DAY - 1,
+  );
   const applicableResults = boutResults
     .filter(
       (result) =>
@@ -64,7 +71,7 @@ export function deriveRikishiTournamentNotes({
       banzukeEntries,
       bashoStatus,
       throughDay,
-      hasCompleteFinalDayResults,
+      hasCompleteEarlierResults && hasCompleteFinalDayResults,
     ),
   };
 }

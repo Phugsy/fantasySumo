@@ -115,7 +115,6 @@ describe("import service", () => {
         currentDay: 3,
       },
     });
-
     const result = await importBanzuke(
       repositories,
       {
@@ -267,6 +266,15 @@ describe("import service", () => {
         status: "active",
       },
     });
+    for (let day = 1; day <= 14; day += 1) {
+      await repositories.insertBoutResult({
+        id: `2026-05-day-${day}-prior-result`,
+        bashoId: "2026-05",
+        day,
+        winnerRikishiId: "onosato",
+        loserRikishiId: "kotozakura",
+      });
+    }
 
     await importBoutResults(repositories, {
       source: "test",
@@ -338,6 +346,57 @@ describe("import service", () => {
     expect(await repositories.getBasho("2026-05")).toMatchObject({
       status: "complete",
       currentDay: 15,
+    });
+  });
+
+  it("does not jump from day 3 to complete when earlier result days are missing", async () => {
+    const repositories = createRepositories(client);
+    await importBanzuke(repositories, {
+      ...banzukeCommand,
+      basho: {
+        ...banzukeCommand.basho,
+        currentDay: 3,
+        status: "active",
+      },
+    });
+    const finalSchedule: ScheduledBoutsImportCommand = {
+      source: "test-schedule",
+      bashoId: "2026-05",
+      day: 15,
+      isComplete: true,
+      bouts: [
+        {
+          id: "2026-05-day-15-match-1",
+          bashoId: "2026-05",
+          day: 15,
+          eastRikishiId: "onosato",
+          westRikishiId: "kotozakura",
+          status: "scheduled",
+        },
+      ],
+    };
+
+    await importBoutResults(
+      repositories,
+      {
+        source: "test",
+        bashoId: "2026-05",
+        results: [
+          {
+            id: "2026-05-day-15-match-1",
+            bashoId: "2026-05",
+            day: 15,
+            winnerRikishiId: "onosato",
+            loserRikishiId: "kotozakura",
+          },
+        ],
+      },
+      { completionSchedule: finalSchedule },
+    );
+
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 3,
     });
   });
 

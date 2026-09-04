@@ -732,7 +732,14 @@ function RoutedApp() {
     document.title = `${getPageTitle(activeView)} | Fantasy Sumo`;
 
     const focusTimer = window.setTimeout(() => {
-      document.getElementById("page-title")?.focus();
+      const pageTitle = document.getElementById("page-title");
+
+      if (pageTitle === null) {
+        return;
+      }
+
+      window.scrollTo(0, 0);
+      pageTitle.focus({ preventScroll: true });
     }, 0);
 
     return () => window.clearTimeout(focusTimer);

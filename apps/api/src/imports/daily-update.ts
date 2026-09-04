@@ -4,10 +4,13 @@ import {
   fetchSumoApiScheduleImport,
   ScheduleUnavailableError,
 } from "./adapters.js";
-import { importBoutResults, importScheduledBouts } from "./service.js";
+import {
+  importBoutResults,
+  importScheduledBouts,
+  importScheduledBoutsAndBoutResults,
+} from "./service.js";
 import type {
   ImportResult,
-  ScheduledBoutsImportCommand,
   SourceFetch,
   SumoApiResultsImportOptions,
 } from "./types.js";
@@ -42,18 +45,18 @@ export async function importDailyResultsAndFollowingSchedule(
   sourceFetch: SourceFetch,
   options: DailyUpdateImportOptions,
 ): Promise<DailyUpdateImportResult> {
-  const refreshedFinalDaySchedule = await refreshFinalDaySchedule(
-    repositories,
-    sourceFetch,
-    options,
-  );
-  const resultsCommand = await fetchSumoApiResultsImport(sourceFetch, options);
-  const resultsImport = await importBoutResults(repositories, resultsCommand, {
-    dryRun: options.dryRun,
-    ...(refreshedFinalDaySchedule === undefined
-      ? {}
-      : { completionSchedule: refreshedFinalDaySchedule }),
-  });
+  const resultsImport =
+    options.day === 15
+      ? await importFinalDayScheduleAndResults(
+          repositories,
+          sourceFetch,
+          options,
+        )
+      : await importBoutResults(
+          repositories,
+          await fetchSumoApiResultsImport(sourceFetch, options),
+          { dryRun: options.dryRun },
+        );
   const schedule = await attemptFollowingDayScheduleImport(
     repositories,
     sourceFetch,
@@ -70,21 +73,23 @@ export async function importDailyResultsAndFollowingSchedule(
   };
 }
 
-async function refreshFinalDaySchedule(
+async function importFinalDayScheduleAndResults(
   repositories: Repositories,
   sourceFetch: SourceFetch,
   options: DailyUpdateImportOptions,
-): Promise<ScheduledBoutsImportCommand | undefined> {
-  if (options.day !== 15) {
-    return undefined;
-  }
+): Promise<ImportResult> {
+  const scheduleCommand = await fetchSumoApiScheduleImport(
+    sourceFetch,
+    options,
+  );
+  const resultsCommand = await fetchSumoApiResultsImport(sourceFetch, options);
 
-  const command = await fetchSumoApiScheduleImport(sourceFetch, options);
-  await importScheduledBouts(repositories, command, {
-    dryRun: options.dryRun,
-  });
-
-  return command;
+  return importScheduledBoutsAndBoutResults(
+    repositories,
+    scheduleCommand,
+    resultsCommand,
+    { dryRun: options.dryRun },
+  );
 }
 
 async function attemptFollowingDayScheduleImport(

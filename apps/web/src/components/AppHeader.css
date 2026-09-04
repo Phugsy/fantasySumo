@@ -133,8 +133,18 @@
 
   .app-header-actions {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
     width: 100%;
+  }
+
+  .session-actions,
+  .session-actions button {
+    width: 100%;
+  }
+
+  .session-actions button {
+    min-height: 44px;
   }
 
   .wordmark-copy small {

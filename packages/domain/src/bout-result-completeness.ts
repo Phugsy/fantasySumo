@@ -7,6 +7,11 @@ interface BoutResultCompletenessInput {
   scheduledDayComplete?: boolean;
 }
 
+interface ScheduledBoutResultInput {
+  boutResults: readonly BoutResult[];
+  scheduledBout: ScheduledBout;
+}
+
 /**
  * Confirms that every bout on a published card has a stored result.
  * A non-empty card or result payload alone is not evidence that the whole day
@@ -39,6 +44,40 @@ export function hasCompleteBoutResultsForScheduledDay({
   );
 
   return expectedMatchups.every((matchup) => completedMatchups.has(matchup));
+}
+
+/** Confirms that every basho day through the supplied day has stored results. */
+export function hasBoutResultsForEveryDayThrough(
+  boutResults: readonly BoutResult[],
+  throughDay: number,
+): boolean {
+  const importedDays = new Set(boutResults.map((result) => result.day));
+
+  for (let day = 1; day <= throughDay; day += 1) {
+    if (!importedDays.has(day)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/** Checks whether a scheduled matchup already has a stored result. */
+export function hasBoutResultForScheduledBout({
+  boutResults,
+  scheduledBout,
+}: ScheduledBoutResultInput): boolean {
+  const scheduledMatchup = matchupKey(
+    scheduledBout.eastRikishiId,
+    scheduledBout.westRikishiId,
+  );
+
+  return boutResults.some(
+    (result) =>
+      result.day === scheduledBout.day &&
+      matchupKey(result.winnerRikishiId, result.loserRikishiId) ===
+        scheduledMatchup,
+  );
 }
 
 function matchupKey(firstRikishiId: string, secondRikishiId: string): string {

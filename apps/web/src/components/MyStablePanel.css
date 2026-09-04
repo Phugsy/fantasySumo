@@ -163,6 +163,7 @@
   display: flex;
   gap: 12px;
   align-items: center;
+  min-width: 0;
 }
 
 .stable-rikishi strong,
@@ -235,7 +236,7 @@
   }
 
   .stable-rikishi .rank-pill {
-    min-width: 74px;
+    min-width: 0;
   }
 }
 

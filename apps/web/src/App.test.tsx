@@ -189,7 +189,28 @@ describe("App", () => {
     expect(window.location.pathname).toBe("/stable");
     await waitFor(() => {
       expect(document.title).toBe("My stable | Fantasy Sumo");
-      expect(screen.getByRole("heading", { name: "My stable" })).toHaveFocus();
+      const pageTitle = screen.getByRole("heading", { name: "My stable" });
+
+      expect(pageTitle).toHaveFocus();
+    });
+  });
+
+  it("focuses the route heading after keyboard navigation", async () => {
+    render(<App />);
+
+    const leaderboardLink = await screen.findByRole("link", {
+      name: "Leaderboard",
+    });
+    leaderboardLink.focus();
+    fireEvent.keyDown(leaderboardLink, { key: "Enter" });
+    fireEvent.click(leaderboardLink);
+
+    await waitFor(() => {
+      const pageTitle = screen.getByRole("heading", {
+        name: "Follow the leaderboard",
+      });
+
+      expect(pageTitle).toHaveFocus();
     });
   });
 

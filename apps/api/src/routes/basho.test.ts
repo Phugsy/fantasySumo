@@ -359,6 +359,16 @@ describe("basho routes", () => {
         .tournamentNotes.achievements,
     ).toEqual([]);
 
+    for (let day = 9; day <= 14; day += 1) {
+      await repositories.insertBoutResult({
+        id: `2026-05-day-${day}-other-status-test`,
+        bashoId: "2026-05",
+        day,
+        winnerRikishiId: "hoshoryu",
+        loserRikishiId: "kirishima",
+      });
+    }
+
     await repositories.insertBoutResult({
       id: "2026-05-day-15-final-status-test-2",
       bashoId: "2026-05",
@@ -1044,6 +1054,24 @@ describe("basho routes", () => {
           },
         },
       ],
+    });
+
+    await repositories.insertBoutResult({
+      id: "2026-05-day-2-match-1",
+      bashoId: "2026-05",
+      day: 2,
+      winnerRikishiId: "onosato",
+      loserRikishiId: "kotozakura",
+    });
+    const scoredResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/schedule",
+    });
+
+    expect(scoredResponse.statusCode).toBe(200);
+    expect(scoredResponse.json()).toMatchObject({
+      publishedDays: [2],
+      bouts: [],
     });
   });
 

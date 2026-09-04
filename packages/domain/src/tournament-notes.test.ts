@@ -95,6 +95,7 @@ describe("deriveRikishiTournamentNotes", () => {
         bashoStatus: "complete",
         boutResults: [
           ...makeRecord("ura", 7, 3),
+          ...otherResultsForDays(11, 14),
           result(15, "onosato", "other"),
         ],
         finalDayScheduleComplete: true,
@@ -117,6 +118,24 @@ describe("deriveRikishiTournamentNotes", () => {
       statuses: [{ type: "withdrawn", effectiveDay: 11, provenance: "source" }],
       achievements: [{ type: "make-koshi", day: 15, provenance: "derived" }],
     });
+  });
+
+  it("does not settle a record when an earlier result day is missing", () => {
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries,
+        bashoStatus: "complete",
+        boutResults: [
+          ...makeRecord("ura", 7, 3),
+          ...otherResultsForDays(12, 14),
+          result(15, "onosato", "other"),
+        ],
+        finalDayScheduleComplete: true,
+        rikishiId: "ura",
+        scheduledBouts: [scheduledBout(15, "onosato", "other")],
+        throughDay: 15,
+      }).achievements,
+    ).toEqual([]);
   });
 
   it("does not settle a record when a basho is closed before day 15", () => {
@@ -264,4 +283,14 @@ function scheduledBout(
     westRikishiId,
     status: "scheduled",
   };
+}
+
+function otherResultsForDays(
+  fromDay: number,
+  throughDay: number,
+): BoutResult[] {
+  return Array.from({ length: throughDay - fromDay + 1 }, (_, index) => {
+    const day = fromDay + index;
+    return result(day, `other-winner-${day}`, `other-loser-${day}`);
+  });
 }

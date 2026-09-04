@@ -44,6 +44,11 @@ export interface ScheduledBoutsImportData {
   bouts: readonly ScheduledBout[];
 }
 
+export interface ScheduledBoutsAndBoutResultsImportData {
+  scheduledBouts: ScheduledBoutsImportData;
+  boutResults: BoutResultsImportData;
+}
+
 export interface DemoBashoResetData extends BanzukeImportData {
   fantasyTeams: readonly FantasyTeam[];
   fantasyPicks: readonly FantasyPick[];
@@ -169,6 +174,9 @@ export interface Repositories {
   applyBoutResultsImport: (importData: BoutResultsImportData) => Promise<void>;
   applyScheduledBoutsImport: (
     importData: ScheduledBoutsImportData,
+  ) => Promise<void>;
+  applyScheduledBoutsAndBoutResultsImport: (
+    importData: ScheduledBoutsAndBoutResultsImportData,
   ) => Promise<void>;
 }
 
@@ -915,6 +923,119 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
         }
       });
     },
+    applyScheduledBoutsAndBoutResultsImport: async (importData) => {
+      db.transaction((transaction) => {
+        const schedule = importData.scheduledBouts;
+        const results = importData.boutResults;
+
+        for (const entry of [
+          ...(schedule.rikishi ?? []),
+          ...(results.rikishi ?? []),
+        ]) {
+          transaction
+            .insert(sqlite.rikishi)
+            .values(toRikishiRow(entry))
+            .onConflictDoNothing({ target: sqlite.rikishi.id })
+            .run();
+        }
+
+        transaction
+          .insert(sqlite.scheduledBoutPublications)
+          .values(schedule.publication)
+          .onConflictDoUpdate({
+            target: [
+              sqlite.scheduledBoutPublications.bashoId,
+              sqlite.scheduledBoutPublications.day,
+            ],
+            set: schedule.publication,
+          })
+          .run();
+
+        for (const entry of schedule.bouts) {
+          transaction
+            .insert(sqlite.scheduledBouts)
+            .values(toScheduledBoutRow(entry))
+            .onConflictDoUpdate({
+              target: sqlite.scheduledBouts.id,
+              set: toScheduledBoutRow(entry),
+            })
+            .run();
+        }
+
+        const importedScheduleDayFilter = and(
+          eq(sqlite.scheduledBouts.bashoId, schedule.publication.bashoId),
+          eq(sqlite.scheduledBouts.day, schedule.publication.day),
+        );
+
+        if (schedule.bouts.length === 0) {
+          transaction
+            .delete(sqlite.scheduledBouts)
+            .where(importedScheduleDayFilter)
+            .run();
+        } else {
+          transaction
+            .delete(sqlite.scheduledBouts)
+            .where(
+              and(
+                importedScheduleDayFilter,
+                notInArray(
+                  sqlite.scheduledBouts.id,
+                  schedule.bouts.map((entry) => entry.id),
+                ),
+              ),
+            )
+            .run();
+        }
+
+        if (results.basho !== undefined) {
+          const existingBasho = transaction
+            .select()
+            .from(sqlite.basho)
+            .where(eq(sqlite.basho.id, results.basho.id))
+            .get();
+          const nextBasho = preserveBashoLifecycleProgress(
+            existingBasho === undefined ? undefined : toBasho(existingBasho),
+            results.basho,
+          );
+
+          transaction
+            .insert(sqlite.basho)
+            .values(toBashoRow(nextBasho))
+            .onConflictDoUpdate({
+              target: sqlite.basho.id,
+              set: toBashoRow(nextBasho),
+            })
+            .run();
+        }
+
+        for (const entry of results.results) {
+          transaction
+            .insert(sqlite.boutResults)
+            .values(toBoutResultRow(entry))
+            .onConflictDoUpdate({
+              target: sqlite.boutResults.id,
+              set: toBoutResultRow(entry),
+            })
+            .run();
+        }
+
+        if (results.results.length > 0) {
+          transaction
+            .delete(sqlite.boutResults)
+            .where(
+              and(
+                eq(sqlite.boutResults.bashoId, results.bashoId),
+                eq(sqlite.boutResults.day, results.day),
+                notInArray(
+                  sqlite.boutResults.id,
+                  results.results.map((entry) => entry.id),
+                ),
+              ),
+            )
+            .run();
+        }
+      });
+    },
   };
 
   return repositories;
@@ -1607,6 +1728,109 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
               notInArray(
                 pg.scheduledBouts.id,
                 importData.bouts.map((entry) => entry.id),
+              ),
+            ),
+          );
+        }
+      });
+    },
+    applyScheduledBoutsAndBoutResultsImport: async (importData) => {
+      await db.transaction(async (transaction) => {
+        const schedule = importData.scheduledBouts;
+        const results = importData.boutResults;
+
+        for (const entry of [
+          ...(schedule.rikishi ?? []),
+          ...(results.rikishi ?? []),
+        ]) {
+          await transaction
+            .insert(pg.rikishi)
+            .values(toRikishiRow(entry))
+            .onConflictDoNothing({ target: pg.rikishi.id });
+        }
+
+        await transaction
+          .insert(pg.scheduledBoutPublications)
+          .values(schedule.publication)
+          .onConflictDoUpdate({
+            target: [
+              pg.scheduledBoutPublications.bashoId,
+              pg.scheduledBoutPublications.day,
+            ],
+            set: schedule.publication,
+          });
+
+        for (const entry of schedule.bouts) {
+          await transaction
+            .insert(pg.scheduledBouts)
+            .values(toScheduledBoutRow(entry))
+            .onConflictDoUpdate({
+              target: pg.scheduledBouts.id,
+              set: toScheduledBoutRow(entry),
+            });
+        }
+
+        const importedScheduleDayFilter = and(
+          eq(pg.scheduledBouts.bashoId, schedule.publication.bashoId),
+          eq(pg.scheduledBouts.day, schedule.publication.day),
+        );
+
+        if (schedule.bouts.length === 0) {
+          await transaction
+            .delete(pg.scheduledBouts)
+            .where(importedScheduleDayFilter);
+        } else {
+          await transaction.delete(pg.scheduledBouts).where(
+            and(
+              importedScheduleDayFilter,
+              notInArray(
+                pg.scheduledBouts.id,
+                schedule.bouts.map((entry) => entry.id),
+              ),
+            ),
+          );
+        }
+
+        if (results.basho !== undefined) {
+          const existingBasho = (
+            await transaction
+              .select()
+              .from(pg.basho)
+              .where(eq(pg.basho.id, results.basho.id))
+              .for("update")
+          ).at(0);
+          const nextBasho = preserveBashoLifecycleProgress(
+            existingBasho === undefined ? undefined : toBasho(existingBasho),
+            results.basho,
+          );
+
+          await transaction
+            .insert(pg.basho)
+            .values(toBashoRow(nextBasho))
+            .onConflictDoUpdate({
+              target: pg.basho.id,
+              set: toBashoRow(nextBasho),
+            });
+        }
+
+        for (const entry of results.results) {
+          await transaction
+            .insert(pg.boutResults)
+            .values(toBoutResultRow(entry))
+            .onConflictDoUpdate({
+              target: pg.boutResults.id,
+              set: toBoutResultRow(entry),
+            });
+        }
+
+        if (results.results.length > 0) {
+          await transaction.delete(pg.boutResults).where(
+            and(
+              eq(pg.boutResults.bashoId, results.bashoId),
+              eq(pg.boutResults.day, results.day),
+              notInArray(
+                pg.boutResults.id,
+                results.results.map((entry) => entry.id),
               ),
             ),
           );

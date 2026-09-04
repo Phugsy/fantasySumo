@@ -15,6 +15,7 @@ import {
   calculateTeamScore,
   canEditFantasyPicks,
   deriveRikishiTournamentNotes,
+  hasBoutResultForScheduledBout,
   getPickLockMessage,
   validateFantasyPicks,
 } from "@fantasy-sumo/domain";
@@ -170,6 +171,9 @@ export function registerBashoRoutes(
         rikishi,
       ]),
     );
+    const boutResults = await context.repositories.listBoutResultsForBasho(
+      basho.id,
+    );
     const toScheduledRikishi = (rikishiId: string) => {
       const rikishi = rikishiById.get(rikishiId);
       const banzuke = banzukeByRikishiId.get(rikishiId);
@@ -184,6 +188,13 @@ export function registerBashoRoutes(
       await context.repositories.listScheduledBoutsForBasho(basho.id)
     )
       .filter((bout) => publishedDays.has(bout.day))
+      .filter(
+        (bout) =>
+          !hasBoutResultForScheduledBout({
+            boutResults,
+            scheduledBout: bout,
+          }),
+      )
       .map((bout) => ({
         id: bout.id,
         day: bout.day,

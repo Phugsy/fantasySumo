@@ -294,19 +294,24 @@ Validation and replacement rules:
 - publication metadata and scheduled bouts never advance basho lifecycle or
   participate in fantasy scoring.
 
-Daily result operations compose the two source-backed imports in order: commit
-day N results, then attempt the published day N+1 schedule. The cron route,
-manual admin result endpoint, and result CLI all use this workflow. Schedule
+Daily result operations for days 1-14 compose the two source-backed imports in
+order: commit day N results, then attempt the published day N+1 schedule. The
+cron route, manual admin result endpoint, and result CLI all use this workflow.
+Schedule
 unavailability or a schedule-only error is returned as explicit partial
 success because completed results must not be rolled back, hidden, or fetched
 again merely because the independent next-day card is late. The rejected empty
-source response cannot delete an existing published card. Before importing day
-15 results, these paths always refresh and atomically replace the current
-final-day schedule so a missing or amended day-14 publication cannot strand the
-basho. The Sumo API adapter marks that refreshed card complete only when the
-final-day response contains resolved winners and the division yusho published
-when the basho concludes. Until that source attestation arrives, stored day-15
-results remain retryable but do not advance lifecycle progress beyond day 14.
+source response cannot delete an existing published card. For day 15, these
+paths fetch and validate both the refreshed final card and its results before
+writing, then replace the schedule, results, and lifecycle state in one database
+transaction. A result failure therefore leaves the previous schedule intact.
+The Sumo API adapter marks the refreshed card complete only when the final-day
+response contains resolved winners and the division yusho published when the
+basho concludes. Until that source attestation arrives, or until stored results
+show every day 1-14 was imported, stored day-15 results remain retryable without
+advancing lifecycle progress to complete. Player-facing future schedules also
+omit any published matchup that already has a stored result during this retry
+state.
 
 ### Tournament status and achievement visibility
 
@@ -317,9 +322,9 @@ rikishi is unavailable. A later non-absence result can reliably derive that a
 rikishi returned.
 
 Kachi-koshi and make-koshi are derived during a basho when the eighth recorded
-win or loss is stored. When the basho is complete at day 15, the final-day card
-has source-backed completion attestation, and every matchup on that card has a
-corresponding result, any rikishi
+win or loss is stored. When the basho is complete at day 15, stored results cover
+every day 1-14, the final-day card has source-backed completion attestation, and
+every matchup on that card has a corresponding result, any rikishi
 without eight wins receives make-koshi, including a rikishi whose remaining
 days were absences. An administrative close before day 15, a post-tournament
 banzuke import without final-day results, or a partial final-day result import
