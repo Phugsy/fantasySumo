@@ -50,6 +50,10 @@ export interface ScheduledBoutsAndBoutResultsImportData {
   boutResults: BoutResultsImportData;
 }
 
+export type ScheduledBoutsImportOutcome =
+  | "applied"
+  | "preserved-existing-complete";
+
 export interface DemoBashoResetData extends BanzukeImportData {
   fantasyTeams: readonly FantasyTeam[];
   fantasyPicks: readonly FantasyPick[];
@@ -175,10 +179,10 @@ export interface Repositories {
   applyBoutResultsImport: (importData: BoutResultsImportData) => Promise<void>;
   applyScheduledBoutsImport: (
     importData: ScheduledBoutsImportData,
-  ) => Promise<void>;
+  ) => Promise<ScheduledBoutsImportOutcome>;
   applyScheduledBoutsAndBoutResultsImport: (
     importData: ScheduledBoutsAndBoutResultsImportData,
-  ) => Promise<void>;
+  ) => Promise<ScheduledBoutsImportOutcome>;
 }
 
 export function createRepositories(database: AppDatabase): Repositories {
@@ -866,7 +870,7 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
       });
     },
     applyScheduledBoutsImport: async (importData) => {
-      db.transaction((transaction) => {
+      return db.transaction((transaction) => {
         const existingPublication = transaction
           .select({ source: sqlite.scheduledBoutPublications.source })
           .from(sqlite.scheduledBoutPublications)
@@ -890,7 +894,7 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
             importData.publication.source,
           )
         ) {
-          return;
+          return "preserved-existing-complete";
         }
 
         for (const entry of importData.rikishi ?? []) {
@@ -948,10 +952,12 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
             )
             .run();
         }
+
+        return "applied";
       });
     },
     applyScheduledBoutsAndBoutResultsImport: async (importData) => {
-      db.transaction((transaction) => {
+      return db.transaction((transaction) => {
         const schedule = importData.scheduledBouts;
         const results = importData.boutResults;
         const existingPublication = transaction
@@ -977,7 +983,7 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
             schedule.publication.source,
           )
         ) {
-          return;
+          return "preserved-existing-complete";
         }
 
         for (const entry of [
@@ -1086,6 +1092,8 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
             )
             .run();
         }
+
+        return "applied";
       });
     },
   };
@@ -1737,7 +1745,7 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
       });
     },
     applyScheduledBoutsImport: async (importData) => {
-      await db.transaction(async (transaction) => {
+      return db.transaction(async (transaction) => {
         await transaction
           .select({ id: pg.basho.id })
           .from(pg.basho)
@@ -1767,7 +1775,7 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
             importData.publication.source,
           )
         ) {
-          return;
+          return "preserved-existing-complete";
         }
 
         for (const entry of importData.rikishi ?? []) {
@@ -1816,10 +1824,12 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
             ),
           );
         }
+
+        return "applied";
       });
     },
     applyScheduledBoutsAndBoutResultsImport: async (importData) => {
-      await db.transaction(async (transaction) => {
+      return db.transaction(async (transaction) => {
         const schedule = importData.scheduledBouts;
         const results = importData.boutResults;
         await transaction
@@ -1848,7 +1858,7 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
             schedule.publication.source,
           )
         ) {
-          return;
+          return "preserved-existing-complete";
         }
 
         for (const entry of [
@@ -1947,6 +1957,8 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
             ),
           );
         }
+
+        return "applied";
       });
     },
   };

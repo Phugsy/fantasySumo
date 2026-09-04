@@ -294,7 +294,9 @@ Validation and replacement rules:
 - once a card carries source-backed completion attestation, a weaker retry
   without that attestation cannot replace the card, its results, or downgrade
   its marker; this precedence check is repeated inside the database transaction
-  so concurrent retries cannot overwrite a stronger snapshot;
+  so concurrent retries cannot overwrite a stronger snapshot, and a
+  transactionally preserved write is returned as skipped in the operator
+  summary;
 - publication metadata and scheduled bouts never advance basho lifecycle or
   participate in fantasy scoring.
 

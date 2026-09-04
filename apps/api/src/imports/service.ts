@@ -242,7 +242,12 @@ export async function importScheduledBouts(
   );
 
   if (options.dryRun !== true) {
-    await repositories.applyScheduledBoutsImport(prepared.data);
+    const outcome = await repositories.applyScheduledBoutsImport(prepared.data);
+
+    if (outcome === "preserved-existing-complete") {
+      return (await prepareScheduledBoutsImport(repositories, command, options))
+        .result;
+    }
   }
 
   return prepared.result;
@@ -351,22 +356,35 @@ export async function importScheduledBoutsAndBoutResults(
     throw new ImportValidationError(commandPairIssues);
   }
 
-  const schedule = await prepareScheduledBoutsImport(
+  let schedule = await prepareScheduledBoutsImport(
     repositories,
     scheduleCommand,
     options,
   );
-  const results = await prepareBoutResultsImport(repositories, resultsCommand, {
+  let results = await prepareBoutResultsImport(repositories, resultsCommand, {
     ...options,
     completionSchedule: scheduleCommand,
     preserveExistingSnapshot: schedule.preserveExistingCompleteCard,
   });
 
   if (options.dryRun !== true) {
-    await repositories.applyScheduledBoutsAndBoutResultsImport({
+    const outcome = await repositories.applyScheduledBoutsAndBoutResultsImport({
       scheduledBouts: schedule.data,
       boutResults: results.data,
     });
+
+    if (outcome === "preserved-existing-complete") {
+      schedule = await prepareScheduledBoutsImport(
+        repositories,
+        scheduleCommand,
+        options,
+      );
+      results = await prepareBoutResultsImport(repositories, resultsCommand, {
+        ...options,
+        completionSchedule: scheduleCommand,
+        preserveExistingSnapshot: true,
+      });
+    }
   }
 
   return {

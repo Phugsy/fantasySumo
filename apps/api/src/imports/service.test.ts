@@ -840,7 +840,7 @@ describe("import service", () => {
     ]);
   });
 
-  it("preserves a confirmed schedule and its results as one snapshot", async () => {
+  it("reports a transactionally preserved schedule and results as skipped", async () => {
     const repositories = createRepositories(client);
     const additionalRikishi = [
       { id: "hoshoryu", shikona: "Hoshoryu" },
@@ -905,13 +905,36 @@ describe("import service", () => {
       ],
     };
 
-    await importScheduledBoutsAndBoutResults(
-      repositories,
-      completeSchedule,
-      completeResults,
-    );
+    const racingRepositories = {
+      ...repositories,
+      applyScheduledBoutsAndBoutResultsImport: async (
+        importData: Parameters<
+          typeof repositories.applyScheduledBoutsAndBoutResultsImport
+        >[0],
+      ) => {
+        await repositories.applyScheduledBoutsAndBoutResultsImport({
+          scheduledBouts: {
+            publication: {
+              id: "2026-05-day-4-concurrent-schedule",
+              bashoId: "2026-05",
+              day: 4,
+              source: "test-schedule:complete",
+              publishedAt: "2026-05-13T09:00:00.000Z",
+            },
+            bouts: completeSchedule.bouts,
+          },
+          boutResults: {
+            bashoId: "2026-05",
+            day: 4,
+            results: completeResults.results,
+          },
+        });
+
+        return repositories.applyScheduledBoutsAndBoutResultsImport(importData);
+      },
+    };
     const retry = await importScheduledBoutsAndBoutResults(
-      repositories,
+      racingRepositories,
       {
         ...completeSchedule,
         isComplete: false,

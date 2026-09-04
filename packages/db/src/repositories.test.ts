@@ -558,24 +558,27 @@ describe("repositories", () => {
       ],
     };
 
-    await repositories.applyScheduledBoutsAndBoutResultsImport({
+    const applied = await repositories.applyScheduledBoutsAndBoutResultsImport({
       scheduledBouts: completeSchedule,
       boutResults: completeResults,
     });
-    await repositories.applyScheduledBoutsAndBoutResultsImport({
-      scheduledBouts: {
-        publication: {
-          ...completeSchedule.publication,
-          source: "sumo-api-schedule",
+    const preserved =
+      await repositories.applyScheduledBoutsAndBoutResultsImport({
+        scheduledBouts: {
+          publication: {
+            ...completeSchedule.publication,
+            source: "sumo-api-schedule",
+          },
+          bouts: [completeSchedule.bouts[0]!],
         },
-        bouts: [completeSchedule.bouts[0]!],
-      },
-      boutResults: {
-        ...completeResults,
-        results: [completeResults.results[0]!],
-      },
-    });
+        boutResults: {
+          ...completeResults,
+          results: [completeResults.results[0]!],
+        },
+      });
 
+    expect(applied).toBe("applied");
+    expect(preserved).toBe("preserved-existing-complete");
     expect(
       await repositories.listScheduledBoutsForBasho(sampleBasho.id),
     ).toHaveLength(2);
