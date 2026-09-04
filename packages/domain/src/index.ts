@@ -35,6 +35,7 @@ export {
   hasBoutResultForScheduledBout,
   hasCompleteBoutResultsForScheduledDay,
   hasCompleteBoutResultsForEveryDayThrough,
+  getVerifiedBoutResultsThroughDay,
 } from "./bout-result-completeness.js";
 export {
   canEditFantasyPicks,

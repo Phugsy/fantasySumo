@@ -311,6 +311,25 @@ describe("source import adapters", () => {
       },
       completeDay14Banzuke,
     );
+    const contradictoryEarlierDay = mapSumoApiSchedulePayload(
+      {
+        torikumi: [
+          {
+            bashoId: "202605",
+            day: 14,
+            eastShikona: "Onosato",
+            westShikona: "Kotozakura",
+            winnerEn: "Kotozakura",
+          },
+        ],
+      },
+      {
+        bashoId: "2026-05",
+        day: 14,
+        expectedRikishiIds: ["onosato", "kotozakura"],
+      },
+      completeDay14Banzuke,
+    );
     const mutuallyTruncatedEarlierDay = mapSumoApiSchedulePayload(
       {
         torikumi: [
@@ -424,12 +443,38 @@ describe("source import adapters", () => {
         ],
       },
     );
+    const mismatchedTarget = mapSumoApiSchedulePayload(
+      {
+        torikumi: [
+          {
+            bashoId: "202605",
+            day: 14,
+            eastShikona: "Onosato",
+            westShikona: "Kotozakura",
+            winnerEn: "Onosato",
+          },
+        ],
+      },
+      {
+        bashoId: "2026-05",
+        day: 14,
+        division: "Makuuchi",
+        expectedRikishiIds: ["onosato", "kotozakura"],
+      },
+      {
+        ...completeDay14Banzuke,
+        bashoId: "202607",
+        division: "Juryo",
+      },
+    );
 
     expect(resolvedEarlierDay.isComplete).toBe(true);
+    expect(contradictoryEarlierDay.isComplete).toBeUndefined();
     expect(mutuallyTruncatedEarlierDay.isComplete).toBeUndefined();
     expect(truncatedEarlierDay.isComplete).toBeUndefined();
     expect(incomplete.isComplete).toBeUndefined();
     expect(complete.isComplete).toBe(true);
+    expect(mismatchedTarget.isComplete).toBeUndefined();
   });
 
   it("maps the current schedule and results from one torikumi response", async () => {
@@ -500,7 +545,7 @@ describe("source import adapters", () => {
     expect(commands.scheduleCommand.isComplete).toBe(true);
   });
 
-  it("imports matching torikumi without attestation when banzuke fetching fails", async () => {
+  it("maps torikumi as unattested when banzuke fetching fails", async () => {
     const commands = await fetchSumoApiDailyImport(
       async (url) =>
         String(url).includes("/banzuke/")
@@ -529,7 +574,7 @@ describe("source import adapters", () => {
     expect(commands.resultsCommand.results).toHaveLength(1);
   });
 
-  it("imports matching torikumi without attestation when banzuke payload is malformed", async () => {
+  it("maps torikumi as unattested when the banzuke payload is malformed", async () => {
     const commands = await fetchSumoApiDailyImport(
       async (url) =>
         new Response(

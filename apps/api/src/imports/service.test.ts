@@ -803,102 +803,46 @@ describe("import service", () => {
     ]);
   });
 
-  it("preserves a fuller unattested card while importing available results", async () => {
+  it("rejects an unattested partial card before importing results", async () => {
     const repositories = createRepositories(client);
-    const additionalRikishi = [
-      { id: "hoshoryu", shikona: "Hoshoryu" },
-      { id: "kirishima", shikona: "Kirishima" },
-    ];
-    await importBanzuke(repositories, {
-      ...banzukeCommand,
-      rikishi: [...banzukeCommand.rikishi, ...additionalRikishi],
-      banzukeEntries: [
-        ...banzukeCommand.banzukeEntries,
-        ...additionalRikishi.map((rikishi, index) => ({
-          id: `2026-05-${rikishi.id}`,
-          bashoId: "2026-05",
-          rikishiId: rikishi.id,
-          rank: "Maegashira",
-          rankOrder: index + 3,
-        })),
-      ],
-    });
-    const fullerSchedule: ScheduledBoutsImportCommand = {
-      source: "test-schedule",
-      bashoId: "2026-05",
-      day: 4,
-      bouts: [
+    await importBanzuke(repositories, banzukeCommand);
+
+    await expect(
+      importScheduledBoutsAndBoutResults(
+        repositories,
         {
-          id: "2026-05-day-4-match-1",
+          source: "test-schedule",
           bashoId: "2026-05",
-          day: 4,
-          eastRikishiId: "onosato",
-          westRikishiId: "kotozakura",
-          status: "scheduled",
+          day: 1,
+          bouts: [
+            {
+              id: "2026-05-day-1-match-1",
+              bashoId: "2026-05",
+              day: 1,
+              eastRikishiId: "onosato",
+              westRikishiId: "kotozakura",
+              status: "scheduled",
+            },
+          ],
         },
         {
-          id: "2026-05-day-4-match-2",
+          source: "test-results",
           bashoId: "2026-05",
-          day: 4,
-          eastRikishiId: "hoshoryu",
-          westRikishiId: "kirishima",
-          status: "scheduled",
+          results: [
+            {
+              id: "2026-05-day-1-match-1",
+              bashoId: "2026-05",
+              day: 1,
+              winnerRikishiId: "onosato",
+              loserRikishiId: "kotozakura",
+            },
+          ],
         },
-      ],
-    };
-    await importScheduledBouts(repositories, fullerSchedule);
-    await repositories.insertBoutResult({
-      id: "2026-05-day-4-match-1",
-      bashoId: "2026-05",
-      day: 4,
-      winnerRikishiId: "kotozakura",
-      loserRikishiId: "onosato",
+      ),
+    ).rejects.toMatchObject({
+      issues: [expect.objectContaining({ path: "schedule.isComplete" })],
     });
-    await repositories.insertBoutResult({
-      id: "2026-05-day-4-match-2",
-      bashoId: "2026-05",
-      day: 4,
-      winnerRikishiId: "hoshoryu",
-      loserRikishiId: "kirishima",
-    });
-
-    const partialImport = await importScheduledBoutsAndBoutResults(
-      repositories,
-      { ...fullerSchedule, bouts: [fullerSchedule.bouts[0]!] },
-      {
-        source: "test-results",
-        bashoId: "2026-05",
-        results: [
-          {
-            id: "2026-05-day-4-match-1",
-            bashoId: "2026-05",
-            day: 4,
-            winnerRikishiId: "onosato",
-            loserRikishiId: "kotozakura",
-          },
-        ],
-      },
-    );
-
-    expect(partialImport.summary.scheduledBouts).toMatchObject({ skipped: 2 });
-    expect(partialImport.summary.results).toMatchObject({
-      updated: 1,
-      skipped: 1,
-      deleted: 0,
-    });
-    expect(
-      await repositories.listScheduledBoutsForBasho("2026-05"),
-    ).toHaveLength(2);
-    expect(await repositories.listBoutResultsForBasho("2026-05")).toEqual([
-      expect.objectContaining({
-        id: "2026-05-day-4-match-1",
-        winnerRikishiId: "onosato",
-      }),
-      expect.objectContaining({
-        id: "2026-05-day-4-match-2",
-        winnerRikishiId: "hoshoryu",
-      }),
-    ]);
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toEqual([]);
   });
 
   it("preserves a confirmed card across a weaker schedule retry", async () => {
@@ -938,7 +882,7 @@ describe("import service", () => {
     ]);
   });
 
-  it("reports a transactionally preserved schedule and results as skipped", async () => {
+  it("keeps a concurrent complete-card retry consistent", async () => {
     const repositories = createRepositories(client);
     const additionalRikishi = [
       { id: "hoshoryu", shikona: "Hoshoryu" },
@@ -1033,19 +977,12 @@ describe("import service", () => {
     };
     const retry = await importScheduledBoutsAndBoutResults(
       racingRepositories,
-      {
-        ...completeSchedule,
-        isComplete: false,
-        bouts: [completeSchedule.bouts[0]!],
-      },
-      {
-        ...completeResults,
-        results: [completeResults.results[0]!],
-      },
+      completeSchedule,
+      completeResults,
     );
 
-    expect(retry.summary.scheduledBouts).toMatchObject({ skipped: 2 });
-    expect(retry.summary.results).toMatchObject({ skipped: 2 });
+    expect(retry.summary.scheduledBouts).toMatchObject({ created: 2 });
+    expect(retry.summary.results).toMatchObject({ created: 2 });
     expect(
       await repositories.listScheduledBoutsForBasho("2026-05"),
     ).toHaveLength(2);
@@ -1065,6 +1002,7 @@ describe("import service", () => {
           source: "test-schedule",
           bashoId: "2026-05",
           day: 4,
+          isComplete: true,
           bouts: [
             {
               id: "schedule-match",

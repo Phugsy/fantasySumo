@@ -44,10 +44,6 @@ export function registerScheduledImportRoutes(
           result.status === "imported" || result.status === "partial"
             ? result.importedDays
             : undefined,
-        backfillFailures:
-          result.status === "imported" || result.status === "partial"
-            ? result.backfillFailures
-            : undefined,
         lockedAt: result.status === "locked" ? result.lockedAt : undefined,
         reason: result.status === "skipped" ? result.reason : undefined,
         schedule:

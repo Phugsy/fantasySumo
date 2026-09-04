@@ -187,6 +187,27 @@ describe("basho routes", () => {
         winnerRikishiId: "onosato",
         loserRikishiId: "hoshoryu",
       });
+      if (day > 2) {
+        await repositories.applyScheduledBoutsImport({
+          publication: {
+            id: `2026-05-day-${day}-status-test`,
+            bashoId: "2026-05",
+            day,
+            source: "test-source:complete",
+            publishedAt: "2026-05-18T08:00:00.000Z",
+          },
+          bouts: [
+            {
+              id: `2026-05-day-${day}-status-test`,
+              bashoId: "2026-05",
+              day,
+              eastRikishiId: "onosato",
+              westRikishiId: "hoshoryu",
+              status: "scheduled",
+            },
+          ],
+        });
+      }
     }
 
     await repositories.applyScheduledBoutsImport({
@@ -214,6 +235,7 @@ describe("basho routes", () => {
       status: "active",
       currentDay: 8,
     });
+    await verifyStoredResultDays(repositories, 8);
 
     const rikishiResponse = await app.inject({
       method: "GET",
@@ -423,7 +445,7 @@ describe("basho routes", () => {
         statuses: [
           { type: "withdrawn", effectiveDay: 9, provenance: "source" },
         ],
-        achievements: [{ type: "make-koshi", day: 15, provenance: "derived" }],
+        achievements: [{ type: "make-koshi", day: 9, provenance: "derived" }],
       },
     });
   });
@@ -680,6 +702,7 @@ describe("basho routes", () => {
       status: "active",
       currentDay: 1,
     });
+    await verifyStoredResultDays(createRepositories(client), 1);
 
     const response = await app.inject({
       headers,
@@ -1114,6 +1137,7 @@ describe("basho routes", () => {
       status: "active",
       currentDay: 2,
     });
+    await verifyStoredResultDays(repositories, 2);
     const response = await app.inject({
       method: "GET",
       url: "/api/basho/2026-05/leaderboard",
@@ -1240,4 +1264,32 @@ async function signIn(
   return {
     cookie: Array.isArray(cookie) ? cookie[0] : cookie,
   };
+}
+
+async function verifyStoredResultDays(
+  repositories: ReturnType<typeof createRepositories>,
+  throughDay: number,
+) {
+  const results = await repositories.listBoutResultsForBasho("2026-05");
+
+  for (let day = 1; day <= throughDay; day += 1) {
+    const dayResults = results.filter((result) => result.day === day);
+    await repositories.applyScheduledBoutsImport({
+      publication: {
+        id: `2026-05-day-${day}-verified-test`,
+        bashoId: "2026-05",
+        day,
+        source: "test:complete",
+        publishedAt: "2026-05-18T08:00:00.000Z",
+      },
+      bouts: dayResults.map((result) => ({
+        id: result.id,
+        bashoId: result.bashoId,
+        day: result.day,
+        eastRikishiId: result.winnerRikishiId,
+        westRikishiId: result.loserRikishiId,
+        status: "scheduled",
+      })),
+    });
+  }
 }

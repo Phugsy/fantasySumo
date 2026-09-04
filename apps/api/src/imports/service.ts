@@ -279,15 +279,30 @@ async function prepareScheduledBoutsImport(
     existingPublication !== undefined &&
     isCompleteScheduledBoutPublicationSource(existingPublication.source) &&
     command.isComplete !== true;
-  const existingScheduledBoutIds = new Set(
-    existingScheduledBouts.map((bout) => bout.id),
+  const existingScheduledBoutsById = new Map(
+    existingScheduledBouts.map((bout) => [bout.id, bout]),
   );
-  const preserveExistingFullerSchedule =
+  const isPartialSubset =
     existingPublication !== undefined &&
     command.isComplete !== true &&
     command.bouts.length > 0 &&
     existingScheduledBouts.length > command.bouts.length &&
-    command.bouts.every((bout) => existingScheduledBoutIds.has(bout.id));
+    command.bouts.every((bout) => existingScheduledBoutsById.has(bout.id));
+  if (
+    isPartialSubset &&
+    !command.bouts.every((bout) =>
+      isEqualScheduledBout(existingScheduledBoutsById.get(bout.id)!, bout),
+    )
+  ) {
+    throw new ImportValidationError([
+      {
+        path: "bouts",
+        message:
+          "A partial schedule conflicts with stored matchups; retry when the complete card is available.",
+      },
+    ]);
+  }
+  const preserveExistingFullerSchedule = isPartialSubset;
   const preserveExistingSchedule =
     preserveExistingCompleteCard || preserveExistingFullerSchedule;
   const importedBouts = preserveExistingSchedule
@@ -358,6 +373,12 @@ export async function importScheduledBoutsAndBoutResults(
       path: "schedule",
       message: "Schedule and result imports must target the same basho day.",
     });
+  } else if (scheduleCommand.isComplete !== true) {
+    commandPairIssues.push({
+      path: "schedule.isComplete",
+      message:
+        "Result imports require a complete, attested schedule for the target day.",
+    });
   } else if (
     !hasMatchingScheduledBoutsAndResults(scheduleCommand, resultsCommand)
   ) {
@@ -372,6 +393,39 @@ export async function importScheduledBoutsAndBoutResults(
     throw new ImportValidationError(commandPairIssues);
   }
 
+  if (options.expectedBanzukeRikishiIds !== undefined) {
+    const importedDay = scheduleCommand.day;
+    const [existingResults, existingSchedules, existingPublications] =
+      await Promise.all([
+        repositories.listBoutResultsForBasho(scheduleCommand.bashoId),
+        repositories.listScheduledBoutsForBasho(scheduleCommand.bashoId),
+        repositories.listScheduledBoutPublicationsForBasho(
+          scheduleCommand.bashoId,
+        ),
+      ]);
+    const previousDaysComplete = hasCompleteBoutResultsForEveryDayThrough({
+      boutResults: existingResults,
+      completeScheduleDays: new Set(
+        existingPublications
+          .filter((publication) =>
+            isCompleteScheduledBoutPublicationSource(publication.source),
+          )
+          .map((publication) => publication.day),
+      ),
+      scheduledBouts: existingSchedules,
+      throughDay: importedDay - 1,
+    });
+
+    if (!previousDaysComplete) {
+      throw new ImportValidationError([
+        {
+          path: "schedule.day",
+          message: `Cannot import day ${importedDay} before every earlier day is complete.`,
+        },
+      ]);
+    }
+  }
+
   let schedule = await prepareScheduledBoutsImport(
     repositories,
     scheduleCommand,
@@ -381,13 +435,13 @@ export async function importScheduledBoutsAndBoutResults(
     ...options,
     completionSchedule: scheduleCommand,
     preserveExistingSnapshot: schedule.preserveExistingCompleteCard,
-    preserveOmittedResults: schedule.preserveExistingFullerSchedule,
   });
 
   if (options.dryRun !== true) {
     const outcome = await repositories.applyScheduledBoutsAndBoutResultsImport({
       scheduledBouts: schedule.data,
       boutResults: results.data,
+      expectedBanzukeRikishiIds: options.expectedBanzukeRikishiIds,
     });
 
     if (outcome !== "applied") {

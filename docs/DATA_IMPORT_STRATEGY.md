@@ -297,12 +297,9 @@ Validation and replacement rules:
   so concurrent retries cannot overwrite a stronger snapshot, and a
   transactionally preserved write is returned as skipped in the operator
   summary;
-- a non-empty unattested response also cannot shrink a fuller stored card. The
-  fuller schedule and its publication metadata are retained, incoming matching
-  results update by bout id, and previously stored results omitted from the
-  partial response remain intact. Equal-size corrections, larger cards, and
-  explicit empty schedule replacements continue through the normal replacement
-  path;
+- a non-empty unattested schedule response cannot shrink a fuller stored card,
+  and a conflicting reused bout id is rejected rather than paired with stale
+  participants;
 - publication metadata and scheduled bouts never advance basho lifecycle or
   participate in fantasy scoring.
 
@@ -312,9 +309,9 @@ as independent completeness evidence: every banzuke rikishi must have a record
 for day N and must either appear in the torikumi or be explicitly recorded as
 absent. The fetched roster must also contain every rikishi on the persisted
 division banzuke, preventing matching truncated source responses from attesting
-each other. If the banzuke evidence request fails or returns a malformed
-payload, the matching torikumi card and results remain importable but the card
-stays unattested for a later retry.
+each other. The evidence must also identify the requested basho and division
+when those fields are present. Missing, malformed, or mismatched evidence
+blocks that day's result import without writes.
 The card is attested only when the coverage checks pass and every bout has a
 resolved winner; day 15 additionally requires the division yusho signal
 described below. The service rejects schedule/result command pairs whose
@@ -335,12 +332,11 @@ attestation arrives, or until stored results
 cover every matchup on every source-attested card for days 1-14, stored day-15
 results remain retryable without advancing lifecycle progress to complete. The
 cron backfills any earlier day whose card is absent, unattested, or only
-partially covered. A failed historical backfill is reported as a recovery
-warning without blocking the current day's healthy import, so one unavailable
-old endpoint cannot freeze subsequent scoring. Player-facing schedules omit any
-published matchup that already has a stored result during this retry state, and
-leaderboard scoring is capped at `Basho.currentDay` so pending later-day rows
-cannot appear publicly.
+partially covered. Days are processed sequentially and the first failed or
+unverified day blocks every later day, so scoring can never jump over a gap.
+Player-facing schedules omit any published matchup that already has a stored
+result during this retry state, and leaderboard scoring is capped at the last
+contiguous verified result day.
 
 ### Tournament status and achievement visibility
 
@@ -350,17 +346,14 @@ withdrawal marker; a missing or merely unpublished card does not imply that a
 rikishi is unavailable. A later non-absence result can reliably derive that a
 rikishi returned.
 
-Kachi-koshi and make-koshi are derived during a basho when the eighth recorded
-win or loss is stored. When the basho is complete at day 15, every day 1-15 has
-a source-attested card and every scheduled matchup on those cards has a
-corresponding result, any rikishi
-without eight wins receives make-koshi, including a rikishi whose remaining
-days were absences. An administrative close before day 15, a post-tournament
-banzuke import without final-day results, or a partial final-day result import
-does not settle the record. A rikishi who secured eight wins before withdrawing
-keeps kachi-koshi. The result importer likewise completes an active basho only
-when the imported final-day payload covers the freshly refreshed,
-source-attested final-day card.
+Kachi-koshi is derived when verified wins reach eight. Make-koshi is derived
+when verified not-wins reach eight; a not-win is a loss, fusen loss, or absence
+attested by the daily banzuke record. Missing or unknown data never counts as a
+not-win. Because imports are contiguous and every verified day accounts for
+every banzuke rikishi, day 15 must leave every rikishi classified; otherwise
+the data is invalid rather than something to repair with a fallback badge. A
+rikishi who secured eight wins before withdrawing keeps kachi-koshi. Only a
+verified day-15 import can complete an active basho.
 A gold-star win is derived only when the stored banzuke identifies
 the winner as maegashira, the loser as yokozuna, and the stored result is not a
 default/absence win. The UI renders only the concise badge label, without day

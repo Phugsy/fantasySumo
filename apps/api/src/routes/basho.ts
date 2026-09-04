@@ -15,6 +15,7 @@ import {
   calculateTeamScore,
   canEditFantasyPicks,
   deriveRikishiTournamentNotes,
+  getVerifiedBoutResultsThroughDay,
   hasBoutResultForScheduledBout,
   getPickLockMessage,
   validateFantasyPicks,
@@ -111,6 +112,15 @@ export function registerBashoRoutes(
       basho,
       scheduledBoutPublications,
     );
+    const verifiedThroughDay =
+      basho.status === "upcoming"
+        ? 0
+        : getVerifiedBoutResultsThroughDay({
+            boutResults,
+            completeScheduleDays,
+            scheduledBouts,
+            throughDay: 15,
+          });
     const rikishiById = new Map(
       allRikishi.map((rikishi) => [rikishi.id, rikishi]),
     );
@@ -125,13 +135,10 @@ export function registerBashoRoutes(
         rankOrder: entry.rankOrder,
         tournamentNotes: deriveRikishiTournamentNotes({
           banzukeEntries,
-          bashoStatus: basho.status,
           boutResults,
-          completeScheduleDays: [...completeScheduleDays],
-          finalDayScheduleComplete: completeScheduleDays.has(15),
           rikishiId: entry.rikishiId,
           scheduledBouts,
-          throughDay: basho.currentDay,
+          throughDay: verifiedThroughDay,
         }),
       };
     });
@@ -373,8 +380,17 @@ export function registerBashoRoutes(
       basho,
       scheduledBoutPublications,
     );
+    const verifiedThroughDay =
+      basho.status === "upcoming"
+        ? 0
+        : getVerifiedBoutResultsThroughDay({
+            boutResults,
+            completeScheduleDays,
+            scheduledBouts,
+            throughDay: 15,
+          });
     const teamScore = calculateTeamScore(team, picks, boutResults, {
-      throughDay: basho.currentDay,
+      throughDay: verifiedThroughDay,
     });
     const scoresByRikishiId = new Map(
       teamScore.rikishiScores.map((score) => [score.rikishiId, score]),
@@ -410,13 +426,10 @@ export function registerBashoRoutes(
             score: score?.score ?? 0,
             tournamentNotes: deriveRikishiTournamentNotes({
               banzukeEntries,
-              bashoStatus: basho.status,
               boutResults,
-              completeScheduleDays: [...completeScheduleDays],
-              finalDayScheduleComplete: completeScheduleDays.has(15),
               rikishiId: pick.rikishiId,
               scheduledBouts,
-              throughDay: basho.currentDay,
+              throughDay: verifiedThroughDay,
             }),
           };
         })
@@ -589,15 +602,30 @@ export function registerBashoRoutes(
       });
     }
 
-    const boutResults = await context.repositories.listBoutResultsForBasho(
-      basho.id,
-    );
+    const [boutResults, scheduledBouts, scheduledBoutPublications] =
+      await Promise.all([
+        context.repositories.listBoutResultsForBasho(basho.id),
+        context.repositories.listScheduledBoutsForBasho(basho.id),
+        context.repositories.listScheduledBoutPublicationsForBasho(basho.id),
+      ]);
+    const verifiedThroughDay =
+      basho.status === "upcoming"
+        ? 0
+        : getVerifiedBoutResultsThroughDay({
+            boutResults,
+            completeScheduleDays: getCompleteScheduleDays(
+              basho,
+              scheduledBoutPublications,
+            ),
+            scheduledBouts,
+            throughDay: 15,
+          });
 
     const leaderboard = calculateLeaderboard(
       await context.repositories.listFantasyTeamsForBasho(basho.id),
       await context.repositories.listFantasyPicksForBasho(basho.id),
       boutResults,
-      { throughDay: basho.currentDay },
+      { throughDay: verifiedThroughDay },
     );
 
     return {

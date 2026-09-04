@@ -76,6 +76,29 @@ export function hasCompleteBoutResultsForEveryDayThrough({
   return true;
 }
 
+/** Returns the last day in the contiguous, verified result history. */
+export function getVerifiedBoutResultsThroughDay({
+  boutResults,
+  completeScheduleDays,
+  scheduledBouts,
+  throughDay,
+}: BashoResultCompletenessInput): number {
+  for (let day = 1; day <= throughDay; day += 1) {
+    if (
+      !hasCompleteBoutResultsForScheduledDay({
+        boutResults,
+        day,
+        scheduledBouts,
+        scheduledDayComplete: completeScheduleDays.has(day),
+      })
+    ) {
+      return day - 1;
+    }
+  }
+
+  return throughDay;
+}
+
 /** Checks whether a scheduled matchup already has a stored result. */
 export function hasBoutResultForScheduledBout({
   boutResults,

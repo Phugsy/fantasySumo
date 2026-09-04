@@ -304,7 +304,7 @@ describe("admin import routes", () => {
     expect(leaderboardResponse.statusCode).toBe(200);
   });
 
-  it("imports final-day data without skipping missing earlier result days", async () => {
+  it("blocks final-day data when earlier result days are missing", async () => {
     await app.inject({
       method: "POST",
       url: "/api/admin/import-banzuke",
@@ -317,14 +317,9 @@ describe("admin import routes", () => {
       payload: { day: 15 },
     });
 
-    expect(dryRunResponse.statusCode).toBe(200);
+    expect(dryRunResponse.statusCode).toBe(400);
     expect(dryRunResponse.json()).toMatchObject({
-      dryRun: true,
-      summary: {
-        basho: { skipped: 1 },
-        results: { created: 1 },
-        scheduledBouts: { created: 1 },
-      },
+      error: "invalid-import",
     });
 
     const repositories = createRepositories(client);
@@ -343,23 +338,15 @@ describe("admin import routes", () => {
       payload: { day: 15 },
     });
 
-    expect(applyResponse.statusCode).toBe(200);
+    expect(applyResponse.statusCode).toBe(400);
     expect(await repositories.getBasho("2026-05")).toMatchObject({
       status: "active",
       currentDay: 3,
     });
     expect(
       await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
-    ).toEqual([
-      expect.objectContaining({
-        bashoId: "2026-05",
-        day: 15,
-        source: "sumo-api-schedule:complete",
-      }),
-    ]);
-    expect(await repositories.listBoutResultsForBasho("2026-05")).toEqual([
-      expect.objectContaining({ day: 15 }),
-    ]);
+    ).toEqual([]);
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toEqual([]);
   });
 
   it("keeps the existing final schedule when snapshot fetching fails", async () => {

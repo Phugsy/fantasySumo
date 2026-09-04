@@ -49,7 +49,8 @@ The first useful version should be intentionally small:
 - **Bout/Torikumi**: A match.
 - **Kimarite**: Winning technique.
 - **Kachi-koshi**: More wins than losses in a tournament.
-- **Make-koshi**: More losses than wins in a tournament.
+- **Make-koshi**: Eight verified not-wins (losses, fusen losses, or absences),
+  meaning eight wins are no longer reachable.
 
 ## Open product decisions
 

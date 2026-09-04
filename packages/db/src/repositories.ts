@@ -48,6 +48,7 @@ export interface ScheduledBoutsImportData {
 export interface ScheduledBoutsAndBoutResultsImportData {
   scheduledBouts: ScheduledBoutsImportData;
   boutResults: BoutResultsImportData;
+  expectedBanzukeRikishiIds?: readonly string[];
 }
 
 export type ScheduledBoutsImportOutcome =
@@ -983,6 +984,15 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
       return db.transaction((transaction) => {
         const schedule = importData.scheduledBouts;
         const results = importData.boutResults;
+        assertExpectedBanzukeRoster(
+          importData.expectedBanzukeRikishiIds,
+          transaction
+            .select({ rikishiId: sqlite.banzukeEntries.rikishiId })
+            .from(sqlite.banzukeEntries)
+            .where(eq(sqlite.banzukeEntries.bashoId, results.bashoId))
+            .all()
+            .map((entry) => entry.rikishiId),
+        );
         const existingPublication = transaction
           .select({ source: sqlite.scheduledBoutPublications.source })
           .from(sqlite.scheduledBoutPublications)
@@ -1904,6 +1914,15 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
           .from(pg.basho)
           .where(eq(pg.basho.id, schedule.publication.bashoId))
           .for("update");
+        assertExpectedBanzukeRoster(
+          importData.expectedBanzukeRikishiIds,
+          (
+            await transaction
+              .select({ rikishiId: pg.banzukeEntries.rikishiId })
+              .from(pg.banzukeEntries)
+              .where(eq(pg.banzukeEntries.bashoId, results.bashoId))
+          ).map((entry) => entry.rikishiId),
+        );
         const existingPublication = (
           await transaction
             .select({ source: pg.scheduledBoutPublications.source })
@@ -2064,6 +2083,26 @@ function shouldPreserveExistingCompleteSnapshot(
     isCompleteScheduledBoutPublicationSource(existingSource) &&
     !isCompleteScheduledBoutPublicationSource(incomingSource)
   );
+}
+
+function assertExpectedBanzukeRoster(
+  expectedRikishiIds: readonly string[] | undefined,
+  actualRikishiIds: readonly string[],
+): void {
+  if (expectedRikishiIds === undefined) {
+    return;
+  }
+
+  const expected = [...expectedRikishiIds].sort();
+  const actual = [...actualRikishiIds].sort();
+  if (
+    expected.length !== actual.length ||
+    expected.some((rikishiId, index) => rikishiId !== actual[index])
+  ) {
+    throw new Error(
+      "The basho banzuke changed while results were being imported; retry with the current roster.",
+    );
+  }
 }
 
 function shouldPreserveExistingFullerSchedule(

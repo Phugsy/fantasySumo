@@ -63,6 +63,7 @@ export function toScheduledBoutPublicationSource(
 
 export interface ImportOptions {
   dryRun?: boolean;
+  expectedBanzukeRikishiIds?: readonly string[];
 }
 
 export interface ImportResult {

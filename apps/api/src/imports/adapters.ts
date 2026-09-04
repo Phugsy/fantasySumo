@@ -227,6 +227,11 @@ export function mapSumoApiSchedulePayload(
   const division = options.division ?? "Makuuchi";
   const isComplete =
     banzukePayload !== undefined &&
+    (banzukePayload.bashoId === undefined ||
+      toLocalBashoId(banzukePayload.bashoId) === options.bashoId) &&
+    (banzukePayload.division === undefined ||
+      banzukePayload.division.trim().toLowerCase() ===
+        division.trim().toLowerCase()) &&
     hasAttestedCompleteCard(
       rows,
       banzukePayload,
@@ -277,15 +282,21 @@ function hasAttestedCompleteCard(
     ...(banzukePayload.east ?? []),
     ...(banzukePayload.west ?? []),
   ];
-  const torikumiRikishiIds = new Set(
-    rows.flatMap((row) => [row.eastId, row.westId]).filter(isNumber),
-  );
-  const torikumiShikona = new Set(
-    rows
-      .flatMap((row) => [row.eastShikona, row.westShikona])
-      .filter(isString)
-      .map(normalizeShikona),
-  );
+  const outcomesByRikishiId = new Map<string, "win" | "loss">();
+  for (const row of rows) {
+    const eastShikona = requiredString(row.eastShikona, "eastShikona");
+    const westShikona = requiredString(row.westShikona, "westShikona");
+    const winnerShikona = resolveWinnerShikona(row, {
+      eastId: row.eastId,
+      eastShikona,
+      westId: row.westId,
+      westShikona,
+    });
+    const loserShikona =
+      winnerShikona === eastShikona ? westShikona : eastShikona;
+    outcomesByRikishiId.set(toLocalRikishiId(winnerShikona), "win");
+    outcomesByRikishiId.set(toLocalRikishiId(loserShikona), "loss");
+  }
   const banzukeRikishiIds = new Set(
     banzukeRows
       .map((rikishi) => rikishi.shikonaEn)
@@ -305,14 +316,15 @@ function hasAttestedCompleteCard(
       }
 
       if (result === "absent") {
-        return true;
+        return !outcomesByRikishiId.has(
+          toLocalRikishiId(rikishi.shikonaEn ?? ""),
+        );
       }
 
       return (
-        (rikishi.rikishiID !== undefined &&
-          torikumiRikishiIds.has(rikishi.rikishiID)) ||
-        (rikishi.shikonaEn !== undefined &&
-          torikumiShikona.has(normalizeShikona(rikishi.shikonaEn)))
+        (result === "win" || result === "loss") &&
+        outcomesByRikishiId.get(toLocalRikishiId(rikishi.shikonaEn ?? "")) ===
+          result
       );
     })
   );
@@ -371,16 +383,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isNumber(value: number | undefined): value is number {
-  return value !== undefined;
-}
-
 function isString(value: string | undefined): value is string {
   return value !== undefined && value.trim() !== "";
-}
-
-function normalizeShikona(value: string): string {
-  return value.trim().toLowerCase();
 }
 
 function hasResolvedWinner(row: SumoApiTorikumiRow): boolean {
@@ -494,7 +498,9 @@ function resolveBashoStatus(payload: JsaBanzukePayload) {
   const endDate = payload.BashoInfo?.end_date;
 
   if (today !== undefined && endDate !== undefined && today > endDate) {
-    return "complete";
+    // Only a verified day-15 result import may complete a basho. The JSA
+    // banzuke date is calendar context, not evidence that all results arrived.
+    return "active";
   }
 
   if (currentDay !== undefined && currentDay > 0) {

@@ -82,7 +82,10 @@ export async function importCurrentDayScheduleAndResults(
     repositories,
     scheduleCommand,
     resultsCommand,
-    { dryRun: options.dryRun },
+    {
+      dryRun: options.dryRun,
+      expectedBanzukeRikishiIds: expectedRikishiIds,
+    },
   );
 }
 

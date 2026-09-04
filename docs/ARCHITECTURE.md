@@ -152,8 +152,8 @@ Current routes:
   - Uses the division banzuke's per-day records to attest that every rikishi is
     represented by a matchup or explicit absence before marking the card
     complete, and verifies that fetched roster against the persisted tournament
-    banzuke. Missing or malformed banzuke evidence leaves the card unattested
-    without discarding valid torikumi results.
+    banzuke. Missing, malformed, or mismatched banzuke evidence rejects the
+    day's result import without writes.
   - Request body: `day` and optional `division`.
   - Maps source payloads into local `BoutResult` records using local shikona-based rikishi ids.
   - Replaces stale result rows only for the imported basho/day.
@@ -208,10 +208,9 @@ Current routes:
     the manual admin route.
   - Moves an upcoming or locked basho to active with day 1 and completes it
     with day 15.
-  - Returns structured locked/imported/partial/skipped status. A schedule-only
-    or historical-backfill warning is logged as partial success after the
-    current day's results commit. Current-day result-source, validation, and
-    target-selection failures remain unsuccessful requests.
+  - Returns structured locked/imported/partial/skipped status. A following-day
+    schedule warning is partial success after the current day's results commit;
+    a failed historical day blocks all later days and is unsuccessful.
 - `GET /api/admin/basho/current`
   - Requires an authenticated admin selected by the server-only
     `ADMIN_USER_IDS` allowlist.
@@ -278,9 +277,8 @@ Current behaviour:
   separately from completed results so they cannot affect scores.
   Complete daily schedule/result snapshots take precedence over weaker retries,
   with the check performed under the same SQLite transaction or Postgres basho
-  row lock as the replacement write. A non-empty unattested partial response
-  likewise cannot truncate a fuller stored schedule, although its available
-  results still commit.
+  row lock as the replacement write. Unattested partial responses never commit
+  results, and the persisted banzuke roster is rechecked in that transaction.
   banzuke writes preserve the furthest stored lifecycle state inside the
   transaction so concurrent refreshes cannot reopen picks.
 - Saves owned teams and replacement picks atomically while rechecking the

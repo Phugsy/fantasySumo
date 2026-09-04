@@ -344,7 +344,7 @@ describe("scheduled result import route", () => {
     expect(requestedDays).toEqual([2, 3, 4]);
   });
 
-  it("continues today's import when a historical backfill source fails", async () => {
+  it("stops before today's import when a historical backfill fails", async () => {
     await seedLiveBasho("2026-05", {
       status: "active",
       currentDay: 2,
@@ -371,28 +371,21 @@ describe("scheduled result import route", () => {
 
     const response = await injectCron(app);
 
-    expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(500);
     expect(response.json()).toMatchObject({
-      status: "partial",
-      day: 3,
-      importedDays: [3],
-      backfillFailures: [
-        {
-          day: 2,
-          message: "Import source request failed with 503.",
-        },
-      ],
+      status: "failed",
+      message: "Import source request failed with 503.",
     });
-    expect(requestedDays).toEqual([2, 3, 4]);
+    expect(requestedDays).toEqual([2]);
     expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
       status: "active",
-      currentDay: 3,
+      currentDay: 2,
     });
     expect(
       (await createRepositories(client).listBoutResultsForBasho("2026-05"))
         .map((result) => result.day)
         .sort((left, right) => left - right),
-    ).toEqual([1, 2, 3]);
+    ).toEqual([1, 2]);
   });
 
   it("does not treat banzuke currentDay as imported results progress", async () => {
@@ -497,7 +490,7 @@ describe("scheduled result import route", () => {
     );
   });
 
-  it("keeps an unconfirmed partial final-day card retryable", async () => {
+  it("rejects an unconfirmed partial final-day card", async () => {
     await seedLiveBasho("2026-05", {
       currentDay: 14,
       importedDays: Array.from({ length: 14 }, (_value, index) => index + 1),
@@ -524,23 +517,26 @@ describe("scheduled result import route", () => {
 
     const response = await injectCron(app);
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ status: "imported", day: 15 });
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toMatchObject({
+      status: "failed",
+      error: "scheduled-results-import-failed",
+    });
     const repositories = createRepositories(client);
     expect(await repositories.getBasho("2026-05")).toMatchObject({
       status: "active",
       currentDay: 14,
     });
-    expect(await repositories.listBoutResultsForBasho("2026-05")).toEqual(
-      expect.arrayContaining([expect.objectContaining({ day: 15 })]),
-    );
     expect(
-      await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
-    ).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ day: 15, source: "sumo-api-schedule" }),
-      ]),
-    );
+      (await repositories.listBoutResultsForBasho("2026-05")).some(
+        (result) => result.day === 15,
+      ),
+    ).toBe(false);
+    expect(
+      (
+        await repositories.listScheduledBoutPublicationsForBasho("2026-05")
+      ).some((publication) => publication.day === 15),
+    ).toBe(false);
   });
 
   it("retries a missing final day after the basho end date", async () => {
@@ -630,7 +626,7 @@ describe("scheduled result import route", () => {
     ).toEqual([]);
   });
 
-  it("imports results without attesting the card when banzuke evidence fails", async () => {
+  it("rejects results when banzuke evidence fails", async () => {
     await seedLiveBasho("2026-05", { importedDays: [1, 2] });
     app = createApp(async (url) => {
       const sourceUrl = String(url);
@@ -642,27 +638,24 @@ describe("scheduled result import route", () => {
 
     const response = await injectCron(app);
 
-    expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(500);
     expect(response.json()).toMatchObject({
-      status: "imported",
-      day: 3,
-      importedDays: [3],
+      status: "failed",
+      error: "scheduled-results-import-failed",
     });
     const repositories = createRepositories(client);
     expect(await repositories.getBasho("2026-05")).toMatchObject({
       status: "active",
-      currentDay: 3,
+      currentDay: 2,
     });
     expect(await repositories.listBoutResultsForBasho("2026-05")).toHaveLength(
-      3,
+      2,
     );
     expect(
-      await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
-    ).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ day: 3, source: "sumo-api-schedule" }),
-      ]),
-    );
+      (
+        await repositories.listScheduledBoutPublicationsForBasho("2026-05")
+      ).some((publication) => publication.day === 3),
+    ).toBe(false);
   });
 
   it("reports partial success when the following-day schedule is unavailable", async () => {

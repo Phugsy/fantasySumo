@@ -476,9 +476,9 @@ inside the database transaction, so even a concurrent refresh cannot regress
 Re-running the route on the same Japan calendar day always refreshes that day.
 A delayed run backfills every earlier day absent from stored bout results;
 `currentDay` remains useful lifecycle/calendar metadata but is not treated as a
-results cursor. Each day commits independently, so if a later source request
-fails, the next invocation sees the earlier stored days and resumes with the
-remaining gaps. The importer replaces only each day's stable result IDs, so
+results cursor. Each verified day commits independently, but the first failed
+day stops the run before later days are attempted. The next invocation resumes
+at that same gap. The importer replaces only each day's stable result IDs, so
 retries correct or skip existing rows without duplicating scores, teams, or
 picks. The response and Vercel function logs include the status, basho ID,
 derived day, imported days, Japan date, schedule outcome, and skip reason when

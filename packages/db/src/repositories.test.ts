@@ -694,6 +694,54 @@ describe("repositories", () => {
     ]);
   });
 
+  it("rejects a daily result commit when the banzuke roster changed", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
+
+    await expect(
+      repositories.applyScheduledBoutsAndBoutResultsImport({
+        expectedBanzukeRikishiIds: ["onosato"],
+        scheduledBouts: {
+          publication: {
+            id: "2026-05-day-5-schedule",
+            bashoId: sampleBasho.id,
+            day: 5,
+            source: "sumo-api-schedule:complete",
+            publishedAt: "2026-05-14T09:00:00.000Z",
+          },
+          bouts: [
+            {
+              id: "2026-05-day-5-match-1",
+              bashoId: sampleBasho.id,
+              day: 5,
+              eastRikishiId: "onosato",
+              westRikishiId: "kotozakura",
+              status: "scheduled",
+            },
+          ],
+        },
+        boutResults: {
+          bashoId: sampleBasho.id,
+          day: 5,
+          results: [
+            {
+              id: "2026-05-day-5-match-1",
+              bashoId: sampleBasho.id,
+              day: 5,
+              winnerRikishiId: "onosato",
+              loserRikishiId: "kotozakura",
+            },
+          ],
+        },
+      }),
+    ).rejects.toThrow("banzuke changed");
+    expect(
+      (await repositories.listBoutResultsForBasho(sampleBasho.id)).some(
+        (result) => result.day === 5,
+      ),
+    ).toBe(false);
+  });
+
   it("loads deterministic demo data for local demos and E2E fixtures", async () => {
     await seedDemoDatabase(createRepositories(client));
     const repositories = createRepositories(client);
