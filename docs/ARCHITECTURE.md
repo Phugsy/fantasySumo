@@ -152,8 +152,8 @@ Current routes:
   - Uses the division banzuke's per-day records to attest that every rikishi is
     represented by a matchup or explicit absence before marking the card
     complete, and verifies that fetched roster against the persisted tournament
-    banzuke. Missing banzuke evidence leaves the card unattested without
-    discarding valid torikumi results.
+    banzuke. Missing or malformed banzuke evidence leaves the card unattested
+    without discarding valid torikumi results.
   - Request body: `day` and optional `division`.
   - Maps source payloads into local `BoutResult` records using local shikona-based rikishi ids.
   - Replaces stale result rows only for the imported basho/day.

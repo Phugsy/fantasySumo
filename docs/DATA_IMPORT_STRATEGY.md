@@ -312,8 +312,9 @@ as independent completeness evidence: every banzuke rikishi must have a record
 for day N and must either appear in the torikumi or be explicitly recorded as
 absent. The fetched roster must also contain every rikishi on the persisted
 division banzuke, preventing matching truncated source responses from attesting
-each other. If the banzuke evidence request fails, the matching torikumi card
-and results remain importable but the card stays unattested for a later retry.
+each other. If the banzuke evidence request fails or returns a malformed
+payload, the matching torikumi card and results remain importable but the card
+stays unattested for a later retry.
 The card is attested only when the coverage checks pass and every bout has a
 resolved winner; day 15 additionally requires the division yusho signal
 described below. The service rejects schedule/result command pairs whose

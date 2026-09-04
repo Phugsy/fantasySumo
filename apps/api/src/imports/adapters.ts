@@ -172,10 +172,12 @@ export async function fetchSumoApiDailyImport(
       fetchFn,
       `${SUMO_API_BASE_URL}/basho/${sourceBashoId}/torikumi/${division}/${options.day}`,
     ),
-    fetchJson<SumoApiBanzukePayload>(
+    fetchJson<unknown>(
       fetchFn,
       `${SUMO_API_BASE_URL}/basho/${sourceBashoId}/banzuke/${division}`,
-    ).catch(() => undefined),
+    )
+      .then(normalizeSumoApiBanzukePayload)
+      .catch(() => undefined),
   ]);
 
   return {
@@ -314,6 +316,59 @@ function hasAttestedCompleteCard(
       );
     })
   );
+}
+
+function normalizeSumoApiBanzukePayload(
+  payload: unknown,
+): SumoApiBanzukePayload | undefined {
+  if (!isRecord(payload)) {
+    return undefined;
+  }
+
+  if (
+    !isOptionalString(payload.bashoId) ||
+    !isOptionalString(payload.division) ||
+    !isOptionalBanzukeRows(payload.east) ||
+    !isOptionalBanzukeRows(payload.west)
+  ) {
+    return undefined;
+  }
+
+  return payload as SumoApiBanzukePayload;
+}
+
+function isOptionalBanzukeRows(
+  value: unknown,
+): value is SumoApiBanzukeRow[] | undefined {
+  return (
+    value === undefined || (Array.isArray(value) && value.every(isBanzukeRow))
+  );
+}
+
+function isBanzukeRow(value: unknown): value is SumoApiBanzukeRow {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    (value.rikishiID === undefined || typeof value.rikishiID === "number") &&
+    isOptionalString(value.shikonaEn) &&
+    (value.record === undefined ||
+      (Array.isArray(value.record) &&
+        value.record.every(
+          (entry) =>
+            isRecord(entry) &&
+            (entry.result === undefined || typeof entry.result === "string"),
+        )))
+  );
+}
+
+function isOptionalString(value: unknown): value is string | undefined {
+  return value === undefined || typeof value === "string";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isNumber(value: number | undefined): value is number {

@@ -529,6 +529,35 @@ describe("source import adapters", () => {
     expect(commands.resultsCommand.results).toHaveLength(1);
   });
 
+  it("imports matching torikumi without attestation when banzuke payload is malformed", async () => {
+    const commands = await fetchSumoApiDailyImport(
+      async (url) =>
+        new Response(
+          String(url).includes("/banzuke/")
+            ? "null"
+            : JSON.stringify({
+                torikumi: [
+                  {
+                    bashoId: "202605",
+                    day: 4,
+                    eastShikona: "Onosato",
+                    westShikona: "Kotozakura",
+                    winnerEn: "Onosato",
+                  },
+                ],
+              }),
+        ),
+      {
+        bashoId: "2026-05",
+        day: 4,
+        expectedRikishiIds: ["onosato", "kotozakura"],
+      },
+    );
+
+    expect(commands.scheduleCommand.isComplete).toBeUndefined();
+    expect(commands.resultsCommand.results).toHaveLength(1);
+  });
+
   it("rejects an empty source schedule instead of claiming it was published", () => {
     expect(() =>
       mapSumoApiSchedulePayload(
