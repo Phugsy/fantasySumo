@@ -209,8 +209,9 @@ Current routes:
   - Moves an upcoming or locked basho to active with day 1 and completes it
     with day 15.
   - Returns structured locked/imported/partial/skipped status. A schedule-only
-    warning is logged as partial success after results commit; result-source,
-    validation, and target-selection failures remain unsuccessful requests.
+    or historical-backfill warning is logged as partial success after the
+    current day's results commit. Current-day result-source, validation, and
+    target-selection failures remain unsuccessful requests.
 - `GET /api/admin/basho/current`
   - Requires an authenticated admin selected by the server-only
     `ADMIN_USER_IDS` allowlist.

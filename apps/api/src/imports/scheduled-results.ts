@@ -36,6 +36,7 @@ export type ScheduledResultsImportResult =
       bashoId: string;
       day: number;
       importedDays: number[];
+      backfillFailures: Array<{ day: number; message: string }>;
       japanDate: string;
       import: ImportResult;
       schedule: FollowingDayScheduleImportResult;
@@ -132,17 +133,31 @@ export async function runScheduledResultsImport(
       )
       .map((publication) => publication.day),
   );
-  const importedDays = Array.from(
+  const daysToImport = Array.from(
     { length: day },
     (_value, index) => index + 1,
   ).filter(
     (importDay) => importDay === day || !verifiedResultDays.has(importDay),
   );
-  for (const importDay of importedDays.slice(0, -1)) {
-    await importCurrentDayScheduleAndResults(repositories, sourceFetch, {
-      bashoId: basho.id,
-      day: importDay,
-    });
+  const importedDays: number[] = [];
+  const backfillFailures: Array<{ day: number; message: string }> = [];
+
+  for (const importDay of daysToImport.slice(0, -1)) {
+    try {
+      await importCurrentDayScheduleAndResults(repositories, sourceFetch, {
+        bashoId: basho.id,
+        day: importDay,
+      });
+      importedDays.push(importDay);
+    } catch (error) {
+      backfillFailures.push({
+        day: importDay,
+        message:
+          error instanceof Error
+            ? error.message
+            : `Historical result backfill failed for ${basho.id} day ${importDay}.`,
+      });
+    }
   }
 
   const dailyUpdate = await importDailyResultsAndFollowingSchedule(
@@ -158,12 +173,17 @@ export async function runScheduledResultsImport(
     status: dailyUpdateStatus,
     ...currentDayImport
   } = dailyUpdate;
+  importedDays.push(day);
 
   return {
-    status: dailyUpdateStatus === "partial" ? "partial" : "imported",
+    status:
+      dailyUpdateStatus === "partial" || backfillFailures.length > 0
+        ? "partial"
+        : "imported",
     bashoId: basho.id,
     day,
     importedDays,
+    backfillFailures,
     japanDate,
     import: currentDayImport,
     schedule,

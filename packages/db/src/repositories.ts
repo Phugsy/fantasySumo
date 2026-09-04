@@ -1120,7 +1120,7 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
             .run();
         }
 
-        if (results.results.length > 0) {
+        if (results.results.length > 0 && !preserveExistingFullerSchedule) {
           transaction
             .delete(sqlite.boutResults)
             .where(
@@ -2032,7 +2032,7 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
             });
         }
 
-        if (results.results.length > 0) {
+        if (results.results.length > 0 && !preserveExistingFullerSchedule) {
           await transaction.delete(pg.boutResults).where(
             and(
               eq(pg.boutResults.bashoId, results.bashoId),

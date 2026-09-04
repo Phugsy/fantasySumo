@@ -44,6 +44,10 @@ export function registerScheduledImportRoutes(
           result.status === "imported" || result.status === "partial"
             ? result.importedDays
             : undefined,
+        backfillFailures:
+          result.status === "imported" || result.status === "partial"
+            ? result.backfillFailures
+            : undefined,
         lockedAt: result.status === "locked" ? result.lockedAt : undefined,
         reason: result.status === "skipped" ? result.reason : undefined,
         schedule:
@@ -56,7 +60,7 @@ export function registerScheduledImportRoutes(
       if (result.status === "partial") {
         request.log.warn(
           logContext,
-          "Scheduled results imported with a following-day schedule warning.",
+          "Scheduled results imported with recovery warnings.",
         );
       } else {
         request.log.info(logContext, "Scheduled basho update finished.");

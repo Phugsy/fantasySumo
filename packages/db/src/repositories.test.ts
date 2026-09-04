@@ -625,6 +625,20 @@ describe("repositories", () => {
       ],
     };
     await repositories.applyScheduledBoutsImport(fullerSchedule);
+    await repositories.insertBoutResult({
+      id: "2026-05-day-4-match-1",
+      bashoId: sampleBasho.id,
+      day: 4,
+      winnerRikishiId: "kotozakura",
+      loserRikishiId: "onosato",
+    });
+    await repositories.insertBoutResult({
+      id: "2026-05-day-4-match-2",
+      bashoId: sampleBasho.id,
+      day: 4,
+      winnerRikishiId: "hoshoryu",
+      loserRikishiId: "kirishima",
+    });
 
     const outcome = await repositories.applyScheduledBoutsAndBoutResultsImport({
       scheduledBouts: {
@@ -659,7 +673,16 @@ describe("repositories", () => {
         (result) => result.day === 4,
       ),
     ).toEqual([
-      expect.objectContaining({ id: "2026-05-day-4-match-1", day: 4 }),
+      expect.objectContaining({
+        id: "2026-05-day-4-match-1",
+        day: 4,
+        winnerRikishiId: "onosato",
+      }),
+      expect.objectContaining({
+        id: "2026-05-day-4-match-2",
+        day: 4,
+        winnerRikishiId: "hoshoryu",
+      }),
     ]);
     expect(
       await repositories.listScheduledBoutPublicationsForBasho(sampleBasho.id),

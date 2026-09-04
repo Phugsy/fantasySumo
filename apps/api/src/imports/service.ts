@@ -42,6 +42,7 @@ interface BoutResultsImportOptions extends ImportOptions {
     "bouts" | "isComplete"
   >;
   preserveExistingSnapshot?: boolean;
+  preserveOmittedResults?: boolean;
 }
 
 interface PreparedBoutResultsImport {
@@ -52,6 +53,7 @@ interface PreparedBoutResultsImport {
 interface PreparedScheduledBoutsImport {
   data: ScheduledBoutsImportData;
   preserveExistingCompleteCard: boolean;
+  preserveExistingFullerSchedule: boolean;
   result: ImportResult;
 }
 
@@ -143,7 +145,9 @@ async function prepareBoutResultsImport(
   );
   const importedResults = options.preserveExistingSnapshot
     ? existingImportedDayResults
-    : command.results;
+    : options.preserveOmittedResults === true
+      ? mergeBoutResults(existingImportedDayResults, command.results)
+      : command.results;
   const existingScheduledBouts = await repositories.listScheduledBoutsForBasho(
     command.bashoId,
   );
@@ -278,13 +282,14 @@ async function prepareScheduledBoutsImport(
   const existingScheduledBoutIds = new Set(
     existingScheduledBouts.map((bout) => bout.id),
   );
+  const preserveExistingFullerSchedule =
+    existingPublication !== undefined &&
+    command.isComplete !== true &&
+    command.bouts.length > 0 &&
+    existingScheduledBouts.length > command.bouts.length &&
+    command.bouts.every((bout) => existingScheduledBoutIds.has(bout.id));
   const preserveExistingSchedule =
-    preserveExistingCompleteCard ||
-    (existingPublication !== undefined &&
-      command.isComplete !== true &&
-      command.bouts.length > 0 &&
-      existingScheduledBouts.length > command.bouts.length &&
-      command.bouts.every((bout) => existingScheduledBoutIds.has(bout.id)));
+    preserveExistingCompleteCard || preserveExistingFullerSchedule;
   const importedBouts = preserveExistingSchedule
     ? existingScheduledBouts
     : command.bouts;
@@ -324,6 +329,7 @@ async function prepareScheduledBoutsImport(
   return {
     data,
     preserveExistingCompleteCard,
+    preserveExistingFullerSchedule,
     result: {
       dryRun: options.dryRun === true,
       source: command.source,
@@ -375,6 +381,7 @@ export async function importScheduledBoutsAndBoutResults(
     ...options,
     completionSchedule: scheduleCommand,
     preserveExistingSnapshot: schedule.preserveExistingCompleteCard,
+    preserveOmittedResults: schedule.preserveExistingFullerSchedule,
   });
 
   if (options.dryRun !== true) {
@@ -384,16 +391,24 @@ export async function importScheduledBoutsAndBoutResults(
     });
 
     if (outcome !== "applied") {
+      const preparedWithKnownSchedule = schedule;
       schedule = await prepareScheduledBoutsImport(
         repositories,
         scheduleCommand,
         options,
       );
-      results = await prepareBoutResultsImport(repositories, resultsCommand, {
-        ...options,
-        completionSchedule: scheduleCommand,
-        preserveExistingSnapshot: outcome === "preserved-existing-complete",
-      });
+      if (
+        outcome === "preserved-existing-complete" ||
+        !preparedWithKnownSchedule.preserveExistingFullerSchedule
+      ) {
+        results = await prepareBoutResultsImport(repositories, resultsCommand, {
+          ...options,
+          completionSchedule: scheduleCommand,
+          preserveExistingSnapshot: outcome === "preserved-existing-complete",
+          preserveOmittedResults:
+            outcome === "preserved-existing-fuller-schedule",
+        });
+      }
     }
   }
 
@@ -428,6 +443,18 @@ function hasMatchingScheduledBoutsAndResults(
 
 function matchupKey(firstRikishiId: string, secondRikishiId: string): string {
   return [firstRikishiId, secondRikishiId].sort().join("\u0000");
+}
+
+function mergeBoutResults(
+  existingResults: readonly BoutResult[],
+  incomingResults: readonly BoutResult[],
+): BoutResult[] {
+  const incomingIds = new Set(incomingResults.map((result) => result.id));
+
+  return [
+    ...existingResults.filter((result) => !incomingIds.has(result.id)),
+    ...incomingResults,
+  ];
 }
 
 function validateBanzukeImport(

@@ -298,8 +298,9 @@ Validation and replacement rules:
   transactionally preserved write is returned as skipped in the operator
   summary;
 - a non-empty unattested response also cannot shrink a fuller stored card. The
-  fuller schedule and its publication metadata are retained while any available
-  matching results still commit; equal-size corrections, larger cards, and
+  fuller schedule and its publication metadata are retained, incoming matching
+  results update by bout id, and previously stored results omitted from the
+  partial response remain intact. Equal-size corrections, larger cards, and
   explicit empty schedule replacements continue through the normal replacement
   path;
 - publication metadata and scheduled bouts never advance basho lifecycle or
@@ -333,9 +334,12 @@ attestation arrives, or until stored results
 cover every matchup on every source-attested card for days 1-14, stored day-15
 results remain retryable without advancing lifecycle progress to complete. The
 cron backfills any earlier day whose card is absent, unattested, or only
-partially covered. Player-facing schedules omit any published matchup that
-already has a stored result during this retry state, and leaderboard scoring is
-capped at `Basho.currentDay` so pending later-day rows cannot appear publicly.
+partially covered. A failed historical backfill is reported as a recovery
+warning without blocking the current day's healthy import, so one unavailable
+old endpoint cannot freeze subsequent scoring. Player-facing schedules omit any
+published matchup that already has a stored result during this retry state, and
+leaderboard scoring is capped at `Basho.currentDay` so pending later-day rows
+cannot appear publicly.
 
 ### Tournament status and achievement visibility
 

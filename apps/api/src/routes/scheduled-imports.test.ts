@@ -344,6 +344,57 @@ describe("scheduled result import route", () => {
     expect(requestedDays).toEqual([2, 3, 4]);
   });
 
+  it("continues today's import when a historical backfill source fails", async () => {
+    await seedLiveBasho("2026-05", {
+      status: "active",
+      currentDay: 2,
+      importedDays: [1],
+    });
+    await seedPublishedSchedule("2026-05", 2);
+    await createRepositories(client).upsertBoutResult({
+      id: "2026-05-day-2-match-1",
+      bashoId: "2026-05",
+      day: 2,
+      winnerRikishiId: "onosato",
+      loserRikishiId: "kotozakura",
+    });
+    const requestedDays: number[] = [];
+    app = createApp(async (url) => {
+      const sourceUrl = String(url);
+      const requestedDay = dayFromUrl(url);
+      if (Number.isFinite(requestedDay)) requestedDays.push(requestedDay);
+
+      return requestedDay === 2 && sourceUrl.includes("/torikumi/")
+        ? new Response(null, { status: 503 })
+        : resultsResponse(requestedDay);
+    });
+
+    const response = await injectCron(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "partial",
+      day: 3,
+      importedDays: [3],
+      backfillFailures: [
+        {
+          day: 2,
+          message: "Import source request failed with 503.",
+        },
+      ],
+    });
+    expect(requestedDays).toEqual([2, 3, 4]);
+    expect(await createRepositories(client).getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 3,
+    });
+    expect(
+      (await createRepositories(client).listBoutResultsForBasho("2026-05"))
+        .map((result) => result.day)
+        .sort((left, right) => left - right),
+    ).toEqual([1, 2, 3]);
+  });
+
   it("does not treat banzuke currentDay as imported results progress", async () => {
     await seedLiveBasho("2026-05", { status: "active", currentDay: 3 });
     const requestedDays: number[] = [];

@@ -847,6 +847,20 @@ describe("import service", () => {
       ],
     };
     await importScheduledBouts(repositories, fullerSchedule);
+    await repositories.insertBoutResult({
+      id: "2026-05-day-4-match-1",
+      bashoId: "2026-05",
+      day: 4,
+      winnerRikishiId: "kotozakura",
+      loserRikishiId: "onosato",
+    });
+    await repositories.insertBoutResult({
+      id: "2026-05-day-4-match-2",
+      bashoId: "2026-05",
+      day: 4,
+      winnerRikishiId: "hoshoryu",
+      loserRikishiId: "kirishima",
+    });
 
     const partialImport = await importScheduledBoutsAndBoutResults(
       repositories,
@@ -867,12 +881,23 @@ describe("import service", () => {
     );
 
     expect(partialImport.summary.scheduledBouts).toMatchObject({ skipped: 2 });
-    expect(partialImport.summary.results).toMatchObject({ skipped: 1 });
+    expect(partialImport.summary.results).toMatchObject({
+      updated: 1,
+      skipped: 1,
+      deleted: 0,
+    });
     expect(
       await repositories.listScheduledBoutsForBasho("2026-05"),
     ).toHaveLength(2);
     expect(await repositories.listBoutResultsForBasho("2026-05")).toEqual([
-      expect.objectContaining({ id: "2026-05-day-4-match-1" }),
+      expect.objectContaining({
+        id: "2026-05-day-4-match-1",
+        winnerRikishiId: "onosato",
+      }),
+      expect.objectContaining({
+        id: "2026-05-day-4-match-2",
+        winnerRikishiId: "hoshoryu",
+      }),
     ]);
   });
 
