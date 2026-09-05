@@ -187,6 +187,27 @@ describe("basho routes", () => {
         winnerRikishiId: "onosato",
         loserRikishiId: "hoshoryu",
       });
+      if (day > 2) {
+        await repositories.applyScheduledBoutsImport({
+          publication: {
+            id: `2026-05-day-${day}-status-test`,
+            bashoId: "2026-05",
+            day,
+            source: "test-source:complete",
+            publishedAt: "2026-05-18T08:00:00.000Z",
+          },
+          bouts: [
+            {
+              id: `2026-05-day-${day}-status-test`,
+              bashoId: "2026-05",
+              day,
+              eastRikishiId: "onosato",
+              westRikishiId: "hoshoryu",
+              status: "scheduled",
+            },
+          ],
+        });
+      }
     }
 
     await repositories.applyScheduledBoutsImport({
@@ -214,6 +235,7 @@ describe("basho routes", () => {
       status: "active",
       currentDay: 8,
     });
+    await verifyStoredResultDays(repositories, 8);
 
     const rikishiResponse = await app.inject({
       method: "GET",
@@ -270,6 +292,162 @@ describe("basho routes", () => {
         }),
       }),
     ]);
+
+    await repositories.updateBasho({
+      ...sampleBasho,
+      status: "complete",
+      currentDay: 8,
+    });
+    const earlyClosedRikishiResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/rikishi",
+    });
+
+    expect(
+      earlyClosedRikishiResponse
+        .json()
+        .rikishi.find((entry: { id: string }) => entry.id === "kotozakura")
+        .tournamentNotes.achievements,
+    ).toEqual([]);
+
+    await repositories.upsertBasho({
+      ...sampleBasho,
+      status: "complete",
+      currentDay: 15,
+    });
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "complete",
+      currentDay: 15,
+    });
+    const missingFinalResultsResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/rikishi",
+    });
+
+    expect(
+      missingFinalResultsResponse
+        .json()
+        .rikishi.find((entry: { id: string }) => entry.id === "kotozakura")
+        .tournamentNotes.achievements,
+    ).toEqual([]);
+
+    await repositories.upsertRikishi({
+      id: "juryo-visitor",
+      shikona: "Juryo Visitor",
+    });
+    await repositories.applyScheduledBoutsImport({
+      publication: {
+        id: "2026-05-day-15-status-test",
+        bashoId: "2026-05",
+        day: 15,
+        source: "test-source:complete",
+        publishedAt: "2026-05-24T08:00:00.000Z",
+      },
+      bouts: [
+        {
+          id: "2026-05-day-15-status-match-1",
+          bashoId: "2026-05",
+          day: 15,
+          eastRikishiId: "onosato",
+          westRikishiId: "hoshoryu",
+          status: "scheduled",
+        },
+        {
+          id: "2026-05-day-15-status-match-2",
+          bashoId: "2026-05",
+          day: 15,
+          eastRikishiId: "kirishima",
+          westRikishiId: "juryo-visitor",
+          status: "scheduled",
+        },
+      ],
+    });
+    await repositories.insertBoutResult({
+      id: "2026-05-day-15-final-status-test-1",
+      bashoId: "2026-05",
+      day: 15,
+      winnerRikishiId: "onosato",
+      loserRikishiId: "hoshoryu",
+    });
+    const partialFinalResultsResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/rikishi",
+    });
+
+    expect(
+      partialFinalResultsResponse
+        .json()
+        .rikishi.find((entry: { id: string }) => entry.id === "kotozakura")
+        .tournamentNotes.achievements,
+    ).toEqual([]);
+
+    for (let day = 9; day <= 14; day += 1) {
+      await repositories.insertBoutResult({
+        id: `2026-05-day-${day}-other-status-test`,
+        bashoId: "2026-05",
+        day,
+        winnerRikishiId: "hoshoryu",
+        loserRikishiId: "kirishima",
+      });
+    }
+
+    const earlierResults = (
+      await repositories.listBoutResultsForBasho("2026-05")
+    ).filter((result) => result.day <= 14);
+    const withdrawal = (
+      await repositories.listScheduledBoutsForBasho("2026-05")
+    ).find((bout) => bout.status === "cancelled");
+    for (let day = 1; day <= 14; day += 1) {
+      const scheduledResults = earlierResults
+        .filter((result) => result.day === day)
+        .map((result) => ({
+          id: `${result.id}-schedule`,
+          bashoId: result.bashoId,
+          day: result.day,
+          eastRikishiId: result.winnerRikishiId,
+          westRikishiId: result.loserRikishiId,
+          status: "scheduled" as const,
+        }));
+      await repositories.applyScheduledBoutsImport({
+        publication: {
+          id: `2026-05-day-${day}-complete-status-test`,
+          bashoId: "2026-05",
+          day,
+          source: "test-source:complete",
+          publishedAt: "2026-05-24T08:00:00.000Z",
+        },
+        bouts: [
+          ...scheduledResults,
+          ...(day === 9 && withdrawal !== undefined ? [withdrawal] : []),
+        ],
+      });
+    }
+
+    await repositories.insertBoutResult({
+      id: "2026-05-day-15-final-status-test-2",
+      bashoId: "2026-05",
+      day: 15,
+      winnerRikishiId: "kirishima",
+      loserRikishiId: "juryo-visitor",
+    });
+    const completedRikishiResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/rikishi",
+    });
+
+    expect(completedRikishiResponse.statusCode).toBe(200);
+    expect(
+      completedRikishiResponse
+        .json()
+        .rikishi.find((entry: { id: string }) => entry.id === "kotozakura"),
+    ).toMatchObject({
+      tournamentNotes: {
+        statuses: [
+          { type: "withdrawn", effectiveDay: 9, provenance: "source" },
+        ],
+        achievements: [{ type: "make-koshi", day: 9, provenance: "derived" }],
+      },
+    });
   });
 
   it("creates and retrieves a fantasy team", async () => {
@@ -524,6 +702,7 @@ describe("basho routes", () => {
       status: "active",
       currentDay: 1,
     });
+    await verifyStoredResultDays(createRepositories(client), 1);
 
     const response = await app.inject({
       headers,
@@ -931,6 +1110,24 @@ describe("basho routes", () => {
         },
       ],
     });
+
+    await repositories.insertBoutResult({
+      id: "2026-05-day-2-match-1",
+      bashoId: "2026-05",
+      day: 2,
+      winnerRikishiId: "onosato",
+      loserRikishiId: "kotozakura",
+    });
+    const scoredResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/schedule",
+    });
+
+    expect(scoredResponse.statusCode).toBe(200);
+    expect(scoredResponse.json()).toMatchObject({
+      publishedDays: [2],
+      bouts: [],
+    });
   });
 
   it("returns a leaderboard ordered by score after picks lock", async () => {
@@ -940,6 +1137,7 @@ describe("basho routes", () => {
       status: "active",
       currentDay: 2,
     });
+    await verifyStoredResultDays(repositories, 2);
     const response = await app.inject({
       method: "GET",
       url: "/api/basho/2026-05/leaderboard",
@@ -1004,6 +1202,23 @@ describe("basho routes", () => {
         },
       ],
     });
+
+    await repositories.insertBoutResult({
+      id: "2026-05-day-15-pending-leaderboard-result",
+      bashoId: "2026-05",
+      day: 15,
+      winnerRikishiId: "onosato",
+      loserRikishiId: "kotozakura",
+    });
+    const pendingFinalDayResponse = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/leaderboard",
+    });
+
+    expect(pendingFinalDayResponse.statusCode).toBe(200);
+    expect(pendingFinalDayResponse.json().leaderboard).toEqual(
+      response.json().leaderboard,
+    );
   });
 
   it("returns clear 404 errors for unknown basho and teams", async () => {
@@ -1049,4 +1264,32 @@ async function signIn(
   return {
     cookie: Array.isArray(cookie) ? cookie[0] : cookie,
   };
+}
+
+async function verifyStoredResultDays(
+  repositories: ReturnType<typeof createRepositories>,
+  throughDay: number,
+) {
+  const results = await repositories.listBoutResultsForBasho("2026-05");
+
+  for (let day = 1; day <= throughDay; day += 1) {
+    const dayResults = results.filter((result) => result.day === day);
+    await repositories.applyScheduledBoutsImport({
+      publication: {
+        id: `2026-05-day-${day}-verified-test`,
+        bashoId: "2026-05",
+        day,
+        source: "test:complete",
+        publishedAt: "2026-05-18T08:00:00.000Z",
+      },
+      bouts: dayResults.map((result) => ({
+        id: result.id,
+        bashoId: result.bashoId,
+        day: result.day,
+        eastRikishiId: result.winnerRikishiId,
+        westRikishiId: result.loserRikishiId,
+        status: "scheduled",
+      })),
+    });
+  }
 }

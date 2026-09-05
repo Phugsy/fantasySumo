@@ -5,6 +5,9 @@ import type {
   Rikishi,
   ScheduledBout,
 } from "@fantasy-sumo/domain";
+import { toCompleteScheduledBoutPublicationSource } from "@fantasy-sumo/domain";
+
+export { isCompleteScheduledBoutPublicationSource } from "@fantasy-sumo/domain";
 
 export type ImportEntityName =
   | "basho"
@@ -44,13 +47,23 @@ export interface BoutResultsImportCommand {
 export interface ScheduledBoutsImportCommand {
   bashoId: Basho["id"];
   day: number;
+  isComplete?: boolean;
   rikishi?: Rikishi[];
   bouts: ScheduledBout[];
   source: string;
 }
 
+export function toScheduledBoutPublicationSource(
+  command: Pick<ScheduledBoutsImportCommand, "isComplete" | "source">,
+): string {
+  return command.isComplete === true
+    ? toCompleteScheduledBoutPublicationSource(command.source)
+    : command.source;
+}
+
 export interface ImportOptions {
   dryRun?: boolean;
+  expectedBanzukeRikishiIds?: readonly string[];
 }
 
 export interface ImportResult {

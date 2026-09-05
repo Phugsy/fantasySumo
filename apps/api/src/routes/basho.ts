@@ -1,14 +1,22 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { DEMO_BASHO_ID, type Repositories } from "@fantasy-sumo/db";
-import type { FantasyPick, FantasyTeam } from "@fantasy-sumo/domain";
+import type {
+  Basho,
+  FantasyPick,
+  FantasyTeam,
+  ScheduledBoutPublication,
+} from "@fantasy-sumo/domain";
 import type { AuthService } from "../auth.js";
 import { getEffectiveBashoGameConfig } from "../game-config.js";
+import { isCompleteScheduledBoutPublicationSource } from "../imports/types.js";
 import {
   calculateLeaderboard,
   calculateTeamScore,
   canEditFantasyPicks,
   deriveRikishiTournamentNotes,
+  getVerifiedBoutResultsThroughDay,
+  hasBoutResultForScheduledBout,
   getPickLockMessage,
   validateFantasyPicks,
 } from "@fantasy-sumo/domain";
@@ -87,13 +95,32 @@ export function registerBashoRoutes(
       });
     }
 
-    const [allRikishi, banzukeEntries, boutResults, scheduledBouts] =
-      await Promise.all([
-        context.repositories.listRikishi(),
-        context.repositories.listBanzukeEntriesForBasho(basho.id),
-        context.repositories.listBoutResultsForBasho(basho.id),
-        context.repositories.listScheduledBoutsForBasho(basho.id),
-      ]);
+    const [
+      allRikishi,
+      banzukeEntries,
+      boutResults,
+      scheduledBouts,
+      scheduledBoutPublications,
+    ] = await Promise.all([
+      context.repositories.listRikishi(),
+      context.repositories.listBanzukeEntriesForBasho(basho.id),
+      context.repositories.listBoutResultsForBasho(basho.id),
+      context.repositories.listScheduledBoutsForBasho(basho.id),
+      context.repositories.listScheduledBoutPublicationsForBasho(basho.id),
+    ]);
+    const completeScheduleDays = getCompleteScheduleDays(
+      basho,
+      scheduledBoutPublications,
+    );
+    const verifiedThroughDay =
+      basho.status === "upcoming"
+        ? 0
+        : getVerifiedBoutResultsThroughDay({
+            boutResults,
+            completeScheduleDays,
+            scheduledBouts,
+            throughDay: 15,
+          });
     const rikishiById = new Map(
       allRikishi.map((rikishi) => [rikishi.id, rikishi]),
     );
@@ -111,7 +138,7 @@ export function registerBashoRoutes(
           boutResults,
           rikishiId: entry.rikishiId,
           scheduledBouts,
-          throughDay: basho.currentDay,
+          throughDay: verifiedThroughDay,
         }),
       };
     });
@@ -152,6 +179,9 @@ export function registerBashoRoutes(
         rikishi,
       ]),
     );
+    const boutResults = await context.repositories.listBoutResultsForBasho(
+      basho.id,
+    );
     const toScheduledRikishi = (rikishiId: string) => {
       const rikishi = rikishiById.get(rikishiId);
       const banzuke = banzukeByRikishiId.get(rikishiId);
@@ -166,6 +196,13 @@ export function registerBashoRoutes(
       await context.repositories.listScheduledBoutsForBasho(basho.id)
     )
       .filter((bout) => publishedDays.has(bout.day))
+      .filter(
+        (bout) =>
+          !hasBoutResultForScheduledBout({
+            boutResults,
+            scheduledBout: bout,
+          }),
+      )
       .map((bout) => ({
         id: bout.id,
         day: bout.day,
@@ -324,16 +361,36 @@ export function registerBashoRoutes(
       });
     }
 
-    const [picks, boutResults, banzukeEntries, allRikishi, scheduledBouts] =
-      await Promise.all([
-        context.repositories.listFantasyPicksForTeam(team.id),
-        context.repositories.listBoutResultsForBasho(basho.id),
-        context.repositories.listBanzukeEntriesForBasho(basho.id),
-        context.repositories.listRikishi(),
-        context.repositories.listScheduledBoutsForBasho(basho.id),
-      ]);
+    const [
+      picks,
+      boutResults,
+      banzukeEntries,
+      allRikishi,
+      scheduledBouts,
+      scheduledBoutPublications,
+    ] = await Promise.all([
+      context.repositories.listFantasyPicksForTeam(team.id),
+      context.repositories.listBoutResultsForBasho(basho.id),
+      context.repositories.listBanzukeEntriesForBasho(basho.id),
+      context.repositories.listRikishi(),
+      context.repositories.listScheduledBoutsForBasho(basho.id),
+      context.repositories.listScheduledBoutPublicationsForBasho(basho.id),
+    ]);
+    const completeScheduleDays = getCompleteScheduleDays(
+      basho,
+      scheduledBoutPublications,
+    );
+    const verifiedThroughDay =
+      basho.status === "upcoming"
+        ? 0
+        : getVerifiedBoutResultsThroughDay({
+            boutResults,
+            completeScheduleDays,
+            scheduledBouts,
+            throughDay: 15,
+          });
     const teamScore = calculateTeamScore(team, picks, boutResults, {
-      throughDay: basho.currentDay,
+      throughDay: verifiedThroughDay,
     });
     const scoresByRikishiId = new Map(
       teamScore.rikishiScores.map((score) => [score.rikishiId, score]),
@@ -372,7 +429,7 @@ export function registerBashoRoutes(
               boutResults,
               rikishiId: pick.rikishiId,
               scheduledBouts,
-              throughDay: basho.currentDay,
+              throughDay: verifiedThroughDay,
             }),
           };
         })
@@ -545,14 +602,30 @@ export function registerBashoRoutes(
       });
     }
 
-    const boutResults = await context.repositories.listBoutResultsForBasho(
-      basho.id,
-    );
+    const [boutResults, scheduledBouts, scheduledBoutPublications] =
+      await Promise.all([
+        context.repositories.listBoutResultsForBasho(basho.id),
+        context.repositories.listScheduledBoutsForBasho(basho.id),
+        context.repositories.listScheduledBoutPublicationsForBasho(basho.id),
+      ]);
+    const verifiedThroughDay =
+      basho.status === "upcoming"
+        ? 0
+        : getVerifiedBoutResultsThroughDay({
+            boutResults,
+            completeScheduleDays: getCompleteScheduleDays(
+              basho,
+              scheduledBoutPublications,
+            ),
+            scheduledBouts,
+            throughDay: 15,
+          });
 
     const leaderboard = calculateLeaderboard(
       await context.repositories.listFantasyTeamsForBasho(basho.id),
       await context.repositories.listFantasyPicksForBasho(basho.id),
       boutResults,
+      { throughDay: verifiedThroughDay },
     );
 
     return {
@@ -572,6 +645,21 @@ export function registerBashoRoutes(
           : leaderboard,
     };
   });
+}
+
+function getCompleteScheduleDays(
+  basho: Basho,
+  publications: readonly ScheduledBoutPublication[],
+): ReadonlySet<number> {
+  return new Set(
+    basho.isDemo
+      ? Array.from({ length: 15 }, (_value, index) => index + 1)
+      : publications
+          .filter((publication) =>
+            isCompleteScheduledBoutPublicationSource(publication.source),
+          )
+          .map((publication) => publication.day),
+  );
 }
 
 async function getPicksLockedResponse(

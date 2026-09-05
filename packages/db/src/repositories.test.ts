@@ -507,6 +507,241 @@ describe("repositories", () => {
     });
   });
 
+  it("transactionally preserves a complete schedule and result snapshot", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
+    const completeSchedule = {
+      publication: {
+        id: "2026-05-day-4-schedule",
+        bashoId: sampleBasho.id,
+        day: 4,
+        source: "sumo-api-schedule:complete",
+        publishedAt: "2026-05-13T09:00:00.000Z",
+      },
+      bouts: [
+        {
+          id: "2026-05-day-4-match-1",
+          bashoId: sampleBasho.id,
+          day: 4,
+          eastRikishiId: "onosato",
+          westRikishiId: "kotozakura",
+          status: "scheduled" as const,
+        },
+        {
+          id: "2026-05-day-4-match-2",
+          bashoId: sampleBasho.id,
+          day: 4,
+          eastRikishiId: "hoshoryu",
+          westRikishiId: "kirishima",
+          status: "scheduled" as const,
+        },
+      ],
+    };
+    const completeResults = {
+      bashoId: sampleBasho.id,
+      day: 4,
+      results: [
+        {
+          id: "2026-05-day-4-match-1",
+          bashoId: sampleBasho.id,
+          day: 4,
+          winnerRikishiId: "onosato",
+          loserRikishiId: "kotozakura",
+        },
+        {
+          id: "2026-05-day-4-match-2",
+          bashoId: sampleBasho.id,
+          day: 4,
+          winnerRikishiId: "hoshoryu",
+          loserRikishiId: "kirishima",
+        },
+      ],
+    };
+
+    const applied = await repositories.applyScheduledBoutsAndBoutResultsImport({
+      scheduledBouts: completeSchedule,
+      boutResults: completeResults,
+    });
+    const preserved =
+      await repositories.applyScheduledBoutsAndBoutResultsImport({
+        scheduledBouts: {
+          publication: {
+            ...completeSchedule.publication,
+            source: "sumo-api-schedule",
+          },
+          bouts: [completeSchedule.bouts[0]!],
+        },
+        boutResults: {
+          ...completeResults,
+          results: [completeResults.results[0]!],
+        },
+      });
+
+    expect(applied).toBe("applied");
+    expect(preserved).toBe("preserved-existing-complete");
+    expect(
+      await repositories.listScheduledBoutsForBasho(sampleBasho.id),
+    ).toHaveLength(2);
+    expect(
+      (await repositories.listBoutResultsForBasho(sampleBasho.id)).filter(
+        (result) => result.day === 4,
+      ),
+    ).toEqual(completeResults.results);
+    expect(
+      await repositories.listScheduledBoutPublicationsForBasho(sampleBasho.id),
+    ).toEqual([
+      expect.objectContaining({ source: "sumo-api-schedule:complete" }),
+    ]);
+  });
+
+  it("preserves a fuller unattested schedule while applying partial results", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
+    const fullerSchedule = {
+      publication: {
+        id: "2026-05-day-4-early-schedule",
+        bashoId: sampleBasho.id,
+        day: 4,
+        source: "sumo-api-schedule",
+        publishedAt: "2026-05-13T09:00:00.000Z",
+      },
+      bouts: [
+        {
+          id: "2026-05-day-4-match-1",
+          bashoId: sampleBasho.id,
+          day: 4,
+          eastRikishiId: "onosato",
+          westRikishiId: "kotozakura",
+          status: "scheduled" as const,
+        },
+        {
+          id: "2026-05-day-4-match-2",
+          bashoId: sampleBasho.id,
+          day: 4,
+          eastRikishiId: "hoshoryu",
+          westRikishiId: "kirishima",
+          status: "scheduled" as const,
+        },
+      ],
+    };
+    await repositories.applyScheduledBoutsImport(fullerSchedule);
+    await repositories.insertBoutResult({
+      id: "2026-05-day-4-match-1",
+      bashoId: sampleBasho.id,
+      day: 4,
+      winnerRikishiId: "kotozakura",
+      loserRikishiId: "onosato",
+    });
+    await repositories.insertBoutResult({
+      id: "2026-05-day-4-match-2",
+      bashoId: sampleBasho.id,
+      day: 4,
+      winnerRikishiId: "hoshoryu",
+      loserRikishiId: "kirishima",
+    });
+
+    const outcome = await repositories.applyScheduledBoutsAndBoutResultsImport({
+      scheduledBouts: {
+        publication: {
+          ...fullerSchedule.publication,
+          id: "2026-05-day-4-current-schedule",
+          publishedAt: "2026-05-14T09:00:00.000Z",
+        },
+        bouts: [fullerSchedule.bouts[0]!],
+      },
+      boutResults: {
+        bashoId: sampleBasho.id,
+        day: 4,
+        results: [
+          {
+            id: "2026-05-day-4-match-1",
+            bashoId: sampleBasho.id,
+            day: 4,
+            winnerRikishiId: "onosato",
+            loserRikishiId: "kotozakura",
+          },
+        ],
+      },
+    });
+
+    expect(outcome).toBe("preserved-existing-fuller-schedule");
+    expect(
+      await repositories.listScheduledBoutsForBasho(sampleBasho.id),
+    ).toHaveLength(2);
+    expect(
+      (await repositories.listBoutResultsForBasho(sampleBasho.id)).filter(
+        (result) => result.day === 4,
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        id: "2026-05-day-4-match-1",
+        day: 4,
+        winnerRikishiId: "onosato",
+      }),
+      expect.objectContaining({
+        id: "2026-05-day-4-match-2",
+        day: 4,
+        winnerRikishiId: "hoshoryu",
+      }),
+    ]);
+    expect(
+      await repositories.listScheduledBoutPublicationsForBasho(sampleBasho.id),
+    ).toEqual([
+      expect.objectContaining({
+        id: "2026-05-day-4-early-schedule",
+        publishedAt: "2026-05-13T09:00:00.000Z",
+      }),
+    ]);
+  });
+
+  it("rejects a daily result commit when the banzuke roster changed", async () => {
+    await seedDatabase(createRepositories(client));
+    const repositories = createRepositories(client);
+
+    await expect(
+      repositories.applyScheduledBoutsAndBoutResultsImport({
+        expectedBanzukeRikishiIds: ["onosato"],
+        scheduledBouts: {
+          publication: {
+            id: "2026-05-day-5-schedule",
+            bashoId: sampleBasho.id,
+            day: 5,
+            source: "sumo-api-schedule:complete",
+            publishedAt: "2026-05-14T09:00:00.000Z",
+          },
+          bouts: [
+            {
+              id: "2026-05-day-5-match-1",
+              bashoId: sampleBasho.id,
+              day: 5,
+              eastRikishiId: "onosato",
+              westRikishiId: "kotozakura",
+              status: "scheduled",
+            },
+          ],
+        },
+        boutResults: {
+          bashoId: sampleBasho.id,
+          day: 5,
+          results: [
+            {
+              id: "2026-05-day-5-match-1",
+              bashoId: sampleBasho.id,
+              day: 5,
+              winnerRikishiId: "onosato",
+              loserRikishiId: "kotozakura",
+            },
+          ],
+        },
+      }),
+    ).rejects.toThrow("banzuke changed");
+    expect(
+      (await repositories.listBoutResultsForBasho(sampleBasho.id)).some(
+        (result) => result.day === 5,
+      ),
+    ).toBe(false);
+  });
+
   it("loads deterministic demo data for local demos and E2E fixtures", async () => {
     await seedDemoDatabase(createRepositories(client));
     const repositories = createRepositories(client);

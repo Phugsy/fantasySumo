@@ -10,12 +10,12 @@ import type {
 
 const WINNING_RECORD_THRESHOLD = 8;
 const LOSING_RECORD_THRESHOLD = 8;
-
 interface TournamentNotesInput {
   banzukeEntries: readonly BanzukeEntry[];
   boutResults: readonly BoutResult[];
   rikishiId: Rikishi["id"];
   scheduledBouts: readonly ScheduledBout[];
+  /** Last contiguous day whose complete card and results were verified. */
   throughDay?: number;
 }
 
@@ -49,6 +49,7 @@ export function deriveRikishiTournamentNotes({
       rikishiId,
       applicableResults,
       banzukeEntries,
+      throughDay,
     ),
   };
 }
@@ -97,22 +98,19 @@ function deriveAchievements(
   rikishiId: Rikishi["id"],
   applicableResults: readonly BoutResult[],
   banzukeEntries: readonly BanzukeEntry[],
+  throughDay: number | undefined,
 ): RikishiTournamentAchievement[] {
   const rankByRikishiId = new Map(
     banzukeEntries.map((entry) => [entry.rikishiId, entry.rank]),
   );
   const achievements: RikishiTournamentAchievement[] = [];
   let wins = 0;
-  let losses = 0;
   let recordSecured = false;
 
+  const winsByDay = new Map<number, BoutResult>();
   for (const result of applicableResults) {
-    const isWin =
-      result.winnerRikishiId === rikishiId && result.winnerAbsent !== true;
-    const isLoss = result.loserRikishiId === rikishiId;
-
-    if (isWin) {
-      wins += 1;
+    if (result.winnerRikishiId === rikishiId && result.winnerAbsent !== true) {
+      winsByDay.set(result.day, result);
 
       if (
         !isDefaultWin(result) &&
@@ -125,21 +123,26 @@ function deriveAchievements(
           provenance: "derived",
         });
       }
-    } else if (isLoss) {
-      losses += 1;
+    }
+  }
+
+  for (let day = 1; day <= (throughDay ?? 0); day += 1) {
+    if (winsByDay.has(day)) {
+      wins += 1;
     }
 
+    const notWins = day - wins;
     if (!recordSecured && wins >= WINNING_RECORD_THRESHOLD) {
       achievements.push({
         type: "kachi-koshi",
-        day: result.day,
+        day,
         provenance: "derived",
       });
       recordSecured = true;
-    } else if (!recordSecured && losses >= LOSING_RECORD_THRESHOLD) {
+    } else if (!recordSecured && notWins >= LOSING_RECORD_THRESHOLD) {
       achievements.push({
         type: "make-koshi",
-        day: result.day,
+        day,
         provenance: "derived",
       });
       recordSecured = true;

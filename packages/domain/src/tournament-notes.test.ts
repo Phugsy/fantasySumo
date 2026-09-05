@@ -41,7 +41,7 @@ describe("deriveRikishiTournamentNotes", () => {
         boutResults,
         rikishiId: "ura",
         scheduledBouts,
-        throughDay: 8,
+        throughDay: 15,
       }),
     ).toEqual({
       statuses: [{ type: "withdrawn", effectiveDay: 9, provenance: "source" }],
@@ -83,8 +83,116 @@ describe("deriveRikishiTournamentNotes", () => {
         boutResults: makeRecord("ura", 0, 9),
         rikishiId: "ura",
         scheduledBouts: [],
+        throughDay: 9,
       }).achievements,
     ).toEqual([{ type: "make-koshi", day: 8, provenance: "derived" }]);
+  });
+
+  it("counts verified absences as not-wins", () => {
+    const boutResults = [
+      ...makeRecord("ura", 7, 3),
+      ...otherResultsForDays(11, 14),
+      result(15, "onosato", "other"),
+    ];
+
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries,
+        boutResults,
+        rikishiId: "ura",
+        scheduledBouts: [
+          ...boutResults.map(scheduledBoutForResult),
+          {
+            id: "day-11-withdrawal",
+            bashoId,
+            day: 11,
+            eastRikishiId: "ura",
+            westRikishiId: "onosato",
+            status: "cancelled",
+            withdrawnRikishiId: "ura",
+          },
+        ],
+        throughDay: 15,
+      }),
+    ).toEqual({
+      statuses: [{ type: "withdrawn", effectiveDay: 11, provenance: "source" }],
+      achievements: [{ type: "make-koshi", day: 15, provenance: "derived" }],
+    });
+  });
+
+  it("does not settle a record when an earlier result day is missing", () => {
+    const completeResults = [
+      ...makeRecord("ura", 7, 3),
+      ...otherResultsForDays(11, 14),
+      result(15, "onosato", "other"),
+    ];
+
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries,
+        boutResults: completeResults.filter((entry) => entry.day !== 11),
+        rikishiId: "ura",
+        scheduledBouts: completeResults.map(scheduledBoutForResult),
+        throughDay: 10,
+      }).achievements,
+    ).toEqual([]);
+  });
+
+  it("does not settle a record when a basho is closed before day 15", () => {
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries,
+        boutResults: makeRecord("ura", 1, 1),
+        rikishiId: "ura",
+        scheduledBouts: [],
+        throughDay: 2,
+      }).achievements,
+    ).toEqual([]);
+  });
+
+  it("does not settle a record without an imported final-day result", () => {
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries,
+        boutResults: makeRecord("ura", 7, 3),
+        rikishiId: "ura",
+        scheduledBouts: [],
+        throughDay: 14,
+      }).achievements,
+    ).toEqual([]);
+  });
+
+  it("does not settle a record from a partial final-day result import", () => {
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries,
+        boutResults: [
+          ...makeRecord("ura", 7, 3),
+          result(15, "onosato", "other"),
+        ],
+        rikishiId: "ura",
+        scheduledBouts: [
+          scheduledBout(15, "onosato", "other"),
+          scheduledBout(15, "ura", "remaining-opponent"),
+        ],
+        throughDay: 14,
+      }).achievements,
+    ).toEqual([]);
+  });
+
+  it("does not settle a record from a matching but unconfirmed final-day card", () => {
+    expect(
+      deriveRikishiTournamentNotes({
+        banzukeEntries,
+        boutResults: [
+          ...makeRecord("ura", 7, 3),
+          result(15, "onosato", "other"),
+        ],
+        rikishiId: "ura",
+        scheduledBouts: [scheduledBout(15, "onosato", "other")],
+        throughDay: 14,
+      }).achievements,
+    ).toEqual([]);
   });
 
   it("derives a gold star only from a recorded maegashira win over a yokozuna", () => {
@@ -155,4 +263,33 @@ function result(
     loserRikishiId,
     ...details,
   };
+}
+
+function scheduledBout(
+  day: number,
+  eastRikishiId: string,
+  westRikishiId: string,
+): ScheduledBout {
+  return {
+    id: `day-${day}-${eastRikishiId}-${westRikishiId}-schedule`,
+    bashoId,
+    day,
+    eastRikishiId,
+    westRikishiId,
+    status: "scheduled",
+  };
+}
+
+function otherResultsForDays(
+  fromDay: number,
+  throughDay: number,
+): BoutResult[] {
+  return Array.from({ length: throughDay - fromDay + 1 }, (_, index) => {
+    const day = fromDay + index;
+    return result(day, `other-winner-${day}`, `other-loser-${day}`);
+  });
+}
+
+function scheduledBoutForResult(entry: BoutResult): ScheduledBout {
+  return scheduledBout(entry.day, entry.winnerRikishiId, entry.loserRikishiId);
 }

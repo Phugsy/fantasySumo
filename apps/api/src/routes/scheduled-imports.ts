@@ -56,7 +56,7 @@ export function registerScheduledImportRoutes(
       if (result.status === "partial") {
         request.log.warn(
           logContext,
-          "Scheduled results imported with a following-day schedule warning.",
+          "Scheduled results imported with recovery warnings.",
         );
       } else {
         request.log.info(logContext, "Scheduled basho update finished.");

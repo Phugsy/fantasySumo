@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { RikishiTournamentBadges } from "./RikishiTournamentBadges";
 
 describe("RikishiTournamentBadges", () => {
-  it("shows readable status, achievement, date, and provenance labels", () => {
+  it("shows concise status and achievement badges without metadata", () => {
     render(
       <RikishiTournamentBadges
         shikona="Ura"
@@ -20,14 +20,11 @@ describe("RikishiTournamentBadges", () => {
       screen.getByLabelText("Ura tournament status and achievements"),
     ).toBeInTheDocument();
     expect(screen.getByText("Withdrawn")).toBeInTheDocument();
-    expect(screen.getByText("Day 9 · source report")).toBeInTheDocument();
     expect(screen.getByText("Gold star")).toBeInTheDocument();
-    expect(screen.getByText("Day 3 · derived")).toBeInTheDocument();
-    expect(
-      screen.getByLabelText(
-        "Ura is withdrawn from day 9; reported by the published tournament data.",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/derived/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/source report/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/day 3/i)).not.toBeInTheDocument();
+    expect(screen.queryByTitle(/Ura/)).not.toBeInTheDocument();
   });
 
   it("renders no badge when no facts are available", () => {

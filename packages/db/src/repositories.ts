@@ -13,6 +13,7 @@ import type {
 } from "@fantasy-sumo/domain";
 import {
   getBashoLifecycleTransition,
+  isCompleteScheduledBoutPublicationSource,
   preserveBashoLifecycleProgress,
 } from "@fantasy-sumo/domain";
 import type {
@@ -43,6 +44,17 @@ export interface ScheduledBoutsImportData {
   rikishi?: readonly Rikishi[];
   bouts: readonly ScheduledBout[];
 }
+
+export interface ScheduledBoutsAndBoutResultsImportData {
+  scheduledBouts: ScheduledBoutsImportData;
+  boutResults: BoutResultsImportData;
+  expectedBanzukeRikishiIds?: readonly string[];
+}
+
+export type ScheduledBoutsImportOutcome =
+  | "applied"
+  | "preserved-existing-complete"
+  | "preserved-existing-fuller-schedule";
 
 export interface DemoBashoResetData extends BanzukeImportData {
   fantasyTeams: readonly FantasyTeam[];
@@ -169,7 +181,10 @@ export interface Repositories {
   applyBoutResultsImport: (importData: BoutResultsImportData) => Promise<void>;
   applyScheduledBoutsImport: (
     importData: ScheduledBoutsImportData,
-  ) => Promise<void>;
+  ) => Promise<ScheduledBoutsImportOutcome>;
+  applyScheduledBoutsAndBoutResultsImport: (
+    importData: ScheduledBoutsAndBoutResultsImportData,
+  ) => Promise<ScheduledBoutsImportOutcome>;
 }
 
 export function createRepositories(database: AppDatabase): Repositories {
@@ -857,7 +872,55 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
       });
     },
     applyScheduledBoutsImport: async (importData) => {
-      db.transaction((transaction) => {
+      return db.transaction((transaction) => {
+        const existingPublication = transaction
+          .select({ source: sqlite.scheduledBoutPublications.source })
+          .from(sqlite.scheduledBoutPublications)
+          .where(
+            and(
+              eq(
+                sqlite.scheduledBoutPublications.bashoId,
+                importData.publication.bashoId,
+              ),
+              eq(
+                sqlite.scheduledBoutPublications.day,
+                importData.publication.day,
+              ),
+            ),
+          )
+          .get();
+
+        if (
+          shouldPreserveExistingCompleteSnapshot(
+            existingPublication?.source,
+            importData.publication.source,
+          )
+        ) {
+          return "preserved-existing-complete";
+        }
+
+        const existingBoutIds = transaction
+          .select({ id: sqlite.scheduledBouts.id })
+          .from(sqlite.scheduledBouts)
+          .where(
+            and(
+              eq(sqlite.scheduledBouts.bashoId, importData.publication.bashoId),
+              eq(sqlite.scheduledBouts.day, importData.publication.day),
+            ),
+          )
+          .all()
+          .map((bout) => bout.id);
+
+        if (
+          shouldPreserveExistingFullerSchedule(
+            existingBoutIds,
+            importData.bouts.map((bout) => bout.id),
+            importData.publication.source,
+          )
+        ) {
+          return "preserved-existing-fuller-schedule";
+        }
+
         for (const entry of importData.rikishi ?? []) {
           transaction
             .insert(sqlite.rikishi)
@@ -913,6 +976,179 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
             )
             .run();
         }
+
+        return "applied";
+      });
+    },
+    applyScheduledBoutsAndBoutResultsImport: async (importData) => {
+      return db.transaction((transaction) => {
+        const schedule = importData.scheduledBouts;
+        const results = importData.boutResults;
+        assertExpectedBanzukeRoster(
+          importData.expectedBanzukeRikishiIds,
+          transaction
+            .select({ rikishiId: sqlite.banzukeEntries.rikishiId })
+            .from(sqlite.banzukeEntries)
+            .where(eq(sqlite.banzukeEntries.bashoId, results.bashoId))
+            .all()
+            .map((entry) => entry.rikishiId),
+        );
+        const existingPublication = transaction
+          .select({ source: sqlite.scheduledBoutPublications.source })
+          .from(sqlite.scheduledBoutPublications)
+          .where(
+            and(
+              eq(
+                sqlite.scheduledBoutPublications.bashoId,
+                schedule.publication.bashoId,
+              ),
+              eq(
+                sqlite.scheduledBoutPublications.day,
+                schedule.publication.day,
+              ),
+            ),
+          )
+          .get();
+
+        if (
+          shouldPreserveExistingCompleteSnapshot(
+            existingPublication?.source,
+            schedule.publication.source,
+          )
+        ) {
+          return "preserved-existing-complete";
+        }
+
+        const existingBoutIds = transaction
+          .select({ id: sqlite.scheduledBouts.id })
+          .from(sqlite.scheduledBouts)
+          .where(
+            and(
+              eq(sqlite.scheduledBouts.bashoId, schedule.publication.bashoId),
+              eq(sqlite.scheduledBouts.day, schedule.publication.day),
+            ),
+          )
+          .all()
+          .map((bout) => bout.id);
+        const preserveExistingFullerSchedule =
+          shouldPreserveExistingFullerSchedule(
+            existingBoutIds,
+            schedule.bouts.map((bout) => bout.id),
+            schedule.publication.source,
+          );
+
+        for (const entry of [
+          ...(schedule.rikishi ?? []),
+          ...(results.rikishi ?? []),
+        ]) {
+          transaction
+            .insert(sqlite.rikishi)
+            .values(toRikishiRow(entry))
+            .onConflictDoNothing({ target: sqlite.rikishi.id })
+            .run();
+        }
+
+        if (!preserveExistingFullerSchedule) {
+          transaction
+            .insert(sqlite.scheduledBoutPublications)
+            .values(schedule.publication)
+            .onConflictDoUpdate({
+              target: [
+                sqlite.scheduledBoutPublications.bashoId,
+                sqlite.scheduledBoutPublications.day,
+              ],
+              set: schedule.publication,
+            })
+            .run();
+
+          for (const entry of schedule.bouts) {
+            transaction
+              .insert(sqlite.scheduledBouts)
+              .values(toScheduledBoutRow(entry))
+              .onConflictDoUpdate({
+                target: sqlite.scheduledBouts.id,
+                set: toScheduledBoutRow(entry),
+              })
+              .run();
+          }
+
+          const importedScheduleDayFilter = and(
+            eq(sqlite.scheduledBouts.bashoId, schedule.publication.bashoId),
+            eq(sqlite.scheduledBouts.day, schedule.publication.day),
+          );
+
+          if (schedule.bouts.length === 0) {
+            transaction
+              .delete(sqlite.scheduledBouts)
+              .where(importedScheduleDayFilter)
+              .run();
+          } else {
+            transaction
+              .delete(sqlite.scheduledBouts)
+              .where(
+                and(
+                  importedScheduleDayFilter,
+                  notInArray(
+                    sqlite.scheduledBouts.id,
+                    schedule.bouts.map((entry) => entry.id),
+                  ),
+                ),
+              )
+              .run();
+          }
+        }
+
+        if (results.basho !== undefined) {
+          const existingBasho = transaction
+            .select()
+            .from(sqlite.basho)
+            .where(eq(sqlite.basho.id, results.basho.id))
+            .get();
+          const nextBasho = preserveBashoLifecycleProgress(
+            existingBasho === undefined ? undefined : toBasho(existingBasho),
+            results.basho,
+          );
+
+          transaction
+            .insert(sqlite.basho)
+            .values(toBashoRow(nextBasho))
+            .onConflictDoUpdate({
+              target: sqlite.basho.id,
+              set: toBashoRow(nextBasho),
+            })
+            .run();
+        }
+
+        for (const entry of results.results) {
+          transaction
+            .insert(sqlite.boutResults)
+            .values(toBoutResultRow(entry))
+            .onConflictDoUpdate({
+              target: sqlite.boutResults.id,
+              set: toBoutResultRow(entry),
+            })
+            .run();
+        }
+
+        if (results.results.length > 0 && !preserveExistingFullerSchedule) {
+          transaction
+            .delete(sqlite.boutResults)
+            .where(
+              and(
+                eq(sqlite.boutResults.bashoId, results.bashoId),
+                eq(sqlite.boutResults.day, results.day),
+                notInArray(
+                  sqlite.boutResults.id,
+                  results.results.map((entry) => entry.id),
+                ),
+              ),
+            )
+            .run();
+        }
+
+        return preserveExistingFullerSchedule
+          ? "preserved-existing-fuller-schedule"
+          : "applied";
       });
     },
   };
@@ -1564,7 +1800,61 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
       });
     },
     applyScheduledBoutsImport: async (importData) => {
-      await db.transaction(async (transaction) => {
+      return db.transaction(async (transaction) => {
+        await transaction
+          .select({ id: pg.basho.id })
+          .from(pg.basho)
+          .where(eq(pg.basho.id, importData.publication.bashoId))
+          .for("update");
+        const existingPublication = (
+          await transaction
+            .select({ source: pg.scheduledBoutPublications.source })
+            .from(pg.scheduledBoutPublications)
+            .where(
+              and(
+                eq(
+                  pg.scheduledBoutPublications.bashoId,
+                  importData.publication.bashoId,
+                ),
+                eq(
+                  pg.scheduledBoutPublications.day,
+                  importData.publication.day,
+                ),
+              ),
+            )
+        ).at(0);
+
+        if (
+          shouldPreserveExistingCompleteSnapshot(
+            existingPublication?.source,
+            importData.publication.source,
+          )
+        ) {
+          return "preserved-existing-complete";
+        }
+
+        const existingBoutIds = (
+          await transaction
+            .select({ id: pg.scheduledBouts.id })
+            .from(pg.scheduledBouts)
+            .where(
+              and(
+                eq(pg.scheduledBouts.bashoId, importData.publication.bashoId),
+                eq(pg.scheduledBouts.day, importData.publication.day),
+              ),
+            )
+        ).map((bout) => bout.id);
+
+        if (
+          shouldPreserveExistingFullerSchedule(
+            existingBoutIds,
+            importData.bouts.map((bout) => bout.id),
+            importData.publication.source,
+          )
+        ) {
+          return "preserved-existing-fuller-schedule";
+        }
+
         for (const entry of importData.rikishi ?? []) {
           await transaction
             .insert(pg.rikishi)
@@ -1611,11 +1901,223 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
             ),
           );
         }
+
+        return "applied";
+      });
+    },
+    applyScheduledBoutsAndBoutResultsImport: async (importData) => {
+      return db.transaction(async (transaction) => {
+        const schedule = importData.scheduledBouts;
+        const results = importData.boutResults;
+        await transaction
+          .select({ id: pg.basho.id })
+          .from(pg.basho)
+          .where(eq(pg.basho.id, schedule.publication.bashoId))
+          .for("update");
+        assertExpectedBanzukeRoster(
+          importData.expectedBanzukeRikishiIds,
+          (
+            await transaction
+              .select({ rikishiId: pg.banzukeEntries.rikishiId })
+              .from(pg.banzukeEntries)
+              .where(eq(pg.banzukeEntries.bashoId, results.bashoId))
+          ).map((entry) => entry.rikishiId),
+        );
+        const existingPublication = (
+          await transaction
+            .select({ source: pg.scheduledBoutPublications.source })
+            .from(pg.scheduledBoutPublications)
+            .where(
+              and(
+                eq(
+                  pg.scheduledBoutPublications.bashoId,
+                  schedule.publication.bashoId,
+                ),
+                eq(pg.scheduledBoutPublications.day, schedule.publication.day),
+              ),
+            )
+        ).at(0);
+
+        if (
+          shouldPreserveExistingCompleteSnapshot(
+            existingPublication?.source,
+            schedule.publication.source,
+          )
+        ) {
+          return "preserved-existing-complete";
+        }
+
+        const existingBoutIds = (
+          await transaction
+            .select({ id: pg.scheduledBouts.id })
+            .from(pg.scheduledBouts)
+            .where(
+              and(
+                eq(pg.scheduledBouts.bashoId, schedule.publication.bashoId),
+                eq(pg.scheduledBouts.day, schedule.publication.day),
+              ),
+            )
+        ).map((bout) => bout.id);
+        const preserveExistingFullerSchedule =
+          shouldPreserveExistingFullerSchedule(
+            existingBoutIds,
+            schedule.bouts.map((bout) => bout.id),
+            schedule.publication.source,
+          );
+
+        for (const entry of [
+          ...(schedule.rikishi ?? []),
+          ...(results.rikishi ?? []),
+        ]) {
+          await transaction
+            .insert(pg.rikishi)
+            .values(toRikishiRow(entry))
+            .onConflictDoNothing({ target: pg.rikishi.id });
+        }
+
+        if (!preserveExistingFullerSchedule) {
+          await transaction
+            .insert(pg.scheduledBoutPublications)
+            .values(schedule.publication)
+            .onConflictDoUpdate({
+              target: [
+                pg.scheduledBoutPublications.bashoId,
+                pg.scheduledBoutPublications.day,
+              ],
+              set: schedule.publication,
+            });
+
+          for (const entry of schedule.bouts) {
+            await transaction
+              .insert(pg.scheduledBouts)
+              .values(toScheduledBoutRow(entry))
+              .onConflictDoUpdate({
+                target: pg.scheduledBouts.id,
+                set: toScheduledBoutRow(entry),
+              });
+          }
+
+          const importedScheduleDayFilter = and(
+            eq(pg.scheduledBouts.bashoId, schedule.publication.bashoId),
+            eq(pg.scheduledBouts.day, schedule.publication.day),
+          );
+
+          if (schedule.bouts.length === 0) {
+            await transaction
+              .delete(pg.scheduledBouts)
+              .where(importedScheduleDayFilter);
+          } else {
+            await transaction.delete(pg.scheduledBouts).where(
+              and(
+                importedScheduleDayFilter,
+                notInArray(
+                  pg.scheduledBouts.id,
+                  schedule.bouts.map((entry) => entry.id),
+                ),
+              ),
+            );
+          }
+        }
+
+        if (results.basho !== undefined) {
+          const existingBasho = (
+            await transaction
+              .select()
+              .from(pg.basho)
+              .where(eq(pg.basho.id, results.basho.id))
+              .for("update")
+          ).at(0);
+          const nextBasho = preserveBashoLifecycleProgress(
+            existingBasho === undefined ? undefined : toBasho(existingBasho),
+            results.basho,
+          );
+
+          await transaction
+            .insert(pg.basho)
+            .values(toBashoRow(nextBasho))
+            .onConflictDoUpdate({
+              target: pg.basho.id,
+              set: toBashoRow(nextBasho),
+            });
+        }
+
+        for (const entry of results.results) {
+          await transaction
+            .insert(pg.boutResults)
+            .values(toBoutResultRow(entry))
+            .onConflictDoUpdate({
+              target: pg.boutResults.id,
+              set: toBoutResultRow(entry),
+            });
+        }
+
+        if (results.results.length > 0 && !preserveExistingFullerSchedule) {
+          await transaction.delete(pg.boutResults).where(
+            and(
+              eq(pg.boutResults.bashoId, results.bashoId),
+              eq(pg.boutResults.day, results.day),
+              notInArray(
+                pg.boutResults.id,
+                results.results.map((entry) => entry.id),
+              ),
+            ),
+          );
+        }
+
+        return preserveExistingFullerSchedule
+          ? "preserved-existing-fuller-schedule"
+          : "applied";
       });
     },
   };
 
   return repositories;
+}
+
+function shouldPreserveExistingCompleteSnapshot(
+  existingSource: string | undefined,
+  incomingSource: string,
+): boolean {
+  return (
+    existingSource !== undefined &&
+    isCompleteScheduledBoutPublicationSource(existingSource) &&
+    !isCompleteScheduledBoutPublicationSource(incomingSource)
+  );
+}
+
+function assertExpectedBanzukeRoster(
+  expectedRikishiIds: readonly string[] | undefined,
+  actualRikishiIds: readonly string[],
+): void {
+  if (expectedRikishiIds === undefined) {
+    return;
+  }
+
+  const expected = [...expectedRikishiIds].sort();
+  const actual = [...actualRikishiIds].sort();
+  if (
+    expected.length !== actual.length ||
+    expected.some((rikishiId, index) => rikishiId !== actual[index])
+  ) {
+    throw new Error(
+      "The basho banzuke changed while results were being imported; retry with the current roster.",
+    );
+  }
+}
+
+function shouldPreserveExistingFullerSchedule(
+  existingBoutIds: readonly string[],
+  incomingBoutIds: readonly string[],
+  incomingSource: string,
+): boolean {
+  const existingBoutIdSet = new Set(existingBoutIds);
+
+  return (
+    !isCompleteScheduledBoutPublicationSource(incomingSource) &&
+    incomingBoutIds.length > 0 &&
+    existingBoutIds.length > incomingBoutIds.length &&
+    incomingBoutIds.every((boutId) => existingBoutIdSet.has(boutId))
+  );
 }
 
 function toBashoRow(entry: Basho) {

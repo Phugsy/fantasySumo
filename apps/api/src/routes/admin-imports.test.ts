@@ -54,9 +54,14 @@ beforeEach(async () => {
         });
       }
 
+      if (sourceUrl.includes("/banzuke/")) {
+        return sumoApiBanzukeResponse();
+      }
+
       const day = Number(sourceUrl.split("/").at(-1));
 
       return jsonResponse({
+        ...(day === 15 ? { yusho: [{ type: "Makuuchi" }] } : {}),
         torikumi: [
           {
             id: "202605-1-1-4227-3661",
@@ -299,6 +304,108 @@ describe("admin import routes", () => {
     expect(leaderboardResponse.statusCode).toBe(200);
   });
 
+  it("blocks final-day data when earlier result days are missing", async () => {
+    await app.inject({
+      method: "POST",
+      url: "/api/admin/import-banzuke",
+      payload: { confirmedSourceBashoId: "2026-05" },
+    });
+
+    const dryRunResponse = await app.inject({
+      method: "POST",
+      url: "/api/admin/basho/2026-05/import-results?dryRun=true",
+      payload: { day: 15 },
+    });
+
+    expect(dryRunResponse.statusCode).toBe(400);
+    expect(dryRunResponse.json()).toMatchObject({
+      error: "invalid-import",
+    });
+
+    const repositories = createRepositories(client);
+    expect(
+      await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
+    ).toEqual([]);
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toEqual([]);
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 3,
+    });
+
+    const applyResponse = await app.inject({
+      method: "POST",
+      url: "/api/admin/basho/2026-05/import-results",
+      payload: { day: 15 },
+    });
+
+    expect(applyResponse.statusCode).toBe(400);
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "active",
+      currentDay: 3,
+    });
+    expect(
+      await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
+    ).toEqual([]);
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toEqual([]);
+  });
+
+  it("keeps the existing final schedule when snapshot fetching fails", async () => {
+    await app.inject({
+      method: "POST",
+      url: "/api/admin/import-banzuke",
+      payload: { confirmedSourceBashoId: "2026-05" },
+    });
+    const repositories = createRepositories(client);
+    await repositories.applyScheduledBoutsImport({
+      publication: {
+        id: "2026-05-day-15-schedule",
+        bashoId: "2026-05",
+        day: 15,
+        source: "existing-schedule",
+        publishedAt: "2026-05-23T08:00:00.000Z",
+      },
+      bouts: [
+        {
+          id: "existing-day-15-bout",
+          bashoId: "2026-05",
+          day: 15,
+          eastRikishiId: "onosato",
+          westRikishiId: "kotozakura",
+          status: "cancelled",
+        },
+      ],
+    });
+
+    await app.close();
+    app = buildApp({
+      allowUnprotectedAdminImports: true,
+      db: client,
+      sourceFetch: async (url) => {
+        return String(url).includes("/banzuke/")
+          ? sumoApiBanzukeResponse()
+          : new Response(null, { status: 503 });
+      },
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/admin/basho/2026-05/import-results",
+      payload: { day: 15 },
+    });
+
+    expect(response.statusCode).toBe(502);
+    expect(
+      await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
+    ).toEqual([expect.objectContaining({ source: "existing-schedule" })]);
+    expect(await repositories.listScheduledBoutsForBasho("2026-05")).toEqual([
+      expect.objectContaining({
+        id: "existing-day-15-bout",
+        status: "cancelled",
+      }),
+    ]);
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toEqual([]);
+  });
+
   it("keeps imported results and reports partial success when the next schedule is unavailable", async () => {
     await app.inject({
       method: "POST",
@@ -311,7 +418,13 @@ describe("admin import routes", () => {
       allowUnprotectedAdminImports: true,
       db: client,
       sourceFetch: async (url) => {
-        const day = Number(String(url).split("/").at(-1));
+        const sourceUrl = String(url);
+
+        if (sourceUrl.includes("/banzuke/")) {
+          return sumoApiBanzukeResponse();
+        }
+
+        const day = Number(sourceUrl.split("/").at(-1));
 
         return day === 1
           ? jsonResponse({
@@ -356,7 +469,12 @@ describe("admin import routes", () => {
     );
     expect(
       await repositories.listScheduledBoutPublicationsForBasho("2026-05"),
-    ).toEqual([]);
+    ).toEqual([
+      expect.objectContaining({
+        day: 1,
+        source: "sumo-api-schedule:complete",
+      }),
+    ]);
   });
 
   it("imports future schedules without creating scored results", async () => {
@@ -459,5 +577,24 @@ function jsonResponse(payload: unknown) {
     headers: {
       "content-type": "application/json",
     },
+  });
+}
+
+function sumoApiBanzukeResponse() {
+  return jsonResponse({
+    east: [
+      {
+        rikishiID: 4227,
+        shikonaEn: "Onosato",
+        record: Array.from({ length: 15 }, () => ({ result: "win" })),
+      },
+    ],
+    west: [
+      {
+        rikishiID: 3661,
+        shikonaEn: "Kotozakura",
+        record: Array.from({ length: 15 }, () => ({ result: "loss" })),
+      },
+    ],
   });
 }
