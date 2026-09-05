@@ -21,7 +21,7 @@ import type {
   PostgresDatabase,
   SqliteDatabase,
 } from "./client.js";
-import { DEMO_BASHO_ID } from "./demo-constants.js";
+import { DEMO_BASHO_ID, DEMO_PREVIOUS_BASHO_ID } from "./demo-constants.js";
 import * as pg from "./schema.pg.js";
 import * as sqlite from "./schema.js";
 
@@ -107,7 +107,9 @@ export type OwnedFantasyTeamSaveResult =
 export interface Repositories {
   /** Clears every game record. Production and admin paths must never call this. */
   resetAllDataForLocalFixtures: () => Promise<void>;
-  replaceDemoBashoData: (resetData: DemoBashoResetData) => Promise<void>;
+  replaceDemoBashosData: (
+    resetData: readonly DemoBashoResetData[],
+  ) => Promise<void>;
 
   insertBasho: (entry: Basho) => Promise<void>;
   upsertBasho: (entry: Basho) => Promise<void>;
@@ -207,95 +209,110 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
       db.delete(sqlite.rikishi).run();
       db.delete(sqlite.basho).run();
     },
-    replaceDemoBashoData: async (resetData) => {
-      assertDemoBashoResetData(resetData);
+    replaceDemoBashosData: async (resetData) => {
+      assertDemoBashosResetData(resetData);
 
       db.transaction((transaction) => {
-        const existingBasho = transaction
-          .select({ isDemo: sqlite.basho.isDemo })
-          .from(sqlite.basho)
-          .where(eq(sqlite.basho.id, resetData.basho.id))
-          .get();
+        const existingConfigs = new Map<
+          string,
+          typeof sqlite.bashoGameConfig.$inferSelect
+        >();
 
-        if (existingBasho !== undefined && !existingBasho.isDemo) {
-          throw new Error(
-            `Refusing to replace live basho ${resetData.basho.id} with demo data.`,
-          );
+        for (const bashoData of resetData) {
+          const existingBasho = transaction
+            .select({ isDemo: sqlite.basho.isDemo })
+            .from(sqlite.basho)
+            .where(eq(sqlite.basho.id, bashoData.basho.id))
+            .get();
+
+          if (existingBasho !== undefined && !existingBasho.isDemo) {
+            throw new Error(
+              `Refusing to replace live basho ${bashoData.basho.id} with demo data.`,
+            );
+          }
+
+          const existingConfig = transaction
+            .select()
+            .from(sqlite.bashoGameConfig)
+            .where(eq(sqlite.bashoGameConfig.bashoId, bashoData.basho.id))
+            .get();
+          if (existingConfig !== undefined) {
+            existingConfigs.set(bashoData.basho.id, existingConfig);
+          }
         }
 
-        const existingConfig = transaction
-          .select()
-          .from(sqlite.bashoGameConfig)
-          .where(eq(sqlite.bashoGameConfig.bashoId, resetData.basho.id))
-          .get();
-
-        transaction
-          .delete(sqlite.basho)
-          .where(
-            and(
-              eq(sqlite.basho.id, resetData.basho.id),
-              eq(sqlite.basho.isDemo, true),
-            ),
-          )
-          .run();
-
-        for (const entry of resetData.rikishi) {
+        for (const bashoData of resetData) {
           transaction
-            .insert(sqlite.rikishi)
-            .values(toRikishiRow(entry))
-            .onConflictDoNothing({ target: sqlite.rikishi.id })
+            .delete(sqlite.basho)
+            .where(
+              and(
+                eq(sqlite.basho.id, bashoData.basho.id),
+                eq(sqlite.basho.isDemo, true),
+              ),
+            )
             .run();
         }
 
-        transaction
-          .insert(sqlite.basho)
-          .values(toBashoRow(resetData.basho))
-          .run();
+        for (const bashoData of resetData) {
+          for (const entry of bashoData.rikishi) {
+            transaction
+              .insert(sqlite.rikishi)
+              .values(toRikishiRow(entry))
+              .onConflictDoNothing({ target: sqlite.rikishi.id })
+              .run();
+          }
 
-        if (existingConfig !== undefined) {
           transaction
-            .insert(sqlite.bashoGameConfig)
-            .values(existingConfig)
+            .insert(sqlite.basho)
+            .values(toBashoRow(bashoData.basho))
             .run();
-        }
 
-        for (const entry of resetData.banzukeEntries) {
-          transaction.insert(sqlite.banzukeEntries).values(entry).run();
-        }
+          const existingConfig = existingConfigs.get(bashoData.basho.id);
+          if (existingConfig !== undefined) {
+            transaction
+              .insert(sqlite.bashoGameConfig)
+              .values(existingConfig)
+              .run();
+          }
 
-        for (const entry of resetData.fantasyTeams) {
-          transaction
-            .insert(sqlite.fantasyTeams)
-            .values(toFantasyTeamRow(entry))
-            .run();
-        }
+          for (const entry of bashoData.banzukeEntries) {
+            transaction.insert(sqlite.banzukeEntries).values(entry).run();
+          }
 
-        for (const entry of resetData.fantasyPicks) {
-          transaction
-            .insert(sqlite.fantasyPicks)
-            .values(toFantasyPickRow(entry))
-            .run();
-        }
+          for (const entry of bashoData.fantasyTeams) {
+            transaction
+              .insert(sqlite.fantasyTeams)
+              .values(toFantasyTeamRow(entry))
+              .run();
+          }
 
-        for (const entry of resetData.boutResults) {
-          transaction
-            .insert(sqlite.boutResults)
-            .values(toBoutResultRow(entry))
-            .run();
-        }
+          for (const entry of bashoData.fantasyPicks) {
+            transaction
+              .insert(sqlite.fantasyPicks)
+              .values(toFantasyPickRow(entry))
+              .run();
+          }
 
-        for (const entry of resetData.scheduledBoutPublications) {
-          transaction
-            .insert(sqlite.scheduledBoutPublications)
-            .values(entry)
-            .run();
-        }
+          for (const entry of bashoData.boutResults) {
+            transaction
+              .insert(sqlite.boutResults)
+              .values(toBoutResultRow(entry))
+              .run();
+          }
 
-        for (const entry of resetData.scheduledBouts) {
-          transaction
-            .insert(sqlite.scheduledBouts)
-            .values(toScheduledBoutRow(entry))
-            .run();
+          for (const entry of bashoData.scheduledBoutPublications) {
+            transaction
+              .insert(sqlite.scheduledBoutPublications)
+              .values(entry)
+              .run();
+          }
+
+          for (const entry of bashoData.scheduledBouts) {
+            transaction
+              .insert(sqlite.scheduledBouts)
+              .values(toScheduledBoutRow(entry))
+              .run();
+          }
         }
       });
     },
@@ -1169,80 +1186,102 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
       await db.delete(pg.rikishi);
       await db.delete(pg.basho);
     },
-    replaceDemoBashoData: async (resetData) => {
-      assertDemoBashoResetData(resetData);
+    replaceDemoBashosData: async (resetData) => {
+      assertDemoBashosResetData(resetData);
 
       await db.transaction(async (transaction) => {
-        const existingBasho = (
+        const existingConfigs = new Map<
+          string,
+          typeof pg.bashoGameConfig.$inferSelect
+        >();
+
+        for (const bashoData of resetData) {
+          const existingBasho = (
+            await transaction
+              .select({ isDemo: pg.basho.isDemo })
+              .from(pg.basho)
+              .where(eq(pg.basho.id, bashoData.basho.id))
+              .for("update")
+          ).at(0);
+
+          if (existingBasho !== undefined && !existingBasho.isDemo) {
+            throw new Error(
+              `Refusing to replace live basho ${bashoData.basho.id} with demo data.`,
+            );
+          }
+
+          const existingConfig = (
+            await transaction
+              .select()
+              .from(pg.bashoGameConfig)
+              .where(eq(pg.bashoGameConfig.bashoId, bashoData.basho.id))
+          ).at(0);
+          if (existingConfig !== undefined) {
+            existingConfigs.set(bashoData.basho.id, existingConfig);
+          }
+        }
+
+        for (const bashoData of resetData) {
           await transaction
-            .select({ isDemo: pg.basho.isDemo })
-            .from(pg.basho)
-            .where(eq(pg.basho.id, resetData.basho.id))
-            .for("update")
-        ).at(0);
-
-        if (existingBasho !== undefined && !existingBasho.isDemo) {
-          throw new Error(
-            `Refusing to replace live basho ${resetData.basho.id} with demo data.`,
-          );
+            .delete(pg.basho)
+            .where(
+              and(
+                eq(pg.basho.id, bashoData.basho.id),
+                eq(pg.basho.isDemo, true),
+              ),
+            );
         }
 
-        const existingConfig = (
+        for (const bashoData of resetData) {
+          for (const entry of bashoData.rikishi) {
+            await transaction
+              .insert(pg.rikishi)
+              .values(toRikishiRow(entry))
+              .onConflictDoNothing({ target: pg.rikishi.id });
+          }
+
           await transaction
-            .select()
-            .from(pg.bashoGameConfig)
-            .where(eq(pg.bashoGameConfig.bashoId, resetData.basho.id))
-        ).at(0);
+            .insert(pg.basho)
+            .values(toBashoRow(bashoData.basho));
 
-        await transaction
-          .delete(pg.basho)
-          .where(
-            and(eq(pg.basho.id, resetData.basho.id), eq(pg.basho.isDemo, true)),
-          );
+          const existingConfig = existingConfigs.get(bashoData.basho.id);
+          if (existingConfig !== undefined) {
+            await transaction.insert(pg.bashoGameConfig).values(existingConfig);
+          }
 
-        for (const entry of resetData.rikishi) {
-          await transaction
-            .insert(pg.rikishi)
-            .values(toRikishiRow(entry))
-            .onConflictDoNothing({ target: pg.rikishi.id });
-        }
+          for (const entry of bashoData.banzukeEntries) {
+            await transaction.insert(pg.banzukeEntries).values(entry);
+          }
 
-        await transaction.insert(pg.basho).values(toBashoRow(resetData.basho));
+          for (const entry of bashoData.fantasyTeams) {
+            await transaction
+              .insert(pg.fantasyTeams)
+              .values(toFantasyTeamRow(entry));
+          }
 
-        if (existingConfig !== undefined) {
-          await transaction.insert(pg.bashoGameConfig).values(existingConfig);
-        }
+          for (const entry of bashoData.fantasyPicks) {
+            await transaction
+              .insert(pg.fantasyPicks)
+              .values(toFantasyPickRow(entry));
+          }
 
-        for (const entry of resetData.banzukeEntries) {
-          await transaction.insert(pg.banzukeEntries).values(entry);
-        }
+          for (const entry of bashoData.boutResults) {
+            await transaction
+              .insert(pg.boutResults)
+              .values(toBoutResultRow(entry));
+          }
 
-        for (const entry of resetData.fantasyTeams) {
-          await transaction
-            .insert(pg.fantasyTeams)
-            .values(toFantasyTeamRow(entry));
-        }
+          for (const entry of bashoData.scheduledBoutPublications) {
+            await transaction
+              .insert(pg.scheduledBoutPublications)
+              .values(entry);
+          }
 
-        for (const entry of resetData.fantasyPicks) {
-          await transaction
-            .insert(pg.fantasyPicks)
-            .values(toFantasyPickRow(entry));
-        }
-
-        for (const entry of resetData.boutResults) {
-          await transaction
-            .insert(pg.boutResults)
-            .values(toBoutResultRow(entry));
-        }
-
-        for (const entry of resetData.scheduledBoutPublications) {
-          await transaction.insert(pg.scheduledBoutPublications).values(entry);
-        }
-
-        for (const entry of resetData.scheduledBouts) {
-          await transaction
-            .insert(pg.scheduledBouts)
-            .values(toScheduledBoutRow(entry));
+          for (const entry of bashoData.scheduledBouts) {
+            await transaction
+              .insert(pg.scheduledBouts)
+              .values(toScheduledBoutRow(entry));
+          }
         }
       });
     },
@@ -2130,42 +2169,53 @@ function toBashoRow(entry: Basho) {
   };
 }
 
-function assertDemoBashoResetData(resetData: DemoBashoResetData): void {
-  if (resetData.basho.id !== DEMO_BASHO_ID) {
-    throw new Error(
-      `Demo reset may only replace the fixed basho ${DEMO_BASHO_ID}.`,
-    );
-  }
-
-  if (!resetData.basho.isDemo) {
-    throw new Error(
-      `Refusing to replace live basho ${resetData.basho.id} through the demo reset path.`,
-    );
-  }
+function assertDemoBashosResetData(
+  resetData: readonly DemoBashoResetData[],
+): void {
+  const allowedBashoIds = new Set([DEMO_BASHO_ID, DEMO_PREVIOUS_BASHO_ID]);
+  const suppliedBashoIds = new Set(resetData.map((entry) => entry.basho.id));
 
   if (
-    resetData.banzukeEntries.some(
-      (entry) => entry.bashoId !== resetData.basho.id,
-    ) ||
-    resetData.fantasyTeams.some(
-      (entry) => entry.bashoId !== resetData.basho.id,
-    ) ||
-    resetData.boutResults.some(
-      (entry) => entry.bashoId !== resetData.basho.id,
-    ) ||
-    resetData.scheduledBoutPublications.some(
-      (entry) => entry.bashoId !== resetData.basho.id,
-    ) ||
-    resetData.scheduledBouts.some(
-      (entry) => entry.bashoId !== resetData.basho.id,
-    )
+    resetData.length !== allowedBashoIds.size ||
+    suppliedBashoIds.size !== allowedBashoIds.size ||
+    [...suppliedBashoIds].some((bashoId) => !allowedBashoIds.has(bashoId))
   ) {
-    throw new Error("Demo reset data must be scoped to one demo basho.");
+    throw new Error(
+      `Demo reset must replace exactly ${[...allowedBashoIds].join(" and ")}.`,
+    );
   }
 
-  const teamIds = new Set(resetData.fantasyTeams.map((team) => team.id));
-  if (resetData.fantasyPicks.some((pick) => !teamIds.has(pick.teamId))) {
-    throw new Error("Demo reset picks must belong to demo reset teams.");
+  for (const bashoData of resetData) {
+    if (!bashoData.basho.isDemo) {
+      throw new Error(
+        `Refusing to replace live basho ${bashoData.basho.id} through the demo reset path.`,
+      );
+    }
+
+    if (
+      bashoData.banzukeEntries.some(
+        (entry) => entry.bashoId !== bashoData.basho.id,
+      ) ||
+      bashoData.fantasyTeams.some(
+        (entry) => entry.bashoId !== bashoData.basho.id,
+      ) ||
+      bashoData.boutResults.some(
+        (entry) => entry.bashoId !== bashoData.basho.id,
+      ) ||
+      bashoData.scheduledBoutPublications.some(
+        (entry) => entry.bashoId !== bashoData.basho.id,
+      ) ||
+      bashoData.scheduledBouts.some(
+        (entry) => entry.bashoId !== bashoData.basho.id,
+      )
+    ) {
+      throw new Error("Demo reset data must be scoped to one demo basho.");
+    }
+
+    const teamIds = new Set(bashoData.fantasyTeams.map((team) => team.id));
+    if (bashoData.fantasyPicks.some((pick) => !teamIds.has(pick.teamId))) {
+      throw new Error("Demo reset picks must belong to demo reset teams.");
+    }
   }
 }
 

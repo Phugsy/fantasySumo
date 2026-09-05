@@ -15,13 +15,27 @@ import {
   demoBanzukeEntries,
   demoBasho,
   demoBoutResults,
+  demoFantasyPicks,
   demoFantasyTeams,
+  demoPreviousBanzukeEntries,
+  demoPreviousBasho,
+  demoPreviousBoutResults,
+  demoPreviousRikishi,
+  demoPreviousScheduledBoutPublications,
+  demoPreviousScheduledBouts,
   demoRikishi,
+  demoScheduledBoutPublications,
+  demoScheduledBouts,
 } from "./demo-seed-data.js";
 import { runMigrations } from "./migrate.js";
-import { createRepositories } from "./repositories.js";
+import { createRepositories, type DemoBashoResetData } from "./repositories.js";
 import { seedDatabase, seedDemoDatabase } from "./seed.js";
-import { sampleBasho, sampleFantasyTeams, sampleRikishi } from "./seed-data.js";
+import {
+  sampleBasho,
+  sampleFantasyTeams,
+  samplePreviousBasho,
+  sampleRikishi,
+} from "./seed-data.js";
 
 let tmpRoot: string;
 let client: DatabaseClient;
@@ -42,7 +56,10 @@ describe("repositories", () => {
     await seedDatabase(createRepositories(client));
     const repositories = createRepositories(client);
 
-    expect(await repositories.listBashos()).toEqual([sampleBasho]);
+    expect(await repositories.listBashos()).toEqual([
+      samplePreviousBasho,
+      sampleBasho,
+    ]);
     expect(await repositories.listRikishi()).toHaveLength(sampleRikishi.length);
     expect(
       (await repositories.listBanzukeEntriesForBasho(sampleBasho.id)).map(
@@ -787,8 +804,15 @@ describe("repositories", () => {
     await seedDemoDatabase(createRepositories(client));
     const repositories = createRepositories(client);
 
-    expect(await repositories.listBashos()).toEqual([demoBasho]);
-    expect(await repositories.listRikishi()).toHaveLength(demoRikishi.length);
+    expect(await repositories.listBashos()).toEqual([
+      demoPreviousBasho,
+      demoBasho,
+    ]);
+    expect(await repositories.listRikishi()).toHaveLength(
+      new Set(
+        [...demoPreviousRikishi, ...demoRikishi].map((rikishi) => rikishi.id),
+      ).size,
+    );
     expect(
       await repositories.listBanzukeEntriesForBasho(demoBasho.id),
     ).toHaveLength(demoBanzukeEntries.length);
@@ -909,19 +933,84 @@ describe("repositories", () => {
     const repositories = createRepositories(client);
 
     await expect(
-      repositories.replaceDemoBashoData({
-        basho: { ...demoBasho, id: "demo-other" },
-        rikishi: [],
-        banzukeEntries: [],
-        fantasyTeams: [],
-        fantasyPicks: [],
-        boutResults: [],
-        scheduledBoutPublications: [],
-        scheduledBouts: [],
-      }),
+      repositories.replaceDemoBashosData([
+        {
+          basho: { ...demoBasho, id: "demo-other" },
+          rikishi: [],
+          banzukeEntries: [],
+          fantasyTeams: [],
+          fantasyPicks: [],
+          boutResults: [],
+          scheduledBoutPublications: [],
+          scheduledBouts: [],
+        },
+      ]),
     ).rejects.toThrow(
-      `Demo reset may only replace the fixed basho ${demoBasho.id}.`,
+      "Demo reset must replace exactly demo-2026-05 and demo-2026-03.",
     );
+  });
+
+  it("rolls back both demo bashos when an atomic fixture replacement fails", async () => {
+    const repositories = createRepositories(client);
+    await seedDemoDatabase(repositories);
+    const resetData = createDemoBashosResetData();
+    const previousBashoData = resetData[1]!;
+    const duplicateEntry = previousBashoData.banzukeEntries[0]!;
+    resetData[1] = {
+      ...previousBashoData,
+      banzukeEntries: [duplicateEntry, duplicateEntry],
+    };
+
+    await expect(
+      repositories.replaceDemoBashosData(resetData),
+    ).rejects.toThrow();
+
+    expect(
+      await repositories.listBanzukeEntriesForBasho(demoBasho.id),
+    ).toHaveLength(demoBanzukeEntries.length);
+    expect(
+      await repositories.listBanzukeEntriesForBasho(demoPreviousBasho.id),
+    ).toHaveLength(demoPreviousBanzukeEntries.length);
+  });
+
+  it("removes stale historical cards during the exact demo reset", async () => {
+    const repositories = createRepositories(client);
+    await seedDemoDatabase(repositories);
+    const dayOneBouts = demoPreviousScheduledBouts.filter(
+      (bout) => bout.day === 1,
+    );
+    const staleBout = {
+      id: `${demoPreviousBasho.id}-day-1-stale-match`,
+      bashoId: demoPreviousBasho.id,
+      day: 1,
+      eastRikishiId: "meisei",
+      westRikishiId: "tobizaru",
+      status: "scheduled" as const,
+    };
+    await repositories.applyScheduledBoutsImport({
+      publication: {
+        id: `${demoPreviousBasho.id}-day-1-stale-schedule`,
+        bashoId: demoPreviousBasho.id,
+        day: 1,
+        source: "demo-history-fixture",
+        publishedAt: "2026-03-08T09:00:00.000Z",
+      },
+      bouts: [...dayOneBouts, staleBout],
+    });
+
+    expect(
+      (
+        await repositories.listScheduledBoutsForBasho(demoPreviousBasho.id)
+      ).some((bout) => bout.id === staleBout.id),
+    ).toBe(true);
+
+    await seedDemoDatabase(repositories);
+
+    const resetBouts = await repositories.listScheduledBoutsForBasho(
+      demoPreviousBasho.id,
+    );
+    expect(resetBouts).toHaveLength(demoPreviousScheduledBouts.length);
+    expect(resetBouts.some((bout) => bout.id === staleBout.id)).toBe(false);
   });
 
   it("resets demo progression to a deterministic pre-basho state", async () => {
@@ -1049,3 +1138,30 @@ describe("repositories", () => {
     });
   });
 });
+
+function createDemoBashosResetData(): DemoBashoResetData[] {
+  return [
+    {
+      basho: demoBasho,
+      rikishi: demoRikishi,
+      banzukeEntries: demoBanzukeEntries,
+      fantasyTeams: demoFantasyTeams,
+      fantasyPicks: demoFantasyPicks,
+      boutResults: [],
+      scheduledBoutPublications: demoScheduledBoutPublications,
+      scheduledBouts: demoScheduledBouts,
+    },
+    {
+      basho: demoPreviousBasho,
+      rikishi: demoPreviousRikishi.filter(
+        (rikishi) => !demoRikishi.some((current) => current.id === rikishi.id),
+      ),
+      banzukeEntries: demoPreviousBanzukeEntries,
+      fantasyTeams: [],
+      fantasyPicks: [],
+      boutResults: demoPreviousBoutResults,
+      scheduledBoutPublications: demoPreviousScheduledBoutPublications,
+      scheduledBouts: demoPreviousScheduledBouts,
+    },
+  ];
+}

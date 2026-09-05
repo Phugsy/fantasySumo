@@ -5,6 +5,7 @@ import type {
   Basho,
   FantasyPick,
   FantasyTeam,
+  PreviousBashoRecordState,
   ScheduledBoutPublication,
 } from "@fantasy-sumo/domain";
 import type { AuthService } from "../auth.js";
@@ -14,7 +15,9 @@ import {
   calculateLeaderboard,
   calculateTeamScore,
   canEditFantasyPicks,
+  derivePreviousBashoRecord,
   deriveRikishiTournamentNotes,
+  findPreviousCompletedBasho,
   getVerifiedBoutResultsThroughDay,
   hasBoutResultForScheduledBout,
   getPickLockMessage,
@@ -274,13 +277,23 @@ export function registerBashoRoutes(
       boutResults,
       scheduledBouts,
       scheduledBoutPublications,
+      bashos,
     ] = await Promise.all([
       context.repositories.listRikishi(),
       context.repositories.listBanzukeEntriesForBasho(basho.id),
       context.repositories.listBoutResultsForBasho(basho.id),
       context.repositories.listScheduledBoutsForBasho(basho.id),
       context.repositories.listScheduledBoutPublicationsForBasho(basho.id),
+      context.repositories.listBashos(),
     ]);
+    const previousBasho = findPreviousCompletedBasho(basho, bashos);
+    const previousBashoData =
+      previousBasho === undefined
+        ? undefined
+        : await loadVerifiedPreviousBashoData(
+            context.repositories,
+            previousBasho,
+          );
     const completeScheduleDays = getCompleteScheduleDays(
       basho,
       scheduledBoutPublications,
@@ -306,6 +319,11 @@ export function registerBashoRoutes(
         heya: entry.heya ?? rikishiEntry?.heya,
         rank: entry.rank,
         rankOrder: entry.rankOrder,
+        previousBashoRecord: getPreviousBashoRecordState({
+          previousBasho,
+          previousBashoData,
+          rikishiId: entry.rikishiId,
+        }),
         tournamentNotes: deriveRikishiTournamentNotes({
           banzukeEntries,
           boutResults,
@@ -820,6 +838,122 @@ export function registerBashoRoutes(
           : leaderboard,
     };
   });
+}
+
+async function loadVerifiedPreviousBashoData(
+  repositories: Repositories,
+  basho: Basho,
+) {
+  const totalDays = getBashoTotalDays(basho);
+
+  if (totalDays === undefined) {
+    return undefined;
+  }
+
+  const [
+    banzukeEntries,
+    boutResults,
+    scheduledBouts,
+    scheduledBoutPublications,
+  ] = await Promise.all([
+    repositories.listBanzukeEntriesForBasho(basho.id),
+    repositories.listBoutResultsForBasho(basho.id),
+    repositories.listScheduledBoutsForBasho(basho.id),
+    repositories.listScheduledBoutPublicationsForBasho(basho.id),
+  ]);
+  const completeScheduleDays = getCompleteScheduleDays(
+    basho,
+    scheduledBoutPublications,
+  );
+  const verifiedThroughDay = getVerifiedBoutResultsThroughDay({
+    boutResults,
+    completeScheduleDays,
+    scheduledBouts,
+    throughDay: totalDays,
+  });
+
+  if (verifiedThroughDay !== totalDays) {
+    return undefined;
+  }
+
+  const scheduledResultKeys = new Set(
+    scheduledBouts.map((bout) =>
+      scheduledMatchupKey(bout.day, bout.eastRikishiId, bout.westRikishiId),
+    ),
+  );
+  const verifiedBoutResults = boutResults.filter((result) =>
+    scheduledResultKeys.has(
+      scheduledMatchupKey(
+        result.day,
+        result.winnerRikishiId,
+        result.loserRikishiId,
+      ),
+    ),
+  );
+
+  return {
+    basho,
+    banzukeEntries,
+    boutResults: verifiedBoutResults,
+    totalDays,
+  };
+}
+
+interface PreviousBashoRecordStateInput {
+  previousBasho: Basho | undefined;
+  previousBashoData:
+    | Awaited<ReturnType<typeof loadVerifiedPreviousBashoData>>
+    | undefined;
+  rikishiId: string;
+}
+
+function getPreviousBashoRecordState({
+  previousBasho,
+  previousBashoData,
+  rikishiId,
+}: PreviousBashoRecordStateInput): PreviousBashoRecordState {
+  if (previousBasho === undefined) {
+    return { status: "unavailable" };
+  }
+
+  const bashoIdentity = {
+    bashoId: previousBasho.id,
+    bashoName: previousBasho.name,
+    startDate: previousBasho.startDate,
+  };
+
+  if (previousBashoData === undefined) {
+    return { status: "unavailable", ...bashoIdentity };
+  }
+
+  const record = derivePreviousBashoRecord({
+    ...previousBashoData,
+    rikishiId,
+  });
+
+  if (record !== undefined) {
+    return { status: "available", ...record };
+  }
+
+  const hasBanzukeEntry = previousBashoData.banzukeEntries.some(
+    (entry) => entry.rikishiId === rikishiId,
+  );
+
+  // The deterministic demo fixture is a complete, closed set. Live imports are
+  // currently Makuuchi-only, so a missing live row cannot prove non-participation.
+  if (previousBasho.isDemo && !hasBanzukeEntry) {
+    return { status: "did-not-compete", ...bashoIdentity };
+  }
+
+  return { status: "unavailable", ...bashoIdentity };
+}
+
+function scheduledMatchupKey(
+  day: number,
+  firstRikishiId: string,
+  secondRikishiId: string,
+): string {
+  return `${day}\0${[firstRikishiId, secondRikishiId].sort().join("\0")}`;
 }
 
 function getCompleteScheduleDays(

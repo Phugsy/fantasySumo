@@ -11,6 +11,16 @@ const rikishi: RankedRikishi[] = [
     heya: "Nishonoseki",
     rank: "Ozeki",
     rankOrder: 1,
+    previousBashoRecord: {
+      status: "available",
+      bashoId: "2026-03",
+      bashoName: "March 2026 Basho",
+      startDate: "2026-03-08",
+      rank: "Sekiwake",
+      wins: 10,
+      losses: 5,
+      absences: 0,
+    },
     tournamentNotes: { statuses: [], achievements: [] },
   },
   {
@@ -19,6 +29,16 @@ const rikishi: RankedRikishi[] = [
     heya: "Sadogatake",
     rank: "Ozeki",
     rankOrder: 2,
+    previousBashoRecord: {
+      status: "available",
+      bashoId: "2026-03",
+      bashoName: "March 2026 Basho",
+      startDate: "2026-03-08",
+      rank: "Ozeki",
+      wins: 5,
+      losses: 4,
+      absences: 6,
+    },
     tournamentNotes: { statuses: [], achievements: [] },
   },
   {
@@ -27,6 +47,20 @@ const rikishi: RankedRikishi[] = [
     heya: "Tatsunami",
     rank: "Sekiwake",
     rankOrder: 3,
+    previousBashoRecord: {
+      status: "did-not-compete",
+      bashoId: "2026-03",
+      bashoName: "March 2026 Basho",
+      startDate: "2026-03-08",
+    },
+    tournamentNotes: { statuses: [], achievements: [] },
+  },
+  {
+    id: "tobizaru",
+    shikona: "Tobizaru",
+    heya: "Oitekaze",
+    rank: "Maegashira #1",
+    rankOrder: 4,
     tournamentNotes: { statuses: [], achievements: [] },
   },
 ];
@@ -60,6 +94,27 @@ describe("TeamSelection", () => {
     expect(
       within(banzuke).getByRole("button", { name: /Hoshoryu/ }),
     ).toBeDisabled();
+  });
+
+  it("shows accessible previous-basho records and distinct missing-history states", () => {
+    renderTeamSelection();
+
+    expect(
+      screen.getByText("Previous basho: March 2026 Basho · 10–5 · Sekiwake"),
+    ).toBeInTheDocument();
+    const banzuke = screen.getByRole("region", { name: "Choose rikishi" });
+
+    expect(
+      within(banzuke).getByRole("button", { name: /Kotozakura/ }),
+    ).toHaveAccessibleName(
+      /Previous basho March 2026 Basho: 5 wins, 4 losses, 6 absences, ranked Ozeki/,
+    );
+    expect(
+      screen.getByText("Previous basho: March 2026 Basho · Did not compete"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Previous basho: Record unavailable"),
+    ).toBeInTheDocument();
   });
 
   it("emits input, pick, remove, and submit events", () => {

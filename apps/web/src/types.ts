@@ -15,8 +15,34 @@ export interface RankedRikishi {
   heya?: string;
   rank: string;
   rankOrder: number;
+  previousBashoRecord?: PreviousBashoRecordState;
   tournamentNotes?: RikishiTournamentNotes;
 }
+
+export interface PreviousBashoRecord {
+  bashoId: string;
+  bashoName: string;
+  startDate: string;
+  rank: string;
+  wins: number;
+  losses: number;
+  absences: number;
+}
+
+export type PreviousBashoRecordState =
+  | ({ status: "available" } & PreviousBashoRecord)
+  | {
+      status: "did-not-compete";
+      bashoId: string;
+      bashoName: string;
+      startDate: string;
+    }
+  | {
+      status: "unavailable";
+      bashoId?: string;
+      bashoName?: string;
+      startDate?: string;
+    };
 
 export interface RikishiTournamentNotes {
   statuses: Array<{
