@@ -72,6 +72,13 @@ export async function importBanzuke(
 
   const summary = createEmptySummary();
   const existingBasho = await repositories.getBasho(command.basho.id);
+  const existingBanzukeEntries = await repositories.listBanzukeEntriesForBasho(
+    command.basho.id,
+  );
+  const banzukeEntriesForSummary = preserveKnownBanzukeHeya(
+    existingBanzukeEntries,
+    command.banzukeEntries,
+  );
   const nextBasho = preserveBashoLifecycleProgress(
     existingBasho,
     command.basho,
@@ -83,8 +90,8 @@ export async function importBanzuke(
     isEqualRikishi,
   );
   summary.banzuke = summarizeMany(
-    await repositories.listBanzukeEntriesForBasho(command.basho.id),
-    command.banzukeEntries,
+    existingBanzukeEntries,
+    banzukeEntriesForSummary,
     isEqualBanzukeEntry,
     { countDeleted: true },
   );
@@ -93,6 +100,8 @@ export async function importBanzuke(
     await repositories.applyBanzukeImport({
       basho: nextBasho,
       rikishi: command.rikishi,
+      // Leave omitted optional fields sparse so the repository's atomic
+      // conflict update preserves the latest value stored in the database.
       banzukeEntries: command.banzukeEntries,
     });
   }
@@ -102,6 +111,23 @@ export async function importBanzuke(
     source: command.source,
     summary,
   };
+}
+
+function preserveKnownBanzukeHeya(
+  existingEntries: readonly BanzukeEntry[],
+  incomingEntries: readonly BanzukeEntry[],
+): BanzukeEntry[] {
+  const existingById = new Map(
+    existingEntries.map((entry) => [entry.id, entry]),
+  );
+
+  return incomingEntries.map((entry) => {
+    const existingHeya = existingById.get(entry.id)?.heya;
+
+    return entry.heya !== undefined || existingHeya === undefined
+      ? entry
+      : { ...entry, heya: existingHeya };
+  });
 }
 
 export async function importBoutResults(
@@ -910,6 +936,8 @@ function isEqualBanzukeEntry(left: BanzukeEntry, right: BanzukeEntry) {
     left.id === right.id &&
     left.bashoId === right.bashoId &&
     left.rikishiId === right.rikishiId &&
+    left.shikona === right.shikona &&
+    left.heya === right.heya &&
     left.rank === right.rank &&
     left.rankOrder === right.rankOrder
   );

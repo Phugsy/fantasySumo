@@ -107,6 +107,50 @@ describe("import service", () => {
     });
   });
 
+  it("preserves a known banzuke heya when a reimport omits it", async () => {
+    const repositories = createRepositories(client);
+    const withIdentitySnapshots: BanzukeImportCommand = {
+      ...banzukeCommand,
+      banzukeEntries: banzukeCommand.banzukeEntries.map((entry, index) => ({
+        ...entry,
+        shikona: banzukeCommand.rikishi[index]!.shikona,
+        heya: banzukeCommand.rikishi[index]!.heya,
+      })),
+    };
+    await importBanzuke(repositories, withIdentitySnapshots);
+    const withoutHeya: BanzukeImportCommand = {
+      ...withIdentitySnapshots,
+      rikishi: withIdentitySnapshots.rikishi.map(({ id, shikona }) => ({
+        id,
+        shikona,
+      })),
+      banzukeEntries: withIdentitySnapshots.banzukeEntries.map(
+        ({ id, bashoId, rikishiId, shikona, rank, rankOrder }) => ({
+          id,
+          bashoId,
+          rikishiId,
+          ...(shikona === undefined ? {} : { shikona }),
+          rank,
+          rankOrder,
+        }),
+      ),
+    };
+
+    const result = await importBanzuke(repositories, withoutHeya);
+    const repeatedDryRun = await importBanzuke(repositories, withoutHeya, {
+      dryRun: true,
+    });
+
+    expect(result.summary.banzuke).toMatchObject({ skipped: 2, updated: 0 });
+    expect(repeatedDryRun.summary.banzuke).toMatchObject({
+      skipped: 2,
+      updated: 0,
+    });
+    expect(await repositories.listBanzukeEntriesForBasho("2026-05")).toEqual(
+      withIdentitySnapshots.banzukeEntries,
+    );
+  });
+
   it("counts basho current-day changes in banzuke import summaries", async () => {
     const repositories = createRepositories(client);
     await importBanzuke(repositories, {

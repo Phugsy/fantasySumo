@@ -141,6 +141,19 @@ Current routes:
   - Each day records every pick's `win`, `loss`, `absent`, or `no-result`
     outcome and fantasy-point contribution. Days without stored results are
     omitted rather than presented as scored.
+- `GET /api/bashos`
+  - Returns the non-demo tournament archive, newest first.
+- `GET /api/leaderboard/all-time`
+  - Aggregates each authenticated owner's scores across completed, non-demo
+    bashos. A live basho can appear in personal history but cannot change the
+    cumulative standings. Legacy teams without an owner remain independent
+    entries.
+  - Uses the latest tournament team name for display without exposing user IDs.
+- `GET /api/my-history`
+  - Requires authentication and returns the current user's teams, scores, and
+    per-rikishi wins for every non-demo basho in which they participated.
+  - Resolves shikona and heya from the per-basho banzuke snapshot before falling
+    back to current global rikishi metadata.
 - `GET /api/session`
   - Returns the current authenticated user or `null`.
 - `POST /api/session`
@@ -150,6 +163,8 @@ Current routes:
 - `POST /api/admin/import-banzuke`
   - Fetches current Makuuchi banzuke data from the Japan Sumo Association `indexAjax` endpoint.
   - Maps source payloads into local `Basho`, `Rikishi`, and `BanzukeEntry` records.
+  - Snapshots shikona and heya on each banzuke entry so later global metadata
+    updates cannot rewrite historical tournament displays.
   - Replaces stale banzuke rows for the imported basho without deleting rikishi, teams, or picks.
   - Preserves the most advanced stored basho lifecycle state so a reimport
     cannot reopen picks after locking.

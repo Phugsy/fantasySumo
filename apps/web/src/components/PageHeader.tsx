@@ -15,6 +15,12 @@ const pageCopy: Record<
     description:
       "See the current tournament and track every stable as results are recorded.",
   },
+  history: {
+    eyebrow: "Across tournaments",
+    title: "Basho history",
+    description:
+      "Review past tournaments, cumulative standings, and your rikishi records over time.",
+  },
   login: {
     eyebrow: "Player account",
     title: "Log in or join",

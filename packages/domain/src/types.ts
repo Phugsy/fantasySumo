@@ -20,6 +20,8 @@ export interface BanzukeEntry {
   id: string;
   bashoId: Basho["id"];
   rikishiId: Rikishi["id"];
+  shikona?: string;
+  heya?: string;
   rank: string;
   rankOrder: number;
 }

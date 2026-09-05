@@ -10,13 +10,13 @@ The current codebase has been reset onto the clean rebuild foundation described 
 
 At present, the app has the first local playable foundations:
 
-- A routed Vite + React front end with a public current-basho leaderboard, a dedicated login page, and authenticated team and stable pages.
+- A routed Vite + React front end with current and all-time leaderboards, a tournament archive, a dedicated login page, and authenticated team, stable, and personal-history views.
 - A picks editor that shows each rikishi's verified previous-basho W-L-A record
   and historical rank, with distinct neutral states for unavailable history and
   confirmed non-participation.
 - A private My Stable view with the signed-in player's picks, edit/lock state, rikishi details, scoring progress, and each pick's next published matchup.
 - Informational rikishi tournament badges for source-reported withdrawal status and reliably derived record or gold-star milestones; these never change fantasy points.
-- A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.
+- A Fastify API with health, basho, rikishi, team, tournament-history, and leaderboard endpoints.
 - A shared TypeScript domain package with MVP types, lifecycle rules, validation, scoring, and leaderboard logic.
 - A swappable Drizzle database package with local SQLite, production Postgres, repositories, migrations, sample seed data, and deterministic demo data.
 - Automated source-backed import commands and protected admin controls for current banzuke, daily results, and published schedules.
@@ -146,6 +146,7 @@ Local URLs:
 Useful API endpoints:
 
 - `GET /api/basho/current`
+- `GET /api/bashos`
 - `GET /api/basho/:bashoId/rikishi`
 - `GET /api/basho/:bashoId/schedule`
 - `POST /api/basho/:bashoId/teams`
@@ -153,6 +154,8 @@ Useful API endpoints:
 - `PUT /api/basho/:bashoId/my-team`
 - `GET /api/basho/:bashoId/teams/:teamId`
 - `GET /api/basho/:bashoId/leaderboard`
+- `GET /api/leaderboard/all-time`
+- `GET /api/my-history` (authenticated)
 - `POST /api/admin/demo/reset`
 - `POST /api/admin/demo/start`
 - `POST /api/admin/demo/advance-day`
@@ -242,6 +245,7 @@ Set `CRON_SECRET` in production to authenticate Vercel's scheduled basho job.
 Fantasy team creation requires a current user. The browser route split is:
 
 - `/` — public current-basho summary and leaderboard.
+- `/history` — public tournament archive and cumulative leaderboard across completed bashos, plus a signed-in player's preserved per-basho rikishi records.
 - `/login` — dedicated sign-in and registration controls.
 - `/reset-password` — Neon Auth password-reset request and completion flow.
 - `/stable` — authenticated My Stable view.
@@ -289,7 +293,7 @@ make import-results ARGS="-- --basho 2026-05 --day 1 --dry-run"
 make import-schedule ARGS="-- --basho 2026-05 --day 2 --dry-run"
 ```
 
-Banzuke reimports replace the stored banzuke entries for that basho without deleting rikishi, teams, or picks. Result reimports replace only the imported basho/day, so rerunning day 1 cannot delete day 2 results. Schedule imports use separate publication and scheduled-bout tables; reimporting a day atomically replaces that card and never changes fantasy scores. An empty Sumo API response is treated as unpublished or unavailable and preserves any stored card; only a trusted internal import command can explicitly replace a day with an empty published card.
+Banzuke reimports replace the stored banzuke entries for that basho without deleting rikishi, teams, or picks. Each entry snapshots the imported shikona and heya so later rikishi metadata changes do not rewrite historical displays. Result reimports replace only the imported basho/day, so rerunning day 1 cannot delete day 2 results. Schedule imports use separate publication and scheduled-bout tables; reimporting a day atomically replaces that card and never changes fantasy scores. An empty Sumo API response is treated as unpublished or unavailable and preserves any stored card; only a trusted internal import command can explicitly replace a day with an empty published card.
 
 The picks editor derives a historical record only from the nearest earlier
 completed basho in the same live/demo data mode whose 15 published schedule

@@ -2,6 +2,7 @@ import type { ActiveView } from "./types";
 
 export const appPaths = {
   home: "/",
+  history: "/history",
   login: "/login",
   resetPassword: "/reset-password",
   stable: "/stable",
@@ -24,6 +25,8 @@ export function getActiveView(pathname: string): ActiveView {
   switch (pathname) {
     case appPaths.login:
       return "login";
+    case appPaths.history:
+      return "history";
     case appPaths.resetPassword:
       return "reset-password";
     case appPaths.stable:

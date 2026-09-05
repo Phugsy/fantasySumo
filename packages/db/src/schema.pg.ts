@@ -49,6 +49,8 @@ export const banzukeEntries = pgTable(
     rikishiId: text("rikishi_id")
       .notNull()
       .references(() => rikishi.id, { onDelete: "cascade" }),
+    shikona: text("shikona"),
+    heya: text("heya"),
     rank: text("rank").notNull(),
     rankOrder: integer("rank_order").notNull(),
   },

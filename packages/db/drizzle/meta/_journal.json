@@ -43,6 +43,13 @@
       "when": 1787253139361,
       "tag": "0005_great_scarecrow",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788538479402,
+      "tag": "0006_good_guardsmen",
+      "breakpoints": true
     }
   ]
 }

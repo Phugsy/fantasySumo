@@ -43,6 +43,45 @@ describe("demo flag migration", () => {
   });
 });
 
+describe("banzuke identity snapshot migration", () => {
+  it("backfills existing banzuke names and heya", () => {
+    const database = new Database(":memory:");
+    database.exec(`
+      CREATE TABLE rikishi (
+        id text PRIMARY KEY NOT NULL,
+        shikona text NOT NULL,
+        heya text
+      );
+      CREATE TABLE banzuke_entries (
+        id text PRIMARY KEY NOT NULL,
+        basho_id text NOT NULL,
+        rikishi_id text NOT NULL,
+        rank text NOT NULL,
+        rank_order integer NOT NULL
+      );
+      INSERT INTO rikishi VALUES ('kirishima', 'Kirishima', 'Oitekaze');
+      INSERT INTO banzuke_entries VALUES
+        ('2026-07-kirishima', '2026-07', 'kirishima', 'Maegashira', 1);
+    `);
+
+    const migration = readFileSync(
+      join(packageRoot, "drizzle", "0006_good_guardsmen.sql"),
+      "utf8",
+    ).replaceAll("--> statement-breakpoint", "");
+    database.exec(migration);
+
+    expect(
+      database
+        .prepare(
+          "SELECT shikona, heya FROM banzuke_entries WHERE id = '2026-07-kirishima'",
+        )
+        .get(),
+    ).toEqual({ shikona: "Kirishima", heya: "Oitekaze" });
+
+    database.close();
+  });
+});
+
 describe("Postgres migration ledger", () => {
   it("preserves the deployed production migration identities and order", () => {
     const migrationsFolder = join(packageRoot, "drizzle-pg");
@@ -56,6 +95,7 @@ describe("Postgres migration ledger", () => {
       "0002_basho_demo_flag.sql",
       "0003_scheduled_bouts.sql",
       "0004_basho_game_config.sql",
+      "0005_banzuke_identity_snapshot.sql",
     ]);
     const initialMigration = readFileSync(
       join(migrationsFolder, "0000_initial.sql"),
@@ -73,6 +113,10 @@ describe("Postgres migration ledger", () => {
       join(migrationsFolder, "0003_scheduled_bouts.sql"),
       "utf8",
     );
+    const identitySnapshotMigration = readFileSync(
+      join(migrationsFolder, "0005_banzuke_identity_snapshot.sql"),
+      "utf8",
+    );
 
     expect(getMigrationChecksum(initialMigration)).toBe(
       "355dc080c83437a8a07343062a0d60be1513c3c2c03f0602aaff4fc3963d2ad8",
@@ -86,6 +130,10 @@ describe("Postgres migration ledger", () => {
     expect(demoMigration).toContain("ADD COLUMN IF NOT EXISTS");
     expect(getMigrationChecksum(scheduleMigration)).toBe(
       "af3fb3690d94ec2a0b69ce4b7f13537c9660936cbf24f8866d6f80313e019e4e",
+    );
+    expect(identitySnapshotMigration).toContain('UPDATE "banzuke_entries"');
+    expect(identitySnapshotMigration).toContain(
+      'AND "banzuke_entries"."shikona" IS NULL',
     );
   });
 

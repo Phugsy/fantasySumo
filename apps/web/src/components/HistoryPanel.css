@@ -1,0 +1,148 @@
+.history-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.history-panel {
+  padding: 22px;
+  border: 1px solid var(--clay-light);
+  border-radius: var(--radius);
+  background: rgb(255 253 248 / 94%);
+  box-shadow: var(--shadow);
+}
+
+.personal-history {
+  grid-column: 1 / -1;
+}
+
+.history-heading {
+  display: flex;
+  gap: 18px;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.history-heading > strong {
+  color: var(--vermilion-dark);
+  white-space: nowrap;
+}
+
+.all-time-list,
+.archive-list,
+.personal-history-list ul {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.all-time-list li,
+.archive-list li,
+.personal-history-list li {
+  display: grid;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--clay-light);
+  border-radius: 9px;
+  background: #fff;
+}
+
+.all-time-list li {
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+}
+
+.archive-list li,
+.personal-history-list li {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.all-time-list span > strong,
+.all-time-list small,
+.archive-list li div > *,
+.personal-history-list li span > * {
+  display: block;
+}
+
+.all-time-list small,
+.archive-list span,
+.personal-history-list small {
+  color: var(--muted);
+}
+
+.history-rank {
+  color: var(--vermilion-dark);
+  font-weight: 900;
+}
+
+.history-status {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--paper-warm);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: capitalize;
+}
+
+.history-status-active,
+.history-status-complete {
+  background: var(--moss-light);
+  color: var(--moss);
+}
+
+.personal-history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.personal-history-list details {
+  overflow: hidden;
+  border: 1px solid var(--clay-light);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.personal-history-list summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  cursor: pointer;
+}
+
+.personal-history-list summary span > * {
+  display: block;
+}
+
+.personal-history-list summary small {
+  color: var(--muted);
+}
+
+.personal-history-list ul {
+  padding: 0 14px 14px;
+}
+
+.history-empty {
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
+@media (max-width: 760px) {
+  .history-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .personal-history {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 460px) {
+  .history-heading {
+    display: grid;
+    align-items: start;
+  }
+}

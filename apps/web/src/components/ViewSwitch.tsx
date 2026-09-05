@@ -21,6 +21,7 @@ export function ViewSwitch({
       <NavLink to={appPaths.home} end>
         Leaderboard
       </NavLink>
+      <NavLink to={appPaths.history}>History</NavLink>
       {sessionState === "loading" ? (
         <span className="session-check">Checking session...</span>
       ) : user === null ? (

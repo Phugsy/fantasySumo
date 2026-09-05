@@ -86,6 +86,179 @@ export function registerBashoRoutes(
     },
   );
 
+  app.get("/api/bashos", async () => ({
+    bashos: (await context.repositories.listBashos())
+      .filter((basho) => !basho.isDemo)
+      .sort((left, right) => right.startDate.localeCompare(left.startDate)),
+  }));
+
+  app.get("/api/leaderboard/all-time", async () => {
+    const bashos = (await context.repositories.listBashos())
+      .filter((basho) => !basho.isDemo && basho.status === "complete")
+      .sort((left, right) => left.startDate.localeCompare(right.startDate));
+    const scoredBashos = await Promise.all(
+      bashos.map(async (basho) => {
+        const [teams, picks, boutResults] = await Promise.all([
+          context.repositories.listFantasyTeamsForBasho(basho.id),
+          context.repositories.listFantasyPicksForBasho(basho.id),
+          context.repositories.listBoutResultsForBasho(basho.id),
+        ]);
+
+        return {
+          basho,
+          teams,
+          leaderboard: calculateLeaderboard(teams, picks, boutResults, {
+            throughDay: basho.currentDay,
+          }),
+        };
+      }),
+    );
+    const standings = new Map<
+      string,
+      {
+        displayName: string;
+        score: number;
+        bashos: Array<{ bashoId: string; bashoName: string; score: number }>;
+      }
+    >();
+
+    for (const scoredBasho of scoredBashos) {
+      const teamsById = new Map(
+        scoredBasho.teams.map((team) => [team.id, team]),
+      );
+
+      for (const entry of scoredBasho.leaderboard) {
+        const team = teamsById.get(entry.teamId);
+        const playerKey =
+          team?.ownerUserId ?? `legacy:${scoredBasho.basho.id}:${entry.teamId}`;
+        const standing = standings.get(playerKey) ?? {
+          displayName: entry.displayName,
+          score: 0,
+          bashos: [],
+        };
+
+        standing.displayName = entry.displayName;
+        standing.score += entry.score;
+        standing.bashos.push({
+          bashoId: scoredBasho.basho.id,
+          bashoName: scoredBasho.basho.name,
+          score: entry.score,
+        });
+        standings.set(playerKey, standing);
+      }
+    }
+
+    return {
+      bashoCount: bashos.length,
+      leaderboard: [...standings.values()]
+        .sort(
+          (left, right) =>
+            right.score - left.score ||
+            right.bashos.length - left.bashos.length ||
+            left.displayName.localeCompare(right.displayName),
+        )
+        .map((standing, index) => ({
+          rank: index + 1,
+          displayName: standing.displayName,
+          score: standing.score,
+          tournamentsPlayed: standing.bashos.length,
+          bashos: [...standing.bashos].reverse(),
+        })),
+    };
+  });
+
+  app.get("/api/my-history", async (request, reply) => {
+    const currentUser = await context.auth.getCurrentUser(request);
+
+    if (currentUser === undefined) {
+      return reply.code(401).send({
+        error: "unauthenticated",
+        message: "Sign in before viewing your tournament history.",
+      });
+    }
+
+    const [allBashos, allRikishi] = await Promise.all([
+      context.repositories.listBashos(),
+      context.repositories.listRikishi(),
+    ]);
+    const bashos = allBashos
+      .filter((basho) => !basho.isDemo)
+      .sort((left, right) => right.startDate.localeCompare(left.startDate));
+    const rikishiById = new Map(
+      allRikishi.map((rikishi) => [rikishi.id, rikishi]),
+    );
+    const ownedBashos = (
+      await Promise.all(
+        bashos.map(async (basho) => {
+          const team = await context.repositories.getFantasyTeamForOwner(
+            basho.id,
+            currentUser.id,
+          );
+          return team === undefined ? [] : [{ basho, team }];
+        }),
+      )
+    ).flat();
+    const history = await Promise.all(
+      ownedBashos.map(async ({ basho, team }) => {
+        const [picks, boutResults, banzukeEntries] = await Promise.all([
+          context.repositories.listFantasyPicksForTeam(team.id),
+          context.repositories.listBoutResultsForBasho(basho.id),
+          context.repositories.listBanzukeEntriesForBasho(basho.id),
+        ]);
+        const teamScore = calculateTeamScore(team, picks, boutResults, {
+          throughDay: basho.currentDay,
+        });
+        const scoresByRikishiId = new Map(
+          teamScore.rikishiScores.map((score) => [score.rikishiId, score]),
+        );
+        const banzukeByRikishiId = new Map(
+          banzukeEntries.map((entry) => [entry.rikishiId, entry]),
+        );
+
+        return {
+          basho,
+          team: {
+            id: team.id,
+            displayName: team.displayName,
+            lockedAt: team.lockedAt,
+          },
+          score: teamScore.score,
+          picks: picks
+            .map((pick) => {
+              const rikishi = rikishiById.get(pick.rikishiId);
+              const banzuke = banzukeByRikishiId.get(pick.rikishiId);
+              const score = scoresByRikishiId.get(pick.rikishiId);
+              const heya = banzuke?.heya ?? rikishi?.heya;
+
+              return {
+                rikishiId: pick.rikishiId,
+                shikona: banzuke?.shikona ?? rikishi?.shikona ?? pick.rikishiId,
+                ...(heya === undefined ? {} : { heya }),
+                ...(banzuke === undefined
+                  ? {}
+                  : { rank: banzuke.rank, rankOrder: banzuke.rankOrder }),
+                wins: score?.wins ?? 0,
+                score: score?.score ?? 0,
+              };
+            })
+            .sort(
+              (left, right) =>
+                (left.rankOrder ?? Number.MAX_SAFE_INTEGER) -
+                  (right.rankOrder ?? Number.MAX_SAFE_INTEGER) ||
+                left.shikona.localeCompare(right.shikona),
+            ),
+        };
+      }),
+    );
+
+    return {
+      score: history
+        .filter((entry) => entry.basho.status === "complete")
+        .reduce((total, entry) => total + entry.score, 0),
+      history,
+    };
+  });
+
   app.get<{
     Params: { bashoId: string };
   }>("/api/basho/:bashoId/rikishi", async (request, reply) => {
@@ -142,8 +315,8 @@ export function registerBashoRoutes(
 
       return {
         id: entry.rikishiId,
-        shikona: rikishiEntry?.shikona ?? entry.rikishiId,
-        heya: rikishiEntry?.heya,
+        shikona: entry.shikona ?? rikishiEntry?.shikona ?? entry.rikishiId,
+        heya: entry.heya ?? rikishiEntry?.heya,
         rank: entry.rank,
         rankOrder: entry.rankOrder,
         previousBashoRecord: getPreviousBashoRecordState({
@@ -206,7 +379,7 @@ export function registerBashoRoutes(
 
       return {
         id: rikishiId,
-        shikona: rikishi?.shikona ?? rikishiId,
+        shikona: banzuke?.shikona ?? rikishi?.shikona ?? rikishiId,
         ...(banzuke === undefined ? {} : { rank: banzuke.rank }),
       };
     };
@@ -429,11 +602,13 @@ export function registerBashoRoutes(
           const rikishi = rikishiById.get(pick.rikishiId);
           const banzukeEntry = banzukeByRikishiId.get(pick.rikishiId);
           const score = scoresByRikishiId.get(pick.rikishiId);
+          const heya = banzukeEntry?.heya ?? rikishi?.heya;
 
           return {
             ...pick,
-            shikona: rikishi?.shikona ?? pick.rikishiId,
-            ...(rikishi?.heya === undefined ? {} : { heya: rikishi.heya }),
+            shikona:
+              banzukeEntry?.shikona ?? rikishi?.shikona ?? pick.rikishiId,
+            ...(heya === undefined ? {} : { heya }),
             ...(banzukeEntry === undefined
               ? {}
               : {

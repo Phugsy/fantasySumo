@@ -508,7 +508,8 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
         .from(sqlite.banzukeEntries)
         .where(eq(sqlite.banzukeEntries.bashoId, bashoId))
         .orderBy(sqlite.banzukeEntries.rankOrder)
-        .all(),
+        .all()
+        .map(toBanzukeEntry),
 
     insertFantasyTeam: async (entry) => {
       db.insert(sqlite.fantasyTeams).values(toFantasyTeamRow(entry)).run();
@@ -1466,11 +1467,13 @@ function createPostgresRepositories(db: PostgresDatabase): Repositories {
       });
     },
     listBanzukeEntriesForBasho: async (bashoId) =>
-      await db
-        .select()
-        .from(pg.banzukeEntries)
-        .where(eq(pg.banzukeEntries.bashoId, bashoId))
-        .orderBy(pg.banzukeEntries.rankOrder),
+      (
+        await db
+          .select()
+          .from(pg.banzukeEntries)
+          .where(eq(pg.banzukeEntries.bashoId, bashoId))
+          .orderBy(pg.banzukeEntries.rankOrder)
+      ).map(toBanzukeEntry),
 
     insertFantasyTeam: async (entry) => {
       await db.insert(pg.fantasyTeams).values(toFantasyTeamRow(entry));
@@ -2225,6 +2228,22 @@ function toBasho(row: typeof sqlite.basho.$inferSelect): Basho {
     endDate: row.endDate,
     status: row.status,
     ...(row.currentDay === null ? {} : { currentDay: row.currentDay }),
+  };
+}
+
+function toBanzukeEntry(
+  row:
+    | typeof sqlite.banzukeEntries.$inferSelect
+    | typeof pg.banzukeEntries.$inferSelect,
+): BanzukeEntry {
+  return {
+    id: row.id,
+    bashoId: row.bashoId,
+    rikishiId: row.rikishiId,
+    ...(row.shikona === null ? {} : { shikona: row.shikona }),
+    ...(row.heya === null ? {} : { heya: row.heya }),
+    rank: row.rank,
+    rankOrder: row.rankOrder,
   };
 }
 

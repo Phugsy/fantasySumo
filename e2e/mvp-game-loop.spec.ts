@@ -41,6 +41,52 @@ test("loads API-backed current basho content", async ({ page, request }) => {
   ).toHaveCount(0);
 });
 
+test("shows archived bashos and cross-tournament standings", async ({
+  page,
+}) => {
+  await page.route("**/api/bashos", async (route) => {
+    await route.fulfill({
+      json: {
+        bashos: [
+          {
+            id: "2026-07",
+            isDemo: false,
+            name: "July 2026 Basho",
+            startDate: "2026-07-12",
+            endDate: "2026-07-26",
+            status: "complete",
+          },
+        ],
+      },
+    });
+  });
+  await page.route("**/api/leaderboard/all-time", async (route) => {
+    await route.fulfill({
+      json: {
+        bashoCount: 2,
+        leaderboard: [
+          {
+            rank: 1,
+            displayName: "North Star",
+            score: 19,
+            tournamentsPlayed: 2,
+            bashos: [],
+          },
+        ],
+      },
+    });
+  });
+
+  await page.goto("/history");
+
+  await expect(
+    page.getByRole("heading", { name: "Basho history" }),
+  ).toBeVisible();
+  await expect(page.getByText("North Star")).toBeVisible();
+  await expect(page.getByText("July 2026 Basho")).toBeVisible();
+  await expect(page.getByText("19 pts")).toBeVisible();
+});
+
 test("lets an authenticated admin run the deterministic demo loop", async ({
   page,
 }) => {

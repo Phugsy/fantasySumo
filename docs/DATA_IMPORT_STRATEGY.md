@@ -359,6 +359,13 @@ Player-facing schedules omit any published matchup that already has a stored
 result during this retry state, and leaderboard scoring is capped at the last
 contiguous verified result day.
 
+Banzuke entries store the imported shikona and heya alongside rank. These
+per-basho identity snapshots are the display source for tournament history;
+the shared rikishi row remains useful for current metadata and legacy fallback.
+A reimport that omits heya preserves a known value in that basho snapshot;
+source omission is treated as unknown rather than evidence that historical
+identity data should be erased.
+
 ### Tournament status and achievement visibility
 
 Player-facing tournament notes use only facts already stored through these
