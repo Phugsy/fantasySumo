@@ -24,6 +24,31 @@ export interface BanzukeEntry {
   rankOrder: number;
 }
 
+export interface PreviousBashoRecord {
+  bashoId: Basho["id"];
+  bashoName: Basho["name"];
+  startDate: Basho["startDate"];
+  rank: BanzukeEntry["rank"];
+  wins: number;
+  losses: number;
+  absences: number;
+}
+
+export type PreviousBashoRecordState =
+  | ({ status: "available" } & PreviousBashoRecord)
+  | {
+      status: "did-not-compete";
+      bashoId: Basho["id"];
+      bashoName: Basho["name"];
+      startDate: Basho["startDate"];
+    }
+  | {
+      status: "unavailable";
+      bashoId?: Basho["id"];
+      bashoName?: Basho["name"];
+      startDate?: Basho["startDate"];
+    };
+
 export interface FantasyTeam {
   id: string;
   bashoId: Basho["id"];

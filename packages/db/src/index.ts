@@ -34,6 +34,12 @@ export {
   demoFantasyPicks,
   demoFantasyTeams,
   demoRikishi,
+  demoPreviousBanzukeEntries,
+  demoPreviousBasho,
+  demoPreviousBoutResults,
+  demoPreviousRikishi,
+  demoPreviousScheduledBoutPublications,
+  demoPreviousScheduledBouts,
   demoScheduledBoutPublications,
   demoScheduledBouts,
 } from "./demo-seed-data.js";
@@ -44,5 +50,10 @@ export {
   sampleFantasyPicks,
   sampleFantasyTeams,
   sampleRikishi,
+  samplePreviousBanzukeEntries,
+  samplePreviousBasho,
+  samplePreviousBoutResults,
+  samplePreviousScheduledBoutPublications,
+  samplePreviousScheduledBouts,
 } from "./seed-data.js";
 export { seedDatabase, seedDemoDatabase } from "./seed.js";

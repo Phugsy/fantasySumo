@@ -11,6 +11,9 @@ The current codebase has been reset onto the clean rebuild foundation described 
 At present, the app has the first local playable foundations:
 
 - A routed Vite + React front end with a public current-basho leaderboard, a dedicated login page, and authenticated team and stable pages.
+- A picks editor that shows each rikishi's verified previous-basho W-L-A record
+  and historical rank, with distinct neutral states for unavailable history and
+  confirmed non-participation.
 - A private My Stable view with the signed-in player's picks, edit/lock state, rikishi details, scoring progress, and each pick's next published matchup.
 - Informational rikishi tournament badges for source-reported withdrawal status and reliably derived record or gold-star milestones; these never change fantasy points.
 - A Fastify API with health, basho, rikishi, team, and leaderboard endpoints.
@@ -87,11 +90,15 @@ Or reset the demo data and start both dev servers in one command:
 make demo
 ```
 
-Demo mode replaces only the fixed demo basho and its dependent banzuke, team,
-pick, and result data with fake but stable fixtures. Live bashos and shared
-rikishi metadata are preserved. The demo starts at day 0 with picks open and no
-applied results. It does not use live sumo data, but it exercises the same API,
-UI, database, and scoring logic as normal local development. The explicit
+Demo mode replaces only the fixed pickable demo basho and its dependent
+banzuke, team, pick, and result data with fake but stable fixtures. It also
+maintains a separate completed demo basho so the picks editor can exercise
+winning, losing, absent, previous-Juryo, and confirmed non-participation record
+states. Live bashos and shared rikishi metadata are preserved. The pickable demo
+starts at
+day 0 with picks open and no applied results. It does not use live sumo data,
+but it exercises the same API, UI, database, and scoring logic as normal local
+development. The explicit
 `VITE_BASHO_MODE=demo` flag makes the browser request the fixed flagged demo;
 without it, current-basho selection remains live-first.
 
@@ -283,6 +290,15 @@ make import-schedule ARGS="-- --basho 2026-05 --day 2 --dry-run"
 ```
 
 Banzuke reimports replace the stored banzuke entries for that basho without deleting rikishi, teams, or picks. Result reimports replace only the imported basho/day, so rerunning day 1 cannot delete day 2 results. Schedule imports use separate publication and scheduled-bout tables; reimporting a day atomically replaces that card and never changes fantasy scores. An empty Sumo API response is treated as unpublished or unavailable and preserves any stored card; only a trusted internal import command can explicitly replace a day with an empty published card.
+
+The picks editor derives a historical record only from the nearest earlier
+completed basho in the same live/demo data mode whose 15 published schedule
+days and stored results are fully verified. Incomplete history is reported as
+unavailable rather than inferred from a partial import. Historical rank context
+can show any division represented in stored fixture/import data. The current
+automated banzuke importer remains Makuuchi-only, so a missing live historical
+row is reported as unavailable rather than guessed to mean non-participation.
+Available rank context comes from that basho's stored banzuke.
 
 The API exposes equivalent local admin triggers:
 

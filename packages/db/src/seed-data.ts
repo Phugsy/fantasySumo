@@ -5,6 +5,8 @@ import type {
   FantasyPick,
   FantasyTeam,
   Rikishi,
+  ScheduledBout,
+  ScheduledBoutPublication,
 } from "@fantasy-sumo/domain";
 
 export const sampleBasho: Basho = {
@@ -137,3 +139,80 @@ export const sampleBoutResults: BoutResult[] = [
     kimarite: "hatakikomi",
   },
 ];
+
+export const samplePreviousBasho: Basho = {
+  id: "2026-03",
+  isDemo: false,
+  name: "March 2026 Sample Basho",
+  startDate: "2026-03-08",
+  endDate: "2026-03-22",
+  status: "complete",
+  currentDay: 15,
+};
+
+export const samplePreviousBanzukeEntries: BanzukeEntry[] =
+  sampleBanzukeEntries.map((entry) => ({
+    ...entry,
+    id: entry.id.replace(sampleBasho.id, samplePreviousBasho.id),
+    bashoId: samplePreviousBasho.id,
+  }));
+
+export const samplePreviousBoutResults: BoutResult[] = Array.from(
+  { length: 15 },
+  (_, index) => {
+    const day = index + 1;
+
+    return [
+      toSamplePreviousResult(
+        day,
+        1,
+        day <= 10 ? "onosato" : "kotozakura",
+        day <= 10 ? "kotozakura" : "onosato",
+      ),
+      toSamplePreviousResult(
+        day,
+        2,
+        day % 2 === 1 ? "hoshoryu" : "kirishima",
+        day % 2 === 1 ? "kirishima" : "hoshoryu",
+      ),
+    ];
+  },
+).flat();
+
+export const samplePreviousScheduledBoutPublications: ScheduledBoutPublication[] =
+  Array.from({ length: 15 }, (_, index) => {
+    const day = index + 1;
+
+    return {
+      id: `${samplePreviousBasho.id}-day-${day}-schedule`,
+      bashoId: samplePreviousBasho.id,
+      day,
+      source: "sample-fixture:complete",
+      publishedAt: `2026-03-${String(7 + day).padStart(2, "0")}T08:00:00.000Z`,
+    };
+  });
+
+export const samplePreviousScheduledBouts: ScheduledBout[] =
+  samplePreviousBoutResults.map((result) => ({
+    id: result.id.replace("-bout-", "-match-"),
+    bashoId: result.bashoId,
+    day: result.day,
+    eastRikishiId: result.winnerRikishiId,
+    westRikishiId: result.loserRikishiId,
+    status: "scheduled",
+  }));
+
+function toSamplePreviousResult(
+  day: number,
+  bout: number,
+  winnerRikishiId: string,
+  loserRikishiId: string,
+): BoutResult {
+  return {
+    id: `${samplePreviousBasho.id}-day-${day}-bout-${bout}`,
+    bashoId: samplePreviousBasho.id,
+    day,
+    winnerRikishiId,
+    loserRikishiId,
+  };
+}

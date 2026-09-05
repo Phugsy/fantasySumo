@@ -16,12 +16,19 @@ import {
   demoBasho,
   demoBoutResults,
   demoFantasyTeams,
+  demoPreviousBasho,
+  demoPreviousRikishi,
   demoRikishi,
 } from "./demo-seed-data.js";
 import { runMigrations } from "./migrate.js";
 import { createRepositories } from "./repositories.js";
 import { seedDatabase, seedDemoDatabase } from "./seed.js";
-import { sampleBasho, sampleFantasyTeams, sampleRikishi } from "./seed-data.js";
+import {
+  sampleBasho,
+  sampleFantasyTeams,
+  samplePreviousBasho,
+  sampleRikishi,
+} from "./seed-data.js";
 
 let tmpRoot: string;
 let client: DatabaseClient;
@@ -42,7 +49,10 @@ describe("repositories", () => {
     await seedDatabase(createRepositories(client));
     const repositories = createRepositories(client);
 
-    expect(await repositories.listBashos()).toEqual([sampleBasho]);
+    expect(await repositories.listBashos()).toEqual([
+      samplePreviousBasho,
+      sampleBasho,
+    ]);
     expect(await repositories.listRikishi()).toHaveLength(sampleRikishi.length);
     expect(
       (await repositories.listBanzukeEntriesForBasho(sampleBasho.id)).map(
@@ -746,8 +756,15 @@ describe("repositories", () => {
     await seedDemoDatabase(createRepositories(client));
     const repositories = createRepositories(client);
 
-    expect(await repositories.listBashos()).toEqual([demoBasho]);
-    expect(await repositories.listRikishi()).toHaveLength(demoRikishi.length);
+    expect(await repositories.listBashos()).toEqual([
+      demoPreviousBasho,
+      demoBasho,
+    ]);
+    expect(await repositories.listRikishi()).toHaveLength(
+      new Set(
+        [...demoPreviousRikishi, ...demoRikishi].map((rikishi) => rikishi.id),
+      ).size,
+    );
     expect(
       await repositories.listBanzukeEntriesForBasho(demoBasho.id),
     ).toHaveLength(demoBanzukeEntries.length);

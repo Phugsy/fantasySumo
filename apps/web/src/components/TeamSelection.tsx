@@ -72,6 +72,7 @@ export function TeamSelection({
                 <span>
                   <strong>{entry.shikona}</strong>
                   {entry.heya !== undefined && <small>{entry.heya}</small>}
+                  <PreviousBashoRecord entry={entry} />
                 </span>
                 <span
                   className={isSelected ? "pick-mark selected" : "pick-mark"}
@@ -171,5 +172,44 @@ export function TeamSelection({
         )}
       </aside>
     </form>
+  );
+}
+
+function PreviousBashoRecord({ entry }: { entry: RankedRikishi }) {
+  const record = entry.previousBashoRecord;
+
+  if (record?.status === "did-not-compete") {
+    return (
+      <small className="previous-basho-record unavailable">
+        Previous basho: {record.bashoName} · Did not compete
+      </small>
+    );
+  }
+
+  if (record === undefined || record.status === "unavailable") {
+    const bashoName = record?.bashoName;
+
+    return (
+      <small className="previous-basho-record unavailable">
+        Previous basho: {bashoName ?? "Record unavailable"}
+        {bashoName === undefined ? "" : " · Record unavailable"}
+      </small>
+    );
+  }
+
+  const formattedRecord = [record.wins, record.losses, record.absences]
+    .slice(0, record.absences > 0 ? 3 : 2)
+    .join("–");
+
+  return (
+    <small className="previous-basho-record">
+      <span aria-hidden="true">
+        Previous basho: {record.bashoName} · {formattedRecord} · {record.rank}
+      </span>
+      <span className="visually-hidden">
+        Previous basho {record.bashoName}: {record.wins} wins, {record.losses}{" "}
+        losses, {record.absences} absences, ranked {record.rank}
+      </span>
+    </small>
   );
 }
