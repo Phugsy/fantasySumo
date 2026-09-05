@@ -44,6 +44,13 @@ not compete in another division. The API reports that case as unavailable.
 `did-not-compete` is reserved for data sets, such as the closed deterministic
 demo fixture, that affirmatively establish non-participation.
 
+Rikishi IDs are currently derived from shikona text at the adapter boundary.
+That is not safe across shikona changes or name reuse, and upstream IDs cannot
+be shared blindly because JSA and Sumo API use separate namespaces. A
+provider-alias-to-canonical-identity model is scoped in
+[issue #102](https://github.com/Phugsy/fantasySumo/issues/102); until then,
+history that cannot be matched is presented as unavailable rather than guessed.
+
 The protected `/admin` page now supplies that manual trigger. It defaults to a
 dry run, shows per-entity created/updated/skipped/deleted counts, reports
 following-schedule counts and partial success explicitly, and requires

@@ -8,7 +8,7 @@ import type {
   ScheduledBout,
   ScheduledBoutPublication,
 } from "@fantasy-sumo/domain";
-import { DEMO_BASHO_ID } from "./demo-constants.js";
+import { DEMO_BASHO_ID, DEMO_PREVIOUS_BASHO_ID } from "./demo-constants.js";
 
 export const demoBasho: Basho = {
   id: DEMO_BASHO_ID,
@@ -715,7 +715,7 @@ export const demoScheduledBouts: ScheduledBout[] = demoBoutResults.map(
 );
 
 export const demoPreviousBasho: Basho = {
-  id: "demo-2026-03",
+  id: DEMO_PREVIOUS_BASHO_ID,
   isDemo: true,
   name: "Demo March Basho",
   startDate: "2026-03-08",

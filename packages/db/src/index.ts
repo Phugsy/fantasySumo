@@ -18,7 +18,7 @@ export type {
   Repositories,
   ScheduledBoutsImportData,
 } from "./repositories.js";
-export { DEMO_BASHO_ID } from "./demo-constants.js";
+export { DEMO_BASHO_ID, DEMO_PREVIOUS_BASHO_ID } from "./demo-constants.js";
 export {
   DEMO_FINAL_DAY,
   advanceDemoBashoDay,

@@ -94,8 +94,8 @@ Demo mode replaces only the fixed pickable demo basho and its dependent
 banzuke, team, pick, and result data with fake but stable fixtures. It also
 maintains a separate completed demo basho so the picks editor can exercise
 winning, losing, absent, previous-Juryo, and confirmed non-participation record
-states. Live bashos and shared rikishi metadata are preserved. The pickable demo
-starts at
+states. Both demo bashos are replaced exactly in one transaction, while live
+bashos and shared rikishi metadata are preserved. The pickable demo starts at
 day 0 with picks open and no applied results. It does not use live sumo data,
 but it exercises the same API, UI, database, and scoring logic as normal local
 development. The explicit

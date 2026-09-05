@@ -60,41 +60,30 @@ export async function seedDatabase(repositories: Repositories): Promise<void> {
 export async function seedDemoDatabase(
   repositories: Repositories,
 ): Promise<void> {
-  await assertDemoFixtureIdsAreSafe(repositories);
-  await repositories.replaceDemoBashoData({
-    basho: demoBasho,
-    rikishi: demoRikishi,
-    banzukeEntries: demoBanzukeEntries,
-    fantasyTeams: demoFantasyTeams,
-    fantasyPicks: demoFantasyPicks,
-    boutResults: [],
-    scheduledBoutPublications: demoScheduledBoutPublications,
-    scheduledBouts: demoScheduledBouts,
-  });
-  await seedCompletedBasho(repositories, {
-    basho: demoPreviousBasho,
-    rikishi: demoPreviousRikishi.filter(
-      (rikishi) => !demoRikishi.some((current) => current.id === rikishi.id),
-    ),
-    banzukeEntries: demoPreviousBanzukeEntries,
-    boutResults: demoPreviousBoutResults,
-    scheduledBoutPublications: demoPreviousScheduledBoutPublications,
-    scheduledBouts: demoPreviousScheduledBouts,
-  });
-}
-
-async function assertDemoFixtureIdsAreSafe(
-  repositories: Repositories,
-): Promise<void> {
-  for (const fixture of [demoBasho, demoPreviousBasho]) {
-    const existing = await repositories.getBasho(fixture.id);
-
-    if (existing !== undefined && !existing.isDemo) {
-      throw new Error(
-        `Refusing to replace live basho ${fixture.id} with demo data.`,
-      );
-    }
-  }
+  await repositories.replaceDemoBashosData([
+    {
+      basho: demoBasho,
+      rikishi: demoRikishi,
+      banzukeEntries: demoBanzukeEntries,
+      fantasyTeams: demoFantasyTeams,
+      fantasyPicks: demoFantasyPicks,
+      boutResults: [],
+      scheduledBoutPublications: demoScheduledBoutPublications,
+      scheduledBouts: demoScheduledBouts,
+    },
+    {
+      basho: demoPreviousBasho,
+      rikishi: demoPreviousRikishi.filter(
+        (rikishi) => !demoRikishi.some((current) => current.id === rikishi.id),
+      ),
+      banzukeEntries: demoPreviousBanzukeEntries,
+      fantasyTeams: [],
+      fantasyPicks: [],
+      boutResults: demoPreviousBoutResults,
+      scheduledBoutPublications: demoPreviousScheduledBoutPublications,
+      scheduledBouts: demoPreviousScheduledBouts,
+    },
+  ]);
 }
 
 async function replaceAllSeedData(

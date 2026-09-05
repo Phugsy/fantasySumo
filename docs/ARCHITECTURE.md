@@ -171,6 +171,9 @@ Current routes:
     result when that second source-backed step cannot complete; completed
     results remain committed and any stored schedule remains unchanged.
   - Supports `?dryRun=true`.
+  - Rikishi identity is currently derived from shikona text. Provider-specific
+    stable aliases and rename-safe canonical identities are tracked separately
+    in [issue #102](https://github.com/Phugsy/fantasySumo/issues/102).
 - `POST /api/admin/basho/:bashoId/import-schedule`
   - Fetches one published Makuuchi torikumi day without requiring winner data.
   - Maps source payloads to `ScheduledBout` records, separately from
@@ -304,8 +307,9 @@ Current behaviour:
   non-participation records. Cross-division rank display is supported for stored
   data, while the automated live banzuke importer remains Makuuchi-only.
 - Classifies bashos explicitly with `isDemo`. The fixed demo reset transaction
-  requires both the known demo ID and `isDemo: true`, replaces only that
-  basho's dependent data, and preserves live bashos and shared rikishi metadata.
+  requires both known demo IDs and `isDemo: true`, replaces both bashos and all
+  dependent fixture rows exactly, and preserves live bashos and shared rikishi
+  metadata. A failure rolls back both demo bashos together.
 - Keeps normal current-basho selection live-first. Local demo mode explicitly
   requests the fixed flagged demo with `VITE_BASHO_MODE=demo`, so mixed live and
   demo data cannot silently change which environment the browser displays.
