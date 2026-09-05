@@ -9,6 +9,7 @@ import {
   demoBasho,
   runMigrations,
   seedDatabase,
+  seedDemoDatabase,
   sampleBasho,
   type DatabaseClient,
 } from "@fantasy-sumo/db";
@@ -162,7 +163,236 @@ describe("basho routes", () => {
       shikona: "Onosato",
       rank: "Ozeki",
       rankOrder: 1,
+      previousBashoRecord: {
+        status: "available",
+        bashoId: "2026-03",
+        bashoName: "March 2026 Sample Basho",
+        startDate: "2026-03-08",
+        rank: "Ozeki",
+        wins: 10,
+        losses: 5,
+        absences: 0,
+      },
       tournamentNotes: { statuses: [], achievements: [] },
+    });
+  });
+
+  it("returns verified demo history with absences and previous-rank context", async () => {
+    await seedDemoDatabase(createRepositories(client));
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/basho/${demoBasho.id}/rikishi`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const rikishi = response.json().rikishi as Array<{
+      id: string;
+      previousBashoRecord?: unknown;
+    }>;
+
+    expect(rikishi.find((entry) => entry.id === "onosato")).toMatchObject({
+      previousBashoRecord: {
+        status: "available",
+        bashoName: "Demo March Basho",
+        rank: "Ozeki",
+        wins: 12,
+        losses: 3,
+        absences: 0,
+      },
+    });
+    expect(rikishi.find((entry) => entry.id === "takayasu")).toMatchObject({
+      previousBashoRecord: {
+        status: "available",
+        wins: 5,
+        losses: 4,
+        absences: 6,
+      },
+    });
+    expect(rikishi.find((entry) => entry.id === "wakatakakage")).toMatchObject({
+      previousBashoRecord: { rank: "Juryo #1" },
+    });
+    expect(rikishi.find((entry) => entry.id === "tobizaru")).toMatchObject({
+      previousBashoRecord: {
+        status: "did-not-compete",
+        bashoName: "Demo March Basho",
+      },
+    });
+  });
+
+  it("does not infer non-participation from a missing live banzuke row", async () => {
+    const repositories = createRepositories(client);
+    await repositories.upsertRikishi({
+      id: "newcomer",
+      shikona: "Newcomer",
+    });
+    await repositories.insertBanzukeEntry({
+      id: "2026-05-newcomer",
+      bashoId: "2026-05",
+      rikishiId: "newcomer",
+      rank: "Maegashira #16",
+      rankOrder: 5,
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/rikishi",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(
+      response
+        .json()
+        .rikishi.find((entry: { id: string }) => entry.id === "newcomer"),
+    ).toMatchObject({
+      previousBashoRecord: {
+        status: "unavailable",
+        bashoName: "March 2026 Sample Basho",
+      },
+    });
+  });
+
+  it("does not expose a record from an unverified nearer historical basho", async () => {
+    const repositories = createRepositories(client);
+    await repositories.insertBasho({
+      id: "2026-04",
+      isDemo: false,
+      name: "Unverified April Basho",
+      startDate: "2026-04-01",
+      endDate: "2026-04-15",
+      status: "complete",
+      currentDay: 15,
+    });
+    await repositories.insertBanzukeEntry({
+      id: "2026-04-onosato",
+      bashoId: "2026-04",
+      rikishiId: "onosato",
+      rank: "Ozeki",
+      rankOrder: 1,
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/rikishi",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(
+      response
+        .json()
+        .rikishi.find((entry: { id: string }) => entry.id === "onosato"),
+    ).toMatchObject({
+      previousBashoRecord: {
+        status: "unavailable",
+        bashoName: "Unverified April Basho",
+      },
+    });
+  });
+
+  it("does not count a stored result that was not on the verified card", async () => {
+    const repositories = createRepositories(client);
+    await repositories.insertBoutResult({
+      id: "2026-03-day-1-off-card",
+      bashoId: "2026-03",
+      day: 1,
+      winnerRikishiId: "onosato",
+      loserRikishiId: "hoshoryu",
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/rikishi",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(
+      response
+        .json()
+        .rikishi.find((entry: { id: string }) => entry.id === "onosato"),
+    ).toMatchObject({
+      previousBashoRecord: {
+        status: "available",
+        wins: 10,
+        losses: 5,
+        absences: 0,
+      },
+    });
+  });
+
+  it("counts a default win whose verified card matchup is cancelled", async () => {
+    const repositories = createRepositories(client);
+    await repositories.upsertRikishi({
+      id: "default-winner",
+      shikona: "Default Winner",
+    });
+    await repositories.upsertRikishi({
+      id: "withdrawn-opponent",
+      shikona: "Withdrawn Opponent",
+    });
+    await repositories.insertBanzukeEntry({
+      id: "2026-05-default-winner",
+      bashoId: "2026-05",
+      rikishiId: "default-winner",
+      rank: "Maegashira #16",
+      rankOrder: 5,
+    });
+    await repositories.insertBanzukeEntry({
+      id: "2026-03-default-winner",
+      bashoId: "2026-03",
+      rikishiId: "default-winner",
+      rank: "Maegashira #17",
+      rankOrder: 5,
+    });
+    const dayOneBouts = (
+      await repositories.listScheduledBoutsForBasho("2026-03")
+    ).filter((bout) => bout.day === 1);
+    await repositories.applyScheduledBoutsImport({
+      publication: {
+        id: "2026-03-day-1-default-schedule",
+        bashoId: "2026-03",
+        day: 1,
+        source: "sample-fixture:complete",
+        publishedAt: "2026-03-08T08:00:00.000Z",
+      },
+      bouts: [
+        ...dayOneBouts,
+        {
+          id: "2026-03-day-1-default-match",
+          bashoId: "2026-03",
+          day: 1,
+          eastRikishiId: "default-winner",
+          westRikishiId: "withdrawn-opponent",
+          status: "cancelled",
+          withdrawnRikishiId: "withdrawn-opponent",
+        },
+      ],
+    });
+    await repositories.insertBoutResult({
+      id: "2026-03-day-1-default-result",
+      bashoId: "2026-03",
+      day: 1,
+      winnerRikishiId: "default-winner",
+      loserRikishiId: "withdrawn-opponent",
+      loserAbsent: true,
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-05/rikishi",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(
+      response
+        .json()
+        .rikishi.find((entry: { id: string }) => entry.id === "default-winner"),
+    ).toMatchObject({
+      previousBashoRecord: {
+        status: "available",
+        wins: 1,
+        losses: 0,
+        absences: 14,
+      },
     });
   });
 

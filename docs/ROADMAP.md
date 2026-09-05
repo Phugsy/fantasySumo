@@ -52,6 +52,7 @@ Goal: make it usable by a small group of friends.
 - [x] Add simple user identity or display-name-based teams.
 - [ ] Add private league concept if needed.
 - [x] Add basic admin flow for importing data.
+- [x] Show verified previous-basho records while creating or editing picks.
 - [ ] Improve responsive UI.
 - [x] Add error/loading/empty states.
 

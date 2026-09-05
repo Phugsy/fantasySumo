@@ -520,6 +520,18 @@ test("creates a fantasy team and follows its My Stable score", async ({
   await page.goto("/");
   await signInAsDemoUser(page);
 
+  await expect(
+    page.getByText("Previous basho: Demo March Basho · 9–6 · Juryo #1"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: /Takayasu.*Previous basho Demo March Basho: 5 wins, 4 losses, 6 absences, ranked Maegashira #8/,
+    }),
+  ).toContainText("Previous basho: Demo March Basho · 5–4–6 · Maegashira #8");
+  await expect(
+    page.getByText("Previous basho: Demo March Basho · Did not compete"),
+  ).toBeVisible();
+
   await page.getByLabel("Team name").fill("Codex Stable");
   await page.getByRole("button", { name: /Wakatakakage/ }).click();
   await page.getByRole("button", { name: /Ura/ }).click();
@@ -547,6 +559,9 @@ test("creates a fantasy team and follows its My Stable score", async ({
   await page.getByRole("button", { name: "Edit picks" }).click();
   await expect(
     page.getByRole("heading", { name: "Edit stable" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Previous basho: Demo March Basho · 9–6 · Juryo #1"),
   ).toBeVisible();
   await expect(page.getByLabel("Team name")).toHaveValue("Codex Stable");
   await page.getByLabel("Team name").fill("Codex Stable Updated");

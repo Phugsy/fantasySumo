@@ -9,6 +9,8 @@ export type {
   PickValidationError,
   PickValidationErrorCode,
   PickValidationOptions,
+  PreviousBashoRecord,
+  PreviousBashoRecordState,
   Rikishi,
   RikishiTournamentAchievement,
   RikishiTournamentAchievementType,
@@ -26,6 +28,10 @@ export type {
   TeamScore,
   TeamScoreHistoryEntry,
 } from "./types.js";
+export {
+  derivePreviousBashoRecord,
+  findPreviousCompletedBasho,
+} from "./previous-basho-record.js";
 export { deriveRikishiTournamentNotes } from "./tournament-notes.js";
 export {
   isCompleteScheduledBoutPublicationSource,

@@ -49,6 +49,9 @@ Current behaviour:
 - Fetches the current basho and its ranked rikishi from the Fastify API.
 - Fetches leaderboard standings from the Fastify API.
 - Lets a player select and deselect rikishi up to the API-configured team size.
+- Shows each choice's verified previous-basho W-L-A record and historical rank,
+  or distinct neutral states for unavailable source data and confirmed
+  non-participation.
 - Captures a display/team name and submits the team to the API for the signed-in/current user.
 - Gives the signed-in player a dedicated My Stable view with private pick
   details, rikishi rank/heya, individual wins and points, total score, and an
@@ -96,6 +99,11 @@ Current routes:
   - Returns a basho and its rikishi with banzuke rank data plus informational
     tournament statuses and dated achievements derived from stored source
     facts.
+  - Adds a discriminated `previousBashoRecord` state. An `available` record has
+    basho identity, historical rank, wins, losses, and absences only when the
+    nearest earlier completed basho in the same live/demo mode has a fully
+    verified schedule/result history. `unavailable` never guesses from partial
+    live imports; `did-not-compete` requires affirmative fixture/source evidence.
 - `GET /api/basho/:bashoId/schedule`
   - Returns only stored, published days after the basho's current scored day.
   - Enriches each scheduled side with existing shikona and banzuke rank data.
@@ -163,6 +171,9 @@ Current routes:
     result when that second source-backed step cannot complete; completed
     results remain committed and any stored schedule remains unchanged.
   - Supports `?dryRun=true`.
+  - Rikishi identity is currently derived from shikona text. Provider-specific
+    stable aliases and rename-safe canonical identities are tracked separately
+    in [issue #102](https://github.com/Phugsy/fantasySumo/issues/102).
 - `POST /api/admin/basho/:bashoId/import-schedule`
   - Fetches one published Makuuchi torikumi day without requiring winner data.
   - Maps source payloads to `ScheduledBout` records, separately from
@@ -247,6 +258,10 @@ Current behaviour:
 - Calculates a leaderboard ordered by score descending.
 - Allows tied team scores and orders ties deterministically by display name, then team id.
 - Validates duplicate picks and exact team size when a team size is supplied.
+- Selects the nearest earlier completed basho within the target's live/demo
+  boundary and derives a compact W-L-A record from stored regulation results.
+  Missing decisions become absences only after the API verifies every schedule
+  day; ambiguous multiple same-day appearances fail closed.
 
 Current limitations:
 
@@ -283,13 +298,18 @@ Current behaviour:
   transaction so concurrent refreshes cannot reopen picks.
 - Saves owned teams and replacement picks atomically while rechecking the
   persisted basho status and upserting on the per-basho owner key.
-- Provides sample seed data for one basho, four rikishi, two fantasy teams, picks, and bout results.
-- Provides deterministic demo seed data for one pickable basho, eight rikishi,
-  four fantasy teams, picks, 15 published matchup cards, and a separate 15-day
-  bout result fixture.
+- Provides sample seed data for one pickable basho plus one completed historical
+  basho, four rikishi, two fantasy teams, picks, and bout results.
+- Provides deterministic demo seed data for one pickable basho, one completed
+  historical basho, eight current rikishi, four fantasy teams, picks, published
+  matchup cards, and separate 15-day bout result fixtures. Historical fixtures
+  cover winning, losing, absence, previous-Juryo, and confirmed
+  non-participation records. Cross-division rank display is supported for stored
+  data, while the automated live banzuke importer remains Makuuchi-only.
 - Classifies bashos explicitly with `isDemo`. The fixed demo reset transaction
-  requires both the known demo ID and `isDemo: true`, replaces only that
-  basho's dependent data, and preserves live bashos and shared rikishi metadata.
+  requires both known demo IDs and `isDemo: true`, replaces both bashos and all
+  dependent fixture rows exactly, and preserves live bashos and shared rikishi
+  metadata. A failure rolls back both demo bashos together.
 - Keeps normal current-basho selection live-first. Local demo mode explicitly
   requests the fixed flagged demo with `VITE_BASHO_MODE=demo`, so mixed live and
   demo data cannot silently change which environment the browser displays.
@@ -317,8 +337,9 @@ pnpm --filter @fantasy-sumo/db db:generate
 ```
 
 `pnpm db:seed:demo` is the preferred fixture reset for local demos, browser
-smoke checks, and the Playwright E2E harness. It replaces only the fixed demo
-basho with fake deterministic data while using the same database schema,
+smoke checks, and the Playwright E2E harness. It replaces the fixed pickable
+demo basho and maintains its completed historical fixture with fake
+deterministic data while using the same database schema,
 repositories, API routes, UI, and domain scoring logic as the regular app. It
 starts with the demo basho in `upcoming`, `currentDay: 0`, and no applied
 results; use `pnpm demo:start`, `pnpm demo:advance-day`, and

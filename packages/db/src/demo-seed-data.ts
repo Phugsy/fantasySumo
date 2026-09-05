@@ -8,7 +8,7 @@ import type {
   ScheduledBout,
   ScheduledBoutPublication,
 } from "@fantasy-sumo/domain";
-import { DEMO_BASHO_ID } from "./demo-constants.js";
+import { DEMO_BASHO_ID, DEMO_PREVIOUS_BASHO_ID } from "./demo-constants.js";
 
 export const demoBasho: Basho = {
   id: DEMO_BASHO_ID,
@@ -714,8 +714,144 @@ export const demoScheduledBouts: ScheduledBout[] = demoBoutResults.map(
   (result) => toDemoScheduledBout(result, false),
 );
 
+export const demoPreviousBasho: Basho = {
+  id: DEMO_PREVIOUS_BASHO_ID,
+  isDemo: true,
+  name: "Demo March Basho",
+  startDate: "2026-03-08",
+  endDate: "2026-03-22",
+  status: "complete",
+  currentDay: 15,
+};
+
+export const demoPreviousRikishi: Rikishi[] = [
+  ...demoRikishi.filter((rikishi) => rikishi.id !== "tobizaru"),
+  { id: "meisei", shikona: "Meisei", heya: "Tatsunami" },
+];
+
+const demoPreviousRanks = [
+  "Ozeki",
+  "Ozeki",
+  "Sekiwake",
+  "Komusubi",
+  "Juryo #1",
+  "Maegashira #8",
+  "Maegashira #10",
+  "Maegashira #12",
+];
+
+export const demoPreviousBanzukeEntries: BanzukeEntry[] =
+  demoPreviousRikishi.map((rikishi, index) => ({
+    id: `${demoPreviousBasho.id}-${rikishi.id}`,
+    bashoId: demoPreviousBasho.id,
+    rikishiId: rikishi.id,
+    rank: demoPreviousRanks[index]!,
+    rankOrder: index + 1,
+  }));
+
+export const demoPreviousBoutResults: BoutResult[] = Array.from(
+  { length: 15 },
+  (_, index) => createDemoPreviousDayResults(index + 1),
+).flat();
+
+export const demoPreviousScheduledBoutPublications: ScheduledBoutPublication[] =
+  Array.from({ length: 15 }, (_, index) => {
+    const day = index + 1;
+
+    return {
+      id: `${demoPreviousBasho.id}-day-${day}-schedule`,
+      bashoId: demoPreviousBasho.id,
+      day,
+      source: "demo-history-fixture",
+      publishedAt: `2026-03-${String(7 + day).padStart(2, "0")}T08:00:00.000Z`,
+    };
+  });
+
+export const demoPreviousScheduledBouts: ScheduledBout[] = Array.from(
+  { length: 15 },
+  (_, index) => createDemoPreviousDayBouts(index + 1),
+).flat();
+
 export function demoScheduledBoutsForDay(day: number): ScheduledBout[] {
   return demoBoutResults
     .filter((result) => result.day === day)
     .map((result) => toDemoScheduledBout(result, true));
+}
+
+function createDemoPreviousDayResults(day: number): BoutResult[] {
+  const results = [
+    toDemoPreviousResult(
+      day,
+      1,
+      day <= 12 ? "onosato" : "hoshoryu",
+      day <= 12 ? "hoshoryu" : "onosato",
+    ),
+    toDemoPreviousResult(
+      day,
+      2,
+      day % 2 === 1 ? "kotozakura" : "kirishima",
+      day % 2 === 1 ? "kirishima" : "kotozakura",
+    ),
+    toDemoPreviousResult(
+      day,
+      3,
+      day <= 9 ? "wakatakakage" : "ura",
+      day <= 9 ? "ura" : "wakatakakage",
+    ),
+  ];
+
+  if (day <= 10) {
+    results.push({
+      ...toDemoPreviousResult(
+        day,
+        4,
+        day <= 5 ? "takayasu" : "meisei",
+        day <= 5 ? "meisei" : "takayasu",
+      ),
+      ...(day === 10 ? { loserAbsent: true } : {}),
+    });
+  }
+
+  return results;
+}
+
+function createDemoPreviousDayBouts(day: number): ScheduledBout[] {
+  const scheduledResults = createDemoPreviousDayResults(day);
+  const bouts: ScheduledBout[] = scheduledResults.map((result) => ({
+    id: result.id.replace("-bout-", "-match-"),
+    bashoId: result.bashoId,
+    day: result.day,
+    eastRikishiId: result.winnerRikishiId,
+    westRikishiId: result.loserRikishiId,
+    status: "scheduled",
+  }));
+
+  if (day > 10) {
+    bouts.push({
+      id: `${demoPreviousBasho.id}-day-${day}-match-4`,
+      bashoId: demoPreviousBasho.id,
+      day,
+      eastRikishiId: "takayasu",
+      westRikishiId: "meisei",
+      status: "cancelled",
+      withdrawnRikishiId: "takayasu",
+    });
+  }
+
+  return bouts;
+}
+
+function toDemoPreviousResult(
+  day: number,
+  bout: number,
+  winnerRikishiId: string,
+  loserRikishiId: string,
+): BoutResult {
+  return {
+    id: `${demoPreviousBasho.id}-day-${day}-bout-${bout}`,
+    bashoId: demoPreviousBasho.id,
+    day,
+    winnerRikishiId,
+    loserRikishiId,
+  };
 }
