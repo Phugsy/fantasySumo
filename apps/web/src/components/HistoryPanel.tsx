@@ -23,29 +23,37 @@ export function HistoryPanel({ signedIn }: HistoryPanelProps) {
   );
   const [myHistory, setMyHistory] = useState<MyHistoryResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [personalErrorMessage, setPersonalErrorMessage] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     let current = true;
 
     async function loadHistory() {
       setErrorMessage(null);
+      setPersonalErrorMessage(null);
       setMyHistory(null);
 
-      try {
-        const [archiveResponse, allTimeResponse, myHistoryResponse] =
-          await Promise.all([
-            fetchBashoArchive(),
-            fetchAllTimeLeaderboard(),
-            signedIn ? fetchMyHistory() : Promise.resolve(null),
-          ]);
+      const [publicResult, personalResult] = await Promise.allSettled([
+        Promise.all([fetchBashoArchive(), fetchAllTimeLeaderboard()]),
+        signedIn ? fetchMyHistory() : Promise.resolve(null),
+      ]);
 
-        if (!current) return;
+      if (!current) return;
+
+      if (publicResult.status === "fulfilled") {
+        const [archiveResponse, allTimeResponse] = publicResult.value;
         setArchive(archiveResponse);
         setAllTime(allTimeResponse);
-        setMyHistory(myHistoryResponse);
-      } catch (error) {
-        if (!current) return;
-        setErrorMessage(getErrorMessage(error));
+      } else {
+        setErrorMessage(getErrorMessage(publicResult.reason));
+      }
+
+      if (personalResult.status === "fulfilled") {
+        setMyHistory(personalResult.value);
+      } else {
+        setPersonalErrorMessage(getErrorMessage(personalResult.reason));
       }
     }
 
@@ -84,7 +92,7 @@ export function HistoryPanel({ signedIn }: HistoryPanelProps) {
         </div>
         {allTime.leaderboard.length === 0 ? (
           <p className="history-empty">
-            Scores will appear once a basho starts.
+            Scores will appear once a basho is complete.
           </p>
         ) : (
           <ol className="all-time-list">
@@ -136,7 +144,11 @@ export function HistoryPanel({ signedIn }: HistoryPanelProps) {
             </div>
             <strong>{myHistory?.score ?? 0} all-time pts</strong>
           </div>
-          {myHistory === null || myHistory.history.length === 0 ? (
+          {personalErrorMessage !== null ? (
+            <p className="history-empty" role="alert">
+              {personalErrorMessage}
+            </p>
+          ) : myHistory === null || myHistory.history.length === 0 ? (
             <p className="history-empty">
               Your completed and current teams will appear here.
             </p>

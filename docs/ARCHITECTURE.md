@@ -136,8 +136,10 @@ Current routes:
 - `GET /api/bashos`
   - Returns the non-demo tournament archive, newest first.
 - `GET /api/leaderboard/all-time`
-  - Aggregates each authenticated owner's scores across non-demo active and
-    completed bashos. Legacy teams without an owner remain independent entries.
+  - Aggregates each authenticated owner's scores across completed, non-demo
+    bashos. A live basho can appear in personal history but cannot change the
+    cumulative standings. Legacy teams without an owner remain independent
+    entries.
   - Uses the latest tournament team name for display without exposing user IDs.
 - `GET /api/my-history`
   - Requires authentication and returns the current user's teams, scores, and

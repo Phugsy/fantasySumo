@@ -91,11 +91,7 @@ export function registerBashoRoutes(
 
   app.get("/api/leaderboard/all-time", async () => {
     const bashos = (await context.repositories.listBashos())
-      .filter(
-        (basho) =>
-          !basho.isDemo &&
-          (basho.status === "active" || basho.status === "complete"),
-      )
+      .filter((basho) => !basho.isDemo && basho.status === "complete")
       .sort((left, right) => left.startDate.localeCompare(right.startDate));
     const scoredBashos = await Promise.all(
       bashos.map(async (basho) => {
@@ -254,11 +250,7 @@ export function registerBashoRoutes(
 
     return {
       score: history
-        .filter(
-          (entry) =>
-            entry.basho.status === "active" ||
-            entry.basho.status === "complete",
-        )
+        .filter((entry) => entry.basho.status === "complete")
         .reduce((total, entry) => total + entry.score, 0),
       history,
     };

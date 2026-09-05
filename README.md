@@ -238,7 +238,7 @@ Set `CRON_SECRET` in production to authenticate Vercel's scheduled basho job.
 Fantasy team creation requires a current user. The browser route split is:
 
 - `/` — public current-basho summary and leaderboard.
-- `/history` — public tournament archive and cumulative leaderboard, plus a signed-in player's preserved per-basho rikishi records.
+- `/history` — public tournament archive and cumulative leaderboard across completed bashos, plus a signed-in player's preserved per-basho rikishi records.
 - `/login` — dedicated sign-in and registration controls.
 - `/reset-password` — Neon Auth password-reset request and completion flow.
 - `/stable` — authenticated My Stable view.

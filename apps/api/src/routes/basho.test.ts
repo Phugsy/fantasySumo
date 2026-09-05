@@ -1349,21 +1349,24 @@ describe("basho routes", () => {
       bashosResponse.json().bashos.map((basho: { id: string }) => basho.id),
     ).toEqual(["2026-07", "2026-05"]);
     expect(leaderboardResponse.statusCode).toBe(200);
-    expect(leaderboardResponse.json().bashoCount).toBe(2);
-    expect(leaderboardResponse.json().leaderboard[0]).toMatchObject({
-      rank: 1,
-      displayName: "History Stable II",
-      score: 4,
-      tournamentsPlayed: 2,
-      bashos: [
-        { bashoId: "2026-07", score: 2 },
-        { bashoId: "2026-05", score: 2 },
-      ],
+    expect(leaderboardResponse.json().bashoCount).toBe(1);
+    expect(
+      leaderboardResponse
+        .json()
+        .leaderboard.find(
+          (entry: { displayName: string }) =>
+            entry.displayName === "History Stable",
+        ),
+    ).toMatchObject({
+      displayName: "History Stable",
+      score: 2,
+      tournamentsPlayed: 1,
+      bashos: [{ bashoId: "2026-05", score: 2 }],
     });
     expect(unauthenticatedHistory.statusCode).toBe(401);
     expect(historyResponse.statusCode).toBe(200);
     const historyBody = historyResponse.json();
-    expect(historyBody.score).toBe(4);
+    expect(historyBody.score).toBe(2);
     expect(
       historyBody.history.map(
         (entry: { basho: { id: string } }) => entry.basho.id,

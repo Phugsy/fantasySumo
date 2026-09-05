@@ -479,6 +479,47 @@ describe("repositories", () => {
     });
   });
 
+  it("does not overwrite a newer banzuke heya with a stale omission", async () => {
+    const repositories = createRepositories(client);
+    const entry = {
+      id: "2026-05-onosato",
+      bashoId: sampleBasho.id,
+      rikishiId: "onosato",
+      shikona: "Onosato",
+      heya: "Original Heya",
+      rank: "Ozeki",
+      rankOrder: 1,
+    };
+    const staleOmission = {
+      id: entry.id,
+      bashoId: entry.bashoId,
+      rikishiId: entry.rikishiId,
+      shikona: entry.shikona,
+      rank: entry.rank,
+      rankOrder: entry.rankOrder,
+    };
+    await repositories.applyBanzukeImport({
+      basho: sampleBasho,
+      rikishi: [sampleRikishi[0]!],
+      banzukeEntries: [entry],
+    });
+    await repositories.applyBanzukeImport({
+      basho: sampleBasho,
+      rikishi: [sampleRikishi[0]!],
+      banzukeEntries: [{ ...entry, heya: "Corrected Heya" }],
+    });
+
+    await repositories.applyBanzukeImport({
+      basho: sampleBasho,
+      rikishi: [sampleRikishi[0]!],
+      banzukeEntries: [staleOmission],
+    });
+
+    expect(
+      await repositories.listBanzukeEntriesForBasho(sampleBasho.id),
+    ).toEqual([{ ...entry, heya: "Corrected Heya" }]);
+  });
+
   it("does not let a stale result import undo an admin close", async () => {
     await seedDatabase(createRepositories(client));
     const repositories = createRepositories(client);

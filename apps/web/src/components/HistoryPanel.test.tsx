@@ -115,6 +115,68 @@ describe("HistoryPanel", () => {
     expect(screen.getByText("Kirishima")).toBeInTheDocument();
     expect(screen.getByText("8 wins · 8 pts")).toBeInTheDocument();
   });
+
+  it("keeps public history visible when personal history fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url === "/api/bashos") {
+          return jsonResponse({
+            bashos: [
+              {
+                id: "2026-07",
+                isDemo: false,
+                name: "July 2026 Basho",
+                startDate: "2026-07-12",
+                endDate: "2026-07-26",
+                status: "complete",
+              },
+            ],
+          });
+        }
+        if (url === "/api/leaderboard/all-time") {
+          return jsonResponse({
+            bashoCount: 1,
+            leaderboard: [
+              {
+                rank: 1,
+                displayName: "North Star",
+                score: 11,
+                tournamentsPlayed: 1,
+                bashos: [],
+              },
+            ],
+          });
+        }
+        if (url === "/api/my-history") {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                error: "unauthenticated",
+                message: "Sign in again to view your tournament history.",
+              }),
+              {
+                headers: { "content-type": "application/json" },
+                status: 401,
+              },
+            ),
+          );
+        }
+
+        throw new Error(`Unexpected request: ${url}`);
+      }),
+    );
+
+    render(<HistoryPanel signedIn />);
+
+    expect(await screen.findByText("North Star")).toBeInTheDocument();
+    expect(screen.getByText("July 2026 Basho")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Sign in again to view your tournament history.",
+    );
+  });
 });
 
 function jsonResponse(body: unknown): Promise<Response> {
