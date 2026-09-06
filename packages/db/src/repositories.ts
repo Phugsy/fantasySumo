@@ -1,3 +1,7 @@
+import {
+  createScoringRepositories,
+  type ScoringRepositories,
+} from "./scoring-repositories.js";
 import { and, eq, isNull, notInArray } from "drizzle-orm";
 import type {
   BanzukeEntry,
@@ -104,7 +108,7 @@ export type OwnedFantasyTeamSaveResult =
       teamSize: number;
     };
 
-export interface Repositories {
+export interface Repositories extends ScoringRepositories {
   /** Clears every game record. Production and admin paths must never call this. */
   resetAllDataForLocalFixtures: () => Promise<void>;
   replaceDemoBashosData: (
@@ -191,14 +195,22 @@ export interface Repositories {
 
 export function createRepositories(database: AppDatabase): Repositories {
   if (database.provider === "postgres") {
-    return createPostgresRepositories(database.db);
+    return {
+      ...createPostgresRepositories(database.db),
+      ...createScoringRepositories(database),
+    };
   }
 
-  return createSqliteRepositories(database.db);
+  return {
+    ...createSqliteRepositories(database.db),
+    ...createScoringRepositories(database),
+  };
 }
 
-function createSqliteRepositories(db: SqliteDatabase): Repositories {
-  const repositories: Repositories = {
+function createSqliteRepositories(
+  db: SqliteDatabase,
+): Omit<Repositories, keyof ScoringRepositories> {
+  const repositories: Omit<Repositories, keyof ScoringRepositories> = {
     resetAllDataForLocalFixtures: async () => {
       db.delete(sqlite.fantasyPicks).run();
       db.delete(sqlite.fantasyTeams).run();
@@ -1174,8 +1186,10 @@ function createSqliteRepositories(db: SqliteDatabase): Repositories {
   return repositories;
 }
 
-function createPostgresRepositories(db: PostgresDatabase): Repositories {
-  const repositories: Repositories = {
+function createPostgresRepositories(
+  db: PostgresDatabase,
+): Omit<Repositories, keyof ScoringRepositories> {
+  const repositories: Omit<Repositories, keyof ScoringRepositories> = {
     resetAllDataForLocalFixtures: async () => {
       await db.delete(pg.fantasyPicks);
       await db.delete(pg.fantasyTeams);

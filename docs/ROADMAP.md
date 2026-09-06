@@ -86,8 +86,8 @@ Before display-preference work, make the game rules deliberate:
 
 1. Provide a separate shared demo/playtest environment without using the
    production database, then record the first multi-user round (#91).
-2. Define one secondary scoring mode, including whether kinboshi and special
-   prizes award points and what source facts are required (#92).
+2. Secondary scoring is defined and implemented with per-basho rules,
+   separate categories, and special-prize imports (#92; see `SCORING.md`).
 3. Select and specify one pick modifier or withdrawal mechanic, such as a
    joker/captain or substitutes (#93).
 4. Fix the reported initial-focus and mobile-header regressions (#94).

@@ -1,3 +1,6 @@
+import type { ScoringMode } from "@fantasy-sumo/domain";
+import { ScoreBreakdown } from "./ScoreBreakdown";
+import { compareScoringMode, scoringModeLabel } from "../scoring-view";
 import { useId, useMemo, useState } from "react";
 import type {
   Basho,
@@ -31,12 +34,28 @@ export function LeaderboardPanel({
   currentTeamId,
   errorMessage,
   expandedTeamId,
-  leaderboard,
+  leaderboard: officialLeaderboard,
   loadState,
   onToggleTeam,
   rikishi,
   totalDays,
 }: LeaderboardPanelProps) {
+  const [comparison, setComparison] = useState<{
+    bashoId: string;
+    mode: ScoringMode;
+  } | null>(null);
+  const officialMode = basho.scoringMode ?? "wins-v0";
+  const comparisonMode =
+    comparison?.bashoId === basho.id ? comparison.mode : null;
+  const isWhatIf = comparisonMode !== null;
+  const displayMode = comparisonMode ?? officialMode;
+  const leaderboard = useMemo(
+    () =>
+      comparisonMode === null
+        ? officialLeaderboard
+        : compareScoringMode(officialLeaderboard, comparisonMode),
+    [officialLeaderboard, comparisonMode],
+  );
   const rikishiById = useMemo(
     () => new Map(rikishi.map((entry) => [entry.id, entry])),
     [rikishi],
@@ -62,6 +81,47 @@ export function LeaderboardPanel({
         <span>{getLeaderboardStatusCopy(basho)}</span>
       </div>
 
+      <div className="scoring-view">
+        <label htmlFor="leaderboard-scoring-view">Scoring view</label>
+        <select
+          id="leaderboard-scoring-view"
+          value={comparisonMode ?? "official"}
+          onChange={(event) =>
+            setComparison(
+              event.target.value === "official"
+                ? null
+                : {
+                    bashoId: basho.id,
+                    mode: event.target.value as ScoringMode,
+                  },
+            )
+          }
+        >
+          <option value="official">
+            Official · {scoringModeLabel(officialMode)}
+          </option>
+          <option value="wins-v0">What if · wins only</option>
+          <option value="achievements-v1">What if · wins + achievements</option>
+        </select>
+        {isWhatIf ? (
+          <p className="what-if-notice" role="status">
+            What if comparison — these are not the official standings. Official
+            rules remain {scoringModeLabel(officialMode)}.
+          </p>
+        ) : (
+          <p>Official rules: {scoringModeLabel(officialMode)}.</p>
+        )}
+        {displayMode === "achievements-v1" && (
+          <p>
+            +1 per win · +2 per kinboshi · +3 at eight wins · +1 per special
+            prize.
+          </p>
+        )}
+        {basho.specialPrizesStatus === "pending" &&
+          displayMode === "achievements-v1" && (
+            <p>Special prizes pending. Totals exclude unconfirmed awards.</p>
+          )}
+      </div>
       {errorMessage !== null && (
         <p className="form-message error-state" role="alert">
           {errorMessage}
@@ -91,6 +151,7 @@ export function LeaderboardPanel({
             {getEmptyScoringMessage(basho)}
           </div>
           {renderLeaderboardList({
+            scoringMode: displayMode,
             currentTeamId,
             expandedTeamId,
             leaderboard,
@@ -106,6 +167,7 @@ export function LeaderboardPanel({
       ) : (
         <>
           {renderLeaderboardList({
+            scoringMode: displayMode,
             currentTeamId,
             expandedTeamId,
             leaderboard,
@@ -124,6 +186,7 @@ export function LeaderboardPanel({
 }
 
 function renderLeaderboardList({
+  scoringMode,
   currentTeamId,
   expandedTeamId,
   leaderboard,
@@ -131,6 +194,7 @@ function renderLeaderboardList({
   rikishiById,
   tiedScoreCounts,
 }: {
+  scoringMode: ScoringMode;
   currentTeamId?: string | null;
   expandedTeamId: string | null;
   leaderboard: LeaderboardEntry[];
@@ -181,6 +245,11 @@ function renderLeaderboardList({
             {isExpanded && (
               <div className="score-breakdown">
                 <h3>Tournament totals</h3>
+                <ScoreBreakdown
+                  breakdown={entry.breakdown}
+                  mode={scoringMode}
+                  label={`${entry.displayName} score categories`}
+                />
                 {entry.rikishiScores.some((score) => {
                   const notes = rikishiById.get(
                     score.rikishiId,
@@ -192,8 +261,9 @@ function renderLeaderboardList({
                   );
                 }) && (
                   <p className="tournament-notes-disclaimer">
-                    Tournament badges are informational and do not add fantasy
-                    points.
+                    {scoringMode === "achievements-v1"
+                      ? "Points follow the selected scoring rules; the category breakdown shows each bonus."
+                      : "Tournament badges are informational and do not add fantasy points."}
                   </p>
                 )}
                 {entry.rikishiScores.length === 0 ? (
@@ -209,6 +279,7 @@ function renderLeaderboardList({
                           score.rikishiId,
                         )}
                         score={score}
+                        scoringMode={scoringMode}
                       />
                     ))}
                   </ul>
@@ -229,10 +300,12 @@ type RikishiResult = {
 };
 
 function RikishiScoreRow({
+  scoringMode,
   pickedRikishi,
   results,
   score,
 }: {
+  scoringMode: ScoringMode;
   pickedRikishi?: RankedRikishi;
   results: RikishiResult[];
   score: LeaderboardEntry["rikishiScores"][number];
@@ -273,6 +346,11 @@ function RikishiScoreRow({
           aria-label={`${shikona} result history`}
         >
           <h4>{shikona} results</h4>
+          <ScoreBreakdown
+            breakdown={score.breakdown}
+            mode={scoringMode}
+            label={`${shikona} score categories`}
+          />
           {results.length === 0 ? (
             <p>No results recorded yet.</p>
           ) : (

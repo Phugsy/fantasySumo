@@ -390,15 +390,14 @@ verified day-15 import can complete an active basho.
 A gold-star win is derived only when the stored banzuke identifies
 the winner as maegashira, the loser as yokozuna, and the stored result is not a
 default/absence win. The UI renders only the concise badge label, without day
-or provenance metadata. These notes are informational and do not participate
-in fantasy scoring.
+or provenance metadata. These notes remain informational; the domain scoring module independently
+calculates bonuses from the same stored facts when the basho mode includes them.
 
-The current live source adapters do not import special-prize awards, and the
-Sumo API schedule adapter does not currently receive an explicit withdrawal
-field. Therefore the app shows no special-prize badge and no live withdrawal
-badge unless a future source adapter or trusted internal command supplies that
-fact. Demo fixtures exercise the same model without implying that unavailable
-live source data exists.
+Final special-prize awards are now imported separately from the Sumo API basho
+endpoint and contribute only under the saved achievement scoring mode. They
+have independent pending/confirmed state and atomic snapshot replacement; see
+[Scoring rules](SCORING.md). The Sumo API schedule adapter still receives no
+explicit withdrawal field, so live withdrawal badges need future source evidence.
 
 ## Failure Handling
 

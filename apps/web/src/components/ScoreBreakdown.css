@@ -1,0 +1,47 @@
+.score-categories {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-block: 0.75rem;
+}
+.score-categories table {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  width: 100%;
+}
+.score-categories caption {
+  text-align: left;
+  font-size: 0.8rem;
+  margin-bottom: 0.4rem;
+}
+.score-categories th,
+.score-categories td {
+  padding: 0.45rem 0.6rem;
+  text-align: center;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-color, #d9d1c4);
+}
+.score-categories th {
+  font-size: 0.75rem;
+}
+.score-categories .excluded-bonus {
+  text-decoration: line-through;
+  color: var(--text-muted, #68615a);
+}
+.scoring-view {
+  display: grid;
+  gap: 0.5rem;
+  margin-block: 1rem;
+}
+.scoring-view select {
+  max-width: 100%;
+  padding: 0.6rem;
+  font: inherit;
+}
+.scoring-view p {
+  margin: 0;
+}
+.what-if-notice {
+  padding: 0.7rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+}

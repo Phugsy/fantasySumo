@@ -25,6 +25,10 @@ export type {
   ScheduledBoutPublication,
   ScheduledBoutStatus,
   ScoringOptions,
+  ScoringMode,
+  ScoreBreakdown,
+  SpecialPrizeType,
+  SpecialPrizeAward,
   TeamScore,
   TeamScoreHistoryEntry,
 } from "./types.js";
@@ -59,6 +63,7 @@ export {
   compareLeaderboardEntries,
 } from "./leaderboard.js";
 export {
+  scoreBreakdownTotal,
   calculateRikishiScore,
   calculateTeamScore,
   calculateTeamScoreHistory,

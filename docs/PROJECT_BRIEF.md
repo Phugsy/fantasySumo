@@ -97,3 +97,10 @@ including when an administrator chooses to lock earlier than the scheduled
 transition. The final status check and team-and-picks write must be one database
 transaction so a concurrent lifecycle update cannot admit a save after
 locking.
+
+## Optional achievement scoring
+
+The accepted `achievements-v1` mode adds kinboshi, eight-win, and final
+special-prize bonuses to the original `wins-v0` mode. Rules are saved per basho
+and freeze when picks first lock. See [Scoring rules](SCORING.md) for the exact
+points, timing, missing-data treatment, and comparison behavior.

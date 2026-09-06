@@ -1,3 +1,5 @@
+import type { ScoringMode } from "@fantasy-sumo/domain";
+import { scoringModeLabel } from "../scoring-view";
 import type { FormEvent } from "react";
 import type { CreatedTeamResponse, RankedRikishi } from "../types";
 import "./TeamSelection.css";
@@ -19,6 +21,7 @@ interface TeamSelectionProps {
   selectedRikishi: RankedRikishi[];
   submitState: "idle" | "submitting";
   teamSize: number;
+  scoringMode?: ScoringMode;
 }
 
 export function TeamSelection({
@@ -38,6 +41,7 @@ export function TeamSelection({
   selectedRikishi,
   submitState,
   teamSize,
+  scoringMode = "wins-v0",
 }: TeamSelectionProps) {
   const picksRemaining = Math.max(teamSize - selectedIds.length, 0);
 
@@ -48,6 +52,12 @@ export function TeamSelection({
           <p className="eyebrow">Banzuke</p>
           <h2 id="rikishi-title">Choose rikishi</h2>
         </div>
+        <p>
+          Official scoring: {scoringModeLabel(scoringMode)}.{" "}
+          {scoringMode === "achievements-v1"
+            ? "+1 per win, +2 per kinboshi, +3 at eight wins, +1 per special prize."
+            : "Losses and absences score zero."}
+        </p>
         {isLocked && lockMessage !== undefined && (
           <p className="form-message" role="status">
             {lockMessage}

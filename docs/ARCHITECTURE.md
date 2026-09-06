@@ -68,8 +68,8 @@ Current behaviour:
   team form, and expandable picked-rikishi tournament totals. Each rikishi row
   shows up to five recent outcomes and expands to the full result history.
 - Shows compact, dated tournament-status and achievement badges in My Stable
-  and expanded leaderboard details, with readable provenance and an explicit
-  reminder that badges do not award fantasy points.
+  and expanded leaderboard details, with readable provenance and a separate breakdown
+  of points awarded under the selected scoring mode.
 - Charts cumulative team scores across scored days with team filters,
   inspectable points, and an accessible exact-value table.
 - Exposes a dedicated `/admin` route only for sessions the API marks as admin,
@@ -80,7 +80,7 @@ Current behaviour:
 
 Current limitations:
 
-- Secondary scoring modes and pick modifiers are not yet defined.
+- Pick modifiers are not yet defined.
 - No persistence of the last created team in browser storage yet.
 
 ## Back end
@@ -198,7 +198,7 @@ Current routes:
   - Supports `?dryRun=true`.
 - `GET /api/admin/basho/:bashoId/game-config`
   - Returns the effective team size, whether it is persisted or inherited from
-    the server default, the fixed `wins-v0` scoring mode, and whether team size
+    the server default, the persisted scoring mode and permanent scoring lock, and whether team size
     can still change.
 - `PUT /api/admin/basho/:bashoId/game-config`
   - Persists team size for one basho.
@@ -254,8 +254,7 @@ Current limitations:
 
 - Auth remains intentionally small. Local development uses a cookie-based development session, while production identity comes from Neon Auth JWTs verified by the API auth boundary.
 - No dedicated API client package.
-- Scoring-mode and pick-modifier configuration remain deferred until their
-  product rules are defined.
+- Pick-modifier configuration remains deferred until its product rules are defined.
 
 ## Domain package
 
@@ -280,7 +279,7 @@ Current behaviour:
 
 Current limitations:
 
-- No scoring bonuses yet.
+- Supports optional `achievements-v1` kinboshi, eight-win, and special-prize bonuses.
 - No rank-band or budget validation yet.
 - No persistence or API dependency by design.
 
@@ -363,8 +362,7 @@ local/test-only helper used by the separate sample seed command.
 
 Current limitations:
 
-- Live special-prize facts and secondary scoring configuration are not yet
-  modeled.
+- Provider identity aliases remain a follow-up for rename-safe prize matching.
 
 ## Release boundary
 
@@ -575,3 +573,16 @@ Prioritise tests for:
 5. Leaderboard ordering.
 
 Browser E2E tests should follow the strategy in [E2E Testing Strategy](E2E_TESTING.md). Add Playwright once the core team-selection and leaderboard flows are stable enough to protect through the browser.
+
+## Versioned scoring
+
+See [Scoring rules](SCORING.md) for the accepted modes and points. The domain
+returns independent score categories and provides the same category-total
+function to the API and React comparison view. The web package depends only on
+the framework-free domain package. Official leaderboard, stable, historical,
+and cumulative scores use per-basho persistence. `basho_scoring_config` and
+`special_prize_snapshots` isolate fantasy rules and final awards from source
+banzuke replacement. Database lifecycle triggers preserve the permanent lock
+across imports and older deployments. Admin mode updates use the protected
+`PUT /api/admin/basho/:bashoId/game-config/scoring` route; prizes have a separate
+protected import and completion-recovery path.

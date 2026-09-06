@@ -1,3 +1,4 @@
+import { getBashoScoringOptions } from "../scoring.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { DEMO_BASHO_ID, type Repositories } from "@fantasy-sumo/db";
@@ -82,6 +83,7 @@ export function registerBashoRoutes(
       return {
         ...currentBasho,
         teamSize: gameConfig.teamSize,
+        scoringMode: gameConfig.scoringMode,
       };
     },
   );
@@ -108,6 +110,7 @@ export function registerBashoRoutes(
           basho,
           teams,
           leaderboard: calculateLeaderboard(teams, picks, boutResults, {
+            ...(await getBashoScoringOptions(context.repositories, basho.id)),
             throughDay: basho.currentDay,
           }),
         };
@@ -206,6 +209,7 @@ export function registerBashoRoutes(
           context.repositories.listBanzukeEntriesForBasho(basho.id),
         ]);
         const teamScore = calculateTeamScore(team, picks, boutResults, {
+          ...(await getBashoScoringOptions(context.repositories, basho.id)),
           throughDay: basho.currentDay,
         });
         const scoresByRikishiId = new Map(
@@ -239,6 +243,7 @@ export function registerBashoRoutes(
                   : { rank: banzuke.rank, rankOrder: banzuke.rankOrder }),
                 wins: score?.wins ?? 0,
                 score: score?.score ?? 0,
+                breakdown: score?.breakdown,
               };
             })
             .sort(
@@ -580,7 +585,12 @@ export function registerBashoRoutes(
             scheduledBouts,
             throughDay: 15,
           });
+    const scoringOptions = await getBashoScoringOptions(
+      context.repositories,
+      basho.id,
+    );
     const teamScore = calculateTeamScore(team, picks, boutResults, {
+      ...scoringOptions,
       throughDay: verifiedThroughDay,
     });
     const scoresByRikishiId = new Map(
@@ -597,6 +607,13 @@ export function registerBashoRoutes(
       basho,
       team,
       totalScore: teamScore.score,
+      breakdown: teamScore.breakdown,
+      scoringMode: scoringOptions.scoringMode,
+      specialPrizesStatus:
+        (await context.repositories.getSpecialPrizeSnapshot(basho.id)) ===
+        undefined
+          ? "pending"
+          : "confirmed",
       picks: picks
         .map((pick) => {
           const rikishi = rikishiById.get(pick.rikishiId);
@@ -617,6 +634,7 @@ export function registerBashoRoutes(
                 }),
             wins: score?.wins ?? 0,
             score: score?.score ?? 0,
+            breakdown: score?.breakdown,
             tournamentNotes: deriveRikishiTournamentNotes({
               banzukeEntries,
               boutResults,
@@ -814,16 +832,26 @@ export function registerBashoRoutes(
             throughDay: 15,
           });
 
+    const scoringOptions = await getBashoScoringOptions(
+      context.repositories,
+      basho.id,
+    );
+    const prizeSnapshot = await context.repositories.getSpecialPrizeSnapshot(
+      basho.id,
+    );
     const leaderboard = calculateLeaderboard(
       await context.repositories.listFantasyTeamsForBasho(basho.id),
       await context.repositories.listFantasyPicksForBasho(basho.id),
       boutResults,
-      { throughDay: verifiedThroughDay },
+      { ...scoringOptions, throughDay: verifiedThroughDay },
     );
 
     return {
       basho,
       bashoId: basho.id,
+      scoringMode: scoringOptions.scoringMode,
+      specialPrizesStatus:
+        prizeSnapshot === undefined ? "pending" : "confirmed",
       totalDays: getBashoTotalDays(basho),
       leaderboard:
         basho.status === "upcoming"

@@ -9,6 +9,7 @@
     "test": "vitest run src"
   },
   "dependencies": {
+    "@fantasy-sumo/domain": "workspace:*",
     "@neondatabase/neon-js": "0.6.2-beta",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

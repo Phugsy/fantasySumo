@@ -158,7 +158,21 @@ async function describeDemoProgression(
   repositories: Repositories,
   basho: Basho,
 ): Promise<DemoProgressionResult> {
+  if (basho.status === "complete") {
+    await repositories.replaceSpecialPrizeSnapshot({
+      bashoId: basho.id,
+      source: "demo",
+      fetchedAt: "2026-05-24T12:00:00.000Z",
+      awards: [
+        { rikishiId: "wakatakakage", type: "technique" },
+        { rikishiId: "takayasu", type: "fighting-spirit" },
+        { rikishiId: "takayasu", type: "outstanding-performance" },
+      ],
+    });
+  }
   const results = await repositories.listBoutResultsForBasho(basho.id);
+  const scoring = await repositories.getBashoScoringConfig(basho.id);
+  const specialPrizes = await repositories.getSpecialPrizeSnapshot(basho.id);
 
   return {
     basho,
@@ -167,7 +181,12 @@ async function describeDemoProgression(
       await repositories.listFantasyTeamsForBasho(basho.id),
       await repositories.listFantasyPicksForBasho(basho.id),
       results,
-      { throughDay: basho.currentDay },
+      {
+        throughDay: basho.currentDay,
+        scoringMode: scoring?.mode ?? "wins-v0",
+        banzukeEntries: await repositories.listBanzukeEntriesForBasho(basho.id),
+        specialPrizes: specialPrizes?.awards ?? [],
+      },
     ),
   };
 }

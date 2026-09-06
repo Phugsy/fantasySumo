@@ -284,7 +284,9 @@ test("lets an admin persist inherited live config and validate a result import w
   await expect(
     page.getByRole("heading", { name: "September 2026 Basho" }),
   ).toBeVisible();
-  await expect(page.getByText("One point per win")).toBeVisible();
+  await expect(page.getByLabel("Scoring mode", { exact: true })).toHaveValue(
+    "wins-v0",
+  );
   await expect(page.getByLabel("Rikishi per stable")).toBeDisabled();
   await page.getByRole("button", { name: "Save inherited team size" }).click();
   await expect(page.getByText("Team size saved as 2.")).toBeVisible();
@@ -820,7 +822,7 @@ test("shows completed demo leaderboard entries in score order", async ({
   });
 
   expect(scores).toEqual([...scores].sort((left, right) => right - left));
-  await expect(page.getByText(/wins/).first()).toBeVisible();
+  await expect(page.locator(".rikishi-wins").first()).toBeVisible();
 
   await leaderboardRows.filter({ hasText: "Salt Circle" }).click();
   const uraNotes = page.getByLabel("Ura tournament status and achievements");
@@ -1125,3 +1127,53 @@ async function signInRequest(request: APIRequestContext) {
 
   await expect(response).toBeOK();
 }
+
+test("keeps official bonus scoring fixed while comparing wins-only standings", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/admin");
+  await page.getByLabel("Email").fill("e2e-admin@example.com");
+  await page.getByLabel("Display name").fill("E2E Admin");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+  await page
+    .getByLabel("Scoring mode", { exact: true })
+    .selectOption("achievements-v1");
+  await page.getByRole("button", { name: "Save scoring mode" }).click();
+  await expect(
+    page.getByText("Official scoring saved: Wins + achievements."),
+  ).toBeVisible();
+  const completeResponse = await request.post("/api/admin/demo/complete", {
+    headers: demoAdminHeaders,
+  });
+  await expect(completeResponse).toBeOK();
+  await page.reload();
+  await expect(page.getByLabel("Scoring mode", { exact: true })).toBeDisabled();
+  await expect(page.getByLabel("Scoring mode", { exact: true })).toHaveValue(
+    "achievements-v1",
+  );
+  await page.getByRole("link", { name: "Leaderboard", exact: true }).click();
+  const rows = page.locator(".leaderboard-summary");
+  await expect(rows).toHaveCount(4);
+  const officialRows = await rows.allTextContents();
+  await expect(
+    page.getByText("Official rules: Wins + achievements."),
+  ).toBeVisible();
+  await expect(page.getByText(/Special prizes pending/)).toHaveCount(0);
+  await expect(
+    page.getByRole("columnheader", { name: "Technique", exact: true }).first(),
+  ).toBeVisible();
+  await page.getByLabel("Scoring view").selectOption("wins-v0");
+  await expect(
+    page.getByText(/What if comparison — these are not the official standings/),
+  ).toBeVisible();
+  expect(await rows.allTextContents()).not.toEqual(officialRows);
+  const officialApi = await request.get("/api/basho/demo-2026-05/leaderboard");
+  expect((await officialApi.json()).scoringMode).toBe("achievements-v1");
+  await page.getByLabel("Scoring view").selectOption("official");
+  expect(await rows.allTextContents()).toEqual(officialRows);
+  await page.reload();
+  await expect(page.getByLabel("Scoring view")).toHaveValue("official");
+  expect(await rows.allTextContents()).toEqual(officialRows);
+});

@@ -57,3 +57,8 @@ export {
   samplePreviousScheduledBouts,
 } from "./seed-data.js";
 export { seedDatabase, seedDemoDatabase } from "./seed.js";
+
+export type {
+  BashoScoringConfig,
+  SpecialPrizeSnapshot,
+} from "./scoring-repositories.js";
