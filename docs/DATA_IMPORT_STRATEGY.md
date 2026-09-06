@@ -333,6 +333,11 @@ division banzuke, preventing matching truncated source responses from attesting
 each other. The evidence must also identify the requested basho and division
 when those fields are present. Missing, malformed, or mismatched evidence
 blocks that day's result import without writes.
+The banzuke outcome labels `fusen win` and `fusen loss` are accepted when they
+match the resolved winner/loser and the torikumi marks the bout's kimarite as
+`fusen`. A forfeit loss remains an absence in stored results and historical
+W-L-A records; it is not converted to an ordinary loss. Unknown outcome labels
+and contradictory forfeit evidence remain unverified.
 The card is attested only when the coverage checks pass and every bout has a
 resolved winner; day 15 additionally requires the division yusho signal
 described below. The service rejects schedule/result command pairs whose

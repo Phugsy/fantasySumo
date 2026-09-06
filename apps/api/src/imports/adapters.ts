@@ -286,7 +286,10 @@ function hasAttestedCompleteCard(
     ...(banzukePayload.east ?? []),
     ...(banzukePayload.west ?? []),
   ];
-  const outcomesByRikishiId = new Map<string, "win" | "loss">();
+  const outcomesByRikishiId = new Map<
+    string,
+    { result: "win" | "loss"; isFusen: boolean }
+  >();
   for (const row of rows) {
     const eastShikona = requiredString(row.eastShikona, "eastShikona");
     const westShikona = requiredString(row.westShikona, "westShikona");
@@ -298,8 +301,15 @@ function hasAttestedCompleteCard(
     });
     const loserShikona =
       winnerShikona === eastShikona ? westShikona : eastShikona;
-    outcomesByRikishiId.set(toLocalRikishiId(winnerShikona), "win");
-    outcomesByRikishiId.set(toLocalRikishiId(loserShikona), "loss");
+    const fusen = isFusen(row.kimarite);
+    outcomesByRikishiId.set(toLocalRikishiId(winnerShikona), {
+      result: "win",
+      isFusen: fusen,
+    });
+    outcomesByRikishiId.set(toLocalRikishiId(loserShikona), {
+      result: "loss",
+      isFusen: fusen,
+    });
   }
   const banzukeRikishiIds = new Set(
     banzukeRows
@@ -325,10 +335,20 @@ function hasAttestedCompleteCard(
         );
       }
 
+      const outcome = outcomesByRikishiId.get(
+        toLocalRikishiId(rikishi.shikonaEn ?? ""),
+      );
+
+      // Explicit forfeit records must agree with the bout's absence marker,
+      // which the result mapper preserves for scoring and historical records.
+      if (result === "fusen win" || result === "fusen loss") {
+        return (
+          outcome?.isFusen === true && result === `fusen ${outcome.result}`
+        );
+      }
+
       return (
-        (result === "win" || result === "loss") &&
-        outcomesByRikishiId.get(toLocalRikishiId(rikishi.shikonaEn ?? "")) ===
-          result
+        (result === "win" || result === "loss") && outcome?.result === result
       );
     })
   );
