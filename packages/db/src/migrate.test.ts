@@ -82,6 +82,47 @@ describe("banzuke identity snapshot migration", () => {
   });
 });
 
+describe("scoring migration compatibility", () => {
+  it("preserves win-only rules for existing data and records previous locks", () => {
+    const database = new Database(":memory:");
+    database.exec(`
+      CREATE TABLE basho (id text PRIMARY KEY, status text NOT NULL);
+      CREATE TABLE fantasy_teams (basho_id text, locked_at text);
+      INSERT INTO basho VALUES ('open', 'upcoming'), ('reopened', 'upcoming'), ('old', 'complete');
+      INSERT INTO fantasy_teams VALUES ('reopened', '2026-07-10T12:00:00.000Z');
+    `);
+    database.exec(
+      readFileSync(
+        join(packageRoot, "drizzle", "0007_friendly_skreet.sql"),
+        "utf8",
+      ).replaceAll("--> statement-breakpoint", ""),
+    );
+    expect(
+      database
+        .prepare(
+          "SELECT basho_id, mode, locked FROM basho_scoring_config ORDER BY basho_id",
+        )
+        .all(),
+    ).toEqual([
+      { basho_id: "old", mode: "wins-v0", locked: 1 },
+      { basho_id: "open", mode: "wins-v0", locked: 0 },
+      { basho_id: "reopened", mode: "wins-v0", locked: 1 },
+    ]);
+    // These writes model the older application, which knows nothing about scoring.
+    database.exec(
+      "INSERT INTO basho VALUES ('new', 'upcoming'); UPDATE basho SET status = 'locked' WHERE id = 'new'; UPDATE basho SET status = 'upcoming' WHERE id = 'new';",
+    );
+    expect(
+      database
+        .prepare(
+          "SELECT mode, locked FROM basho_scoring_config WHERE basho_id = 'new'",
+        )
+        .get(),
+    ).toEqual({ mode: "wins-v0", locked: 1 });
+    database.close();
+  });
+});
+
 describe("Postgres migration ledger", () => {
   it("preserves the deployed production migration identities and order", () => {
     const migrationsFolder = join(packageRoot, "drizzle-pg");
@@ -96,6 +137,7 @@ describe("Postgres migration ledger", () => {
       "0003_scheduled_bouts.sql",
       "0004_basho_game_config.sql",
       "0005_banzuke_identity_snapshot.sql",
+      "0006_scoring_modes.sql",
     ]);
     const initialMigration = readFileSync(
       join(migrationsFolder, "0000_initial.sql"),

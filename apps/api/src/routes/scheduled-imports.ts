@@ -1,3 +1,4 @@
+import { attemptSpecialPrizeImport } from "../imports/special-prizes.js";
 import type { FastifyInstance } from "fastify";
 import type { Repositories } from "@fantasy-sumo/db";
 import { runScheduledResultsImport } from "../imports/scheduled-results.js";
@@ -62,6 +63,42 @@ export function registerScheduledImportRoutes(
         request.log.info(logContext, "Scheduled basho update finished.");
       }
 
+      // Completed tournaments are no longer eligible for bout-result cron.
+      // Recover their missing award snapshot independently, without reopening them.
+      const completed = (await context.repositories.listBashos())
+        .filter((basho) => !basho.isDemo && basho.status === "complete")
+        .sort((a, b) => b.startDate.localeCompare(a.startDate));
+      const latestCompleted = completed[0];
+      if (
+        latestCompleted &&
+        (result.status === "skipped" ||
+          result.bashoId !== latestCompleted.id) &&
+        !(await context.repositories.getSpecialPrizeSnapshot(
+          latestCompleted.id,
+        ))
+      ) {
+        const prizes = await attemptSpecialPrizeImport(
+          context.repositories,
+          context.sourceFetch,
+          latestCompleted.id,
+          { now: context.now },
+        );
+        if (prizes.status === "pending")
+          request.log.warn(
+            { bashoId: latestCompleted.id, prizes },
+            "Special prizes remain pending.",
+          );
+        return {
+          ...result,
+          status:
+            prizes.status === "pending"
+              ? "partial"
+              : result.status === "skipped"
+                ? "prizes-imported"
+                : result.status,
+          prizeRecovery: { bashoId: latestCompleted.id, ...prizes },
+        };
+      }
       return result;
     } catch (error) {
       request.log.error({ err: error }, "Scheduled basho update failed.");

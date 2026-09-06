@@ -129,6 +129,7 @@
   gap: 10px;
 }
 
+.admin-config-card select,
 .admin-number-control input,
 .admin-import-options input[type="number"] {
   width: 92px;
@@ -141,6 +142,8 @@
   font: inherit;
 }
 
+.admin-config-card > button,
+.admin-config-panel > button,
 .admin-number-control button {
   min-height: 42px;
   padding: 9px 15px;
@@ -150,6 +153,8 @@
   font-weight: 800;
 }
 
+.admin-config-card > button:disabled,
+.admin-config-panel > button:disabled,
 .admin-number-control button:disabled {
   background: #9aa1a4;
 }
@@ -300,4 +305,8 @@
   .admin-number-control input {
     width: 100%;
   }
+}
+
+.admin-config-card select {
+  width: 100%;
 }

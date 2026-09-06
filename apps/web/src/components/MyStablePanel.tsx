@@ -1,3 +1,5 @@
+import { ScoreBreakdown } from "./ScoreBreakdown";
+import { scoringModeLabel } from "../scoring-view";
 import type {
   Basho,
   MyTeamResponse,
@@ -101,12 +103,18 @@ export function MyStablePanel({
         )}
       </div>
 
+      <p>
+        Official rules: {scoringModeLabel(myTeam.scoringMode ?? "wins-v0")}.
+      </p>
+      <ScoreBreakdown breakdown={myTeam.breakdown} mode={myTeam.scoringMode} />
       <div className="section-heading stable-lineup-heading">
         <p className="eyebrow">Line-up</p>
         <h3>Selected rikishi</h3>
         {myTeam.picks.some(hasTournamentNotes) && (
           <p className="tournament-notes-disclaimer">
-            Tournament badges are informational and do not add fantasy points.
+            {myTeam.scoringMode === "achievements-v1"
+              ? "Points follow the official scoring rules; the category breakdown shows each bonus."
+              : "Tournament badges are informational and do not add fantasy points."}
           </p>
         )}
       </div>
@@ -130,6 +138,11 @@ export function MyStablePanel({
               </span>
               <strong>{pick.score} pts</strong>
             </div>
+            <ScoreBreakdown
+              breakdown={pick.breakdown}
+              mode={myTeam.scoringMode}
+              label={`${pick.shikona} score categories`}
+            />
             <MatchupPreview
               basho={stableBasho}
               rikishiId={pick.rikishiId}

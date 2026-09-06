@@ -262,3 +262,8 @@
     text-align: right;
   }
 }
+
+.stable-picks .score-categories {
+  grid-column: 1 / -1;
+  width: 100%;
+}

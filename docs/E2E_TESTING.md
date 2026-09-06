@@ -318,3 +318,10 @@ isolated hosted boundary. Its deploy workflow still runs the deterministic
 local Playwright suite before deployment, then uses a demo-aware hosted smoke
 test. The first real multi-user Neon Auth round remains manual evidence because
 CI must not store tester passwords or administrator browser sessions.
+
+## Scoring modes
+
+The deterministic game-loop suite selects achievement scoring in the admin UI,
+completes the demo with fake prize awards, verifies the rules are locked, and
+compares wins-only standings before restoring the identical official leaderboard.
+It verifies category columns and that refresh defaults back to official scoring.

@@ -159,3 +159,22 @@ export const scheduledBouts = sqliteTable("scheduled_bouts", {
     { onDelete: "set null" },
   ),
 });
+
+export const bashoScoringConfig = sqliteTable("basho_scoring_config", {
+  bashoId: text("basho_id")
+    .primaryKey()
+    .references(() => basho.id, { onDelete: "cascade" }),
+  mode: text("mode", { enum: ["wins-v0", "achievements-v1"] })
+    .notNull()
+    .default("wins-v0"),
+  locked: integer("locked", { mode: "boolean" }).notNull().default(false),
+});
+
+export const specialPrizeSnapshots = sqliteTable("special_prize_snapshots", {
+  bashoId: text("basho_id")
+    .primaryKey()
+    .references(() => basho.id, { onDelete: "cascade" }),
+  source: text("source").notNull(),
+  fetchedAt: text("fetched_at").notNull(),
+  awardsJson: text("awards_json").notNull(),
+});
