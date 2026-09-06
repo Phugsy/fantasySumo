@@ -14,8 +14,10 @@ import { buildApp } from "../app.js";
 let app: FastifyInstance;
 let client: DatabaseClient;
 let tmpRoot: string;
+let fusenDays: number[];
 
 beforeEach(async () => {
+  fusenDays = [];
   tmpRoot = mkdtempSync(join(tmpdir(), "fantasy-sumo-admin-imports-"));
   client = createDatabaseClient(`file:${join(tmpRoot, "test.sqlite")}`);
   await runMigrations(client);
@@ -55,7 +57,7 @@ beforeEach(async () => {
       }
 
       if (sourceUrl.includes("/banzuke/")) {
-        return sumoApiBanzukeResponse();
+        return sumoApiBanzukeResponse(fusenDays);
       }
 
       const day = Number(sourceUrl.split("/").at(-1));
@@ -72,7 +74,7 @@ beforeEach(async () => {
             eastShikona: "Onosato",
             westId: 3661,
             westShikona: "Kotozakura",
-            kimarite: "oshidashi",
+            kimarite: fusenDays.includes(day) ? "fusen" : "oshidashi",
             winnerId: 4227,
             winnerEn: "Onosato",
           },
@@ -302,6 +304,107 @@ describe("admin import routes", () => {
       url: "/api/basho/2026-05/leaderboard",
     });
     expect(leaderboardResponse.statusCode).toBe(200);
+  });
+
+  it("backfills forfeit days and exposes verified previous-basho records", async () => {
+    fusenDays = [7, 14];
+    await app.inject({
+      method: "POST",
+      url: "/api/admin/import-banzuke",
+      payload: { confirmedSourceBashoId: "2026-05" },
+    });
+    const repositories = createRepositories(client);
+
+    for (let day = 1; day <= 15; day++) {
+      const dryRun = await app.inject({
+        method: "POST",
+        url: "/api/admin/basho/2026-05/import-results?dryRun=true",
+        payload: { day },
+      });
+      expect(dryRun.statusCode, `day ${day} dry run`).toBe(200);
+      expect(
+        await repositories.listBoutResultsForBasho("2026-05"),
+      ).toHaveLength(day - 1);
+
+      const applied = await app.inject({
+        method: "POST",
+        url: "/api/admin/basho/2026-05/import-results",
+        payload: { day },
+      });
+      expect(applied.statusCode, `day ${day} import`).toBe(200);
+    }
+
+    const results = await repositories.listBoutResultsForBasho("2026-05");
+    expect(results).toHaveLength(15);
+    expect(
+      results
+        .filter((result) => result.loserAbsent)
+        .map((result) => result.day),
+    ).toEqual(fusenDays);
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "complete",
+      currentDay: 15,
+    });
+
+    const retry = await app.inject({
+      method: "POST",
+      url: "/api/admin/basho/2026-05/import-results",
+      payload: { day: 7 },
+    });
+    expect(retry.statusCode).toBe(200);
+    expect(await repositories.listBoutResultsForBasho("2026-05")).toEqual(
+      results,
+    );
+    expect(await repositories.getBasho("2026-05")).toMatchObject({
+      status: "complete",
+      currentDay: 15,
+    });
+
+    await repositories.upsertBasho({
+      id: "2026-07",
+      isDemo: false,
+      name: "July Basho",
+      startDate: "2026-07-12",
+      endDate: "2026-07-26",
+      status: "upcoming",
+      currentDay: 0,
+    });
+    for (const entry of await repositories.listBanzukeEntriesForBasho(
+      "2026-05",
+    )) {
+      await repositories.upsertBanzukeEntry({
+        ...entry,
+        id: `2026-07-${entry.rikishiId}`,
+        bashoId: "2026-07",
+      });
+    }
+    const picks = await app.inject({
+      method: "GET",
+      url: "/api/basho/2026-07/rikishi",
+    });
+    expect(picks.statusCode).toBe(200);
+    expect(picks.json().rikishi).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "onosato",
+          previousBashoRecord: expect.objectContaining({
+            status: "available",
+            wins: 15,
+            losses: 0,
+            absences: 0,
+          }),
+        }),
+        expect.objectContaining({
+          id: "kotozakura",
+          previousBashoRecord: expect.objectContaining({
+            status: "available",
+            wins: 0,
+            losses: 13,
+            absences: 2,
+          }),
+        }),
+      ]),
+    );
   });
 
   it("blocks final-day data when earlier result days are missing", async () => {
@@ -580,20 +683,24 @@ function jsonResponse(payload: unknown) {
   });
 }
 
-function sumoApiBanzukeResponse() {
+function sumoApiBanzukeResponse(fusenDays: readonly number[] = []) {
   return jsonResponse({
     east: [
       {
         rikishiID: 4227,
         shikonaEn: "Onosato",
-        record: Array.from({ length: 15 }, () => ({ result: "win" })),
+        record: Array.from({ length: 15 }, (_, index) => ({
+          result: fusenDays.includes(index + 1) ? "fusen win" : "win",
+        })),
       },
     ],
     west: [
       {
         rikishiID: 3661,
         shikonaEn: "Kotozakura",
-        record: Array.from({ length: 15 }, () => ({ result: "loss" })),
+        record: Array.from({ length: 15 }, (_, index) => ({
+          result: fusenDays.includes(index + 1) ? "fusen loss" : "loss",
+        })),
       },
     ],
   });

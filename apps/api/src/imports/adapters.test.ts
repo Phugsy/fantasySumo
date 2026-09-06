@@ -477,73 +477,132 @@ describe("source import adapters", () => {
     expect(mismatchedTarget.isComplete).toBeUndefined();
   });
 
-  it("maps the current schedule and results from one torikumi response", async () => {
-    const requestedUrls: string[] = [];
-    const torikumiPayload = {
-      torikumi: [
-        {
-          bashoId: "202605",
-          day: 4,
-          eastId: 4227,
-          eastShikona: "Onosato",
-          westId: 3661,
-          westShikona: "Kotozakura",
-          winnerId: 4227,
-          winnerEn: "Onosato",
+  it.each(["oshidashi", "fusen"])(
+    "maps the current %s schedule and results from one torikumi response",
+    async (kimarite) => {
+      const requestedUrls: string[] = [];
+      const torikumiPayload = {
+        torikumi: [
+          {
+            bashoId: "202605",
+            day: 4,
+            eastId: 4227,
+            eastShikona: "Onosato",
+            westId: 3661,
+            westShikona: "Kotozakura",
+            winnerId: 4227,
+            winnerEn: "Onosato",
+            kimarite,
+          },
+        ],
+      };
+
+      const commands = await fetchSumoApiDailyImport(
+        async (url) => {
+          requestedUrls.push(String(url));
+          return new Response(
+            JSON.stringify(
+              String(url).includes("/banzuke/")
+                ? {
+                    east: [
+                      {
+                        rikishiID: 4227,
+                        shikonaEn: "Onosato",
+                        record: Array.from({ length: 4 }, () => ({
+                          result: kimarite === "fusen" ? "fusen win" : "win",
+                        })),
+                      },
+                    ],
+                    west: [
+                      {
+                        rikishiID: 3661,
+                        shikonaEn: "Kotozakura",
+                        record: Array.from({ length: 4 }, () => ({
+                          result: kimarite === "fusen" ? "fusen loss" : "loss",
+                        })),
+                      },
+                    ],
+                  }
+                : torikumiPayload,
+            ),
+          );
         },
-      ],
-    };
+        {
+          bashoId: "2026-05",
+          day: 4,
+          expectedRikishiIds: ["onosato", "kotozakura"],
+        },
+      );
 
-    const commands = await fetchSumoApiDailyImport(
-      async (url) => {
-        requestedUrls.push(String(url));
-        return new Response(
-          JSON.stringify(
-            String(url).includes("/banzuke/")
-              ? {
-                  east: [
-                    {
-                      rikishiID: 4227,
-                      shikonaEn: "Onosato",
-                      record: Array.from({ length: 4 }, () => ({
-                        result: "win",
-                      })),
-                    },
-                  ],
-                  west: [
-                    {
-                      rikishiID: 3661,
-                      shikonaEn: "Kotozakura",
-                      record: Array.from({ length: 4 }, () => ({
-                        result: "loss",
-                      })),
-                    },
-                  ],
-                }
-              : torikumiPayload,
-          ),
-        );
-      },
-      {
-        bashoId: "2026-05",
-        day: 4,
-        expectedRikishiIds: ["onosato", "kotozakura"],
-      },
-    );
+      expect(
+        requestedUrls.filter((url) => url.includes("/torikumi/")),
+      ).toHaveLength(1);
+      expect(commands.scheduleCommand.bouts[0]).toMatchObject({
+        eastRikishiId: "onosato",
+        westRikishiId: "kotozakura",
+      });
+      expect(commands.resultsCommand.results[0]).toMatchObject({
+        winnerRikishiId: "onosato",
+        loserRikishiId: "kotozakura",
+      });
+      expect(commands.scheduleCommand.isComplete).toBe(true);
+      expect(commands.resultsCommand.results[0]?.loserAbsent).toBe(
+        kimarite === "fusen" ? true : undefined,
+      );
+    },
+  );
 
-    expect(
-      requestedUrls.filter((url) => url.includes("/torikumi/")),
-    ).toHaveLength(1);
-    expect(commands.scheduleCommand.bouts[0]).toMatchObject({
-      eastRikishiId: "onosato",
-      westRikishiId: "kotozakura",
-    });
-    expect(commands.resultsCommand.results[0]).toMatchObject({
-      winnerRikishiId: "onosato",
-      loserRikishiId: "kotozakura",
-    });
-    expect(commands.scheduleCommand.isComplete).toBe(true);
-  });
+  it.each([
+    ["fusen win", "fusen loss", "fusen", true],
+    [" FUSEN WIN ", " FUSEN LOSS ", " FUSEN ", true],
+    ["win", "loss", "fusen", true],
+    ["fusen loss", "fusen win", "fusen", false],
+    ["fusen win", "fusen loss", "oshidashi", false],
+    ["fusen win", "fusen loss", undefined, false],
+    ["fusen win", "absent", "fusen", false],
+    ["fusen win", "unknown", "fusen", false],
+    ["fusen win", "", "fusen", false],
+  ])(
+    "attests records %s / %s with kimarite %s: %s",
+    (winnerRecord, loserRecord, kimarite, expectedComplete) => {
+      const command = mapSumoApiSchedulePayload(
+        {
+          torikumi: [
+            {
+              eastShikona: "Wakanosho",
+              westShikona: "Kinbozan",
+              winnerEn: "Kinbozan",
+              kimarite,
+            },
+          ],
+        },
+        {
+          bashoId: "2026-07",
+          day: 7,
+          expectedRikishiIds: ["wakanosho", "kinbozan"],
+        },
+        {
+          east: [
+            {
+              shikonaEn: "Wakanosho",
+              record: Array.from({ length: 7 }, () => ({
+                result: loserRecord,
+              })),
+            },
+          ],
+          west: [
+            {
+              shikonaEn: "Kinbozan",
+              record: Array.from({ length: 7 }, () => ({
+                result: winnerRecord,
+              })),
+            },
+          ],
+        },
+      );
+      expect(command.isComplete).toBe(expectedComplete ? true : undefined);
+    },
+  );
 
   it("maps torikumi as unattested when banzuke fetching fails", async () => {
     const commands = await fetchSumoApiDailyImport(
