@@ -559,3 +559,13 @@ restored immediately, redeploy a previous application SHA only after confirming
 that it is compatible with the advanced schema. Record the migration result,
 deployed SHA, failed URL/check, and operator action in the release or incident
 notes.
+
+## Scoring configuration and final prizes
+
+The additive scoring migration preserves existing `wins-v0` rules and freezes
+non-upcoming bashos, including previously locked teams. Lifecycle triggers cover
+older application writes during rollout. Admin scoring changes serialize with
+pick locking; reopening picks cannot unlock the rules. Final-day prize failures
+do not roll back completed bouts. The existing cron retries missing prizes for
+the latest completed live basho; older backfills and corrections use the protected
+`import-prizes` endpoint. See [Scoring rules](SCORING.md) for recovery details.

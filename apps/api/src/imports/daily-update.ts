@@ -1,3 +1,7 @@
+import {
+  attemptSpecialPrizeImport,
+  type SpecialPrizeImportResult,
+} from "./special-prizes.js";
 import type { Repositories } from "@fantasy-sumo/db";
 import {
   fetchSumoApiDailyImport,
@@ -33,6 +37,7 @@ export type FollowingDayScheduleImportResult =
 export type DailyUpdateImportResult = ImportResult & {
   status: "complete" | "partial";
   schedule: FollowingDayScheduleImportResult;
+  prizes?: SpecialPrizeImportResult;
 };
 
 interface DailyUpdateImportOptions extends SumoApiResultsImportOptions {
@@ -55,10 +60,21 @@ export async function importDailyResultsAndFollowingSchedule(
     options,
   );
 
+  const prizes =
+    options.day === 15 && !options.dryRun
+      ? await attemptSpecialPrizeImport(
+          repositories,
+          sourceFetch,
+          options.bashoId,
+        )
+      : undefined;
   return {
     ...resultsImport,
+    ...(prizes === undefined ? {} : { prizes }),
     status:
-      schedule.status === "unavailable" || schedule.status === "failed"
+      schedule.status === "unavailable" ||
+      schedule.status === "failed" ||
+      prizes?.status === "pending"
         ? "partial"
         : "complete",
     schedule,

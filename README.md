@@ -15,9 +15,10 @@ At present, the app has the first local playable foundations:
   and historical rank, with distinct neutral states for unavailable history and
   confirmed non-participation.
 - A private My Stable view with the signed-in player's picks, edit/lock state, rikishi details, scoring progress, and each pick's next published matchup.
-- Informational rikishi tournament badges for source-reported withdrawal status and reliably derived record or gold-star milestones; these never change fantasy points.
+- Informational rikishi tournament badges for source-reported withdrawal status and reliably derived record or gold-star milestones; points are calculated separately under the saved scoring rules.
 - A Fastify API with health, basho, rikishi, team, tournament-history, and leaderboard endpoints.
-- A shared TypeScript domain package with MVP types, lifecycle rules, validation, scoring, and leaderboard logic.
+- A shared TypeScript domain package with MVP types, lifecycle rules, validation, versioned scoring, and leaderboard logic.
+- Per-basho wins-only or achievement scoring, with separate bonus categories and a read-only “what if” leaderboard comparison.
 - A swappable Drizzle database package with local SQLite, production Postgres, repositories, migrations, sample seed data, and deterministic demo data.
 - Automated source-backed import commands and protected admin controls for current banzuke, daily results, and published schedules.
 - A role-gated `/admin` page for explicit live basho lifecycle actions, per-basho team-size configuration, and safe deterministic demo progression.
@@ -26,7 +27,7 @@ At present, the app has the first local playable foundations:
 
 It now supports the local playable and administrator loops and includes a
 manual, isolated shared-playtest deployment path. Running the first hosted
-multi-user round, secondary scoring rules, and pick modifiers remain deliberate
+multi-user round and pick modifiers remain deliberate
 follow-up work.
 
 ## Tech Stack
@@ -50,6 +51,7 @@ Start here:
 - `AGENTS.md` - guidance for AI coding agents working on the repo.
 - `skills/fantasy-sumo-issue-loop/SKILL.md` - repo-local issue-to-PR loop for agents. Invoke it with a prompt like: "Use the Fantasy Sumo issue loop on #44."
 - `docs/PROJECT_BRIEF.md` - product intent and MVP definition.
+- `docs/SCORING.md` - scoring modes, category points, rule locking, and special-prize imports.
 - `docs/ARCHITECTURE.md` - current architecture and suggested future boundaries.
 - `docs/adr/0001-rebuild-architecture.md` - accepted rebuild architecture decision.
 - `docs/DATA_IMPORT_STRATEGY.md` - MVP data-source investigation and import recommendation.
@@ -169,6 +171,8 @@ Useful API endpoints:
 - `POST /api/admin/import-banzuke`
 - `POST /api/admin/basho/:bashoId/import-results`
 - `POST /api/admin/basho/:bashoId/import-schedule`
+- `POST /api/admin/basho/:bashoId/import-prizes`
+- `PUT /api/admin/basho/:bashoId/game-config/scoring`
 - `GET /api/cron/import-results`
 
 Browser admin endpoints require an authenticated user whose verified user ID is
@@ -375,7 +379,8 @@ schema in a later release.
 ## Recommended next steps
 
 1. Provide a safe shared demo/playtest environment without using production data (#91).
-2. Define the secondary scoring mode for kinboshi and special prizes (#92).
+2. Secondary scoring is implemented with separate categories and final prizes
+   (#92; see `docs/SCORING.md`).
 3. Select a joker, substitute, or withdrawal-handling mechanic (#93).
 4. Fix the reported responsive header and initial focus regressions (#94).
 5. Add display preferences after the game-rule decisions above (#73).

@@ -756,7 +756,14 @@ function createApp(
     cronSecret: CRON_SECRET,
     db: client,
     now: () => now,
-    sourceFetch,
+    sourceFetch: async (url, init) =>
+      /\/api\/basho\/\d{6}$/.test(String(url))
+        ? jsonResponse({
+            date: String(url).split("/").at(-1),
+            yusho: [{ type: "Makuuchi" }],
+            specialPrizes: [],
+          })
+        : sourceFetch(url, init),
   });
 }
 

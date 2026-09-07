@@ -128,6 +128,26 @@ export interface RikishiScore {
   rikishiId: Rikishi["id"];
   wins: number;
   score: number;
+  breakdown?: ScoreBreakdown;
+}
+
+export type ScoringMode = "wins-v0" | "achievements-v1";
+export type SpecialPrizeType =
+  | "outstanding-performance"
+  | "fighting-spirit"
+  | "technique";
+export interface SpecialPrizeAward {
+  rikishiId: Rikishi["id"];
+  type: SpecialPrizeType;
+}
+/** Potential points in each category, independent of the selected total. */
+export interface ScoreBreakdown {
+  wins: number;
+  kinboshi: number;
+  kachiKoshi: number;
+  outstandingPerformance: number;
+  fightingSpirit: number;
+  technique: number;
 }
 
 export type RikishiDayOutcome = "win" | "loss" | "absent" | "no-result";
@@ -136,6 +156,7 @@ export interface RikishiDayScore {
   rikishiId: Rikishi["id"];
   outcome: RikishiDayOutcome;
   score: number;
+  breakdown?: ScoreBreakdown;
 }
 
 export interface TeamScoreHistoryEntry {
@@ -147,12 +168,17 @@ export interface TeamScoreHistoryEntry {
 
 export interface ScoringOptions {
   throughDay?: BoutResult["day"];
+  scoringMode?: ScoringMode;
+  banzukeEntries?: readonly BanzukeEntry[];
+  /** Only confirmed final awards; applied on day 15. */
+  specialPrizes?: readonly SpecialPrizeAward[];
 }
 
 export interface TeamScore {
   teamId: FantasyTeam["id"];
   displayName: FantasyTeam["displayName"];
   score: number;
+  breakdown?: ScoreBreakdown;
   rikishiScores: RikishiScore[];
 }
 

@@ -1,3 +1,5 @@
+import type { ScoringMode } from "@fantasy-sumo/domain";
+import { scoringModeLabel } from "../scoring-view";
 import { useEffect, useRef, useState } from "react";
 import {
   ApiRequestError,
@@ -10,6 +12,8 @@ import {
   runAdminResultsImport,
   runAdminScheduleImport,
   updateAdminGameConfig,
+  updateAdminScoringMode,
+  runAdminPrizesImport,
 } from "../api";
 import type {
   AdminActionResponse,
@@ -38,6 +42,8 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
   const [gameConfig, setGameConfig] = useState<AdminGameConfigResponse | null>(
     null,
   );
+  const [scoringModeDraft, setScoringModeDraft] =
+    useState<ScoringMode>("wins-v0");
   const [teamSizeDraft, setTeamSizeDraft] = useState("2");
   const [importDay, setImportDay] = useState("1");
   const [dryRun, setDryRun] = useState(true);
@@ -74,6 +80,7 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
         if (!isCurrent) return;
         setBasho(response.basho);
         setGameConfig(config);
+        setScoringModeDraft(config.gameConfig.scoringMode);
         setTeamSizeDraft(String(config.gameConfig.teamSize));
         setLoadState("ready");
       })
@@ -171,6 +178,7 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
       }
 
       setGameConfig(config);
+      setScoringModeDraft(config.gameConfig.scoringMode);
       setTeamSizeDraft(String(config.gameConfig.teamSize));
     } catch (error) {
       if (!isMountedRef.current) {
@@ -249,6 +257,52 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
       if (isMountedRef.current) {
         setPendingAction(null);
       }
+    }
+  }
+
+  async function saveScoringMode() {
+    if (basho === null) return;
+    setPendingAction("scoring");
+    setErrorMessage(null);
+    setMessage(null);
+    try {
+      await updateAdminScoringMode(basho.id, scoringModeDraft);
+      const config = await fetchAdminGameConfig(basho.id);
+      if (!isMountedRef.current) return;
+      setGameConfig(config);
+      setScoringModeDraft(config.gameConfig.scoringMode);
+      setMessage(
+        `Official scoring saved: ${scoringModeLabel(config.gameConfig.scoringMode)}.`,
+      );
+      await onPlayerDataRefresh();
+    } catch (error) {
+      if (isMountedRef.current) setErrorMessage(getErrorMessage(error));
+    } finally {
+      if (isMountedRef.current) setPendingAction(null);
+    }
+  }
+
+  async function importPrizes() {
+    if (basho === null || mode !== "live") return;
+    if (
+      !dryRun &&
+      !window.confirm(`Import confirmed special prizes for ${basho.name}?`)
+    )
+      return;
+    setPendingAction("prizes");
+    setErrorMessage(null);
+    setMessage(null);
+    try {
+      const result = await runAdminPrizesImport(basho.id, dryRun);
+      if (!isMountedRef.current) return;
+      setMessage(
+        `${dryRun ? "Validated" : "Imported"} ${result.count} special-prize awards.`,
+      );
+      if (!dryRun) await onPlayerDataRefresh();
+    } catch (error) {
+      if (isMountedRef.current) setErrorMessage(getErrorMessage(error));
+    } finally {
+      if (isMountedRef.current) setPendingAction(null);
     }
   }
 
@@ -450,6 +504,23 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
             </dl>
           </div>
 
+          {mode === "live" && basho.status === "complete" && (
+            <section className="admin-config-panel">
+              <h2>Special prizes</h2>
+              <p>
+                Import confirmed final awards. Missing awards remain pending;
+                retries do not duplicate points.
+              </p>
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={pending}
+                onClick={() => void importPrizes()}
+              >
+                {dryRun ? "Validate special prizes" : "Import special prizes"}
+              </button>
+            </section>
+          )}
           {gameConfig !== null && (
             <section
               className="admin-config-panel"
@@ -508,16 +579,45 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
                       : "Using the server default until saved"}
                   </p>
                 </form>
-                <article className="admin-config-card">
-                  <h3>Scoring mode</h3>
-                  <p className="admin-config-value">One point per win</p>
+                <form
+                  className="admin-config-card"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void saveScoringMode();
+                  }}
+                >
+                  <label htmlFor="admin-scoring-mode">Scoring mode</label>
+                  <select
+                    id="admin-scoring-mode"
+                    value={scoringModeDraft}
+                    disabled={pending || !gameConfig.canChangeScoringMode}
+                    onChange={(event) =>
+                      setScoringModeDraft(event.target.value as ScoringMode)
+                    }
+                  >
+                    <option value="wins-v0">One point per win</option>
+                    <option value="achievements-v1">Wins + achievements</option>
+                  </select>
                   <p>
-                    Kinboshi, special prizes, jokers, and substitutes are not
-                    scored yet. Their rules will be selected before another mode
-                    is enabled.
+                    +1 per win. Achievements add +2 per kinboshi, +3 at eight
+                    wins, and +1 per special prize.
                   </p>
-                  <span className="admin-config-source">wins-v0</span>
-                </article>
+                  <p>
+                    {gameConfig.canChangeScoringMode
+                      ? "Rules can change until picks lock. Players see the saved rules."
+                      : "Official scoring is permanently locked for this basho."}
+                  </p>
+                  <button
+                    type="submit"
+                    className="primary-button"
+                    disabled={pending || !gameConfig.canChangeScoringMode}
+                  >
+                    Save scoring mode
+                  </button>
+                  <span className="admin-config-source">
+                    {gameConfig.gameConfig.scoringMode}
+                  </span>
+                </form>
               </div>
             </section>
           )}
@@ -838,6 +938,15 @@ function ImportReport({ report }: { report: AdminImportResponse }) {
             ))}
           </tbody>
         </table>
+      )}
+      {report.prizes?.status === "pending" && (
+        <p className="form-message" role="status">
+          Results are saved. Special prizes remain pending:{" "}
+          {report.prizes.message}
+        </p>
+      )}
+      {report.prizes?.status === "confirmed" && (
+        <p>{report.prizes.count} special-prize awards imported.</p>
       )}
       {report.status === "partial" &&
         report.schedule !== undefined &&

@@ -20,7 +20,7 @@ export function registerAdminGameConfigRoutes(
   context: RouteContext,
 ) {
   app.addHook("preHandler", async (request, reply) => {
-    if (!isGameConfigAdminUrl(request.url)) {
+    if (!isGameConfigAdminUrl(request.routeOptions.url ?? "")) {
       return;
     }
 
@@ -55,6 +55,8 @@ export function registerAdminGameConfigRoutes(
       return {
         bashoId: basho.id,
         gameConfig,
+        canChangeScoringMode:
+          basho.status === "upcoming" && !gameConfig.scoringLocked,
         canChangeTeamSize: basho.status === "upcoming" && teams.length === 0,
       };
     },
@@ -112,16 +114,55 @@ export function registerAdminGameConfigRoutes(
     return {
       bashoId: result.config.bashoId,
       changed: result.changed,
-      gameConfig: {
-        teamSize: result.config.teamSize,
-        teamSizeSource: "basho" as const,
-        scoringMode: "wins-v0" as const,
-      },
+      gameConfig: await getEffectiveBashoGameConfig(
+        context.repositories,
+        result.config.bashoId,
+        context.defaultTeamSize,
+      ),
+      canChangeScoringMode: !(
+        await context.repositories.getBashoScoringConfig(result.config.bashoId)
+      )?.locked,
       canChangeTeamSize: result.canChangeTeamSize,
     };
   });
+  app.put<{ Params: { bashoId: string }; Body: unknown }>(
+    "/api/admin/basho/:bashoId/game-config/scoring",
+    async (request, reply) => {
+      const body = z
+        .object({ scoringMode: z.enum(["wins-v0", "achievements-v1"]) })
+        .strict()
+        .safeParse(request.body);
+      if (!body.success)
+        return reply.code(400).send({
+          error: "invalid-request",
+          message: "Select a supported scoring mode.",
+        });
+      const result = await context.repositories.setBashoScoringMode(
+        request.params.bashoId,
+        body.data.scoringMode,
+      );
+      if (result === "not-found")
+        return reply
+          .code(404)
+          .send({ error: "not-found", message: "Basho not found." });
+      if (result === "locked")
+        return reply.code(409).send({
+          error: "scoring-locked",
+          message:
+            "Official scoring cannot change after picks have locked, even if picks reopen.",
+        });
+      const gameConfig = await getEffectiveBashoGameConfig(
+        context.repositories,
+        request.params.bashoId,
+        context.defaultTeamSize,
+      );
+      return { bashoId: request.params.bashoId, gameConfig };
+    },
+  );
 }
 
 function isGameConfigAdminUrl(url: string): boolean {
-  return /^\/api\/admin\/basho\/[^/]+\/game-config(?:\?|$)/.test(url);
+  return /^\/api\/admin\/basho\/[^/]+\/game-config(?:\/scoring)?(?:\?|$)/.test(
+    url,
+  );
 }

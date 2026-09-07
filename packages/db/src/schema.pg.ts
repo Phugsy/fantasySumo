@@ -156,3 +156,22 @@ export const scheduledBouts = pgTable("scheduled_bouts", {
     { onDelete: "set null" },
   ),
 });
+
+export const bashoScoringConfig = pgTable("basho_scoring_config", {
+  bashoId: text("basho_id")
+    .primaryKey()
+    .references(() => basho.id, { onDelete: "cascade" }),
+  mode: text("mode", { enum: ["wins-v0", "achievements-v1"] })
+    .notNull()
+    .default("wins-v0"),
+  locked: boolean("locked").notNull().default(false),
+});
+
+export const specialPrizeSnapshots = pgTable("special_prize_snapshots", {
+  bashoId: text("basho_id")
+    .primaryKey()
+    .references(() => basho.id, { onDelete: "cascade" }),
+  source: text("source").notNull(),
+  fetchedAt: text("fetched_at").notNull(),
+  awardsJson: text("awards_json").notNull(),
+});

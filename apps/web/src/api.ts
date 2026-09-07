@@ -1,3 +1,4 @@
+import type { ScoringMode } from "@fantasy-sumo/domain";
 import type {
   AdminActionResponse,
   AdminBashoResponse,
@@ -363,4 +364,22 @@ async function readApiError(response: Response): Promise<{
   } catch {
     return { message: `Request failed with status ${response.status}.` };
   }
+}
+
+export async function updateAdminScoringMode(
+  bashoId: string,
+  scoringMode: ScoringMode,
+): Promise<void> {
+  await putJson(`/api/admin/basho/${bashoId}/game-config/scoring`, {
+    scoringMode,
+  });
+}
+export async function runAdminPrizesImport(
+  bashoId: string,
+  dryRun: boolean,
+): Promise<{ status: "confirmed"; count: number; dryRun: boolean }> {
+  return postJson(
+    `/api/admin/basho/${bashoId}/import-prizes?dryRun=${dryRun}`,
+    {},
+  );
 }

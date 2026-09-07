@@ -1,3 +1,4 @@
+import type { ScoreBreakdown, ScoringMode } from "@fantasy-sumo/domain";
 export interface Basho {
   id: string;
   isDemo: boolean;
@@ -7,6 +8,8 @@ export interface Basho {
   status: "upcoming" | "locked" | "active" | "complete";
   currentDay?: number;
   teamSize: number;
+  scoringMode?: ScoringMode;
+  specialPrizesStatus?: "pending" | "confirmed";
 }
 
 export interface RankedRikishi {
@@ -78,6 +81,9 @@ export interface MyTeamResponse {
   basho: Omit<Basho, "teamSize">;
   team: CreatedTeamResponse["team"];
   totalScore: number;
+  specialPrizesStatus?: "pending" | "confirmed";
+  breakdown?: ScoreBreakdown;
+  scoringMode?: ScoringMode;
   picks: Array<
     CreatedTeamResponse["picks"][number] & {
       shikona: string;
@@ -86,6 +92,7 @@ export interface MyTeamResponse {
       rankOrder?: number;
       wins: number;
       score: number;
+      breakdown?: ScoreBreakdown;
       tournamentNotes?: RikishiTournamentNotes;
     }
   >;
@@ -128,6 +135,8 @@ export interface LeaderboardResponse {
   basho: Omit<Basho, "teamSize">;
   bashoId: string;
   totalDays?: number;
+  scoringMode?: ScoringMode;
+  specialPrizesStatus?: "pending" | "confirmed";
   leaderboard: LeaderboardEntry[];
 }
 
@@ -168,6 +177,7 @@ export interface MyHistoryResponse {
       rankOrder?: number;
       wins: number;
       score: number;
+      breakdown?: ScoreBreakdown;
     }>;
   }>;
 }
@@ -177,6 +187,7 @@ export interface LeaderboardEntry {
   teamId: string;
   displayName: string;
   score: number;
+  breakdown?: ScoreBreakdown;
   rikishiScores: RikishiScore[];
   latestDayScore?: {
     day: number;
@@ -189,6 +200,7 @@ export interface RikishiScore {
   rikishiId: string;
   wins: number;
   score: number;
+  breakdown?: ScoreBreakdown;
 }
 
 export interface TeamScoreHistoryEntry {
@@ -199,6 +211,7 @@ export interface TeamScoreHistoryEntry {
     rikishiId: string;
     outcome: "win" | "loss" | "absent" | "no-result";
     score: number;
+    breakdown?: ScoreBreakdown;
   }>;
 }
 
@@ -221,10 +234,12 @@ export interface AdminGameConfigResponse {
   bashoId: string;
   changed?: boolean;
   canChangeTeamSize: boolean;
+  canChangeScoringMode?: boolean;
   gameConfig: {
     teamSize: number;
     teamSizeSource: "basho" | "default";
-    scoringMode: "wins-v0";
+    scoringMode: ScoringMode;
+    scoringLocked?: boolean;
   };
 }
 
@@ -242,6 +257,9 @@ export interface AdminImportResponse {
   targetBasho?: Omit<Basho, "teamSize">;
   targetBashoId?: string;
   status?: "complete" | "partial";
+  prizes?:
+    | { status: "confirmed"; count: number; dryRun: boolean }
+    | { status: "pending"; message: string };
   schedule?:
     | {
         status: "imported";

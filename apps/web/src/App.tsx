@@ -1021,6 +1021,7 @@ function RoutedApp() {
                     selectedRikishi={selectedRikishi}
                     submitState={submitState}
                     teamSize={teamSize}
+                    scoringMode={basho?.scoringMode}
                   />,
                 )}
               </ProtectedRoute>
@@ -1209,6 +1210,8 @@ function mergeLeaderboardBasho(
 ): Basho {
   return {
     ...leaderboardResponse.basho,
+    scoringMode: leaderboardResponse.scoringMode ?? currentBasho?.scoringMode,
+    specialPrizesStatus: leaderboardResponse.specialPrizesStatus,
     teamSize: currentBasho?.teamSize ?? 0,
   };
 }

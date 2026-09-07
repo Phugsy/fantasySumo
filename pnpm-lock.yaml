@@ -69,6 +69,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@fantasy-sumo/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@neondatabase/neon-js':
         specifier: 0.6.2-beta
         version: 0.6.2-beta(1c3817792242fe86b6facb481f1aba72)

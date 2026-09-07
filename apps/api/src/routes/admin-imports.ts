@@ -1,3 +1,4 @@
+import { importSpecialPrizes } from "../imports/special-prizes.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { Repositories } from "@fantasy-sumo/db";
@@ -47,7 +48,7 @@ export function registerAdminImportRoutes(
   context: RouteContext,
 ) {
   app.addHook("preHandler", async (request, reply) => {
-    if (!request.url.startsWith("/api/admin/import-banzuke")) {
+    if (request.routeOptions.url !== "/api/admin/import-banzuke") {
       return;
     }
 
@@ -55,16 +56,40 @@ export function registerAdminImportRoutes(
   });
 
   app.addHook("preHandler", async (request, reply) => {
+    const route = request.routeOptions.url ?? "";
     if (
-      !request.url.startsWith("/api/admin/basho/") ||
-      (!request.url.includes("/import-results") &&
-        !request.url.includes("/import-schedule"))
+      !route.startsWith("/api/admin/basho/") ||
+      (!route.endsWith("/import-results") &&
+        !route.endsWith("/import-schedule") &&
+        !route.endsWith("/import-prizes"))
     ) {
       return;
     }
 
     return authorizeAdminImport(request, reply, context);
   });
+
+  app.post<{ Params: { bashoId: string }; Querystring: unknown }>(
+    "/api/admin/basho/:bashoId/import-prizes",
+    async (request, reply) => {
+      const query = dryRunQuerySchema.safeParse(request.query);
+      if (!query.success)
+        return reply.code(400).send({
+          error: "invalid-request",
+          message: "Invalid dry-run option.",
+        });
+      try {
+        return await importSpecialPrizes(
+          context.repositories,
+          context.sourceFetch,
+          request.params.bashoId,
+          { dryRun: query.data.dryRun },
+        );
+      } catch (error) {
+        return sendImportError(reply, error);
+      }
+    },
+  );
 
   app.post<{
     Querystring: unknown;
