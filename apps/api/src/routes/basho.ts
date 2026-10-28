@@ -100,18 +100,19 @@ export function registerBashoRoutes(
       .sort((left, right) => left.startDate.localeCompare(right.startDate));
     const scoredBashos = await Promise.all(
       bashos.map(async (basho) => {
-        const [teams, picks, boutResults] = await Promise.all([
-          context.repositories.listFantasyTeamsForBasho(basho.id),
-          context.repositories.listFantasyPicksForBasho(basho.id),
-          context.repositories.listBoutResultsForBasho(basho.id),
-        ]);
+        const [teams, picks, { boutResults, verifiedThroughDay }] =
+          await Promise.all([
+            context.repositories.listFantasyTeamsForBasho(basho.id),
+            context.repositories.listFantasyPicksForBasho(basho.id),
+            loadVerifiedScoringResults(context.repositories, basho),
+          ]);
 
         return {
           basho,
           teams,
           leaderboard: calculateLeaderboard(teams, picks, boutResults, {
             ...(await getBashoScoringOptions(context.repositories, basho.id)),
-            throughDay: basho.currentDay,
+            throughDay: verifiedThroughDay,
           }),
         };
       }),
@@ -203,14 +204,15 @@ export function registerBashoRoutes(
     ).flat();
     const history = await Promise.all(
       ownedBashos.map(async ({ basho, team }) => {
-        const [picks, boutResults, banzukeEntries] = await Promise.all([
-          context.repositories.listFantasyPicksForTeam(team.id),
-          context.repositories.listBoutResultsForBasho(basho.id),
-          context.repositories.listBanzukeEntriesForBasho(basho.id),
-        ]);
+        const [picks, { boutResults, verifiedThroughDay }, banzukeEntries] =
+          await Promise.all([
+            context.repositories.listFantasyPicksForTeam(team.id),
+            loadVerifiedScoringResults(context.repositories, basho),
+            context.repositories.listBanzukeEntriesForBasho(basho.id),
+          ]);
         const teamScore = calculateTeamScore(team, picks, boutResults, {
           ...(await getBashoScoringOptions(context.repositories, basho.id)),
-          throughDay: basho.currentDay,
+          throughDay: verifiedThroughDay,
         });
         const scoresByRikishiId = new Map(
           teamScore.rikishiScores.map((score) => [score.rikishiId, score]),
@@ -813,24 +815,8 @@ export function registerBashoRoutes(
       });
     }
 
-    const [boutResults, scheduledBouts, scheduledBoutPublications] =
-      await Promise.all([
-        context.repositories.listBoutResultsForBasho(basho.id),
-        context.repositories.listScheduledBoutsForBasho(basho.id),
-        context.repositories.listScheduledBoutPublicationsForBasho(basho.id),
-      ]);
-    const verifiedThroughDay =
-      basho.status === "upcoming"
-        ? 0
-        : getVerifiedBoutResultsThroughDay({
-            boutResults,
-            completeScheduleDays: getCompleteScheduleDays(
-              basho,
-              scheduledBoutPublications,
-            ),
-            scheduledBouts,
-            throughDay: 15,
-          });
+    const { boutResults, verifiedThroughDay } =
+      await loadVerifiedScoringResults(context.repositories, basho);
 
     const scoringOptions = await getBashoScoringOptions(
       context.repositories,
@@ -982,6 +968,32 @@ function scheduledMatchupKey(
   secondRikishiId: string,
 ): string {
   return `${day}\0${[firstRikishiId, secondRikishiId].sort().join("\0")}`;
+}
+
+async function loadVerifiedScoringResults(
+  repositories: Repositories,
+  basho: Basho,
+) {
+  const [boutResults, scheduledBouts, scheduledBoutPublications] =
+    await Promise.all([
+      repositories.listBoutResultsForBasho(basho.id),
+      repositories.listScheduledBoutsForBasho(basho.id),
+      repositories.listScheduledBoutPublicationsForBasho(basho.id),
+    ]);
+  const verifiedThroughDay =
+    basho.status === "upcoming"
+      ? 0
+      : getVerifiedBoutResultsThroughDay({
+          boutResults,
+          completeScheduleDays: getCompleteScheduleDays(
+            basho,
+            scheduledBoutPublications,
+          ),
+          scheduledBouts,
+          throughDay: 15,
+        });
+
+  return { boutResults, verifiedThroughDay };
 }
 
 function getCompleteScheduleDays(
