@@ -466,8 +466,13 @@ Resolution order is deliberately conservative:
 JSA banzuke snapshots take precedence for ranked names/heya. Within a Sumo API
 complete-card command, the attesting banzuke supplies display metadata when its
 shikona differs from torikumi for the same numeric ID; identity and record
-attestation still join by ID. Known aliases take
-precedence over all names for identity; Sumo API does not overwrite the
+attestation still join by ID. Paired daily schedule and result commands share
+one read-only identity plan from the same stored roster and aliases. The
+schedule's preferred source metadata is used for both commands, so a first
+Sumo API import can attach its aliases using the attesting banzuke even when
+torikumi still uses an old shikona. Both commands save those aliases only with
+their atomic import; dry runs and failed validation leave no attachment behind.
+Known aliases take precedence over all names for identity; Sumo API does not overwrite the
 banzuke's historical display. Reused names with a new ID from an already
 attached provider are rejected rather than merged. A provider disagreement or
 rename before the first safe attachment needs an operator-verified alias.

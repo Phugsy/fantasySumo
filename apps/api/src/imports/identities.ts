@@ -22,6 +22,8 @@ type Resolved<T> = T & {
   sourceIdentities: RikishiSourceIdentity[];
   identityRoster?: IdentityRosterExpectation;
 };
+type IdentityPlan = Awaited<ReturnType<typeof resolveRikishiIdentities>>;
+
 const nameKey = (name: string) => name.normalize("NFKC").trim().toLowerCase();
 
 function conflict(message: string): never {
@@ -160,27 +162,33 @@ export function reconcileImportCommand(
   repositories: Repositories,
   bashoId: string,
   command: BanzukeImportCommand,
+  sharedPlan?: IdentityPlan,
 ): Promise<Resolved<BanzukeImportCommand>>;
 export function reconcileImportCommand(
   repositories: Repositories,
   bashoId: string,
   command: BoutResultsImportCommand,
+  sharedPlan?: IdentityPlan,
 ): Promise<Resolved<BoutResultsImportCommand>>;
 export function reconcileImportCommand(
   repositories: Repositories,
   bashoId: string,
   command: ScheduledBoutsImportCommand,
+  sharedPlan?: IdentityPlan,
 ): Promise<Resolved<ScheduledBoutsImportCommand>>;
 export async function reconcileImportCommand(
   repositories: Repositories,
   bashoId: string,
   command: ImportCommand,
+  sharedPlan?: IdentityPlan,
 ): Promise<Resolved<ImportCommand>> {
-  const plan = await resolveRikishiIdentities(
-    repositories,
-    bashoId,
-    command.rikishi ?? [],
-  );
+  const plan =
+    sharedPlan ??
+    (await resolveRikishiIdentities(
+      repositories,
+      bashoId,
+      command.rikishi ?? [],
+    ));
   const identityData = {
     rikishi: plan.rikishi,
     sourceIdentities: plan.sourceIdentities,
@@ -227,4 +235,46 @@ export async function reconcileImportCommand(
         : { withdrawnRikishiId: plan.resolve(bout.withdrawnRikishiId) }),
     })),
   };
+}
+
+/** Plan both commands from the same roster/alias snapshot without persisting aliases early. */
+export async function reconcileScheduledBoutsAndResults(
+  repositories: Repositories,
+  schedule: ScheduledBoutsImportCommand,
+  results: BoutResultsImportCommand,
+) {
+  const identityKey = (entry: SourceRikishi) =>
+    entry.sourceIdentity === undefined
+      ? undefined
+      : `${entry.sourceIdentity.source}:${entry.sourceIdentity.sourceRikishiId}`;
+  const preferredByIdentity = new Map(
+    (schedule.rikishi ?? []).flatMap((entry) => {
+      const key = identityKey(entry);
+      return key === undefined ? [] : [[key, entry] as const];
+    }),
+  );
+  const incoming = [
+    ...(schedule.rikishi ?? []),
+    ...(results.rikishi ?? []).map((entry) => {
+      const key = identityKey(entry);
+      const preferred =
+        key === undefined ? undefined : preferredByIdentity.get(key);
+      // Schedule metadata already prefers the attesting banzuke's name. Only
+      // share that preference when provider identities agree; keep each raw
+      // reference and identity so conflicting mappings still fail validation.
+      return preferred === undefined
+        ? entry
+        : { ...preferred, id: entry.id, sourceIdentity: entry.sourceIdentity };
+    }),
+  ];
+  const plan = await resolveRikishiIdentities(
+    repositories,
+    schedule.bashoId,
+    incoming,
+  );
+  const [scheduleCommand, resultsCommand] = await Promise.all([
+    reconcileImportCommand(repositories, schedule.bashoId, schedule, plan),
+    reconcileImportCommand(repositories, results.bashoId, results, plan),
+  ]);
+  return { scheduleCommand, resultsCommand };
 }

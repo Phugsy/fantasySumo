@@ -386,57 +386,129 @@ for (const provider of providers) {
       expect(await repositories.listRikishiSourceIdentities()).toHaveLength(4);
     });
 
-    it("imports an attested card when endpoint shikona differ for an established provider alias", async () => {
-      await importBanzuke(repositories, banzuke("2026-07", "Oldname"));
-      await importScheduledBouts(repositories, schedule("Oldname"));
-      const original = (await repositories.listRikishi()).find(
-        (entry) => entry.shikona === "Oldname",
-      )!;
-      const card = mapSumoApiSchedulePayload(
-        torikumi("Oldname"),
-        { bashoId: "2026-07", day: 1 },
-        {
-          bashoId: "202607",
-          division: "Makuuchi",
-          east: [
-            {
-              rikishiID: 987,
-              shikonaEn: "Newname",
-              record: [{ result: "win" }],
-            },
-          ],
-          west: [
-            {
-              rikishiID: 654,
-              shikonaEn: "Opponent",
-              record: [{ result: "loss" }],
-            },
-          ],
-        },
+    it.each([
+      { establishedAlias: true, historicalOldName: false },
+      { establishedAlias: false, historicalOldName: false },
+      { establishedAlias: false, historicalOldName: true },
+    ])(
+      "imports differing endpoint names with alias=$establishedAlias and historical old name=$historicalOldName",
+      async ({ establishedAlias, historicalOldName }) => {
+        await importBanzuke(repositories, banzuke("2026-07", "Newname"));
+        if (establishedAlias)
+          await importScheduledBouts(repositories, schedule("Newname"));
+        if (historicalOldName)
+          await repositories.upsertRikishi({
+            id: "historical-old",
+            shikona: "Oldname",
+          });
+        const original = (await repositories.listRikishi()).find(
+          (entry) => entry.shikona === "Newname",
+        )!;
+        const aliasesBefore = await repositories.listRikishiSourceIdentities();
+        const schedulesBefore =
+          await repositories.listScheduledBoutsForBasho("2026-07");
+        const card = mapSumoApiSchedulePayload(
+          torikumi("Oldname"),
+          { bashoId: "2026-07", day: 1 },
+          {
+            bashoId: "202607",
+            division: "Makuuchi",
+            east: [
+              {
+                rikishiID: 987,
+                shikonaEn: "Newname",
+                record: [{ result: "win" }],
+              },
+            ],
+            west: [
+              {
+                rikishiID: 654,
+                shikonaEn: "Opponent",
+                record: [{ result: "loss" }],
+              },
+            ],
+          },
+        );
+        expect(card.isComplete).toBe(true);
+        expect(
+          card.rikishi?.find((entry) => entry.id === "sumo-api:987")?.shikona,
+        ).toBe("Newname");
+        const expectedBanzukeRikishiIds = (
+          await repositories.listBanzukeEntriesForBasho("2026-07")
+        ).map((entry) => entry.rikishiId);
+        await importScheduledBoutsAndBoutResults(
+          repositories,
+          card,
+          results("Oldname"),
+          { expectedBanzukeRikishiIds, dryRun: true },
+        );
+        expect(await repositories.listRikishiSourceIdentities()).toEqual(
+          aliasesBefore,
+        );
+        expect(
+          await repositories.listScheduledBoutsForBasho("2026-07"),
+        ).toEqual(schedulesBefore);
+        expect(await repositories.listBoutResultsForBasho("2026-07")).toEqual(
+          [],
+        );
+        expect((await repositories.getBasho("2026-07"))?.status).toBe(
+          "upcoming",
+        );
+        await importScheduledBoutsAndBoutResults(
+          repositories,
+          card,
+          results("Oldname"),
+          { expectedBanzukeRikishiIds },
+        );
+        // A retry after the first atomic attachment must reuse exactly those aliases.
+        await importScheduledBoutsAndBoutResults(
+          repositories,
+          card,
+          results("Oldname"),
+          { expectedBanzukeRikishiIds },
+        );
+        expect(
+          (await repositories.listBoutResultsForBasho("2026-07"))[0]
+            ?.winnerRikishiId,
+        ).toBe(original.id);
+        expect(
+          (await repositories.listScheduledBoutsForBasho("2026-07"))[0]
+            ?.eastRikishiId,
+        ).toBe(original.id);
+        expect(
+          (await repositories.listBanzukeEntriesForBasho("2026-07")).find(
+            (entry) => entry.rikishiId === original.id,
+          )?.shikona,
+        ).toBe("Newname");
+        expect(await repositories.listRikishiSourceIdentities()).toHaveLength(
+          4,
+        );
+        expect(await repositories.listRikishiSourceIdentities()).toContainEqual(
+          {
+            source: "sumo-api",
+            sourceRikishiId: "987",
+            rikishiId: original.id,
+          },
+        );
+        expect(await repositories.listRikishi()).toHaveLength(
+          historicalOldName ? 3 : 2,
+        );
+      },
+    );
+
+    it("rejects contradictory provider identities across a paired import without writes", async () => {
+      await importBanzuke(repositories, banzuke("2026-07", "Newname"));
+      const card = { ...schedule("Newname"), isComplete: true };
+      const resultCommand = results("Newname");
+      resultCommand.rikishi![0]!.sourceIdentity!.sourceRikishiId = "999";
+      await expect(
+        importScheduledBoutsAndBoutResults(repositories, card, resultCommand),
+      ).rejects.toMatchObject({ issues: [{ path: "rikishi.sourceIdentity" }] });
+      expect(await repositories.listRikishiSourceIdentities()).toHaveLength(2);
+      expect(await repositories.listScheduledBoutsForBasho("2026-07")).toEqual(
+        [],
       );
-      expect(card.isComplete).toBe(true);
-      expect(
-        card.rikishi?.find((entry) => entry.id === "sumo-api:987")?.shikona,
-      ).toBe("Newname");
-      const expectedBanzukeRikishiIds = (
-        await repositories.listBanzukeEntriesForBasho("2026-07")
-      ).map((entry) => entry.rikishiId);
-      await importScheduledBoutsAndBoutResults(
-        repositories,
-        card,
-        results("Oldname"),
-        { expectedBanzukeRikishiIds },
-      );
-      expect(
-        (await repositories.listBoutResultsForBasho("2026-07"))[0]
-          ?.winnerRikishiId,
-      ).toBe(original.id);
-      expect(
-        (await repositories.listBanzukeEntriesForBasho("2026-07")).find(
-          (entry) => entry.rikishiId === original.id,
-        )?.shikona,
-      ).toBe("Oldname");
-      expect(await repositories.listRikishi()).toHaveLength(2);
+      expect(await repositories.listBoutResultsForBasho("2026-07")).toEqual([]);
     });
 
     it("uses provider identity for prizes even when the displayed shikona changes", async () => {

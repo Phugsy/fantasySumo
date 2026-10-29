@@ -32,7 +32,10 @@ import {
   toScheduledBoutPublicationSource,
 } from "./types.js";
 
-import { reconcileImportCommand } from "./identities.js";
+import {
+  reconcileImportCommand,
+  reconcileScheduledBoutsAndResults,
+} from "./identities.js";
 import { ImportValidationError } from "./validation.js";
 export { ImportValidationError } from "./validation.js";
 
@@ -421,16 +424,23 @@ export async function importScheduledBoutsAndBoutResults(
   resultsInput: BoutResultsImportCommand,
   options: ImportOptions = {},
 ): Promise<ImportResult> {
-  const scheduleCommand = await reconcileImportCommand(
-    repositories,
-    scheduleInput.bashoId,
-    scheduleInput,
-  );
-  const resultsCommand = await reconcileImportCommand(
-    repositories,
-    resultsInput.bashoId,
-    resultsInput,
-  );
+  if (
+    scheduleInput.bashoId !== resultsInput.bashoId ||
+    scheduleInput.day !== resultsInput.results[0]?.day
+  ) {
+    throw new ImportValidationError([
+      {
+        path: "schedule",
+        message: "Schedule and result imports must target the same basho day.",
+      },
+    ]);
+  }
+  const { scheduleCommand, resultsCommand } =
+    await reconcileScheduledBoutsAndResults(
+      repositories,
+      scheduleInput,
+      resultsInput,
+    );
   if (
     scheduleCommand.attestedRikishiIds !== undefined &&
     options.expectedBanzukeRikishiIds !== undefined
@@ -451,15 +461,7 @@ export async function importScheduledBoutsAndBoutResults(
   }
   const commandPairIssues: ImportValidationIssue[] = [];
 
-  if (
-    scheduleCommand.bashoId !== resultsCommand.bashoId ||
-    scheduleCommand.day !== resultsCommand.results[0]?.day
-  ) {
-    commandPairIssues.push({
-      path: "schedule",
-      message: "Schedule and result imports must target the same basho day.",
-    });
-  } else if (scheduleCommand.isComplete !== true) {
+  if (scheduleCommand.isComplete !== true) {
     commandPairIssues.push({
       path: "schedule.isComplete",
       message:
