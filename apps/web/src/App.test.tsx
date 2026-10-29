@@ -347,7 +347,10 @@ describe("App", () => {
     expect(
       await screen.findByRole("heading", { name: "Follow the leaderboard" }),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole("link", { name: "Log in / Join" })[0]!);
+    // The home route can render before the sign-out session reset finishes.
+    fireEvent.click(
+      (await screen.findAllByRole("link", { name: "Log in / Join" }))[0]!,
+    );
     expect(await screen.findByLabelText("Email")).toHaveValue("");
     expect(screen.getByLabelText("Display name")).toHaveValue("");
   });

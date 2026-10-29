@@ -72,9 +72,9 @@ No webhook subscription or additional paid service is required.
 The isolated adapter accepts only a matching basho, a Makuuchi yusho signal,
 an explicit prize array, known prize categories, unique recipient/category
 pairs, and recipients matched to the persisted tournament roster. The local
-basho must be complete. Source names map using the existing shikona identity
-boundary; ambiguous/unmatched winners fail closed. Rename-safe provider aliases
-remain #102. The source does not expose an independent completeness attestation
+basho must be complete. Provider `rikishiId` values resolve through established
+Sumo API aliases to canonical local rikishi IDs; shikona is display metadata.
+Unknown IDs fail closed without replacing saved awards. The source does not expose an independent completeness attestation
 for its prize array; finality is inferred from its documented completed-basho
 payload and our completed results. Protected reimports support later corrections.
 

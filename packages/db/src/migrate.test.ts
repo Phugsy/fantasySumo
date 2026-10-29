@@ -138,6 +138,7 @@ describe("Postgres migration ledger", () => {
       "0004_basho_game_config.sql",
       "0005_banzuke_identity_snapshot.sql",
       "0006_scoring_modes.sql",
+      "0007_rikishi_source_identities.sql",
     ]);
     const initialMigration = readFileSync(
       join(migrationsFolder, "0000_initial.sql"),

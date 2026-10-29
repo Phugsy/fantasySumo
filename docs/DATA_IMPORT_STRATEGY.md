@@ -44,12 +44,12 @@ not compete in another division. The API reports that case as unavailable.
 `did-not-compete` is reserved for data sets, such as the closed deterministic
 demo fixture, that affirmatively establish non-participation.
 
-Rikishi IDs are currently derived from shikona text at the adapter boundary.
-That is not safe across shikona changes or name reuse, and upstream IDs cannot
-be shared blindly because JSA and Sumo API use separate namespaces. A
-provider-alias-to-canonical-identity model is scoped in
-[issue #102](https://github.com/Phugsy/fantasySumo/issues/102); until then,
-history that cannot be matched is presented as unavailable rather than guessed.
+Source-backed imports retain provider IDs and reconcile them through persisted
+aliases to immutable local rikishi IDs. JSA and Sumo API use separate
+namespaces. Existing shikona-derived local rows remain valid; same-basho
+snapshot evidence or an operator-verified attachment adopts their aliases.
+Ambiguous legacy matches fail closed. See [canonical identity and legacy
+adoption](#canonical-identity-and-legacy-adoption).
 
 The protected `/admin` page now supplies that manual trigger. It defaults to a
 dry run, shows per-entity created/updated/skipped/deleted counts, reports
@@ -439,3 +439,84 @@ For the first local MVP, a failed import can return a structured API error and l
 ## Follow-Up Tickets
 
 - GitHub issue #26: add redundant/fallback source adapters after the first automated import path exists.
+
+## Canonical identity and legacy adoption
+
+JSA `rikishi_id` and Sumo API `rikishiID`, `eastId`, `westId`, and prize
+`rikishiId` belong to separate provider namespaces. Numeric equality between
+providers is never evidence of identity. Adapters require positive stable
+participant IDs even if winner selection falls back to `winnerEn`; a missing
+or contradictory winner/participant ID fails rather than creating a name-only
+identity. Banzuke record attestation also joins by Sumo API ID.
+
+Resolution order is deliberately conservative:
+
+1. Resolve an established provider alias, regardless of its current shikona.
+2. For a previously unseen provider ID, allow attachment only to a unique exact
+   shikona match in the **same basho's stored banzuke snapshot** (case and Unicode
+   normalization are allowed). This permits adoption of existing rows and
+   correlation of JSA and Sumo API rosters for the same tournament. The target
+   must not already have a different ID from that provider.
+3. If no same-basho match exists and no shared rikishi has that name, create a
+   new opaque canonical ID. New IDs are deterministic across retries/dry runs.
+4. If the name is ambiguous, known only outside the target roster, or conflicts
+   with an established source mapping, stop with an identity validation error.
+   Never infer a cross-basho identity from shikona, rank, or heya alone.
+
+JSA banzuke snapshots take precedence for ranked names/heya. Within a Sumo API
+complete-card command, the attesting banzuke supplies display metadata when its
+shikona differs from torikumi for the same numeric ID; identity and record
+attestation still join by ID. Paired daily schedule and result commands share
+one read-only identity plan from the same stored roster and aliases. The
+schedule's preferred source metadata is used for both commands, so a first
+Sumo API import can attach its aliases using the attesting banzuke even when
+torikumi still uses an old shikona. Both commands save those aliases only with
+their atomic import; dry runs and failed validation leave no attachment behind.
+Known aliases take precedence over all names for identity; Sumo API does not overwrite the
+banzuke's historical display. Reused names with a new ID from an already
+attached provider are rejected rather than merged. A provider disagreement or
+rename before the first safe attachment needs an operator-verified alias.
+No automatic migration can recover a historical name-only identity with
+certainty; already split legacy rows are not automatically merged.
+
+Before the first import after deployment, dry-run the current banzuke and daily
+import. Reimport the existing basho first where possible so its snapshot can
+attach legacy IDs. Existing rows keep their IDs and every dependent pick and
+result. If a rename has already happened or only historical name evidence
+exists, verify the intended wrestler and both provider IDs independently, then
+attach each alias to the existing canonical row:
+
+```bash
+make attach-rikishi-identity ARGS="-- --source jsa --source-id 4227 --rikishi onosato --dry-run"
+make attach-rikishi-identity ARGS="-- --source jsa --source-id 4227 --rikishi onosato"
+# Use that provider's verified numeric ID for the separate sumo-api attachment.
+```
+
+This database-operator command uses the configured `DATABASE_URL`, requires an
+existing canonical row, is idempotent, and cannot replace conflicting aliases
+or merge canonical rows. It adds no browser/admin HTTP surface. A conflict
+requires investigation; do not delete aliases or rewrite foreign keys to make
+an import pass. Resume the normal dry run/import after attachment.
+
+Alias insertions and imported data share a transaction. A database uniqueness
+conflict caused by concurrent import planning rolls back the import; retry
+with a fresh plan. Every source-backed import also rechecks the exact stored
+roster/name evidence under its transaction lock before attaching aliases, so a
+concurrent banzuke refresh cannot invalidate a name-based correlation silently.
+The daily import compares its attested canonical roster
+against the stored roster and rechecks that roster under the persistence lock.
+Prizes match established Sumo API aliases only and leave the saved award
+snapshot intact when a winner cannot be resolved.
+
+Regression coverage runs on SQLite by default. To run the same adapter/service/
+repository cases on an isolated local Postgres server as well:
+
+```bash
+IDENTITY_TEST_POSTGRES_URL=postgres://postgres@127.0.0.1:55432/fantasy_sumo_identity_test \
+  pnpm --filter @fantasy-sumo/api exec vitest run src/imports/identities.test.ts
+```
+
+The opt-in suite creates and drops uniquely named test databases and therefore
+requires a test-only role with `CREATEDB`. It never reads `DATABASE_URL` or uses
+production data. Source payloads are deterministic fixtures; no provider
+network request is needed.

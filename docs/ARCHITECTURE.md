@@ -178,7 +178,7 @@ Current routes:
     banzuke. Missing, malformed, or mismatched banzuke evidence rejects the
     day's result import without writes.
   - Request body: `day` and optional `division`.
-  - Maps source payloads into local `BoutResult` records using local shikona-based rikishi ids.
+  - Maps provider-scoped participant IDs into immutable canonical `Rikishi.id` values before validating `BoutResult` records.
   - Replaces stale result rows only for the imported basho/day.
   - After results commit, attempts to import the following day's published
     schedule through the same workflow used by production cron.
@@ -186,9 +186,9 @@ Current routes:
     result when that second source-backed step cannot complete; completed
     results remain committed and any stored schedule remains unchanged.
   - Supports `?dryRun=true`.
-  - Rikishi identity is currently derived from shikona text. Provider-specific
-    stable aliases and rename-safe canonical identities are tracked separately
-    in [issue #102](https://github.com/Phugsy/fantasySumo/issues/102).
+  - Daily record attestation uses Sumo API numeric IDs. Its roster is reconciled
+    to canonical IDs before comparing it with the persisted banzuke, including
+    absent rikishi. Display-name changes cannot truncate the verified roster.
 - `POST /api/admin/basho/:bashoId/import-schedule`
   - Fetches one published Makuuchi torikumi day without requiring winner data.
   - Maps source payloads to `ScheduledBout` records, separately from
@@ -360,9 +360,8 @@ results; use `pnpm demo:start`, `pnpm demo:advance-day`, and
 `pnpm demo:complete` to exercise the lifecycle. Whole-database reset remains a
 local/test-only helper used by the separate sample seed command.
 
-Current limitations:
-
-- Provider identity aliases remain a follow-up for rename-safe prize matching.
+Source-backed prize winners resolve only through established Sumo API aliases;
+unknown IDs fail without changing the saved snapshot.
 
 ## Release boundary
 
@@ -586,3 +585,36 @@ banzuke replacement. Database lifecycle triggers preserve the permanent lock
 across imports and older deployments. Admin mode updates use the protected
 `PUT /api/admin/basho/:bashoId/game-config/scoring` route; prizes have a separate
 protected import and completion-recovery path.
+
+## Canonical rikishi identity
+
+`Rikishi.id` is an immutable local identity. Existing shikona-derived IDs remain
+valid canonical IDs; new source-backed identities receive opaque local IDs
+computed from the first provider identity, independent of shikona. No picks,
+results, schedules, prize awards, or banzuke foreign keys are rewritten.
+
+`rikishi_source_identities` stores `(source, sourceRikishiId) -> rikishiId`.
+Both `(source, sourceRikishiId)` and `(source, rikishiId)` are unique. A canonical
+rikishi can have a JSA alias and a different Sumo API alias. An established
+alias always wins over display-name matching and cannot be reassigned through
+imports or the operator attachment command.
+
+Adapters retain provider IDs in temporary references such as `jsa:4227` or
+`sumo-api:100`. The API's identity planner resolves these references before
+ordinary import validation. Alias writes occur in the same transaction as the
+import; failed validation, conflicting aliases, and dry runs cannot leave
+partial identity state. Database uniqueness guards concurrent attachments on
+SQLite and Postgres. Retry a concurrent conflict from a fresh import plan.
+
+JSA banzuke supplies ranked shikona/heya snapshots; results and schedule imports
+only add missing shared rikishi metadata. Prize imports require established
+Sumo API aliases and never match winners by name. Missing legacy shikona
+snapshots are materialized from their existing display fallback before a
+source-backed banzuke update changes shared metadata.
+
+The additive SQLite/Postgres migrations expand the schema without rekeying or
+deleting existing rows, so the running older application remains schema
+compatible during migration-before-deploy. Retain the alias table during
+application rollback. A later contract release may remove obsolete code only
+after aliases have been adopted; never use a down migration or bulk name-based
+foreign-key rewrite. See [identity adoption and collision handling](DATA_IMPORT_STRATEGY.md#canonical-identity-and-legacy-adoption).

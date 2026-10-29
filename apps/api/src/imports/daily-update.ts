@@ -91,7 +91,7 @@ export async function importCurrentDayScheduleAndResults(
   ).map((entry) => entry.rikishiId);
   const { scheduleCommand, resultsCommand } = await fetchSumoApiDailyImport(
     sourceFetch,
-    { ...options, expectedRikishiIds },
+    options,
   );
 
   return importScheduledBoutsAndBoutResults(

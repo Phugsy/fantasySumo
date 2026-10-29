@@ -13,6 +13,8 @@ import {
 import type {
   BoutResultsImportData,
   Repositories,
+  RikishiSourceIdentity,
+  IdentityRosterExpectation,
   ScheduledBoutsImportData,
 } from "@fantasy-sumo/db";
 import type {
@@ -30,11 +32,12 @@ import {
   toScheduledBoutPublicationSource,
 } from "./types.js";
 
-export class ImportValidationError extends Error {
-  constructor(readonly issues: ImportValidationIssue[]) {
-    super("Import validation failed.");
-  }
-}
+import {
+  reconcileImportCommand,
+  reconcileScheduledBoutsAndResults,
+} from "./identities.js";
+import { ImportValidationError } from "./validation.js";
+export { ImportValidationError } from "./validation.js";
 
 interface BoutResultsImportOptions extends ImportOptions {
   completionSchedule?: Pick<
@@ -59,9 +62,15 @@ interface PreparedScheduledBoutsImport {
 
 export async function importBanzuke(
   repositories: Repositories,
-  command: BanzukeImportCommand,
+  input: BanzukeImportCommand,
   options: ImportOptions = {},
 ): Promise<ImportResult> {
+  const command = await reconcileImportCommand(
+    repositories,
+    input.basho.id,
+    input,
+  );
+
   // Validate source-shaped data before any database write so failed imports
   // cannot leave the local game in a partly updated state.
   const issues = validateBanzukeImport(command);
@@ -99,6 +108,8 @@ export async function importBanzuke(
   if (options.dryRun !== true) {
     await repositories.applyBanzukeImport({
       basho: nextBasho,
+      sourceIdentities: command.sourceIdentities,
+      identityRoster: command.identityRoster,
       rikishi: command.rikishi,
       // Leave omitted optional fields sparse so the repository's atomic
       // conflict update preserves the latest value stored in the database.
@@ -132,9 +143,15 @@ function preserveKnownBanzukeHeya(
 
 export async function importBoutResults(
   repositories: Repositories,
-  command: BoutResultsImportCommand,
+  input: BoutResultsImportCommand,
   options: BoutResultsImportOptions = {},
 ): Promise<ImportResult> {
+  const command = await reconcileImportCommand(
+    repositories,
+    input.bashoId,
+    input,
+  );
+
   const prepared = await prepareBoutResultsImport(
     repositories,
     command,
@@ -150,7 +167,10 @@ export async function importBoutResults(
 
 async function prepareBoutResultsImport(
   repositories: Repositories,
-  command: BoutResultsImportCommand,
+  command: BoutResultsImportCommand & {
+    sourceIdentities?: RikishiSourceIdentity[];
+    identityRoster?: IdentityRosterExpectation;
+  },
   options: BoutResultsImportOptions = {},
 ): Promise<PreparedBoutResultsImport> {
   // Result imports are scoped to one basho/day. Reimporting that day should
@@ -243,6 +263,10 @@ async function prepareBoutResultsImport(
   );
 
   const data: BoutResultsImportData = {
+    identityRoster: command.identityRoster,
+    sourceIdentities: options.preserveExistingSnapshot
+      ? []
+      : command.sourceIdentities,
     ...(nextBasho === undefined ? {} : { basho: nextBasho }),
     bashoId: command.bashoId,
     day: command.results[0]!.day,
@@ -262,9 +286,15 @@ async function prepareBoutResultsImport(
 
 export async function importScheduledBouts(
   repositories: Repositories,
-  command: ScheduledBoutsImportCommand,
+  input: ScheduledBoutsImportCommand,
   options: ImportOptions = {},
 ): Promise<ImportResult> {
+  const command = await reconcileImportCommand(
+    repositories,
+    input.bashoId,
+    input,
+  );
+
   const prepared = await prepareScheduledBoutsImport(
     repositories,
     command,
@@ -285,7 +315,10 @@ export async function importScheduledBouts(
 
 async function prepareScheduledBoutsImport(
   repositories: Repositories,
-  command: ScheduledBoutsImportCommand,
+  command: ScheduledBoutsImportCommand & {
+    sourceIdentities?: RikishiSourceIdentity[];
+    identityRoster?: IdentityRosterExpectation;
+  },
   options: ImportOptions = {},
 ): Promise<PreparedScheduledBoutsImport> {
   const issues = await validateScheduledBoutsImport(repositories, command);
@@ -356,6 +389,8 @@ async function prepareScheduledBoutsImport(
   );
 
   const data: ScheduledBoutsImportData = {
+    identityRoster: command.identityRoster,
+    sourceIdentities: preserveExistingSchedule ? [] : command.sourceIdentities,
     publication: {
       id: `${command.bashoId}-day-${command.day}-schedule`,
       bashoId: command.bashoId,
@@ -385,21 +420,48 @@ async function prepareScheduledBoutsImport(
  */
 export async function importScheduledBoutsAndBoutResults(
   repositories: Repositories,
-  scheduleCommand: ScheduledBoutsImportCommand,
-  resultsCommand: BoutResultsImportCommand,
+  scheduleInput: ScheduledBoutsImportCommand,
+  resultsInput: BoutResultsImportCommand,
   options: ImportOptions = {},
 ): Promise<ImportResult> {
+  if (
+    scheduleInput.bashoId !== resultsInput.bashoId ||
+    scheduleInput.day !== resultsInput.results[0]?.day
+  ) {
+    throw new ImportValidationError([
+      {
+        path: "schedule",
+        message: "Schedule and result imports must target the same basho day.",
+      },
+    ]);
+  }
+  const { scheduleCommand, resultsCommand } =
+    await reconcileScheduledBoutsAndResults(
+      repositories,
+      scheduleInput,
+      resultsInput,
+    );
+  if (
+    scheduleCommand.attestedRikishiIds !== undefined &&
+    options.expectedBanzukeRikishiIds !== undefined
+  ) {
+    const attested = new Set(scheduleCommand.attestedRikishiIds);
+    if (
+      options.expectedBanzukeRikishiIds.length === 0 ||
+      !options.expectedBanzukeRikishiIds.every((id) => attested.has(id))
+    ) {
+      throw new ImportValidationError([
+        {
+          path: "schedule.attestedRikishiIds",
+          message:
+            "Source banzuke does not cover the persisted canonical roster.",
+        },
+      ]);
+    }
+  }
   const commandPairIssues: ImportValidationIssue[] = [];
 
-  if (
-    scheduleCommand.bashoId !== resultsCommand.bashoId ||
-    scheduleCommand.day !== resultsCommand.results[0]?.day
-  ) {
-    commandPairIssues.push({
-      path: "schedule",
-      message: "Schedule and result imports must target the same basho day.",
-    });
-  } else if (scheduleCommand.isComplete !== true) {
+  if (scheduleCommand.isComplete !== true) {
     commandPairIssues.push({
       path: "schedule.isComplete",
       message:
