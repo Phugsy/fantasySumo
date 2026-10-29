@@ -42,7 +42,12 @@ award snapshots remain the facts; weighted totals are derived, not incremented
 or overwritten in the database.
 
 The official leaderboard, My Stable, tournament history, and cumulative
-standings use each basho's persisted mode. The leaderboard's explicitly labelled
+standings use each basho's persisted mode. Tournament, all-time, and personal
+history scores stop at the same last contiguous day verified against complete
+schedule publications, even if an administrator closes a basho early. Stored
+wins beyond that boundary contribute no points or achievements until verified.
+Only completed, non-demo bashos contribute to cumulative totals; active bashos
+remain visible in personal history with their verified individual scores. The leaderboard's explicitly labelled
 “What if” selector projects the same categories under either mode. This changes
 only the displayed totals, ordering, and score chart. It makes no write request,
 does not change official history, and resets to official when the page reloads

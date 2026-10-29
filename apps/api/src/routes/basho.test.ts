@@ -1473,8 +1473,112 @@ describe("basho routes", () => {
     });
   });
 
+  it.each(["missing-publication", "unattested", "missing-result", "verified"])(
+    "uses the same verified scores after early closure with %s day 2",
+    async (verification) => {
+      const repositories = createRepositories(client);
+      const { cookie } = await signIn();
+      await app.inject({
+        method: "POST",
+        url: "/api/basho/2026-05/teams",
+        headers: { cookie },
+        payload: {
+          displayName: "Verified Stable",
+          rikishiIds: ["onosato", "kirishima"],
+        },
+      });
+      await repositories.insertBoutResult({
+        id: "day-3-win",
+        bashoId: sampleBasho.id,
+        day: 3,
+        winnerRikishiId: "onosato",
+        loserRikishiId: "kotozakura",
+      });
+      await verifyStoredResultDays(repositories, 1);
+      const results = await repositories.listBoutResultsForBasho(
+        sampleBasho.id,
+      );
+      for (const day of [2, 3]) {
+        if (day === 2 && verification === "missing-publication") continue;
+        await repositories.applyScheduledBoutsImport({
+          publication: {
+            id: `verification-${day}`,
+            bashoId: sampleBasho.id,
+            day,
+            source:
+              day === 2 && verification === "unattested"
+                ? "test:partial"
+                : "test:complete",
+            publishedAt: "2026-05-18T08:00:00.000Z",
+          },
+          bouts: [
+            ...results
+              .filter((result) => result.day === day)
+              .map((result) => ({
+                id: result.id,
+                bashoId: result.bashoId,
+                day,
+                eastRikishiId: result.winnerRikishiId,
+                westRikishiId: result.loserRikishiId,
+                status: "scheduled" as const,
+              })),
+            ...(day === 2 && verification === "missing-result"
+              ? [
+                  {
+                    id: "missing-bout",
+                    bashoId: sampleBasho.id,
+                    day,
+                    eastRikishiId: "onosato",
+                    westRikishiId: "kotozakura",
+                    status: "scheduled" as const,
+                  },
+                ]
+              : []),
+          ],
+        });
+      }
+      await repositories.updateBasho({
+        ...sampleBasho,
+        status: "active",
+        currentDay: 3,
+      });
+      await repositories.transitionBashoLifecycle(
+        sampleBasho.id,
+        "close",
+        "2026-05-18T09:00:00.000Z",
+      );
+      const expectedScore = verification === "verified" ? 3 : 1;
+      const board = (await app.inject("/api/basho/2026-05/leaderboard")).json();
+      const cumulative = (await app.inject("/api/leaderboard/all-time")).json();
+      const personal = (
+        await app.inject({ url: "/api/my-history", headers: { cookie } })
+      ).json();
+      expect(
+        board.leaderboard.find(
+          (entry: { displayName: string }) =>
+            entry.displayName === "Verified Stable",
+        ).score,
+      ).toBe(expectedScore);
+      expect(
+        cumulative.leaderboard.find(
+          (entry: { displayName: string }) =>
+            entry.displayName === "Verified Stable",
+        ).score,
+      ).toBe(expectedScore);
+      expect(personal.score).toBe(expectedScore);
+      expect(personal.history[0].score).toBe(expectedScore);
+      expect(
+        personal.history[0].picks.reduce(
+          (sum: number, pick: { wins: number }) => sum + pick.wins,
+          0,
+        ),
+      ).toBe(expectedScore);
+    },
+  );
+
   it("aggregates cross-tournament scores and preserves personal pick history", async () => {
     const repositories = createRepositories(client);
+    await seedDemoDatabase(repositories);
     const { cookie } = await signIn("history@example.com", "History Player");
     const createdTeamResponse = await app.inject({
       method: "POST",
@@ -1493,6 +1597,7 @@ describe("basho routes", () => {
       status: "complete",
       currentDay: 15,
     });
+    await verifyStoredResultDays(repositories, 2);
     await repositories.upsertBanzukeEntry({
       id: "2026-05-onosato",
       bashoId: "2026-05",
@@ -1604,13 +1709,13 @@ describe("basho routes", () => {
     ).toEqual(["2026-07", "2026-05"]);
     expect(historyBody.history[0]).toMatchObject({
       basho: { id: "2026-07" },
-      score: 2,
+      score: 0,
     });
     expect(historyBody.history[0].picks[0]).toMatchObject({
       rikishiId: "onosato",
       shikona: "Modern Onosato",
       heya: "Modern Heya",
-      wins: 1,
+      wins: 0,
     });
     expect(historyBody.history[1]).toMatchObject({
       basho: { id: "2026-05" },
