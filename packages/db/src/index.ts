@@ -16,6 +16,7 @@ export { createRepositories } from "./repositories.js";
 export type {
   BoutResultsImportData,
   Repositories,
+  RikishiSourceIdentity,
   ScheduledBoutsImportData,
 } from "./repositories.js";
 export { DEMO_BASHO_ID, DEMO_PREVIOUS_BASHO_ID } from "./demo-constants.js";
@@ -62,3 +63,6 @@ export type {
   BashoScoringConfig,
   SpecialPrizeSnapshot,
 } from "./scoring-repositories.js";
+
+export { getIdentityRosterKey } from "./identity-roster.js";
+export type { IdentityRosterExpectation } from "./identity-roster.js";

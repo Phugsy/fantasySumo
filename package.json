@@ -25,7 +25,8 @@
     "test": "pnpm --filter @fantasy-sumo/domain build && pnpm -r --if-present test",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "attach:rikishi-identity": "pnpm --filter @fantasy-sumo/api attach:rikishi-identity"
   },
   "repository": {
     "type": "git",

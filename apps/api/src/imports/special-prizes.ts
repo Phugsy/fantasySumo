@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Repositories, SpecialPrizeSnapshot } from "@fantasy-sumo/db";
 import type { SpecialPrizeType } from "@fantasy-sumo/domain";
 import type { SourceFetch } from "./types.js";
-import { toCompactBashoId, toLocalRikishiId } from "./ids.js";
+import { toCompactBashoId } from "./ids.js";
 
 const prizeTypes = {
   "Shukun-sho": "outstanding-performance",
@@ -49,9 +49,15 @@ export async function importSpecialPrizes(
     throw new Error("Special-prize source basho does not match the target.");
   const banzuke = await repositories.listBanzukeEntriesForBasho(bashoId);
   const roster = new Set(banzuke.map((entry) => entry.rikishiId));
+  const aliases = await repositories.listRikishiSourceIdentities();
   const awards = payload.specialPrizes.map((prize) => ({
     type: prizeTypes[prize.type],
-    rikishiId: toLocalRikishiId(prize.shikonaEn),
+    rikishiId:
+      aliases.find(
+        (alias) =>
+          alias.source === "sumo-api" &&
+          alias.sourceRikishiId === String(prize.rikishiId),
+      )?.rikishiId ?? "",
   }));
   const keys = new Set<string>();
   for (const award of awards) {

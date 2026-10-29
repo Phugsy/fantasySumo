@@ -57,6 +57,13 @@
       "when": 1788699126654,
       "tag": "0007_friendly_skreet",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793232000000,
+      "tag": "0008_rikishi_source_identities",
+      "breakpoints": true
     }
   ]
 }

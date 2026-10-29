@@ -38,6 +38,29 @@ export const rikishi = sqliteTable("rikishi", {
   heya: text("heya"),
 });
 
+// Local rikishi IDs are immutable; provider IDs live in this additive alias table.
+export const rikishiSourceIdentities = sqliteTable(
+  "rikishi_source_identities",
+  {
+    source: text("source", { enum: ["jsa", "sumo-api"] }).notNull(),
+    sourceRikishiId: text("source_rikishi_id").notNull(),
+    rikishiId: text("rikishi_id")
+      .notNull()
+      .references(() => rikishi.id),
+  },
+  (table) => [
+    uniqueIndex("rikishi_source_identity_idx").on(
+      table.source,
+      table.sourceRikishiId,
+    ),
+    uniqueIndex("rikishi_source_canonical_idx").on(
+      table.source,
+      table.rikishiId,
+    ),
+    check("rikishi_source_valid", sql`${table.source} IN ('jsa', 'sumo-api')`),
+  ],
+);
+
 export const banzukeEntries = sqliteTable(
   "banzuke_entries",
   {

@@ -1,4 +1,5 @@
 import type {
+  SourceRikishi,
   BanzukeImportCommand,
   JsaBanzukeImportOptions,
   SourceFetch,
@@ -7,7 +8,7 @@ import type {
   BoutResultsImportCommand,
   ScheduledBoutsImportCommand,
 } from "./types.js";
-import { toCompactBashoId, toLocalBashoId, toLocalRikishiId } from "./ids.js";
+import { toCompactBashoId, toLocalBashoId } from "./ids.js";
 
 const JSA_BANZUKE_BASE_URL =
   "https://www.sumo.or.jp/EnHonbashoBanzuke/indexAjax";
@@ -118,14 +119,14 @@ export function mapJsaBanzukePayload(
       currentDay: resolveCurrentDay(payload),
     },
     rikishi: rows.map((row) => ({
-      id: toLocalRikishiId(String(row.shikona)),
+      ...toSourceRikishi(String(row.shikona), "jsa", row.rikishi_id),
       shikona: String(row.shikona),
       ...(row.heya_name === undefined || row.heya_name === ""
         ? {}
         : { heya: String(row.heya_name) }),
     })),
     banzukeEntries: rows.map((row, index) => {
-      const rikishiId = toLocalRikishiId(String(row.shikona));
+      const rikishiId = sourceRikishiId("jsa", row.rikishi_id);
       const rankOrder = Number(row.banzuke_id) || index + 1;
 
       return {
@@ -162,9 +163,7 @@ export async function fetchSumoApiResultsImport(
 
 export async function fetchSumoApiDailyImport(
   fetchFn: SourceFetch,
-  options: SumoApiResultsImportOptions & {
-    expectedRikishiIds: readonly string[];
-  },
+  options: SumoApiResultsImportOptions,
 ): Promise<{
   scheduleCommand: ScheduledBoutsImportCommand;
   resultsCommand: BoutResultsImportCommand;
@@ -214,7 +213,6 @@ export function mapSumoApiSchedulePayload(
     bashoId: string;
     day: number;
     division?: string;
-    expectedRikishiIds?: readonly string[];
   },
   banzukePayload?: SumoApiBanzukePayload,
 ): ScheduledBoutsImportCommand {
@@ -225,8 +223,16 @@ export function mapSumoApiSchedulePayload(
   }
 
   const participants = rows.flatMap((row) => [
-    toSourceRikishi(requiredString(row.eastShikona, "eastShikona")),
-    toSourceRikishi(requiredString(row.westShikona, "westShikona")),
+    toSourceRikishi(
+      requiredString(row.eastShikona, "eastShikona"),
+      "sumo-api",
+      row.eastId,
+    ),
+    toSourceRikishi(
+      requiredString(row.westShikona, "westShikona"),
+      "sumo-api",
+      row.westId,
+    ),
   ]);
   const division = options.division ?? "Makuuchi";
   const isComplete =
@@ -236,12 +242,7 @@ export function mapSumoApiSchedulePayload(
     (banzukePayload.division === undefined ||
       banzukePayload.division.trim().toLowerCase() ===
         division.trim().toLowerCase()) &&
-    hasAttestedCompleteCard(
-      rows,
-      banzukePayload,
-      options.day,
-      options.expectedRikishiIds ?? [],
-    ) &&
+    hasAttestedCompleteCard(rows, banzukePayload, options.day) &&
     (options.day < 15 ||
       payload.yusho?.some(
         (winner) => winner.type?.toLowerCase() === division.toLowerCase(),
@@ -252,7 +253,29 @@ export function mapSumoApiSchedulePayload(
     bashoId: options.bashoId,
     day: options.day,
     ...(isComplete ? { isComplete: true } : {}),
-    rikishi: uniqueRikishi(participants),
+    ...(isComplete
+      ? {
+          attestedRikishiIds: [
+            ...(banzukePayload?.east ?? []),
+            ...(banzukePayload?.west ?? []),
+          ].map((row) => sourceRikishiId("sumo-api", row.rikishiID)),
+        }
+      : {}),
+    rikishi: uniqueRikishi([
+      ...participants,
+      ...(isComplete
+        ? [
+            ...(banzukePayload?.east ?? []),
+            ...(banzukePayload?.west ?? []),
+          ].map((row) =>
+            toSourceRikishi(
+              requiredString(row.shikonaEn, "shikonaEn"),
+              "sumo-api",
+              row.rikishiID,
+            ),
+          )
+        : []),
+    ]),
     bouts: rows.map((row, index) => {
       const matchNo = row.matchNo ?? index + 1;
 
@@ -260,12 +283,8 @@ export function mapSumoApiSchedulePayload(
         id: `${options.bashoId}-day-${options.day}-match-${matchNo}`,
         bashoId: toLocalBashoId(row.bashoId ?? options.bashoId),
         day: row.day ?? options.day,
-        eastRikishiId: toLocalRikishiId(
-          requiredString(row.eastShikona, "eastShikona"),
-        ),
-        westRikishiId: toLocalRikishiId(
-          requiredString(row.westShikona, "westShikona"),
-        ),
+        eastRikishiId: sourceRikishiId("sumo-api", row.eastId),
+        westRikishiId: sourceRikishiId("sumo-api", row.westId),
         status: "scheduled",
       };
     }),
@@ -276,7 +295,6 @@ function hasAttestedCompleteCard(
   rows: readonly SumoApiTorikumiRow[],
   banzukePayload: SumoApiBanzukePayload,
   day: number,
-  expectedRikishiIds: readonly string[],
 ): boolean {
   if (!rows.every(hasResolvedWinner)) {
     return false;
@@ -286,41 +304,26 @@ function hasAttestedCompleteCard(
     ...(banzukePayload.east ?? []),
     ...(banzukePayload.west ?? []),
   ];
+  if (!banzukeRows.every(isBanzukeRow)) return false;
   const outcomesByRikishiId = new Map<
     string,
     { result: "win" | "loss"; isFusen: boolean }
   >();
   for (const row of rows) {
-    const eastShikona = requiredString(row.eastShikona, "eastShikona");
-    const westShikona = requiredString(row.westShikona, "westShikona");
-    const winnerShikona = resolveWinnerShikona(row, {
-      eastId: row.eastId,
-      eastShikona,
-      westId: row.westId,
-      westShikona,
-    });
-    const loserShikona =
-      winnerShikona === eastShikona ? westShikona : eastShikona;
+    const winnerId = resolveWinnerRikishiId(row);
+    const eastId = sourceRikishiId("sumo-api", row.eastId);
+    const westId = sourceRikishiId("sumo-api", row.westId);
+    const loserId = winnerId === eastId ? westId : eastId;
     const fusen = isFusen(row.kimarite);
-    outcomesByRikishiId.set(toLocalRikishiId(winnerShikona), {
-      result: "win",
-      isFusen: fusen,
-    });
-    outcomesByRikishiId.set(toLocalRikishiId(loserShikona), {
-      result: "loss",
-      isFusen: fusen,
-    });
+    outcomesByRikishiId.set(winnerId, { result: "win", isFusen: fusen });
+    outcomesByRikishiId.set(loserId, { result: "loss", isFusen: fusen });
   }
-  const banzukeRikishiIds = new Set(
-    banzukeRows
-      .map((rikishi) => rikishi.shikonaEn)
-      .filter(isString)
-      .map(toLocalRikishiId),
+  const banzukeIds = banzukeRows.map((row) =>
+    sourceRikishiId("sumo-api", row.rikishiID),
   );
-
   return (
-    expectedRikishiIds.length > 0 &&
-    expectedRikishiIds.every((rikishiId) => banzukeRikishiIds.has(rikishiId)) &&
+    banzukeRows.length > 0 &&
+    new Set(banzukeIds).size === banzukeIds.length &&
     banzukeRows.every((rikishi) => {
       const dayRecord = rikishi.record?.[day - 1];
       const result = dayRecord?.result?.trim().toLowerCase();
@@ -331,12 +334,12 @@ function hasAttestedCompleteCard(
 
       if (result === "absent") {
         return !outcomesByRikishiId.has(
-          toLocalRikishiId(rikishi.shikonaEn ?? ""),
+          sourceRikishiId("sumo-api", rikishi.rikishiID),
         );
       }
 
       const outcome = outcomesByRikishiId.get(
-        toLocalRikishiId(rikishi.shikonaEn ?? ""),
+        sourceRikishiId("sumo-api", rikishi.rikishiID),
       );
 
       // Explicit forfeit records must agree with the bout's absence marker,
@@ -387,8 +390,11 @@ function isBanzukeRow(value: unknown): value is SumoApiBanzukeRow {
   }
 
   return (
-    (value.rikishiID === undefined || typeof value.rikishiID === "number") &&
-    isOptionalString(value.shikonaEn) &&
+    typeof value.rikishiID === "number" &&
+    Number.isSafeInteger(value.rikishiID) &&
+    value.rikishiID > 0 &&
+    typeof value.shikonaEn === "string" &&
+    value.shikonaEn.trim().length > 0 &&
     (value.record === undefined ||
       (Array.isArray(value.record) &&
         value.record.every(
@@ -405,10 +411,6 @@ function isOptionalString(value: unknown): value is string | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isString(value: string | undefined): value is string {
-  return value !== undefined && value.trim() !== "";
 }
 
 function hasResolvedWinner(row: SumoApiTorikumiRow): boolean {
@@ -429,31 +431,30 @@ export function mapSumoApiTorikumiPayload(
     bashoId: options.bashoId,
     rikishi: uniqueRikishi(
       rows.flatMap((row) => [
-        toSourceRikishi(requiredString(row.eastShikona, "eastShikona")),
-        toSourceRikishi(requiredString(row.westShikona, "westShikona")),
+        toSourceRikishi(
+          requiredString(row.eastShikona, "eastShikona"),
+          "sumo-api",
+          row.eastId,
+        ),
+        toSourceRikishi(
+          requiredString(row.westShikona, "westShikona"),
+          "sumo-api",
+          row.westId,
+        ),
       ]),
     ),
     results: rows.map((row, index) => {
       const matchNo = row.matchNo ?? index + 1;
-      const eastId = row.eastId;
-      const westId = row.westId;
-      const eastShikona = requiredString(row.eastShikona, "eastShikona");
-      const westShikona = requiredString(row.westShikona, "westShikona");
-      const winnerShikona = resolveWinnerShikona(row, {
-        eastId,
-        eastShikona,
-        westId,
-        westShikona,
-      });
-      const loserShikona =
-        winnerShikona === eastShikona ? westShikona : eastShikona;
+      const eastId = sourceRikishiId("sumo-api", row.eastId);
+      const westId = sourceRikishiId("sumo-api", row.westId);
+      const winnerId = resolveWinnerRikishiId(row);
 
       return {
         id: `${options.bashoId}-day-${options.day}-match-${matchNo}`,
         bashoId: toLocalBashoId(row.bashoId ?? options.bashoId),
         day: row.day ?? options.day,
-        winnerRikishiId: toLocalRikishiId(winnerShikona),
-        loserRikishiId: toLocalRikishiId(loserShikona),
+        winnerRikishiId: winnerId,
+        loserRikishiId: winnerId === eastId ? westId : eastId,
         ...(row.kimarite === undefined || row.kimarite === ""
           ? {}
           : { kimarite: row.kimarite }),
@@ -467,20 +468,38 @@ function isFusen(kimarite: string | undefined): boolean {
   return kimarite?.trim().toLowerCase() === "fusen";
 }
 
-function toSourceRikishi(shikona: string) {
+function sourceRikishiId(source: "jsa" | "sumo-api", id: unknown): string {
+  const value = String(id);
+  if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(Number(value))) {
+    throw new Error(`Missing or invalid ${source} rikishi ID.`);
+  }
+  return `${source}:${value}`;
+}
+
+function toSourceRikishi(
+  shikona: string,
+  source: "jsa" | "sumo-api",
+  id: unknown,
+): SourceRikishi {
+  const reference = sourceRikishiId(source, id);
   return {
-    id: toLocalRikishiId(shikona),
+    id: reference,
     shikona,
+    sourceIdentity: {
+      source,
+      sourceRikishiId: reference.slice(source.length + 1),
+    },
   };
 }
 
-function uniqueRikishi(rikishi: ReturnType<typeof toSourceRikishi>[]) {
-  const byId = new Map<string, ReturnType<typeof toSourceRikishi>>();
-
+function uniqueRikishi(rikishi: SourceRikishi[]) {
+  const byId = new Map<string, SourceRikishi>();
   for (const entry of rikishi) {
+    // Provider ID establishes identity even when two endpoints use different
+    // display names. The attesting banzuke is appended last and supplies the
+    // preferred source metadata; persisted JSA snapshots remain authoritative.
     byId.set(entry.id, entry);
   }
-
   return [...byId.values()];
 }
 
@@ -495,14 +514,15 @@ async function fetchJson<T>(fetchFn: SourceFetch, url: string): Promise<T> {
 }
 
 function isUsableJsaBanzukeRow(row: JsaBanzukeRow) {
-  return (
-    row.rikishi_id !== undefined &&
-    row.rikishi_id !== "" &&
-    row.shikona !== undefined &&
-    row.shikona !== "" &&
-    row.banzuke_name !== undefined &&
-    row.banzuke_name !== ""
-  );
+  const hasName = typeof row.shikona === "string" && row.shikona.trim() !== "";
+  const hasRank =
+    typeof row.banzuke_name === "string" && row.banzuke_name.trim() !== "";
+  const hasId = row.rikishi_id !== undefined && row.rikishi_id !== "";
+  if (!hasName && !hasRank && !hasId) return false;
+  if (!hasName || !hasRank)
+    throw new Error("JSA banzuke row is missing shikona or rank.");
+  sourceRikishiId("jsa", row.rikishi_id);
+  return true;
 }
 
 function formatJsaBashoName(payload: JsaBanzukePayload) {
@@ -562,42 +582,31 @@ function daysBetween(startDate: string, endDate: string) {
 }
 
 function requiredString(value: unknown, field: string): string {
-  if (typeof value !== "string" || value.length === 0) {
+  if (typeof value !== "string" || value.trim().length === 0) {
     throw new Error(`Sumo API torikumi row is missing ${field}.`);
   }
 
   return value;
 }
 
-function resolveWinnerShikona(
-  row: SumoApiTorikumiRow,
-  wrestlers: {
-    eastId?: number;
-    eastShikona: string;
-    westId?: number;
-    westShikona: string;
-  },
-): string {
+function resolveWinnerRikishiId(row: SumoApiTorikumiRow): string {
+  const eastId = sourceRikishiId("sumo-api", row.eastId);
+  const westId = sourceRikishiId("sumo-api", row.westId);
+  if (eastId === westId)
+    throw new Error("A bout requires two distinct source rikishi IDs.");
   if (row.winnerId !== undefined) {
-    if (row.winnerId === wrestlers.eastId) {
-      return wrestlers.eastShikona;
-    }
-
-    if (row.winnerId === wrestlers.westId) {
-      return wrestlers.westShikona;
-    }
+    const winnerId = sourceRikishiId("sumo-api", row.winnerId);
+    if (winnerId === eastId || winnerId === westId) return winnerId;
+    throw new Error("Sumo API winner ID does not match either participant.");
   }
-
   const winnerEn = requiredString(row.winnerEn, "winnerEn");
-
-  if (
-    winnerEn === wrestlers.eastShikona ||
-    winnerEn === wrestlers.westShikona
-  ) {
-    return winnerEn;
+  const eastShikona = requiredString(row.eastShikona, "eastShikona");
+  const westShikona = requiredString(row.westShikona, "westShikona");
+  if (eastShikona !== westShikona) {
+    if (winnerEn === eastShikona) return eastId;
+    if (winnerEn === westShikona) return westId;
   }
-
   throw new Error(
-    "Sumo API torikumi row winner does not match either rikishi.",
+    "Sumo API torikumi row winner does not uniquely match either rikishi.",
   );
 }

@@ -53,31 +53,79 @@ describe("source import adapters", () => {
       },
       rikishi: [
         {
-          id: "hoshoryu",
+          id: "jsa:3842",
           shikona: "Hoshoryu",
           heya: "Tatsunami",
         },
         {
-          id: "onosato",
+          id: "jsa:4227",
           shikona: "Onosato",
           heya: "Nishonoseki",
         },
       ],
       banzukeEntries: [
         {
-          id: "2026-05-hoshoryu",
-          rikishiId: "hoshoryu",
+          id: "2026-05-jsa:3842",
+          rikishiId: "jsa:3842",
           rank: "Yokozuna",
           rankOrder: 1,
         },
         {
-          id: "2026-05-onosato",
-          rikishiId: "onosato",
+          id: "2026-05-jsa:4227",
+          rikishiId: "jsa:4227",
           rank: "Ozeki",
           rankOrder: 2,
         },
       ],
     });
+  });
+
+  it("preserves provider namespaces and rejects missing or conflicting participant IDs", () => {
+    const row = {
+      eastId: 11,
+      eastShikona: "Sharedname",
+      westId: 22,
+      westShikona: "Sharedname",
+      winnerId: 22,
+    };
+    const command = mapSumoApiTorikumiPayload(
+      { torikumi: [row] },
+      { bashoId: "2026-07", day: 1 },
+    );
+    expect(command.rikishi).toEqual([
+      {
+        id: "sumo-api:11",
+        shikona: "Sharedname",
+        sourceIdentity: { source: "sumo-api", sourceRikishiId: "11" },
+      },
+      {
+        id: "sumo-api:22",
+        shikona: "Sharedname",
+        sourceIdentity: { source: "sumo-api", sourceRikishiId: "22" },
+      },
+    ]);
+    expect(command.results[0]).toMatchObject({
+      winnerRikishiId: "sumo-api:22",
+      loserRikishiId: "sumo-api:11",
+    });
+    expect(() =>
+      mapSumoApiTorikumiPayload(
+        { torikumi: [{ ...row, eastId: undefined }] },
+        { bashoId: "2026-07", day: 1 },
+      ),
+    ).toThrow("rikishi ID");
+    expect(() =>
+      mapSumoApiTorikumiPayload(
+        { torikumi: [{ ...row, winnerId: 99, winnerEn: "Sharedname" }] },
+        { bashoId: "2026-07", day: 1 },
+      ),
+    ).toThrow("winner ID");
+    expect(() =>
+      mapJsaBanzukePayload({
+        BashoInfo: { start_date: "2026-07-10", end_date: "2026-07-24" },
+        BanzukeTable: [{ shikona: "Sharedname", banzuke_name: "Yokozuna" }],
+      }),
+    ).toThrow("rikishi ID");
   });
 
   it("locks imported basho once the start date has arrived before active scoring", () => {
@@ -132,16 +180,16 @@ describe("source import adapters", () => {
       },
     );
 
-    expect(command).toEqual({
+    expect(command).toMatchObject({
       source: "sumo-api-results",
       bashoId: "2026-05",
       rikishi: [
         {
-          id: "onosato",
+          id: "sumo-api:4227",
           shikona: "Onosato",
         },
         {
-          id: "kotozakura",
+          id: "sumo-api:3661",
           shikona: "Kotozakura",
         },
       ],
@@ -150,8 +198,8 @@ describe("source import adapters", () => {
           id: "2026-05-day-1-match-1",
           bashoId: "2026-05",
           day: 1,
-          winnerRikishiId: "onosato",
-          loserRikishiId: "kotozakura",
+          winnerRikishiId: "sumo-api:4227",
+          loserRikishiId: "sumo-api:3661",
           kimarite: "oshidashi",
         },
       ],
@@ -166,7 +214,9 @@ describe("source import adapters", () => {
             bashoId: "202605",
             day: 1,
             matchNo: 1,
+            eastId: 4227,
             eastShikona: "Onosato",
+            westId: 3661,
             westShikona: "Kotozakura",
             kimarite: "oshidashi",
             winnerEn: "Kotozakura",
@@ -180,8 +230,8 @@ describe("source import adapters", () => {
     );
 
     expect(command.results[0]).toMatchObject({
-      winnerRikishiId: "kotozakura",
-      loserRikishiId: "onosato",
+      winnerRikishiId: "sumo-api:3661",
+      loserRikishiId: "sumo-api:4227",
     });
   });
 
@@ -207,8 +257,8 @@ describe("source import adapters", () => {
     );
 
     expect(command.results[0]).toMatchObject({
-      winnerRikishiId: "ura",
-      loserRikishiId: "onosato",
+      winnerRikishiId: "sumo-api:28",
+      loserRikishiId: "sumo-api:8850",
       kimarite: "fusen",
       loserAbsent: true,
     });
@@ -218,20 +268,20 @@ describe("source import adapters", () => {
           {
             id: "2026-05-ura",
             bashoId: "2026-05",
-            rikishiId: "ura",
+            rikishiId: "sumo-api:28",
             rank: "Maegashira #1",
             rankOrder: 1,
           },
           {
-            id: "2026-05-onosato",
+            id: "2026-05-sumo-api:8850",
             bashoId: "2026-05",
-            rikishiId: "onosato",
+            rikishiId: "sumo-api:8850",
             rank: "Yokozuna West",
             rankOrder: 2,
           },
         ],
         boutResults: command.results,
-        rikishiId: "ura",
+        rikishiId: "sumo-api:28",
         scheduledBouts: [],
       }).achievements,
     ).toEqual([]);
@@ -245,7 +295,9 @@ describe("source import adapters", () => {
             bashoId: "202605",
             day: 4,
             matchNo: 2,
+            eastId: 4227,
             eastShikona: "Onosato",
+            westId: 3661,
             westShikona: "Kotozakura",
           },
         ],
@@ -253,21 +305,21 @@ describe("source import adapters", () => {
       { bashoId: "2026-05", day: 4 },
     );
 
-    expect(command).toEqual({
+    expect(command).toMatchObject({
       source: "sumo-api-schedule",
       bashoId: "2026-05",
       day: 4,
       rikishi: [
-        { id: "onosato", shikona: "Onosato" },
-        { id: "kotozakura", shikona: "Kotozakura" },
+        { id: "sumo-api:4227", shikona: "Onosato" },
+        { id: "sumo-api:3661", shikona: "Kotozakura" },
       ],
       bouts: [
         {
           id: "2026-05-day-4-match-2",
           bashoId: "2026-05",
           day: 4,
-          eastRikishiId: "onosato",
-          westRikishiId: "kotozakura",
+          eastRikishiId: "sumo-api:4227",
+          westRikishiId: "sumo-api:3661",
           status: "scheduled",
         },
       ],
@@ -298,7 +350,9 @@ describe("source import adapters", () => {
           {
             bashoId: "202605",
             day: 14,
+            eastId: 4227,
             eastShikona: "Onosato",
+            westId: 3661,
             westShikona: "Kotozakura",
             winnerEn: "Onosato",
           },
@@ -307,7 +361,6 @@ describe("source import adapters", () => {
       {
         bashoId: "2026-05",
         day: 14,
-        expectedRikishiIds: ["onosato", "kotozakura"],
       },
       completeDay14Banzuke,
     );
@@ -317,7 +370,9 @@ describe("source import adapters", () => {
           {
             bashoId: "202605",
             day: 14,
+            eastId: 4227,
             eastShikona: "Onosato",
+            westId: 3661,
             westShikona: "Kotozakura",
             winnerEn: "Kotozakura",
           },
@@ -326,26 +381,6 @@ describe("source import adapters", () => {
       {
         bashoId: "2026-05",
         day: 14,
-        expectedRikishiIds: ["onosato", "kotozakura"],
-      },
-      completeDay14Banzuke,
-    );
-    const mutuallyTruncatedEarlierDay = mapSumoApiSchedulePayload(
-      {
-        torikumi: [
-          {
-            bashoId: "202605",
-            day: 14,
-            eastShikona: "Onosato",
-            westShikona: "Kotozakura",
-            winnerEn: "Onosato",
-          },
-        ],
-      },
-      {
-        bashoId: "2026-05",
-        day: 14,
-        expectedRikishiIds: ["onosato", "kotozakura", "hoshoryu"],
       },
       completeDay14Banzuke,
     );
@@ -355,7 +390,9 @@ describe("source import adapters", () => {
           {
             bashoId: "202605",
             day: 14,
+            eastId: 4227,
             eastShikona: "Onosato",
+            westId: 3661,
             westShikona: "Kotozakura",
             winnerEn: "Onosato",
           },
@@ -364,7 +401,6 @@ describe("source import adapters", () => {
       {
         bashoId: "2026-05",
         day: 14,
-        expectedRikishiIds: ["onosato", "kotozakura", "hoshoryu"],
       },
       {
         ...completeDay14Banzuke,
@@ -384,7 +420,9 @@ describe("source import adapters", () => {
           {
             bashoId: "202605",
             day: 15,
+            eastId: 4227,
             eastShikona: "Onosato",
+            westId: 3661,
             westShikona: "Kotozakura",
             winnerEn: "Onosato",
           },
@@ -393,17 +431,18 @@ describe("source import adapters", () => {
       {
         bashoId: "2026-05",
         day: 15,
-        expectedRikishiIds: ["onosato", "kotozakura"],
       },
       {
         east: [
           {
+            rikishiID: 4227,
             shikonaEn: "Onosato",
             record: Array.from({ length: 15 }, () => ({ result: "win" })),
           },
         ],
         west: [
           {
+            rikishiID: 3661,
             shikonaEn: "Kotozakura",
             record: Array.from({ length: 15 }, () => ({ result: "loss" })),
           },
@@ -416,7 +455,9 @@ describe("source import adapters", () => {
           {
             bashoId: "202605",
             day: 15,
+            eastId: 4227,
             eastShikona: "Onosato",
+            westId: 3661,
             westShikona: "Kotozakura",
             winnerEn: "Onosato",
           },
@@ -426,17 +467,18 @@ describe("source import adapters", () => {
       {
         bashoId: "2026-05",
         day: 15,
-        expectedRikishiIds: ["onosato", "kotozakura"],
       },
       {
         east: [
           {
+            rikishiID: 4227,
             shikonaEn: "Onosato",
             record: Array.from({ length: 15 }, () => ({ result: "win" })),
           },
         ],
         west: [
           {
+            rikishiID: 3661,
             shikonaEn: "Kotozakura",
             record: Array.from({ length: 15 }, () => ({ result: "loss" })),
           },
@@ -449,7 +491,9 @@ describe("source import adapters", () => {
           {
             bashoId: "202605",
             day: 14,
+            eastId: 4227,
             eastShikona: "Onosato",
+            westId: 3661,
             westShikona: "Kotozakura",
             winnerEn: "Onosato",
           },
@@ -459,7 +503,6 @@ describe("source import adapters", () => {
         bashoId: "2026-05",
         day: 14,
         division: "Makuuchi",
-        expectedRikishiIds: ["onosato", "kotozakura"],
       },
       {
         ...completeDay14Banzuke,
@@ -470,7 +513,10 @@ describe("source import adapters", () => {
 
     expect(resolvedEarlierDay.isComplete).toBe(true);
     expect(contradictoryEarlierDay.isComplete).toBeUndefined();
-    expect(mutuallyTruncatedEarlierDay.isComplete).toBeUndefined();
+    expect(resolvedEarlierDay.attestedRikishiIds).toEqual([
+      "sumo-api:4227",
+      "sumo-api:3661",
+    ]);
     expect(truncatedEarlierDay.isComplete).toBeUndefined();
     expect(incomplete.isComplete).toBeUndefined();
     expect(complete.isComplete).toBe(true);
@@ -530,7 +576,6 @@ describe("source import adapters", () => {
         {
           bashoId: "2026-05",
           day: 4,
-          expectedRikishiIds: ["onosato", "kotozakura"],
         },
       );
 
@@ -538,12 +583,12 @@ describe("source import adapters", () => {
         requestedUrls.filter((url) => url.includes("/torikumi/")),
       ).toHaveLength(1);
       expect(commands.scheduleCommand.bouts[0]).toMatchObject({
-        eastRikishiId: "onosato",
-        westRikishiId: "kotozakura",
+        eastRikishiId: "sumo-api:4227",
+        westRikishiId: "sumo-api:3661",
       });
       expect(commands.resultsCommand.results[0]).toMatchObject({
-        winnerRikishiId: "onosato",
-        loserRikishiId: "kotozakura",
+        winnerRikishiId: "sumo-api:4227",
+        loserRikishiId: "sumo-api:3661",
       });
       expect(commands.scheduleCommand.isComplete).toBe(true);
       expect(commands.resultsCommand.results[0]?.loserAbsent).toBe(
@@ -569,7 +614,9 @@ describe("source import adapters", () => {
         {
           torikumi: [
             {
+              eastId: 1290,
               eastShikona: "Wakanosho",
+              westId: 1241,
               westShikona: "Kinbozan",
               winnerEn: "Kinbozan",
               kimarite,
@@ -579,11 +626,11 @@ describe("source import adapters", () => {
         {
           bashoId: "2026-07",
           day: 7,
-          expectedRikishiIds: ["wakanosho", "kinbozan"],
         },
         {
           east: [
             {
+              rikishiID: 1290,
               shikonaEn: "Wakanosho",
               record: Array.from({ length: 7 }, () => ({
                 result: loserRecord,
@@ -592,6 +639,7 @@ describe("source import adapters", () => {
           ],
           west: [
             {
+              rikishiID: 1241,
               shikonaEn: "Kinbozan",
               record: Array.from({ length: 7 }, () => ({
                 result: winnerRecord,
@@ -615,7 +663,9 @@ describe("source import adapters", () => {
                   {
                     bashoId: "202605",
                     day: 4,
+                    eastId: 4227,
                     eastShikona: "Onosato",
+                    westId: 3661,
                     westShikona: "Kotozakura",
                     winnerEn: "Onosato",
                   },
@@ -625,7 +675,6 @@ describe("source import adapters", () => {
       {
         bashoId: "2026-05",
         day: 4,
-        expectedRikishiIds: ["onosato", "kotozakura"],
       },
     );
 
@@ -644,7 +693,9 @@ describe("source import adapters", () => {
                   {
                     bashoId: "202605",
                     day: 4,
+                    eastId: 4227,
                     eastShikona: "Onosato",
+                    westId: 3661,
                     westShikona: "Kotozakura",
                     winnerEn: "Onosato",
                   },
@@ -654,7 +705,6 @@ describe("source import adapters", () => {
       {
         bashoId: "2026-05",
         day: 4,
-        expectedRikishiIds: ["onosato", "kotozakura"],
       },
     );
 
