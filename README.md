@@ -49,6 +49,7 @@ follow-up work.
 Start here:
 
 - `AGENTS.md` - guidance for AI coding agents working on the repo.
+- `docs/AUTOMATION_PILOT.md` - supervised local ticket-to-release pilot, classifications, session controls, and release gates.
 - `skills/fantasy-sumo-issue-loop/SKILL.md` - repo-local issue-to-PR loop for agents. Invoke it with a prompt like: "Use the Fantasy Sumo issue loop on #44."
 - `docs/PROJECT_BRIEF.md` - product intent and MVP definition.
 - `docs/SCORING.md` - scoring modes, category points, rule locking, and special-prize imports.

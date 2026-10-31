@@ -45,9 +45,10 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 - Keep scoring logic isolated and well-tested.
 - Keep basho lifecycle and pick-locking rules in the domain/API layer; UI state should mirror those rules, not replace API enforcement.
 - Keep data import logic separate from scoring logic.
-- Do not create or start recurring scheduled, heartbeat, or babysitting
-  automations for pull request review follow-up. Review an open pull request
-  only in a user-requested manual pass.
+- PR follow-up is manual by default. The owner-authorized supervised pilot in
+  `skills/fantasy-sumo-pilot/SKILL.md` is the only exception: it may select
+  eligible issues, follow reviews, merge, and release within its active local
+  session and classification gates. It must not expand its own authority.
 - Once an E2E harness exists, use it to validate completion for changes that affect the browser game loop.
 - Run relevant E2E before the initial handoff for browser-game-loop changes. When meaningful UI or interaction risk remains, add an agent-browser visual pass when available; it supplements rather than replaces E2E.
 

@@ -44,7 +44,7 @@ format: ## Format files with Prettier.
 format-check: ## Check Prettier formatting.
 	$(PNPM) format:check
 
-check: deployment-verify ## Run the main pre-PR validation suite.
+check: deployment-verify pilot-test ## Run the main pre-PR validation suite.
 	$(PNPM) lint
 	$(PNPM) format:check
 	$(PNPM) test
@@ -52,6 +52,21 @@ check: deployment-verify ## Run the main pre-PR validation suite.
 
 deployment-verify: ## Verify deployment workflow migration and release safety gates.
 	$(PNPM) deployment:verify
+
+.PHONY: pilot-start pilot-stop pilot-status pilot-test
+MINUTES ?= 120
+
+pilot-start: ## Arm a supervised local pilot session (default 120 minutes).
+	node scripts/pilot-session.mjs start $(MINUTES)
+
+pilot-stop: ## Stop new pilot work without cancelling in-flight deployments.
+	node scripts/pilot-session.mjs stop
+
+pilot-status: ## Show the shared pilot session and its current checkpoint.
+	node scripts/pilot-session.mjs status
+
+pilot-test: ## Verify pilot expiry, stop, ownership, and release allowance.
+	node --test scripts/pilot-session.test.mjs
 
 e2e: ## Run Playwright E2E tests against deterministic demo data.
 	$(PNPM) e2e

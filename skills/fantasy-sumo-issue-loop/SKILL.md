@@ -11,7 +11,7 @@ Use this skill when the user asks to work an issue through the Fantasy Sumo repo
 Use the Fantasy Sumo issue loop on #44.
 ```
 
-This is a repo-local adapter for Fantasy Sumo's current architecture, data safety rules, and completion evidence. Keep it lightweight. It should help one issue become one focused PR; hand pre-handoff review and later PR feedback to `skills/fantasy-sumo-pr-review-loop/SKILL.md`. It should not automate issue intake, merges, or deployment.
+This is a repo-local adapter for Fantasy Sumo's current architecture, data safety rules, and completion evidence. Keep it lightweight. It should help one issue become one focused PR; hand pre-handoff review and later PR feedback to `skills/fantasy-sumo-pr-review-loop/SKILL.md`. By default it does not automate issue intake, merges, or deployment. The owner-authorized supervised pilot in `../fantasy-sumo-pilot/SKILL.md` may orchestrate this skill within its active session and classification gates.
 
 ## Baseline Rules
 
@@ -127,11 +127,11 @@ The PR body should include:
 
 Do not mark a draft ready for review until required checks, issue-specific acceptance criteria, and the pre-handoff review gate are satisfied. Once those gates pass, convert it to ready rather than leaving it in draft.
 
-Do not create recurring scheduled, heartbeat, or babysitting automations after opening the PR. Opening a ready PR, requesting its initial review, or having automation tools available does not authorize recurring follow-up. Review later feedback only in a manual pass that the user explicitly requests.
+Outside the explicitly authorized supervised pilot, do not create recurring scheduled, heartbeat, or babysitting automations after opening the PR. Opening a ready PR, requesting its initial review, or having automation tools available does not authorize recurring follow-up. Review later feedback only in a manual pass that the user explicitly requests.
 
 ## Automation Boundary
 
-This skill is manual or semi-manual. It does not create a fully automatic "new issue equals new PR" system. After the PR exists, use `skills/fantasy-sumo-pr-review-loop/SKILL.md` only when the user requests a manual, thread-aware feedback pass.
+This skill is manual or semi-manual by default. The supervised pilot is the sole owner-authorized exception; follow its controlling policy rather than inferring authority from this skill. Outside that pilot, after the PR exists use `skills/fantasy-sumo-pr-review-loop/SKILL.md` only when the user requests a manual, thread-aware feedback pass.
 
 A later queue can add automation with safer constraints:
 
@@ -139,6 +139,6 @@ A later queue can add automation with safer constraints:
 - one issue is handled per branch and PR;
 - PRs open ready for review after their handoff gates pass; drafts are reserved for incomplete or blocked work;
 - checks and E2E evidence are required before review;
-- nothing auto-merges.
+- nothing auto-merges outside the supervised pilot's explicit release gates.
 
 If this loop proves reusable, extract a broader shared `issue-to-pr-loop` skill later and keep this file as the Fantasy Sumo-specific adapter.
