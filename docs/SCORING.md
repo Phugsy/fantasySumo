@@ -1,5 +1,9 @@
 # Scoring rules
 
+The owner-approved future daily joker trial is specified in
+[Daily joker trial](JOKER_TRIAL.md). It is not enabled by the current modes and
+does not change existing tournament scores.
+
 Decision for #92, agreed 6 September 2026. Each basho has its own persisted,
 versioned mode. New and migrated bashos default to `wins-v0`. Administrators
 may select `achievements-v1` until picks first lock, including after teams have
