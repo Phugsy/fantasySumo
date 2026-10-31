@@ -78,15 +78,18 @@ import type {
   SessionUser,
 } from "./types";
 import { canEditFantasyPicks, getPickLockMessage } from "./lifecycle";
+import { DisplayPreferencesProvider } from "./DisplayPreferences";
 
 const PASSWORD_RESET_SESSION_ERROR_MESSAGE =
   "We could not securely end the current session. Check your connection and try again.";
 
 export function App() {
   return (
-    <BrowserRouter>
-      <RoutedApp />
-    </BrowserRouter>
+    <DisplayPreferencesProvider>
+      <BrowserRouter>
+        <RoutedApp />
+      </BrowserRouter>
+    </DisplayPreferencesProvider>
   );
 }
 

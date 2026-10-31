@@ -4,7 +4,7 @@ import { globalStyle } from "@vanilla-extract/css";
 // New component styles belong in scoped modules; see docs/STYLING.md.
 globalStyle(".eyebrow", {
   margin: "0 0 7px",
-  color: "var(--vermilion-dark)",
+  color: "var(--accent-text)",
   fontSize: "0.74rem",
   fontWeight: "900",
   letterSpacing: "0.09em",
@@ -20,7 +20,7 @@ globalStyle(
   {
     border: "1px solid var(--clay-light)",
     borderRadius: "var(--radius)",
-    background: "rgb(255 253 248 / 94%)",
+    background: "var(--panel)",
     boxShadow: "var(--shadow)",
   },
 );
@@ -43,10 +43,10 @@ globalStyle(".public-cta", {
   justifyContent: "space-between",
   margin: "18px 0",
   padding: "20px 22px",
-  border: "1px solid #c8dad2",
+  border: "1px solid var(--positive-border)",
   borderRadius: "var(--radius)",
   background: "var(--moss-light)",
-  color: "#263f38",
+  color: "var(--positive-text)",
 });
 
 globalStyle(".public-cta p:last-child", {
@@ -65,7 +65,7 @@ globalStyle(".public-cta a", {
 });
 
 globalStyle(".public-cta a:hover", {
-  background: "var(--indigo-deep)",
+  background: "#102638",
 });
 
 globalStyle(".public-cta a:focus-visible", {
@@ -80,21 +80,21 @@ globalStyle(".stable-confirmation", {
 globalStyle(".form-message", {
   border: "1px solid var(--clay-light)",
   background: "var(--paper-warm)",
-  color: "#514c46",
+  color: "var(--secondary-text)",
 });
 
 globalStyle(".error-state", {
-  borderColor: "#deb8b1",
-  background: "#fff3f0",
-  color: "#792c24",
+  borderColor: "var(--negative-border)",
+  background: "var(--negative-surface)",
+  color: "var(--negative-text)",
 });
 
 globalStyle(".confirmation", {
   display: "grid",
   gap: "4px",
-  border: "1px solid #c8dad2",
+  border: "1px solid var(--positive-border)",
   background: "var(--moss-light)",
-  color: "#263f38",
+  color: "var(--positive-text)",
 });
 
 globalStyle(".public-cta", {

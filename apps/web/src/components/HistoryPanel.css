@@ -8,7 +8,7 @@
   padding: 22px;
   border: 1px solid var(--clay-light);
   border-radius: var(--radius);
-  background: rgb(255 253 248 / 94%);
+  background: var(--panel);
   box-shadow: var(--shadow);
 }
 
@@ -24,7 +24,7 @@
 }
 
 .history-heading > strong {
-  color: var(--vermilion-dark);
+  color: var(--accent-text);
   white-space: nowrap;
 }
 
@@ -47,7 +47,7 @@
   padding: 12px 14px;
   border: 1px solid var(--clay-light);
   border-radius: 9px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .all-time-list li {
@@ -73,7 +73,7 @@
 }
 
 .history-rank {
-  color: var(--vermilion-dark);
+  color: var(--accent-text);
   font-weight: 900;
 }
 
@@ -101,7 +101,7 @@
   overflow: hidden;
   border: 1px solid var(--clay-light);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .personal-history-list summary {

@@ -1,4 +1,5 @@
 import { getBashoScoringOptions } from "../scoring.js";
+import { getRikishiPhoto } from "../rikishi-photos.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { DEMO_BASHO_ID, type Repositories } from "@fantasy-sumo/db";
@@ -14,6 +15,7 @@ import { getEffectiveBashoGameConfig } from "../game-config.js";
 import { isCompleteScheduledBoutPublicationSource } from "../imports/types.js";
 import {
   calculateLeaderboard,
+  calculateRikishiScore,
   calculateTeamScore,
   canEditFantasyPicks,
   derivePreviousBashoRecord,
@@ -285,6 +287,7 @@ export function registerBashoRoutes(
       scheduledBouts,
       scheduledBoutPublications,
       bashos,
+      sourceIdentities,
     ] = await Promise.all([
       context.repositories.listRikishi(),
       context.repositories.listBanzukeEntriesForBasho(basho.id),
@@ -292,6 +295,7 @@ export function registerBashoRoutes(
       context.repositories.listScheduledBoutsForBasho(basho.id),
       context.repositories.listScheduledBoutPublicationsForBasho(basho.id),
       context.repositories.listBashos(),
+      context.repositories.listRikishiSourceIdentities(),
     ]);
     const previousBasho = findPreviousCompletedBasho(basho, bashos);
     const previousBashoData =
@@ -317,6 +321,10 @@ export function registerBashoRoutes(
     const rikishiById = new Map(
       allRikishi.map((rikishi) => [rikishi.id, rikishi]),
     );
+    const scoringOptions = await getBashoScoringOptions(
+      context.repositories,
+      basho.id,
+    );
     const rikishi = banzukeEntries.map((entry) => {
       const rikishiEntry = rikishiById.get(entry.rikishiId);
 
@@ -326,6 +334,11 @@ export function registerBashoRoutes(
         heya: entry.heya ?? rikishiEntry?.heya,
         rank: entry.rank,
         rankOrder: entry.rankOrder,
+        score: calculateRikishiScore(entry.rikishiId, boutResults, {
+          ...scoringOptions,
+          throughDay: verifiedThroughDay,
+        }).score,
+        photo: getRikishiPhoto(entry.rikishiId, basho.isDemo, sourceIdentities),
         previousBashoRecord: getPreviousBashoRecordState({
           previousBasho,
           previousBashoData,
@@ -591,6 +604,8 @@ export function registerBashoRoutes(
       context.repositories,
       basho.id,
     );
+    const photoIdentities =
+      await context.repositories.listRikishiSourceIdentities();
     const teamScore = calculateTeamScore(team, picks, boutResults, {
       ...scoringOptions,
       throughDay: verifiedThroughDay,
@@ -635,6 +650,11 @@ export function registerBashoRoutes(
                   rankOrder: banzukeEntry.rankOrder,
                 }),
             wins: score?.wins ?? 0,
+            photo: getRikishiPhoto(
+              pick.rikishiId,
+              basho.isDemo,
+              photoIdentities,
+            ),
             score: score?.score ?? 0,
             breakdown: score?.breakdown,
             tournamentNotes: deriveRikishiTournamentNotes({

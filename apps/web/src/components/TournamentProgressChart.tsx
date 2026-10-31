@@ -17,12 +17,12 @@ const chartWidth = 800;
 const chartHeight = 340;
 const chartPadding = { top: 32, right: 28, bottom: 48, left: 52 };
 const seriesColors = [
-  "#a84032",
-  "#183247",
-  "#2f6f5e",
-  "#8b5b16",
-  "#654c8a",
-  "#26758a",
+  "var(--chart-red)",
+  "var(--chart-indigo)",
+  "var(--chart-green)",
+  "var(--chart-gold)",
+  "var(--chart-purple)",
+  "var(--chart-cyan)",
 ] as const;
 
 export function TournamentProgressChart({

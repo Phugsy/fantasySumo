@@ -7,7 +7,7 @@
   padding: 22px;
   border: 1px solid var(--clay-light);
   border-radius: var(--radius);
-  background: rgb(255 253 248 / 94%);
+  background: var(--panel);
   box-shadow: var(--shadow);
 }
 
@@ -28,7 +28,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--indigo);
+  color: var(--heading);
   font-weight: 800;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -54,8 +54,8 @@
 }
 
 .auth-mode-switch button.active {
-  background: #ffffff;
-  color: var(--vermilion-dark);
+  background: var(--surface);
+  color: var(--accent-text);
   box-shadow: 0 1px 2px rgb(31 43 49 / 12%);
 }
 
@@ -67,7 +67,7 @@
   padding: 12px;
   border: 1px solid var(--clay-light);
   border-radius: 9px;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .account-summary strong,

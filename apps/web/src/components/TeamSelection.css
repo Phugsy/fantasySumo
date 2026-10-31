@@ -32,7 +32,7 @@
   padding: 12px 14px;
   border: 1px solid var(--clay-light);
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--surface);
   color: var(--ink);
   text-align: left;
   transition:
@@ -42,13 +42,13 @@
 }
 
 .rikishi-row:hover:not(:disabled) {
-  border-color: #bc7569;
-  background: #fffaf5;
+  border-color: var(--negative-border);
+  background: var(--hover);
 }
 
 .rikishi-row[aria-pressed="true"] {
   border-color: var(--vermilion);
-  background: #fff9f4;
+  background: var(--selected);
   box-shadow: inset 4px 0 0 var(--vermilion);
 }
 
@@ -94,14 +94,14 @@
 
 .rikishi-row .previous-basho-record {
   margin-top: 6px;
-  color: #4f5f66;
+  color: var(--secondary-text);
   font-size: 0.76rem;
   font-weight: 700;
   line-height: 1.35;
 }
 
 .rikishi-row .previous-basho-record.unavailable {
-  color: #766f67;
+  color: var(--muted);
   font-weight: 650;
 }
 
@@ -124,10 +124,10 @@
   min-width: 74px;
   min-height: 38px;
   padding: 7px 8px;
-  border: 1px solid #cfddd7;
+  border: 1px solid var(--positive-border);
   border-radius: 8px;
   background: var(--moss-light);
-  color: #2c4a41;
+  color: var(--positive-text);
   font-size: 0.8rem;
   font-weight: 850;
   text-align: center;
@@ -142,7 +142,7 @@
 .field-label {
   display: block;
   margin-bottom: 8px;
-  color: #39474e;
+  color: var(--secondary-text);
   font-size: 0.88rem;
   font-weight: 850;
 }
@@ -153,13 +153,13 @@ input {
   padding: 10px 12px;
   border: 1px solid var(--clay);
   border-radius: 9px;
-  background: #ffffff;
+  background: var(--surface);
   color: var(--ink);
 }
 
 input:disabled {
-  background: #eee8de;
-  color: #6b6964;
+  background: var(--disabled-surface);
+  color: var(--disabled-text);
 }
 
 input:focus,
@@ -187,7 +187,7 @@ input:focus,
   gap: 10px;
   min-height: 50px;
   padding: 10px 12px;
-  border: 1px solid #d7e2dd;
+  border: 1px solid var(--positive-border);
   border-radius: 9px;
   background: var(--moss-light);
   color: var(--ink);
@@ -197,10 +197,10 @@ input:focus,
 .selected-list button {
   min-width: 78px;
   min-height: 38px;
-  border: 1px solid #e2c9c3;
+  border: 1px solid var(--negative-border);
   border-radius: 8px;
-  background: #ffffff;
-  color: var(--vermilion-dark);
+  background: var(--surface);
+  color: var(--accent-text);
   font-size: 0.8rem;
   font-weight: 850;
 }
@@ -208,7 +208,7 @@ input:focus,
 .selected-list .empty-pick {
   border: 1px dashed var(--clay);
   background: transparent;
-  color: #746c62;
+  color: var(--muted);
   font-weight: 700;
 }
 
@@ -227,13 +227,13 @@ input:focus,
   padding: 0 18px;
   border: 1px solid var(--clay);
   border-radius: 9px;
-  background: #ffffff;
+  background: var(--surface);
   color: var(--indigo-deep);
   font-weight: 850;
 }
 
 .cancel-button:hover:not(:disabled) {
-  background: #f7f1e8;
+  background: var(--paper-warm);
 }
 
 .cancel-button:disabled {
@@ -256,9 +256,9 @@ input:focus,
 }
 
 .submit-button:disabled {
-  border-color: #c7bcad;
-  background: #d6cec2;
-  color: #68635d;
+  border-color: var(--clay);
+  background: var(--disabled-surface);
+  color: var(--disabled-text);
   box-shadow: none;
 }
 

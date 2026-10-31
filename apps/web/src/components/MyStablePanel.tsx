@@ -14,6 +14,10 @@ import {
 } from "../lifecycle";
 import { RikishiTournamentBadges } from "./RikishiTournamentBadges";
 import "./MyStablePanel.css";
+import { useDisplayPreferences } from "../DisplayPreferences";
+import { sortRikishi } from "../display-preferences";
+import { PhotoCredits, RikishiPhoto } from "./RikishiPhoto";
+import { identity } from "./RikishiPhoto.css";
 
 interface MyStablePanelProps {
   basho: Basho;
@@ -35,6 +39,11 @@ export function MyStablePanel({
   const stableBasho = myTeam === null ? basho : { ...basho, ...myTeam.basho };
   const teamIsLocked = myTeam?.team.lockedAt !== undefined;
   const canEdit = canEditFantasyPicks(stableBasho) && !teamIsLocked;
+  const { preferences } = useDisplayPreferences();
+  const displayedPicks = sortRikishi(
+    (myTeam?.picks ?? []).map((pick) => ({ ...pick, id: pick.rikishiId })),
+    preferences.order,
+  );
 
   if (user === null) {
     return (
@@ -119,17 +128,20 @@ export function MyStablePanel({
         )}
       </div>
       <ul className="stable-picks" aria-label="Your selected rikishi">
-        {myTeam.picks.map((pick) => (
+        {displayedPicks.map((pick) => (
           <li key={pick.rikishiId}>
             <div className="stable-rikishi">
               <span className="rank-pill">{pick.rank ?? "Unranked"}</span>
-              <span>
-                <strong>{pick.shikona}</strong>
-                {pick.heya !== undefined && <small>{pick.heya}</small>}
-                <RikishiTournamentBadges
-                  notes={pick.tournamentNotes}
-                  shikona={pick.shikona}
-                />
+              <span className={identity}>
+                {preferences.photos && <RikishiPhoto photo={pick.photo} />}
+                <span>
+                  <strong>{pick.shikona}</strong>
+                  {pick.heya !== undefined && <small>{pick.heya}</small>}
+                  <RikishiTournamentBadges
+                    notes={pick.tournamentNotes}
+                    shikona={pick.shikona}
+                  />
+                </span>
               </span>
             </div>
             <div className="stable-rikishi-score">
@@ -152,6 +164,9 @@ export function MyStablePanel({
           </li>
         ))}
       </ul>
+      {preferences.photos && (
+        <PhotoCredits photos={displayedPicks.map((pick) => pick.photo)} />
+      )}
     </section>
   );
 }

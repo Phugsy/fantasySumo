@@ -32,10 +32,10 @@
 .progress-wrap {
   min-width: 190px;
   padding: 11px 14px;
-  border: 1px solid #ceddd6;
+  border: 1px solid var(--positive-border);
   border-radius: 9px;
   background: var(--moss-light);
-  color: #263f38;
+  color: var(--positive-text);
 }
 
 .progress-wrap span,
