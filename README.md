@@ -278,6 +278,18 @@ Import current banzuke data from the Japan Sumo Association source:
 make import-banzuke
 ```
 
+If the JSA banzuke source is unavailable, explicitly select the Sumo API backup
+and the intended tournament. Inspect a dry run first, then omit `--dry-run`
+to apply through the same transactional importer:
+
+```bash
+make import-banzuke ARGS="-- --source sumo-api --basho 2026-11 --dry-run"
+```
+
+The backup supports Makuuchi only. Browser admin imports retain the JSA source;
+there is no silent source switch. See `docs/DATA_IMPORT_STRATEGY.md` for source
+validation, lifecycle preservation, and the deferred results fallback.
+
 Import daily Makuuchi results from Sumo API:
 
 ```bash

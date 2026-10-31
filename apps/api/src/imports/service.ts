@@ -84,9 +84,16 @@ export async function importBanzuke(
     command.basho,
   );
   summary.basho = summarizeOne(existingBasho, nextBasho, isEqualBasho);
+  const existingRikishi = await repositories.listRikishi();
+  const existingRikishiById = new Map(
+    existingRikishi.map((entry) => [entry.id, entry]),
+  );
   summary.rikishi = summarizeMany(
-    await repositories.listRikishi(),
-    command.rikishi,
+    existingRikishi,
+    command.rikishi.map((entry) => {
+      const heya = entry.heya ?? existingRikishiById.get(entry.id)?.heya;
+      return heya === undefined ? entry : { ...entry, heya };
+    }),
     isEqualRikishi,
   );
   summary.banzuke = summarizeMany(
