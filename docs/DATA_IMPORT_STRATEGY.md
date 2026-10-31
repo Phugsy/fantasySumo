@@ -180,10 +180,11 @@ No source result totals are imported as bout results or used to infer scores.
 
 Rank order is derived from the validated Makuuchi rank bands, rank number and
 east-before-west ordering, rather than array order or lexical rank labels.
-Provider numeric IDs remain in their own namespace; persisted IDs continue to
-use the existing shikona normalization pending #102. A name/alias mismatch must
-be investigated rather than guessed. The backup has the same known rename
-limitation as the current primary adapter; it does not solve canonical identity.
+The backup retains provider IDs as `sumo-api` source identities and resolves them
+through the same canonical identity planner as schedules and results. A shikona
+change cannot create a second rikishi or disconnect existing picks. Unknown
+legacy mappings still require unique same-basho evidence or operator attachment;
+the backup does not restore global name-based matching.
 
 The provider does not supply heya on these banzuke rows. Sparse updates preserve
 known global and per-basho heya metadata atomically in SQLite and Postgres, and

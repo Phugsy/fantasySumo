@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { toCompactBashoId, toLocalRikishiId } from "./ids.js";
+import { toCompactBashoId } from "./ids.js";
 import type { BanzukeImportCommand, SourceFetch } from "./types.js";
 
 const bashoIdSchema = z.string().regex(/^\d{4}-(01|03|05|07|09|11)$/);
@@ -68,7 +68,7 @@ export function mapSumoApiBanzukePayload(
   }
 
   const sourceIds = new Set<number>();
-  const localIds = new Set<string>();
+  const names = new Set<string>();
   const positions = new Set<string>();
   const rows = (["East", "West"] as const)
     .flatMap((side) =>
@@ -85,12 +85,12 @@ export function mapSumoApiBanzukePayload(
             "Sumo API banzuke row has inconsistent rank or side.",
           );
         }
-        const id = toLocalRikishiId(row.shikonaEn);
+        const id = `sumo-api:${row.rikishiID}`;
+        const name = row.shikonaEn.normalize("NFKC").trim().toLowerCase();
         const position = `${row.rankValue}-${side}`;
         if (
-          !id ||
           sourceIds.has(row.rikishiID) ||
-          localIds.has(id) ||
+          names.has(name) ||
           positions.has(position)
         ) {
           throw new Error(
@@ -98,7 +98,7 @@ export function mapSumoApiBanzukePayload(
           );
         }
         sourceIds.add(row.rikishiID);
-        localIds.add(id);
+        names.add(name);
         positions.add(position);
         return { ...row, id };
       }),
@@ -128,7 +128,14 @@ export function mapSumoApiBanzukePayload(
       status: now.getTime() < lockAt ? "upcoming" : "locked",
       currentDay: 0,
     },
-    rikishi: rows.map((row) => ({ id: row.id, shikona: row.shikonaEn })),
+    rikishi: rows.map((row) => ({
+      id: row.id,
+      shikona: row.shikonaEn,
+      sourceIdentity: {
+        source: "sumo-api",
+        sourceRikishiId: String(row.rikishiID),
+      },
+    })),
     banzukeEntries: rows.map((row, index) => ({
       id: `${bashoId}-${row.id}`,
       bashoId,

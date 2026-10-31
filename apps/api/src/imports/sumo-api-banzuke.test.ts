@@ -78,12 +78,16 @@ describe("Sumo API banzuke backup", () => {
         rankOrder,
       ]),
     ).toEqual([
-      ["onosato", 1],
-      ["hoshoryu", 2],
-      ["kotozakura", 3],
-      ["east-maegashira", 4],
+      ["sumo-api:2", 1],
+      ["sumo-api:1", 2],
+      ["sumo-api:4", 3],
+      ["sumo-api:3", 4],
     ]);
-    expect(command.rikishi[0]).toEqual({ id: "onosato", shikona: "Onosato" });
+    expect(command.rikishi[0]).toEqual({
+      id: "sumo-api:2",
+      shikona: "Onosato",
+      sourceIdentity: { source: "sumo-api", sourceRikishiId: "2" },
+    });
     expect(command).not.toHaveProperty("results");
   });
 
@@ -134,6 +138,7 @@ describe("Sumo API banzuke backup", () => {
     for (const row of [
       { ...snapshot.east[1], rikishiID: 2 },
       { ...snapshot.east[1], shikonaEn: "Onosato" },
+      { ...snapshot.east[1], shikonaEn: "Ｏｎｏｓａｔｏ" },
       { ...snapshot.east[1], rank: "Yokozuna 1 East", rankValue: 101 },
     ])
       expect(() =>
@@ -207,8 +212,9 @@ describe("Sumo API banzuke backup", () => {
         currentDay: 5,
       });
       expect(
-        (await repositories.listRikishi()).find((row) => row.id === "onosato")
-          ?.heya,
+        (await repositories.listRikishi()).find(
+          (row) => row.shikona === "Onosato",
+        )?.heya,
       ).toBe("Known Heya");
       expect(
         (await repositories.listBanzukeEntriesForBasho(options.bashoId))[0]
@@ -228,6 +234,48 @@ describe("Sumo API banzuke backup", () => {
     } finally {
       await client.close();
       rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the canonical identity and alias when a fallback source shikona changes", async () => {
+    const client = createDatabaseClient(":memory:");
+    try {
+      await runMigrations(client);
+      const repositories = createRepositories(client);
+      await importBanzuke(repositories, map());
+      const original = (await repositories.listRikishi()).find(
+        (row) => row.shikona === "Onosato",
+      )!;
+      expect(original.id).toMatch(/^rk_/);
+      const renamed = {
+        ...snapshot,
+        east: [
+          { ...snapshot.east[0], shikonaEn: "Renamed Onosato" },
+          snapshot.east[1],
+        ],
+      };
+      await importBanzuke(repositories, map(basho, renamed));
+      await importBanzuke(repositories, map(basho, renamed));
+      expect(await repositories.listRikishi()).toHaveLength(4);
+      expect(
+        (await repositories.listRikishi()).find(
+          (row) => row.id === original.id,
+        ),
+      ).toMatchObject({
+        id: original.id,
+        shikona: "Renamed Onosato",
+      });
+      expect(await repositories.listRikishiSourceIdentities()).toHaveLength(4);
+      expect(await repositories.listRikishiSourceIdentities()).toContainEqual({
+        source: "sumo-api",
+        sourceRikishiId: "2",
+        rikishiId: original.id,
+      });
+      expect(
+        (await repositories.listBanzukeEntriesForBasho(options.bashoId))[0],
+      ).toMatchObject({ rikishiId: original.id, shikona: "Renamed Onosato" });
+    } finally {
+      await client.close();
     }
   });
 });
