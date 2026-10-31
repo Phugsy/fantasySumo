@@ -403,6 +403,7 @@ schema in a later release.
 1. Provide a safe shared demo/playtest environment without using production data (#91).
 2. Secondary scoring is implemented with separate categories and final prizes
    (#92; see `docs/SCORING.md`).
-3. Select a joker, substitute, or withdrawal-handling mechanic (#93).
+3. Implement and trial the agreed three-joker mechanic (#114; decision #93,
+   `docs/JOKER_TRIAL.md`), with notifications investigated separately (#115).
 4. Fix the reported responsive header and initial focus regressions (#94).
 5. Add display preferences after the game-rule decisions above (#73).

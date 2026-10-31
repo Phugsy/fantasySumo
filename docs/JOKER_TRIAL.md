@@ -1,6 +1,7 @@
 # Daily joker trial
 
 Product decision for #93, agreed with the owner on 31 October 2026.
+Implementation is tracked in #114; notification feasibility is #115.
 This is the contract for a future opt-in trial; jokers are not implemented or
 enabled by this documentation change. See [Scoring rules](SCORING.md) for the
 currently implemented modes.
