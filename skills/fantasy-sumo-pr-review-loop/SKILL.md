@@ -12,7 +12,7 @@ Keep review fixes focused, independently checked, and traceable to their GitHub 
 - **Pre-handoff review:** review the complete branch diff against its base before calling a change ready.
 - **PR feedback:** inspect unresolved review threads and address safe, actionable findings.
 
-Do not create or start recurring scheduled, heartbeat, or babysitting automations from this skill. PR feedback mode is a single manual pass and requires an explicit user request.
+Do not create or start recurring scheduled, heartbeat, or babysitting automations from this skill. PR feedback mode is a single manual pass by default. The owner-authorized supervised pilot in `../fantasy-sumo-pilot/SKILL.md` may invoke it repeatedly within its active session, classifications, and two-cycle cap; the pilot owns its single schedule.
 
 ## Pre-handoff Review
 
@@ -47,7 +47,7 @@ Do not create or start recurring scheduled, heartbeat, or babysitting automation
 
 ## Publishing an Authorized Fix
 
-Only publish when the user explicitly authorizes GitHub writes.
+Only publish when the user explicitly authorizes GitHub writes. An active, owner-authorized supervised pilot grants that authority only for eligible work under its policy.
 
 1. Confirm the branch and cleanly separate unrelated local changes.
 2. Verify Git identity is `Phugsy <263059804+Phugsy@users.noreply.github.com>` and `/opt/homebrew/bin/gh api user --jq .login` returns `Phugsy`; stop if either identity mismatches or the authenticated GitHub actor cannot be verified.
@@ -56,4 +56,4 @@ Only publish when the user explicitly authorizes GitHub writes.
 5. Resolve only threads fully addressed by that commit.
 6. Re-read thread-aware review state and current checks. Report any new or unresolved feedback.
 
-Never merge, close the PR, delete branches, force-push, or broaden the PR. Leave those actions to the user.
+This review skill never merges, closes PRs, deletes branches, force-pushes, or broadens PRs. The supervised pilot may separately merge a validated autonomous PR under its own gates; all other cases remain with the user.
