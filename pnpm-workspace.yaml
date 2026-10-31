@@ -1,6 +1,8 @@
 packages:
   - "apps/*"
   - "packages/*"
+overrides:
+  "vitest>vite": "7.3.3"
 allowBuilds:
   better-sqlite3: true
   core-js: false

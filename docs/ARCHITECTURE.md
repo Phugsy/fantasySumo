@@ -22,6 +22,8 @@ packages/
 The active app is split into:
 
 - a React client built by Vite;
+- vanilla-extract static CSS extraction with a shared token contract, scoped
+  component styles, and preserved colocated legacy CSS (`docs/STYLING.md`);
 - a Fastify API compiled by TypeScript;
 - a shared framework-free domain package with MVP types, pick validation,
   scoring, leaderboard calculation, and informational rikishi tournament-note

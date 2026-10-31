@@ -35,6 +35,9 @@ Avoid overbuilding. A working single-user/local MVP is preferable to a half-fini
 - Prefer small, reviewable pull requests.
 - Preserve user-facing behaviour unless explicitly changing it.
 - Add or update docs when changing architecture, setup, data model, or scoring rules.
+- Follow `docs/STYLING.md` for browser styling: prefer colocated vanilla-extract
+  `.css.ts` modules and shared tokens; preserve existing CSS until a relevant
+  change warrants conversion, and keep document globals small.
 - Do not introduce paid services, hosted infrastructure, or external APIs without documenting the trade-off.
 - Do not commit secrets or local credentials.
 - Replace hard-coded credentials before any real deployment work.
