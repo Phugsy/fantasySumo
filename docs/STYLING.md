@@ -49,7 +49,10 @@ preserving the existing cascade. Page-header classes are already scoped.
 
 Keep the current visual design, interactions, and semantic markup when converting
 styles. Do not introduce themes, new palettes, layout redesigns, or abstraction
-packages as incidental cleanup.
+packages as incidental cleanup. The explicitly requested display preferences in
+issue #73 add system/light/dark themes through shared semantic tokens; see
+`DISPLAY_PREFERENCES.md`. Use foreground/background token pairs so all themes
+retain readable controls, messages, charts, and focus states.
 
 ## Validation
 

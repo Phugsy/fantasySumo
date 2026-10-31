@@ -10,7 +10,7 @@
   border: 1px solid var(--clay-light);
   border-left: 4px solid var(--vermilion);
   border-radius: 9px;
-  background: #ffffff;
+  background: var(--surface);
   color: var(--ink);
 }
 
@@ -38,7 +38,7 @@
   overflow: hidden;
   border: 1px solid var(--clay-light);
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .leaderboard-entry.current-team {
@@ -62,7 +62,7 @@
 
 .leaderboard-summary:hover,
 .leaderboard-summary[aria-expanded="true"] {
-  background: #fffaf5;
+  background: var(--hover);
   box-shadow: inset 4px 0 0 var(--vermilion);
 }
 
@@ -72,7 +72,7 @@
 }
 
 .leaderboard-rank {
-  color: var(--vermilion-dark);
+  color: var(--accent-text);
   font-size: 1.15rem;
   font-weight: 900;
 }
@@ -138,7 +138,7 @@
 }
 
 .leaderboard-score strong {
-  color: var(--indigo);
+  color: var(--heading);
   font-size: 1.05rem;
   font-weight: 900;
 }
@@ -187,7 +187,7 @@
 
 .rikishi-score-summary:hover,
 .rikishi-score-summary[aria-expanded="true"] {
-  background: rgb(53 91 80 / 8%);
+  background: var(--moss-light);
 }
 
 .rikishi-score-summary:focus-visible {
@@ -244,19 +244,19 @@
 }
 
 .result-no-result {
-  background: #d8dee1;
-  color: #34434a;
+  background: var(--disabled-surface);
+  color: var(--secondary-text);
 }
 
 .rikishi-result-history {
   padding: 10px 12px 12px;
   border-top: 1px solid rgb(53 91 80 / 14%);
-  background: #f3f7f5;
+  background: var(--paper-warm);
 }
 
 .rikishi-result-history h4 {
   margin: 0 0 8px;
-  color: var(--indigo);
+  color: var(--heading);
   font-size: 0.86rem;
 }
 

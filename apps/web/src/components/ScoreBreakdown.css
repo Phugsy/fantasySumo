@@ -18,14 +18,14 @@
   padding: 0.45rem 0.6rem;
   text-align: center;
   white-space: nowrap;
-  border-bottom: 1px solid var(--border-color, #d9d1c4);
+  border-bottom: 1px solid var(--clay-light);
 }
 .score-categories th {
   font-size: 0.75rem;
 }
 .score-categories .excluded-bonus {
   text-decoration: line-through;
-  color: var(--text-muted, #68615a);
+  color: var(--muted);
 }
 .scoring-view {
   display: grid;

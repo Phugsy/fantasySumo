@@ -12,6 +12,8 @@
 
 .app-header-inner {
   display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   align-items: center;
   justify-content: space-between;
   width: min(1180px, 100%);
@@ -64,6 +66,7 @@
 
 .app-header-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
   justify-content: flex-end;

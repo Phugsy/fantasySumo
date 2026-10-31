@@ -18,8 +18,18 @@ export interface RankedRikishi {
   heya?: string;
   rank: string;
   rankOrder: number;
+  score?: number;
+  photo?: RikishiPhoto;
   previousBashoRecord?: PreviousBashoRecordState;
   tournamentNotes?: RikishiTournamentNotes;
+}
+
+export interface RikishiPhoto {
+  url: string;
+  sourceUrl: string;
+  author: string;
+  license: string;
+  licenseUrl?: string;
 }
 
 export interface PreviousBashoRecord {
@@ -92,6 +102,7 @@ export interface MyTeamResponse {
       rankOrder?: number;
       wins: number;
       score: number;
+      photo?: RikishiPhoto;
       breakdown?: ScoreBreakdown;
       tournamentNotes?: RikishiTournamentNotes;
     }

@@ -1,9 +1,10 @@
 import { globalStyle } from "@vanilla-extract/css";
-import "./theme.css";
+import { vars } from "./theme.css";
 
 globalStyle(":root", {
-  color: "#20282d",
-  background: "#f3eee4",
+  color: vars.ink,
+  background: vars.canvas,
+  colorScheme: "light",
   fontFamily:
     'Inter,\n    ui-sans-serif,\n    system-ui,\n    -apple-system,\n    BlinkMacSystemFont,\n    "Segoe UI",\n    sans-serif',
   fontSynthesis: "none",
@@ -16,8 +17,11 @@ globalStyle("*", {
 });
 
 globalStyle("html", {
-  background: "#f3eee4",
+  background: vars.canvas,
 });
+
+globalStyle(':root[data-theme="dark"]', { colorScheme: "dark" });
+globalStyle(':root[data-theme="dark"] body', { background: vars.canvas });
 
 globalStyle("body", {
   margin: "0",
@@ -53,7 +57,7 @@ globalStyle("h1", {
 
 globalStyle("h2", {
   marginBottom: "0",
-  color: "var(--indigo)",
+  color: vars.heading,
   fontSize: "1.25rem",
   letterSpacing: "-0.01em",
   lineHeight: "1.2",

@@ -9,24 +9,24 @@
   display: inline-block;
   max-width: 100%;
   padding: 5px 8px;
-  border: 1px solid #c8dad2;
+  border: 1px solid var(--positive-border);
   border-radius: 7px;
-  background: #ffffff;
-  color: #263f38;
+  background: var(--surface);
+  color: var(--positive-text);
   line-height: 1.2;
 }
 
 .rikishi-note-badge.note-withdrawn,
 .rikishi-note-badge.note-make-koshi {
-  border-color: #d9b7ae;
-  background: #fff3f0;
-  color: #6f2c24;
+  border-color: var(--negative-border);
+  background: var(--negative-surface);
+  color: var(--negative-text);
 }
 
 .rikishi-note-badge.note-gold-star {
-  border-color: #dfc26e;
-  background: #fff8df;
-  color: #57430b;
+  border-color: var(--warning-border);
+  background: var(--warning-surface);
+  color: var(--warning-text);
 }
 
 .rikishi-note-badge strong {

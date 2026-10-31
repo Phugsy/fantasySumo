@@ -3,6 +3,10 @@ import { scoringModeLabel } from "../scoring-view";
 import type { FormEvent } from "react";
 import type { CreatedTeamResponse, RankedRikishi } from "../types";
 import "./TeamSelection.css";
+import { useDisplayPreferences } from "../DisplayPreferences";
+import { sortRikishi } from "../display-preferences";
+import { PhotoCredits, RikishiPhoto } from "./RikishiPhoto";
+import { identity } from "./RikishiPhoto.css";
 
 interface TeamSelectionProps {
   canSubmit: boolean;
@@ -44,6 +48,8 @@ export function TeamSelection({
   scoringMode = "wins-v0",
 }: TeamSelectionProps) {
   const picksRemaining = Math.max(teamSize - selectedIds.length, 0);
+  const { preferences } = useDisplayPreferences();
+  const displayedRikishi = sortRikishi(rikishi, preferences.order);
 
   return (
     <form className="selection-layout" onSubmit={onSubmit}>
@@ -64,7 +70,7 @@ export function TeamSelection({
           </p>
         )}
         <div className="rikishi-list">
-          {rikishi.map((entry) => {
+          {displayedRikishi.map((entry) => {
             const isSelected = selectedIds.includes(entry.id);
             const isDisabled =
               isLocked || (!isSelected && selectedIds.length >= teamSize);
@@ -79,10 +85,13 @@ export function TeamSelection({
                 aria-pressed={isSelected}
               >
                 <span className="rank-pill">{entry.rank}</span>
-                <span>
-                  <strong>{entry.shikona}</strong>
-                  {entry.heya !== undefined && <small>{entry.heya}</small>}
-                  <PreviousBashoRecord entry={entry} />
+                <span className={identity}>
+                  {preferences.photos && <RikishiPhoto photo={entry.photo} />}
+                  <span>
+                    <strong>{entry.shikona}</strong>
+                    {entry.heya !== undefined && <small>{entry.heya}</small>}
+                    <PreviousBashoRecord entry={entry} />
+                  </span>
                 </span>
                 <span
                   className={isSelected ? "pick-mark selected" : "pick-mark"}
@@ -93,6 +102,9 @@ export function TeamSelection({
             );
           })}
         </div>
+        {preferences.photos && (
+          <PhotoCredits photos={displayedRikishi.map((entry) => entry.photo)} />
+        )}
       </section>
 
       <aside className="summary-panel" aria-labelledby="summary-title">

@@ -163,6 +163,7 @@ describe("basho routes", () => {
       shikona: "Onosato",
       rank: "Ozeki",
       rankOrder: 1,
+      score: 0,
       previousBashoRecord: {
         status: "available",
         bashoId: "2026-03",
@@ -483,6 +484,7 @@ describe("basho routes", () => {
         .json()
         .rikishi.find((entry: { id: string }) => entry.id === "onosato"),
     ).toMatchObject({
+      score: 8,
       tournamentNotes: {
         statuses: [],
         achievements: [{ type: "kachi-koshi", day: 8, provenance: "derived" }],

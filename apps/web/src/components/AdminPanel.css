@@ -137,7 +137,7 @@
   padding: 8px 10px;
   border: 1px solid var(--clay-light);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface);
   color: var(--indigo-deep);
   font: inherit;
 }
@@ -156,14 +156,14 @@
 .admin-config-card > button:disabled,
 .admin-config-panel > button:disabled,
 .admin-number-control button:disabled {
-  background: #9aa1a4;
+  background: var(--disabled-surface);
 }
 
 .admin-config-source {
   justify-self: start;
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgb(24 55 78 / 10%);
+  background: var(--paper-warm);
   color: var(--indigo-deep) !important;
   font-size: 0.78rem;
   font-weight: 800;
@@ -239,7 +239,7 @@
 }
 
 .admin-import-warning {
-  color: var(--vermilion-dark) !important;
+  color: var(--accent-text) !important;
   font-weight: 700;
 }
 
@@ -250,7 +250,7 @@
   padding: 20px;
   border: 1px solid var(--clay-light);
   border-radius: var(--radius);
-  background: rgb(255 253 248 / 94%);
+  background: var(--panel);
   box-shadow: var(--shadow);
 }
 
@@ -283,7 +283,7 @@
 }
 
 .admin-action-card button:disabled {
-  background: #9aa1a4;
+  background: var(--disabled-surface);
 }
 
 @media (max-width: 760px) {

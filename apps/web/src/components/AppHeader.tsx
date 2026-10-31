@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { appPaths } from "../routing";
 import type { SessionUser } from "../types";
 import { ViewSwitch } from "./ViewSwitch";
+import { DisplaySettings } from "./DisplaySettings";
 import "./AppHeader.css";
 
 interface AppHeaderProps {
@@ -40,6 +41,7 @@ export function AppHeader({
             showTeam={showTeam}
             user={user}
           />
+          <DisplaySettings />
           {user !== null && (
             <div className="session-actions">
               <span>{user.displayName ?? user.email ?? "Signed in"}</span>
