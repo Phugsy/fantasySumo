@@ -10,7 +10,8 @@
     "import:results": "pnpm --filter @fantasy-sumo/db build && tsx src/scripts/import-results.ts",
     "import:schedule": "pnpm --filter @fantasy-sumo/db build && tsx src/scripts/import-schedule.ts",
     "start": "node dist/server.js",
-    "test": "pnpm --filter @fantasy-sumo/db build && vitest run src"
+    "test": "pnpm --filter @fantasy-sumo/db build && vitest run src",
+    "attach:rikishi-identity": "pnpm --filter @fantasy-sumo/db build && tsx src/scripts/attach-rikishi-identity.ts"
   },
   "dependencies": {
     "@fantasy-sumo/db": "workspace:*",
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@types/node": "^24.10.1",
     "tsx": "^4.20.6",
+    "undici-types": "7.16.0",
     "vitest": "^4.0.13"
   }
 }

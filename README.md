@@ -312,6 +312,12 @@ make import-results ARGS="-- --basho 2026-05 --day 1 --dry-run"
 make import-schedule ARGS="-- --basho 2026-05 --day 2 --dry-run"
 ```
 
+Source-backed imports resolve provider IDs through persisted canonical rikishi
+aliases, so shikona changes preserve picks and history. Existing local IDs stay
+unchanged; ambiguous legacy matches fail closed. See
+[identity adoption](docs/DATA_IMPORT_STRATEGY.md#canonical-identity-and-legacy-adoption)
+for operator attachment and rollout steps.
+
 Banzuke reimports replace the stored banzuke entries for that basho without deleting rikishi, teams, or picks. Each entry snapshots the imported shikona and heya so later rikishi metadata changes do not rewrite historical displays. Result reimports replace only the imported basho/day, so rerunning day 1 cannot delete day 2 results. Schedule imports use separate publication and scheduled-bout tables; reimporting a day atomically replaces that card and never changes fantasy scores. An empty Sumo API response is treated as unpublished or unavailable and preserves any stored card; only a trusted internal import command can explicitly replace a day with an empty published card.
 
 The picks editor derives a historical record only from the nearest earlier

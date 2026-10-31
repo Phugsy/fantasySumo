@@ -386,7 +386,7 @@ describe("admin import routes", () => {
     expect(picks.json().rikishi).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: "onosato",
+          shikona: "Onosato",
           previousBashoRecord: expect.objectContaining({
             status: "available",
             wins: 15,
@@ -395,7 +395,7 @@ describe("admin import routes", () => {
           }),
         }),
         expect.objectContaining({
-          id: "kotozakura",
+          shikona: "Kotozakura",
           previousBashoRecord: expect.objectContaining({
             status: "available",
             wins: 0,
@@ -472,8 +472,12 @@ describe("admin import routes", () => {
           id: "existing-day-15-bout",
           bashoId: "2026-05",
           day: 15,
-          eastRikishiId: "onosato",
-          westRikishiId: "kotozakura",
+          eastRikishiId: (await repositories.listRikishi()).find(
+            (entry) => entry.shikona === "Onosato",
+          )!.id,
+          westRikishiId: (await repositories.listRikishi()).find(
+            (entry) => entry.shikona === "Kotozakura",
+          )!.id,
           status: "cancelled",
         },
       ],

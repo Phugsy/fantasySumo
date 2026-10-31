@@ -60,6 +60,11 @@ beforeEach(async () => {
       },
     ],
   });
+  await repositories.attachRikishiSourceIdentity({
+    source: "sumo-api",
+    sourceRikishiId: "1",
+    rikishiId: "m",
+  });
   unavailable = false;
   payload = {
     date: "202607",

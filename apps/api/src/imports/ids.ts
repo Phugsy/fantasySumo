@@ -11,11 +11,3 @@ export function toLocalBashoId(sourceBashoId: string): string {
 export function toCompactBashoId(localBashoId: string): string {
   return localBashoId.replace("-", "");
 }
-
-export function toLocalRikishiId(shikona: string): string {
-  return shikona
-    .normalize("NFKD")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}

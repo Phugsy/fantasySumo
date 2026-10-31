@@ -1,4 +1,8 @@
 import {
+  getIdentityRosterKey,
+  type IdentityRosterExpectation,
+} from "./identity-roster.js";
+import {
   createScoringRepositories,
   type ScoringRepositories,
 } from "./scoring-repositories.js";
@@ -29,13 +33,24 @@ import { DEMO_BASHO_ID, DEMO_PREVIOUS_BASHO_ID } from "./demo-constants.js";
 import * as pg from "./schema.pg.js";
 import * as sqlite from "./schema.js";
 
-export interface BanzukeImportData {
+export interface RikishiSourceIdentity {
+  source: "jsa" | "sumo-api";
+  sourceRikishiId: string;
+  rikishiId: string;
+}
+
+interface IdentityImportData {
+  identityRoster?: IdentityRosterExpectation;
+  sourceIdentities?: readonly RikishiSourceIdentity[];
+}
+
+export interface BanzukeImportData extends IdentityImportData {
   basho: Basho;
   rikishi: readonly Rikishi[];
   banzukeEntries: readonly BanzukeEntry[];
 }
 
-export interface BoutResultsImportData {
+export interface BoutResultsImportData extends IdentityImportData {
   basho?: Basho;
   bashoId: Basho["id"];
   day: BoutResult["day"];
@@ -43,7 +58,7 @@ export interface BoutResultsImportData {
   results: readonly BoutResult[];
 }
 
-export interface ScheduledBoutsImportData {
+export interface ScheduledBoutsImportData extends IdentityImportData {
   publication: ScheduledBoutPublication;
   rikishi?: readonly Rikishi[];
   bouts: readonly ScheduledBout[];
@@ -133,6 +148,9 @@ export interface Repositories extends ScoringRepositories {
     changedAt: string,
   ) => Promise<BashoLifecycleUpdateResult | undefined>;
 
+  listRikishiSourceIdentities: () => Promise<RikishiSourceIdentity[]>;
+  attachRikishiSourceIdentity: (entry: RikishiSourceIdentity) => Promise<void>;
+
   insertRikishi: (entry: Rikishi) => Promise<void>;
   upsertRikishi: (entry: Rikishi) => Promise<void>;
   listRikishi: () => Promise<Rikishi[]>;
@@ -218,6 +236,7 @@ function createSqliteRepositories(
       db.delete(sqlite.scheduledBoutPublications).run();
       db.delete(sqlite.boutResults).run();
       db.delete(sqlite.banzukeEntries).run();
+      db.delete(sqlite.rikishiSourceIdentities).run();
       db.delete(sqlite.rikishi).run();
       db.delete(sqlite.basho).run();
     },
@@ -482,6 +501,13 @@ function createSqliteRepositories(
         };
       }),
 
+    listRikishiSourceIdentities: async () =>
+      db.select().from(sqlite.rikishiSourceIdentities).all(),
+    attachRikishiSourceIdentity: async (entry) => {
+      db.transaction((transaction) =>
+        attachSqliteIdentities(transaction, [entry]),
+      );
+    },
     insertRikishi: async (entry) => {
       db.insert(sqlite.rikishi).values(toRikishiRow(entry)).run();
     },
@@ -790,6 +816,7 @@ function createSqliteRepositories(
           .from(sqlite.basho)
           .where(eq(sqlite.basho.id, importData.basho.id))
           .get();
+        assertSqliteIdentityRoster(transaction, importData.identityRoster);
         const nextBasho = preserveBashoLifecycleProgress(
           existingBasho === undefined ? undefined : toBasho(existingBasho),
           importData.basho,
@@ -804,6 +831,26 @@ function createSqliteRepositories(
           })
           .run();
 
+        // Preserve the legacy display fallback before updating shared metadata.
+        for (const alias of importData.sourceIdentities ?? []) {
+          const old = transaction
+            .select()
+            .from(sqlite.rikishi)
+            .where(eq(sqlite.rikishi.id, alias.rikishiId))
+            .get();
+          if (old !== undefined)
+            transaction
+              .update(sqlite.banzukeEntries)
+              .set({ shikona: old.shikona })
+              .where(
+                and(
+                  eq(sqlite.banzukeEntries.rikishiId, alias.rikishiId),
+                  isNull(sqlite.banzukeEntries.shikona),
+                ),
+              )
+              .run();
+        }
+
         for (const entry of importData.rikishi) {
           transaction
             .insert(sqlite.rikishi)
@@ -815,6 +862,8 @@ function createSqliteRepositories(
             })
             .run();
         }
+
+        attachSqliteIdentities(transaction, importData.sourceIdentities ?? []);
 
         for (const entry of importData.banzukeEntries) {
           transaction
@@ -866,6 +915,7 @@ function createSqliteRepositories(
             .run();
         }
 
+        assertSqliteIdentityRoster(transaction, importData.identityRoster);
         for (const entry of importData.rikishi ?? []) {
           transaction
             .insert(sqlite.rikishi)
@@ -873,6 +923,8 @@ function createSqliteRepositories(
             .onConflictDoNothing({ target: sqlite.rikishi.id })
             .run();
         }
+
+        attachSqliteIdentities(transaction, importData.sourceIdentities ?? []);
 
         for (const entry of importData.results) {
           transaction
@@ -904,6 +956,7 @@ function createSqliteRepositories(
     },
     applyScheduledBoutsImport: async (importData) => {
       return db.transaction((transaction) => {
+        assertSqliteIdentityRoster(transaction, importData.identityRoster);
         const existingPublication = transaction
           .select({ source: sqlite.scheduledBoutPublications.source })
           .from(sqlite.scheduledBoutPublications)
@@ -960,6 +1013,8 @@ function createSqliteRepositories(
             .run();
         }
 
+        attachSqliteIdentities(transaction, importData.sourceIdentities ?? []);
+
         transaction
           .insert(sqlite.scheduledBoutPublications)
           .values(importData.publication)
@@ -1015,6 +1070,8 @@ function createSqliteRepositories(
       return db.transaction((transaction) => {
         const schedule = importData.scheduledBouts;
         const results = importData.boutResults;
+        assertSqliteIdentityRoster(transaction, schedule.identityRoster);
+        assertSqliteIdentityRoster(transaction, results.identityRoster);
         assertExpectedBanzukeRoster(
           importData.expectedBanzukeRikishiIds,
           transaction
@@ -1078,6 +1135,11 @@ function createSqliteRepositories(
             .onConflictDoNothing({ target: sqlite.rikishi.id })
             .run();
         }
+
+        attachSqliteIdentities(transaction, [
+          ...(schedule.sourceIdentities ?? []),
+          ...(results.sourceIdentities ?? []),
+        ]);
 
         if (!preserveExistingFullerSchedule) {
           transaction
@@ -1198,6 +1260,7 @@ function createPostgresRepositories(
       await db.delete(pg.scheduledBoutPublications);
       await db.delete(pg.boutResults);
       await db.delete(pg.banzukeEntries);
+      await db.delete(pg.rikishiSourceIdentities);
       await db.delete(pg.rikishi);
       await db.delete(pg.basho);
     },
@@ -1455,6 +1518,13 @@ function createPostgresRepositories(
         };
       }),
 
+    listRikishiSourceIdentities: async () =>
+      db.select().from(pg.rikishiSourceIdentities),
+    attachRikishiSourceIdentity: async (entry) => {
+      await db.transaction(async (transaction) =>
+        attachPostgresIdentities(transaction, [entry]),
+      );
+    },
     insertRikishi: async (entry) => {
       await db.insert(pg.rikishi).values(toRikishiRow(entry));
     },
@@ -1755,6 +1825,10 @@ function createPostgresRepositories(
             .where(eq(pg.basho.id, importData.basho.id))
             .for("update")
         ).at(0);
+        await assertPostgresIdentityRoster(
+          transaction,
+          importData.identityRoster,
+        );
         const nextBasho = preserveBashoLifecycleProgress(
           existingBasho === undefined ? undefined : toBasho(existingBasho),
           importData.basho,
@@ -1768,6 +1842,27 @@ function createPostgresRepositories(
             set: toBashoRow(nextBasho),
           });
 
+        // Preserve the legacy display fallback before updating shared metadata.
+        for (const alias of importData.sourceIdentities ?? []) {
+          const old = (
+            await transaction
+              .select()
+              .from(pg.rikishi)
+              .where(eq(pg.rikishi.id, alias.rikishiId))
+              .for("update")
+          ).at(0);
+          if (old !== undefined)
+            await transaction
+              .update(pg.banzukeEntries)
+              .set({ shikona: old.shikona })
+              .where(
+                and(
+                  eq(pg.banzukeEntries.rikishiId, alias.rikishiId),
+                  isNull(pg.banzukeEntries.shikona),
+                ),
+              );
+        }
+
         for (const entry of importData.rikishi) {
           await transaction
             .insert(pg.rikishi)
@@ -1778,6 +1873,11 @@ function createPostgresRepositories(
               set: entry,
             });
         }
+
+        await attachPostgresIdentities(
+          transaction,
+          importData.sourceIdentities ?? [],
+        );
 
         for (const entry of importData.banzukeEntries) {
           await transaction
@@ -1826,12 +1926,21 @@ function createPostgresRepositories(
             });
         }
 
+        await assertPostgresIdentityRoster(
+          transaction,
+          importData.identityRoster,
+        );
         for (const entry of importData.rikishi ?? []) {
           await transaction
             .insert(pg.rikishi)
             .values(toRikishiRow(entry))
             .onConflictDoNothing({ target: pg.rikishi.id });
         }
+
+        await attachPostgresIdentities(
+          transaction,
+          importData.sourceIdentities ?? [],
+        );
 
         for (const entry of importData.results) {
           await transaction
@@ -1864,6 +1973,10 @@ function createPostgresRepositories(
           .from(pg.basho)
           .where(eq(pg.basho.id, importData.publication.bashoId))
           .for("update");
+        await assertPostgresIdentityRoster(
+          transaction,
+          importData.identityRoster,
+        );
         const existingPublication = (
           await transaction
             .select({ source: pg.scheduledBoutPublications.source })
@@ -1920,6 +2033,11 @@ function createPostgresRepositories(
             .onConflictDoNothing({ target: pg.rikishi.id });
         }
 
+        await attachPostgresIdentities(
+          transaction,
+          importData.sourceIdentities ?? [],
+        );
+
         await transaction
           .insert(pg.scheduledBoutPublications)
           .values(importData.publication)
@@ -1972,6 +2090,11 @@ function createPostgresRepositories(
           .from(pg.basho)
           .where(eq(pg.basho.id, schedule.publication.bashoId))
           .for("update");
+        await assertPostgresIdentityRoster(
+          transaction,
+          schedule.identityRoster,
+        );
+        await assertPostgresIdentityRoster(transaction, results.identityRoster);
         assertExpectedBanzukeRoster(
           importData.expectedBanzukeRikishiIds,
           (
@@ -2032,6 +2155,11 @@ function createPostgresRepositories(
             .values(toRikishiRow(entry))
             .onConflictDoNothing({ target: pg.rikishi.id });
         }
+
+        await attachPostgresIdentities(transaction, [
+          ...(schedule.sourceIdentities ?? []),
+          ...(results.sourceIdentities ?? []),
+        ]);
 
         if (!preserveExistingFullerSchedule) {
           await transaction
@@ -2378,4 +2506,153 @@ function toScheduledBout(
       ? {}
       : { withdrawnRikishiId: row.withdrawnRikishiId }),
   };
+}
+
+type SqliteTransaction = Parameters<
+  Parameters<SqliteDatabase["transaction"]>[0]
+>[0];
+type PostgresTransaction = Parameters<
+  Parameters<PostgresDatabase["transaction"]>[0]
+>[0];
+
+function validateSourceIdentity(entry: RikishiSourceIdentity) {
+  if (
+    !["jsa", "sumo-api"].includes(entry.source) ||
+    !/^[1-9][0-9]*$/.test(entry.sourceRikishiId) ||
+    !entry.rikishiId
+  ) {
+    throw new Error(
+      "A valid provider, positive source ID and canonical rikishi ID are required.",
+    );
+  }
+}
+
+function attachSqliteIdentities(
+  transaction: SqliteTransaction,
+  entries: readonly RikishiSourceIdentity[],
+) {
+  for (const entry of entries) {
+    validateSourceIdentity(entry);
+    transaction
+      .insert(sqlite.rikishiSourceIdentities)
+      .values(entry)
+      .onConflictDoNothing({
+        target: [
+          sqlite.rikishiSourceIdentities.source,
+          sqlite.rikishiSourceIdentities.sourceRikishiId,
+        ],
+      })
+      .run();
+    const stored = transaction
+      .select()
+      .from(sqlite.rikishiSourceIdentities)
+      .where(
+        and(
+          eq(sqlite.rikishiSourceIdentities.source, entry.source),
+          eq(
+            sqlite.rikishiSourceIdentities.sourceRikishiId,
+            entry.sourceRikishiId,
+          ),
+        ),
+      )
+      .get();
+    if (stored?.rikishiId !== entry.rikishiId)
+      throw new Error(
+        "Source identity conflict; aliases cannot be reassigned. Retry or reconcile manually.",
+      );
+  }
+}
+
+async function attachPostgresIdentities(
+  transaction: PostgresTransaction,
+  entries: readonly RikishiSourceIdentity[],
+) {
+  for (const entry of entries) {
+    validateSourceIdentity(entry);
+    await transaction
+      .insert(pg.rikishiSourceIdentities)
+      .values(entry)
+      .onConflictDoNothing({
+        target: [
+          pg.rikishiSourceIdentities.source,
+          pg.rikishiSourceIdentities.sourceRikishiId,
+        ],
+      });
+    const stored = (
+      await transaction
+        .select()
+        .from(pg.rikishiSourceIdentities)
+        .where(
+          and(
+            eq(pg.rikishiSourceIdentities.source, entry.source),
+            eq(
+              pg.rikishiSourceIdentities.sourceRikishiId,
+              entry.sourceRikishiId,
+            ),
+          ),
+        )
+    ).at(0);
+    if (stored?.rikishiId !== entry.rikishiId)
+      throw new Error(
+        "Source identity conflict; aliases cannot be reassigned. Retry or reconcile manually.",
+      );
+  }
+}
+
+function assertSqliteIdentityRoster(
+  transaction: SqliteTransaction,
+  expected?: IdentityRosterExpectation,
+) {
+  if (expected === undefined) return;
+  const rows = transaction
+    .select({
+      rikishiId: sqlite.banzukeEntries.rikishiId,
+      snapshot: sqlite.banzukeEntries.shikona,
+      current: sqlite.rikishi.shikona,
+    })
+    .from(sqlite.banzukeEntries)
+    .innerJoin(
+      sqlite.rikishi,
+      eq(sqlite.rikishi.id, sqlite.banzukeEntries.rikishiId),
+    )
+    .where(eq(sqlite.banzukeEntries.bashoId, expected.bashoId))
+    .all();
+  assertIdentityRoster(expected, rows);
+}
+async function assertPostgresIdentityRoster(
+  transaction: PostgresTransaction,
+  expected?: IdentityRosterExpectation,
+) {
+  if (expected === undefined) return;
+  const rows = await transaction
+    .select({
+      rikishiId: pg.banzukeEntries.rikishiId,
+      snapshot: pg.banzukeEntries.shikona,
+      current: pg.rikishi.shikona,
+    })
+    .from(pg.banzukeEntries)
+    .innerJoin(pg.rikishi, eq(pg.rikishi.id, pg.banzukeEntries.rikishiId))
+    .where(eq(pg.banzukeEntries.bashoId, expected.bashoId));
+  assertIdentityRoster(expected, rows);
+}
+function assertIdentityRoster(
+  expected: IdentityRosterExpectation,
+  rows: readonly {
+    rikishiId: string;
+    snapshot: string | null;
+    current: string;
+  }[],
+) {
+  if (
+    getIdentityRosterKey(
+      rows.map((row) => ({
+        rikishiId: row.rikishiId,
+        shikona: row.snapshot ?? row.current,
+      })),
+    ) !== expected.key
+  ) {
+    throw new Error(
+      "Identity roster changed during import planning; retry with a fresh import.",
+    );
+  }
 }

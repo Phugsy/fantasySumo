@@ -30,16 +30,23 @@ export interface ImportValidationIssue {
   message: string;
 }
 
+export interface SourceRikishi extends Rikishi {
+  sourceIdentity?: {
+    source: "jsa" | "sumo-api";
+    sourceRikishiId: string;
+  };
+}
+
 export interface BanzukeImportCommand {
   basho: Basho;
-  rikishi: Rikishi[];
+  rikishi: SourceRikishi[];
   banzukeEntries: BanzukeEntry[];
   source: string;
 }
 
 export interface BoutResultsImportCommand {
   bashoId: Basho["id"];
-  rikishi?: Rikishi[];
+  rikishi?: SourceRikishi[];
   results: BoutResult[];
   source: string;
 }
@@ -48,7 +55,8 @@ export interface ScheduledBoutsImportCommand {
   bashoId: Basho["id"];
   day: number;
   isComplete?: boolean;
-  rikishi?: Rikishi[];
+  attestedRikishiIds?: string[];
+  rikishi?: SourceRikishi[];
   bouts: ScheduledBout[];
   source: string;
 }
