@@ -36,6 +36,7 @@ follow-up work.
 - TypeScript
 - Vite
 - React
+- vanilla-extract for typed, scoped styles and shared theme tokens
 - Fastify
 - SQLite for local development
 - Neon Postgres for production deployment
@@ -59,6 +60,7 @@ Start here:
 - `docs/DEPLOYMENT.md` - Vercel and managed database deployment notes.
 - `docs/PLAYTEST.md` - isolated shared-demo setup, round operation, and teardown.
 - `docs/E2E_TESTING.md` - intended Playwright E2E strategy for the MVP game loop.
+- `docs/STYLING.md` - vanilla-extract conventions, shared tokens, and incremental conversion of existing component CSS.
 - `docs/MODERNISATION_PLAN.md` - safe path for updating or rebuilding the app.
 - `docs/ROADMAP.md` - staged product/engineering roadmap.
 

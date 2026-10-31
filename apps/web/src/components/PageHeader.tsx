@@ -1,5 +1,5 @@
 import type { ActiveView } from "../types";
-import "./PageHeader.css";
+import * as styles from "./PageHeader.css";
 
 interface PageHeaderProps {
   activeView: ActiveView;
@@ -57,13 +57,13 @@ export function PageHeader({ activeView }: PageHeaderProps) {
   const copy = pageCopy[activeView];
 
   return (
-    <section className="page-header" aria-labelledby="page-title">
+    <section className={styles.root} aria-labelledby="page-title">
       <p className="eyebrow">{copy.eyebrow}</p>
       <div>
         <h1 id="page-title" tabIndex={-1}>
           {copy.title}
         </h1>
-        <p className="lede">{copy.description}</p>
+        <p className={styles.lede}>{copy.description}</p>
       </div>
     </section>
   );
