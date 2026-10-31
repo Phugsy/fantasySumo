@@ -6,6 +6,7 @@ const productionPath = ".github/workflows/deploy-production.yml";
 const qualityPath = ".github/workflows/quality.yml";
 const smokePath = "scripts/smoke-deployment.mjs";
 const packagePath = "package.json";
+const apiPackagePath = "apps/api/package.json";
 const tsconfigPath = "tsconfig.json";
 const vercelPath = "vercel.json";
 const preview = readFileSync(previewPath, "utf8");
@@ -14,6 +15,7 @@ const production = readFileSync(productionPath, "utf8");
 const quality = readFileSync(qualityPath, "utf8");
 const smoke = readFileSync(smokePath, "utf8");
 const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
+const apiPackageJson = JSON.parse(readFileSync(apiPackagePath, "utf8"));
 const tsconfig = JSON.parse(readFileSync(tsconfigPath, "utf8"));
 const vercelConfig = JSON.parse(readFileSync(vercelPath, "utf8"));
 
@@ -460,6 +462,12 @@ if (vercelConfig.git?.deploymentEnabled !== false) {
 
 if (
   tsconfig.extends !== "./tsconfig.base.json" ||
+  // Vercel applies compiler defaults before resolving `extends`. Keep these
+  // explicit or its wrapper can override our inherited target and strict mode.
+  tsconfig.compilerOptions?.target !== "ES2022" ||
+  tsconfig.compilerOptions?.module !== "NodeNext" ||
+  tsconfig.compilerOptions?.moduleResolution !== "NodeNext" ||
+  tsconfig.compilerOptions?.strict !== true ||
   !tsconfig.compilerOptions?.lib?.includes("ES2022") ||
   !tsconfig.compilerOptions?.typeRoots?.includes(
     "./apps/api/node_modules/@types",
@@ -468,7 +476,13 @@ if (
   !tsconfig.include?.includes("api/**/*.ts")
 ) {
   throw new Error(
-    `${tsconfigPath} must apply the shared ES2022 and Node.js TypeScript configuration to the Vercel function entrypoint.`,
+    `${tsconfigPath} must explicitly configure strict ES2022/NodeNext compilation and Node.js types for the Vercel function entrypoint.`,
+  );
+}
+
+if (typeof apiPackageJson.devDependencies?.["undici-types"] !== "string") {
+  throw new Error(
+    `${apiPackagePath} must directly declare undici-types so Vercel's TypeScript service can resolve Node fetch response types through pnpm's symlinks.`,
   );
 }
 

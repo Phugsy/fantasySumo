@@ -24,6 +24,23 @@ The root `vercel.json` is the deployment contract:
 
 Create or reconfigure the Vercel project with the repository root as its root directory. A project rooted at `apps/web` will ignore the root `vercel.json` and deploy only the Vite app, not the `/api` serverless function.
 
+The root `tsconfig.json` explicitly sets `target: ES2022`, `module: NodeNext`,
+`moduleResolution: NodeNext`, and `strict: true` for `api/index.ts`. Keep these
+settings in the root config even though the shared base also defines compiler
+options: Vercel's Node builder applies defaults before resolving `extends` and
+can otherwise replace inherited settings, including turning strict mode off.
+That produces misleading lifecycle-union diagnostics even when normal project
+type-checking passes.
+
+The API also directly declares the type-only `undici-types` development
+dependency already used by `@types/node`. Keep it aligned with that Node types
+version. Vercel's incremental TypeScript service does not resolve pnpm symlinks
+like `tsc` does, so a transitive-only package can leave Node's `Response` type
+empty and report missing `ok`, `status`, and `json` properties. This dependency
+adds no runtime HTTP client. The deployment contract check enforces both these
+settings and the direct type dependency; each deployment also runs
+`pnpm exec tsc -p tsconfig.json` as a blocking check after the Vercel build.
+
 ## Automated release path
 
 Hosted deployments are owned by GitHub Actions:

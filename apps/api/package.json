@@ -23,6 +23,7 @@
   "devDependencies": {
     "@types/node": "^24.10.1",
     "tsx": "^4.20.6",
+    "undici-types": "7.16.0",
     "vitest": "^4.0.13"
   }
 }
