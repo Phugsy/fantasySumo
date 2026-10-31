@@ -82,7 +82,8 @@ Current behaviour:
 
 Current limitations:
 
-- Pick modifiers are not yet defined.
+- Daily joker rules are agreed in `JOKER_TRIAL.md`; runtime implementation is
+  follow-up #114.
 - No persistence of the last created team in browser storage yet.
 
 ## Back end
@@ -256,7 +257,8 @@ Current limitations:
 
 - Auth remains intentionally small. Local development uses a cookie-based development session, while production identity comes from Neon Auth JWTs verified by the API auth boundary.
 - No dedicated API client package.
-- Pick-modifier configuration remains deferred until its product rules are defined.
+- Versioned joker configuration and audited daily allocations are specified in
+  `JOKER_TRIAL.md` and await implementation in #114.
 
 ## Domain package
 

@@ -88,7 +88,9 @@ Before display-preference work, make the game rules deliberate:
    production database, then record the first multi-user round (#91).
 2. Secondary scoring is defined and implemented with per-basho rules,
    separate categories, and special-prize imports (#92; see `SCORING.md`).
-3. Select and specify one pick modifier or withdrawal mechanic, such as a
-   joker/captain or substitutes (#93).
+3. The pick-modifier decision is agreed: three single-bout jokers per basho,
+   at most one per day within the player's own stable, with a daily Pick Window
+   (#93; see `JOKER_TRIAL.md`). Runtime implementation and the isolated trial
+   remain follow-up work; existing scoring modes are unchanged.
 4. Fix the reported initial-focus and mobile-header regressions (#94).
 5. Continue with display preferences and theme work (#73).
