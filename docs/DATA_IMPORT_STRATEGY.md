@@ -4,7 +4,7 @@
 
 Accepted for the MVP import path.
 
-Last checked: 2026-06-01.
+Source availability last rechecked: 2026-10-31.
 
 ## Recommendation
 
@@ -158,6 +158,57 @@ Cons:
 - should not be required for local tests or deterministic seed data.
 
 Use this as the first MVP results adapter, and optionally as a backup banzuke adapter. It should map into the same internal import commands as the JSA banzuke adapter.
+
+### Explicit banzuke backup
+
+The CLI now supports a Sumo API Makuuchi banzuke backup:
+
+```bash
+make import-banzuke ARGS="-- --source sumo-api --basho 2026-11 --dry-run"
+make import-banzuke ARGS="-- --source sumo-api --basho 2026-11"
+```
+
+JSA remains the default and the browser-admin source. The operator selects the
+backup explicitly: a primary-source error cannot silently choose a different
+tournament or replace a roster from a different provider. The backup requires
+an explicit `YYYY-MM` target and fetches that provider's basho metadata and
+Makuuchi banzuke. It rejects mismatched tournaments, invalid dates, missing or
+empty roster sides, malformed rank/side data, duplicate provider IDs, normalized
+name collisions, and duplicated rank slots. It maps the same internal
+`BanzukeImportCommand` consumed by the existing dry-run/transactional importer.
+No source result totals are imported as bout results or used to infer scores.
+
+Rank order is derived from the validated Makuuchi rank bands, rank number and
+east-before-west ordering, rather than array order or lexical rank labels.
+Provider numeric IDs remain in their own namespace; persisted IDs continue to
+use the existing shikona normalization pending #102. A name/alias mismatch must
+be investigated rather than guessed. The backup has the same known rename
+limitation as the current primary adapter; it does not solve canonical identity.
+
+The provider does not supply heya on these banzuke rows. Sparse updates preserve
+known global and per-basho heya metadata atomically in SQLite and Postgres, and
+dry-run/retry summaries account for those preserved values. New rows without
+known heya remain unknown. Existing locked, active, or completed lifecycle state
+and result progress cannot regress. A newly created target stays unscored and
+uses the existing 20:00 JST evening-before-day-0 pick cutoff; dates alone never
+mark results active or complete. Review dry-run counts before applying: the
+provider contract is a complete Makuuchi roster snapshot and applying it replaces
+the target basho's banzuke through the existing transaction.
+
+On 2026-10-31, the current JSA banzuke endpoint returned the November tournament,
+and Sumo API's September basho and Makuuchi banzuke endpoints returned JSON with
+the metadata and row fields used by this adapter. Tests use reduced synthetic
+fixtures; default tests and E2E never depend on those live endpoints. This backup
+uses the existing free provider and adds no dependency or paid integration.
+
+The JSA `torikumiAjax/1/15/` endpoint now responds with JSON containing
+`TorikumiData`, `TorHtml`, and `FinHtml`, rather than a documented result import
+contract. Its response does not yet establish verified historical targeting,
+complete daily absence coverage, or correction/default-win semantics for this
+app. A JSA results fallback remains deferred until those facts can be attested;
+an HTTP 200 or an HTML fragment is insufficient evidence to replace verified
+results. Sumo API remains the results/schedule source, with its existing failure
+and retry behavior. No SumoDB scraper is introduced.
 
 ### SumoDB
 
@@ -432,7 +483,7 @@ For the first local MVP, a failed import can return a structured API error and l
    outside this path. Preserve lifecycle progress inside transactional banzuke
    writes so a concurrent refresh cannot regress a scheduled lock.
 8. Add fallback source support:
-   - Sumo API banzuke as backup if JSA banzuke fails;
+   - Sumo API banzuke is available as an explicitly selected CLI backup;
    - JSA results adapter if a stable machine-readable result endpoint is confirmed;
    - no SumoDB scraper unless API paths prove inadequate.
 

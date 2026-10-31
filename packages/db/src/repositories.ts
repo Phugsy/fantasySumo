@@ -810,7 +810,8 @@ function createSqliteRepositories(
             .values(toRikishiRow(entry))
             .onConflictDoUpdate({
               target: sqlite.rikishi.id,
-              set: toRikishiRow(entry),
+              // Omitted source metadata is unknown, not a request to erase it.
+              set: entry,
             })
             .run();
         }
@@ -1773,7 +1774,8 @@ function createPostgresRepositories(
             .values(toRikishiRow(entry))
             .onConflictDoUpdate({
               target: pg.rikishi.id,
-              set: toRikishiRow(entry),
+              // Keep the same sparse-update semantics as SQLite.
+              set: entry,
             });
         }
 
