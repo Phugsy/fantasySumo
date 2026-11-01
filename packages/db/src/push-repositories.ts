@@ -182,11 +182,18 @@ export function createPushRepositories(database: AppDatabase) {
             yield sql`SELECT * FROM push_subscriptions WHERE owner_id=${owner}`;
           if ((old ? String(old.revision) : null) !== expectedRevision)
             throw new PushError("stale-subscription");
+          // Ownership follows the destination, including equivalent host/port
+          // spellings supplied by repository callers outside the HTTP boundary.
+          const canonicalData = {
+            ...data,
+            endpoint: new URL(data.endpoint).href,
+          };
+          const endpointHash = hash(canonicalData.endpoint);
           const [collision] =
-            yield sql`SELECT owner_id FROM push_subscriptions WHERE (device_id=${device} OR endpoint_hash=${hash(data.endpoint)}) AND owner_id<>${owner}`;
+            yield sql`SELECT owner_id FROM push_subscriptions WHERE (device_id=${device} OR endpoint_hash=${endpointHash}) AND owner_id<>${owner}`;
           if (collision) throw new PushError("device-unavailable");
           const revision = randomUUID();
-          yield sql`INSERT INTO push_subscriptions(owner_id,basho_id,device_id,endpoint_hash,revoke_hash,revision,payload_json,consent_at) VALUES(${owner},${id},${device},${hash(data.endpoint)},${hash(revokeToken)},${revision},${JSON.stringify(data)},${at}) ON CONFLICT(owner_id) DO UPDATE SET basho_id=excluded.basho_id,device_id=excluded.device_id,endpoint_hash=excluded.endpoint_hash,revoke_hash=excluded.revoke_hash,revision=excluded.revision,payload_json=excluded.payload_json,consent_at=excluded.consent_at RETURNING owner_id`;
+          yield sql`INSERT INTO push_subscriptions(owner_id,basho_id,device_id,endpoint_hash,revoke_hash,revision,payload_json,consent_at) VALUES(${owner},${id},${device},${endpointHash},${hash(revokeToken)},${revision},${JSON.stringify(canonicalData)},${at}) ON CONFLICT(owner_id) DO UPDATE SET basho_id=excluded.basho_id,device_id=excluded.device_id,endpoint_hash=excluded.endpoint_hash,revoke_hash=excluded.revoke_hash,revision=excluded.revision,payload_json=excluded.payload_json,consent_at=excluded.consent_at RETURNING owner_id`;
           return revision;
         })(),
       ),

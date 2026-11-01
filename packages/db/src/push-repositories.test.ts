@@ -146,6 +146,45 @@ for (const provider of ["sqlite", "postgres"] as const)
         );
         expect(rows).toHaveLength(300);
       });
+      it("binds canonical endpoint spellings to one owner across clients", async () => {
+        await subscribe(owners[0], "first-device", null, {
+          endpoint: data().endpoint.replace(
+            "fcm.googleapis.com",
+            "FCM.GOOGLEAPIS.COM:443",
+          ),
+        });
+        const [stored] = await query(
+          sql`SELECT payload_json FROM push_subscriptions WHERE owner_id=${owners[0]!}`,
+        );
+        expect(JSON.parse(String(stored!.payload_json)).endpoint).toBe(
+          data().endpoint,
+        );
+        for (const endpoint of [
+          data().endpoint,
+          data().endpoint.replace("fcm.googleapis.com", "FCM.GOOGLEAPIS.COM"),
+          data().endpoint.replace(
+            "fcm.googleapis.com",
+            "fcm.googleapis.com:443",
+          ),
+        ]) {
+          await expect(
+            other.savePushSubscription(
+              id,
+              owners[1]!,
+              "other-device",
+              null,
+              { ...data(), endpoint },
+              now,
+            ),
+          ).rejects.toThrow("device-unavailable");
+        }
+        expect(
+          (await repos.getPushPreferences(id, owners[0]!, now)).subscribed,
+        ).toBe(true);
+        expect(
+          (await repos.getPushPreferences(id, owners[1]!, now)).subscribed,
+        ).toBe(false);
+      });
       it("hands a reservation off once, never retries uncertain sends, and preserves a replacement on old expiry", async () => {
         const revision = await subscribe();
         const claim = (await repos.claimPushOpening(id, 1, owners[0]!, now))!;

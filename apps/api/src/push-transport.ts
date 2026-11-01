@@ -17,6 +17,7 @@ export function validatePushSubscription(
 ) {
   const url = new URL(data.endpoint);
   if (
+    url.href !== data.endpoint ||
     url.protocol !== "https:" ||
     url.port ||
     url.username ||

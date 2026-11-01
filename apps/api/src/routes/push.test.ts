@@ -154,6 +154,37 @@ it("is disabled by default; enforces authentication, same origin and expected se
   ).toBe(400);
   await api.close();
 });
+it("rejects noncanonical endpoints before another owner can bind the destination", async () => {
+  const api = app();
+  const enroll = (owner: string, endpoint: string) =>
+    api.inject({
+      method: "PUT",
+      url: "/api/push/subscription",
+      headers: headers(owner),
+      payload: {
+        expectedOwnerId: owner,
+        deviceId: randomUUID(),
+        expectedRevision: null,
+        subscription: { ...subscription, endpoint },
+      },
+    });
+  expect((await enroll("alice", subscription.endpoint)).statusCode).toBe(200);
+  for (const host of ["FCM.GOOGLEAPIS.COM", "fcm.googleapis.com:443"]) {
+    expect(
+      (
+        await enroll(
+          "bob",
+          subscription.endpoint.replace("fcm.googleapis.com", host),
+        )
+      ).statusCode,
+    ).toBe(400);
+  }
+  expect((await enroll("bob", subscription.endpoint)).statusCode).toBe(409);
+  expect((await repos.getPushPreferences(bashoId, "bob", now)).subscribed).toBe(
+    false,
+  );
+  await api.close();
+});
 it("stores one owned subscription and allows only capability-proven device revocation across accounts", async () => {
   const api = app();
   const deviceId = randomUUID();
