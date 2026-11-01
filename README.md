@@ -54,7 +54,8 @@ Start here:
 - `skills/fantasy-sumo-issue-loop/SKILL.md` - repo-local issue-to-PR loop for agents. Invoke it with a prompt like: "Use the Fantasy Sumo issue loop on #44."
 - `docs/PROJECT_BRIEF.md` - product intent and MVP definition.
 - `docs/SCORING.md` - scoring modes, category points, rule locking, and special-prize imports.
-- `docs/JOKER_TRIAL.md` - agreed future three-joker trial, daily Pick Window, scoring/refunds, and implementation validation requirements.
+- `docs/JOKER_TRIAL.md` - agreed three-joker trial, daily Pick Window, scoring/refunds, and validation requirements.
+- `docs/JOKER_IMPLEMENTATION.md` - opt-in isolated joker demo, additive model, clock controls, and verification.
 - `docs/ARCHITECTURE.md` - current architecture and suggested future boundaries.
 - `docs/adr/0001-rebuild-architecture.md` - accepted rebuild architecture decision.
 - `docs/DATA_IMPORT_STRATEGY.md` - MVP data-source investigation and import recommendation.

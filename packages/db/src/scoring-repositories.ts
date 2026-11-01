@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import type { ScoringMode, SpecialPrizeAward } from "@fantasy-sumo/domain";
 import type { AppDatabase } from "./client.js";
 import * as sqlite from "./schema.js";
@@ -66,6 +66,9 @@ export function createScoringRepositories(
             .set({ mode })
             .where(eq(sqlite.bashoScoringConfig.bashoId, id))
             .run();
+          tx.run(
+            sql`UPDATE basho_joker_trial SET base_mode=${mode} WHERE basho_id=${id}`,
+          );
           return "updated";
         }),
       getSpecialPrizeSnapshot: async (id) =>
@@ -137,6 +140,9 @@ export function createScoringRepositories(
           .update(pg.bashoScoringConfig)
           .set({ mode })
           .where(eq(pg.bashoScoringConfig.bashoId, id));
+        await tx.execute(
+          sql`UPDATE basho_joker_trial SET base_mode=${mode} WHERE basho_id=${id}`,
+        );
         return "updated";
       }),
     getSpecialPrizeSnapshot: async (id) =>

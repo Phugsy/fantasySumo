@@ -1,3 +1,4 @@
+import { DemoJokerControls } from "./DemoJokerControls";
 import type { ScoringMode } from "@fantasy-sumo/domain";
 import { scoringModeLabel } from "../scoring-view";
 import { useEffect, useRef, useState } from "react";
@@ -35,6 +36,7 @@ type AdminImportAction = "banzuke" | "results" | "schedule";
 
 export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
   const isMountedRef = useRef(false);
+  const [demoRefreshKey, setDemoRefreshKey] = useState(0);
   const [mode, setMode] = useState<AdminMode>(
     import.meta.env.VITE_BASHO_MODE === "demo" ? "demo" : "live",
   );
@@ -130,6 +132,7 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
       return;
     }
 
+    if (mode === "demo") setDemoRefreshKey((previous) => previous + 1);
     setPendingAction(action);
     setMessage(null);
     setErrorMessage(null);
@@ -635,6 +638,12 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
             />
           )}
 
+          {basho.isDemo && (
+            <DemoJokerControls
+              key={`${basho.id}-${basho.status}-${demoRefreshKey}-${pendingAction ?? "idle"}`}
+              onRefresh={onPlayerDataRefresh}
+            />
+          )}
           {basho.isDemo ? (
             <div className="admin-action-grid">
               <AdminAction

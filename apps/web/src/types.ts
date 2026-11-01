@@ -1,5 +1,6 @@
 import type { ScoreBreakdown, ScoringMode } from "@fantasy-sumo/domain";
 export interface Basho {
+  jokerTrial?: boolean;
   id: string;
   isDemo: boolean;
   name: string;
@@ -88,6 +89,7 @@ export interface CreatedTeamResponse {
 }
 
 export interface MyTeamResponse {
+  jokerTrial?: boolean;
   basho: Omit<Basho, "teamSize">;
   team: CreatedTeamResponse["team"];
   totalScore: number;
@@ -143,6 +145,7 @@ export interface SessionResponse {
 }
 
 export interface LeaderboardResponse {
+  jokerTrial?: boolean;
   basho: Omit<Basho, "teamSize">;
   bashoId: string;
   totalDays?: number;

@@ -383,3 +383,46 @@ export async function runAdminPrizesImport(
     {},
   );
 }
+
+export interface JokerSnapshotResponse {
+  snapshot: null | {
+    now: string;
+    remaining: number;
+    budgetDiscrepancy: boolean;
+    trial: { preset: string; clock: string; baseMode: ScoringMode };
+    allocations: Array<{
+      day: number;
+      rikishiId: string;
+      boutId: string;
+      revision: number;
+      state: string;
+    }>;
+    windows: Array<{
+      day: number;
+      deadline: string;
+      status: string;
+      targets: Array<{ rikishiId: string; boutId: string; opponentId: string }>;
+    }>;
+  };
+}
+export const fetchMyJokers = (id: string) =>
+  getJson<JokerSnapshotResponse>(`/api/basho/${id}/my-jokers`);
+export const saveMyJoker = (
+  id: string,
+  body: {
+    day: number;
+    rikishiId: string | null;
+    boutId: string | null;
+    opponentId: string | null;
+    expectedRevision: number;
+    requestId: string;
+  },
+) => sendJson<JokerSnapshotResponse>(`/api/basho/${id}/my-jokers`, body, "PUT");
+export const fetchDemoJokerTrial = () =>
+  getJson<{ trial: { clock: string } | null }>("/api/admin/demo/jokers");
+export const configureDemoJokerTrial = (clock?: string) =>
+  sendJson<{ trial: { clock: string } }>(
+    "/api/admin/demo/jokers",
+    clock ? { clock } : {},
+    "PUT",
+  );

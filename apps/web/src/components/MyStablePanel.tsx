@@ -1,3 +1,4 @@
+import { JokerPanel } from "./JokerPanel";
 import { ScoreBreakdown } from "./ScoreBreakdown";
 import { scoringModeLabel } from "../scoring-view";
 import type {
@@ -26,6 +27,8 @@ interface MyStablePanelProps {
   schedule: ScheduleResponse | null;
   scheduleLoadState: ScheduleLoadState;
   user: SessionUser | null;
+  onRefresh?: () => Promise<void>;
+  rikishiNames?: Record<string, string>;
 }
 
 export function MyStablePanel({
@@ -35,6 +38,8 @@ export function MyStablePanel({
   schedule,
   scheduleLoadState,
   user,
+  onRefresh,
+  rikishiNames,
 }: MyStablePanelProps) {
   const stableBasho = myTeam === null ? basho : { ...basho, ...myTeam.basho };
   const teamIsLocked = myTeam?.team.lockedAt !== undefined;
@@ -116,6 +121,18 @@ export function MyStablePanel({
         Official rules: {scoringModeLabel(myTeam.scoringMode ?? "wins-v0")}.
       </p>
       <ScoreBreakdown breakdown={myTeam.breakdown} mode={myTeam.scoringMode} />
+      {myTeam.jokerTrial && (
+        <JokerPanel
+          bashoId={stableBasho.id}
+          names={{
+            ...rikishiNames,
+            ...Object.fromEntries(
+              myTeam.picks.map((p) => [p.rikishiId, p.shikona]),
+            ),
+          }}
+          onRefresh={onRefresh}
+        />
+      )}
       <div className="section-heading stable-lineup-heading">
         <p className="eyebrow">Line-up</p>
         <h3>Selected rikishi</h3>

@@ -81,6 +81,12 @@ export function LeaderboardPanel({
         <span>{getLeaderboardStatusCopy(basho)}</span>
       </div>
 
+      {basho.jokerTrial && (
+        <p>
+          Demo joker trial. Each player has three single-bout jokers; joker win
+          and gold-star boosts are shown separately.
+        </p>
+      )}
       <div className="scoring-view">
         <label htmlFor="leaderboard-scoring-view">Scoring view</label>
         <select
