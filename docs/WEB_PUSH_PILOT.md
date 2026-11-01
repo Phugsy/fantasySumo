@@ -81,9 +81,16 @@ import already exists, but reliable operation must demonstrate that complete
 card before its cutoff. This is a launch dependency, not a request to add another
 cron. Late or unavailable cards skip the reminder and preserve normal game rules.
 The demo's preseeded cards alone do not validate the live publication path.
-Demonstrate that future-card completeness can be attested before results exist;
-evidence that a day's results are complete must never be used as the condition
-for announcing a pre-bout window. Verify this distinction for each source adapter.
+There is also a concrete live adapter blocker: `fetchSumoApiScheduleImport`
+currently supplies no banzuke evidence to `mapSumoApiSchedulePayload`, whose
+`isComplete` attestation needs that evidence. Its `hasAttestedCompleteCard`
+helper additionally requires resolved winners. Ordinary future cards therefore
+cannot currently satisfy the non-demo attestation used by `jokerWindow` in
+PR #120. Before a live trial, implement and verify a separate trustworthy
+pre-bout publication contract without weakening existing result-completeness
+checks. The fixed demo-fixture exception is not evidence for live eligibility.
+Treat that work as a prerequisite to real notification implementation/activation,
+not something a sender can bypass by treating any source response as complete.
 
 After the import commits, await a bounded sender within the existing invocation;
 do not fire-and-forget work after responding. Notification failures never roll
