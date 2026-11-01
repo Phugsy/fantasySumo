@@ -25,7 +25,10 @@ export function ScoreBreakdown({
       <table>
         <caption>
           {label}
-          {!bonuses && " · bonuses excluded from this total"}
+          {!bonuses &&
+            (breakdown.joker !== undefined
+              ? " · achievement bonuses excluded; joker win points included"
+              : " · bonuses excluded from this total")}
         </caption>
         <thead>
           <tr>
@@ -35,6 +38,12 @@ export function ScoreBreakdown({
             <th scope="col">Outstanding</th>
             <th scope="col">Fighting spirit</th>
             <th scope="col">Technique</th>
+            {breakdown.joker !== undefined && (
+              <>
+                <th scope="col">Joker win</th>
+                <th scope="col">Joker gold star</th>
+              </>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -54,6 +63,14 @@ export function ScoreBreakdown({
                 {points}
               </td>
             ))}
+            {breakdown.joker !== undefined && (
+              <>
+                <td>{breakdown.joker}</td>
+                <td className={!bonuses ? "excluded-bonus" : undefined}>
+                  {breakdown.jokerKinboshi ?? 0}
+                </td>
+              </>
+            )}
           </tr>
         </tbody>
       </table>

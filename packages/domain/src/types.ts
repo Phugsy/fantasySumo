@@ -1,3 +1,4 @@
+import type { JokerSelection } from "./jokers.js";
 export type BashoStatus = "upcoming" | "locked" | "active" | "complete";
 
 export interface Basho {
@@ -148,6 +149,8 @@ export interface ScoreBreakdown {
   outstandingPerformance: number;
   fightingSpirit: number;
   technique: number;
+  joker?: number;
+  jokerKinboshi?: number;
 }
 
 export type RikishiDayOutcome = "win" | "loss" | "absent" | "no-result";
@@ -167,6 +170,8 @@ export interface TeamScoreHistoryEntry {
 }
 
 export interface ScoringOptions {
+  jokerSelections?: readonly JokerSelection[];
+  jokerTeamId?: string;
   throughDay?: BoutResult["day"];
   scoringMode?: ScoringMode;
   banzukeEntries?: readonly BanzukeEntry[];

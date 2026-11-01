@@ -1,3 +1,4 @@
+import { registerJokerRoutes } from "./routes/jokers.js";
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import {
@@ -85,6 +86,11 @@ export function buildApp(options: AppOptions = {}) {
 
   registerAuthRoutes(app, auth, {
     authClientSessionFailureReporter: options.authClientSessionFailureReporter,
+  });
+  registerJokerRoutes(app, {
+    auth,
+    repositories,
+    now: options.now ?? (() => new Date()),
   });
   registerBashoRoutes(app, {
     auth,

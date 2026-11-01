@@ -36,7 +36,7 @@ export function calculateRikishiScore(
     score:
       options.scoringMode === "achievements-v1"
         ? sumBreakdown(breakdown)
-        : wins,
+        : wins + (breakdown.joker ?? 0),
     ...(options.scoringMode === undefined ? {} : { breakdown }),
   };
 }
@@ -47,6 +47,12 @@ export function calculateTeamScore(
   boutResults: readonly BoutResult[],
   options: ScoringOptions = {},
 ): TeamScore {
+  options = {
+    ...options,
+    scoringMode:
+      options.scoringMode ?? (options.jokerSelections ? "wins-v0" : undefined),
+    jokerTeamId: team.id,
+  };
   const teamPicks = picks.filter((pick) => pick.teamId === team.id);
   const rikishiScores = teamPicks.map((pick) =>
     calculateRikishiScore(pick.rikishiId, boutResults, options),
@@ -87,6 +93,12 @@ export function calculateTeamScoreHistory(
         : []),
     ]),
   ].sort((left, right) => left - right);
+  options = {
+    ...options,
+    scoringMode:
+      options.scoringMode ?? (options.jokerSelections ? "wins-v0" : undefined),
+    jokerTeamId: team.id,
+  };
   const teamPicks = picks.filter((pick) => pick.teamId === team.id);
   let cumulativeScore = 0;
 
@@ -104,8 +116,8 @@ export function calculateTeamScoreHistory(
         throughDay: day - 1,
       });
       const breakdown = emptyBreakdown();
-      for (const key of Object.keys(breakdown) as (keyof ScoreBreakdown)[]) {
-        breakdown[key] = current[key] - previous[key];
+      for (const key of Object.keys(current) as (keyof ScoreBreakdown)[]) {
+        breakdown[key] = (current[key] ?? 0) - (previous[key] ?? 0);
       }
       return {
         ...outcome,
@@ -113,7 +125,7 @@ export function calculateTeamScoreHistory(
         score:
           options.scoringMode === "achievements-v1"
             ? sumBreakdown(breakdown)
-            : breakdown.wins,
+            : breakdown.wins + (breakdown.joker ?? 0),
       };
     });
     const dailyScore = rikishiScores.reduce(
@@ -197,14 +209,14 @@ function emptyBreakdown(): ScoreBreakdown {
 }
 
 function sumBreakdown(breakdown: ScoreBreakdown): number {
-  return Object.values(breakdown).reduce((sum, value) => sum + value, 0);
+  return Object.values(breakdown).reduce((sum, value) => sum + (value ?? 0), 0);
 }
 
 function addBreakdowns(breakdowns: ScoreBreakdown[]): ScoreBreakdown {
   const total = emptyBreakdown();
   for (const breakdown of breakdowns) {
-    for (const key of Object.keys(total) as (keyof ScoreBreakdown)[])
-      total[key] += breakdown[key];
+    for (const key of Object.keys(breakdown) as (keyof ScoreBreakdown)[])
+      total[key] = (total[key] ?? 0) + (breakdown[key] ?? 0);
   }
   return total;
 }
@@ -257,6 +269,32 @@ function calculateBreakdown(
     breakdown.fightingSpirit = awards.has("fighting-spirit") ? 1 : 0;
     breakdown.technique = awards.has("technique") ? 1 : 0;
   }
+  if (
+    options.jokerSelections !== undefined &&
+    options.jokerTeamId !== undefined
+  ) {
+    breakdown.joker = 0;
+    breakdown.jokerKinboshi = 0;
+    for (const joker of options.jokerSelections.filter(
+      (j) => j.teamId === options.jokerTeamId && j.rikishiId === rikishiId,
+    )) {
+      const win = wins.find(
+        (r) =>
+          r.day === joker.day &&
+          r.loserRikishiId === joker.opponentId &&
+          !r.winnerAbsent &&
+          !r.loserAbsent &&
+          r.kimarite?.trim().toLowerCase() !== "fusen",
+      );
+      if (!win) continue;
+      breakdown.joker += 1;
+      if (
+        /^maegashira(?:\s|$)/.test(ranks.get(rikishiId) ?? "") &&
+        /^yokozuna(?:\s|$)/.test(ranks.get(win.loserRikishiId) ?? "")
+      )
+        breakdown.jokerKinboshi += 2;
+    }
+  }
   return breakdown;
 }
 
@@ -264,5 +302,7 @@ export function scoreBreakdownTotal(
   breakdown: ScoreBreakdown,
   mode: ScoringMode,
 ): number {
-  return mode === "wins-v0" ? breakdown.wins : sumBreakdown(breakdown);
+  return mode === "wins-v0"
+    ? breakdown.wins + (breakdown.joker ?? 0)
+    : sumBreakdown(breakdown);
 }
