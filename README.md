@@ -2,6 +2,8 @@
 
 The proposed bounded notification experiment and offline policy rehearsal are
 documented in [the Web Push pilot plan](docs/WEB_PUSH_PILOT.md).
+The [disabled backend preparation](docs/WEB_PUSH_BACKEND.md) adds synthetic-tested
+delivery infrastructure; production collection and delivery remain unconfigured.
 
 Fantasy Sumo is an unfinished fantasy sports app for professional sumo.
 

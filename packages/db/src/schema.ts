@@ -259,3 +259,62 @@ export const jokerEvents = sqliteTable(
     uniqueIndex("joker_event_request_idx").on(table.teamId, table.requestId),
   ],
 );
+
+export const pushPilots = sqliteTable(
+  "push_pilots",
+  {
+    bashoId: text("basho_id")
+      .primaryKey()
+      .references(() => basho.id, { onDelete: "cascade" }),
+    enabled: integer("enabled").notNull().default(0),
+    rosterJson: text("roster_json").notNull(),
+    totalAttempts: integer("total_attempts").notNull().default(0),
+    dayCountsJson: text("day_counts_json").notNull().default("{}"),
+    decisionsJson: text("decisions_json").notNull().default("{}"),
+    lastCleanupAt: text("last_cleanup_at"),
+  },
+  (t) => [
+    check("push_pilot_enabled", sql`${t.enabled} IN (0,1)`),
+    check("push_pilot_cap", sql`${t.totalAttempts} BETWEEN 0 AND 300`),
+  ],
+);
+export const pushSubscriptions = sqliteTable(
+  "push_subscriptions",
+  {
+    ownerId: text("owner_id").primaryKey(),
+    bashoId: text("basho_id")
+      .notNull()
+      .references(() => pushPilots.bashoId, { onDelete: "cascade" }),
+    deviceId: text("device_id").notNull(),
+    endpointHash: text("endpoint_hash").notNull(),
+    revokeHash: text("revoke_hash").notNull(),
+    revision: text("revision").notNull(),
+    payloadJson: text("payload_json").notNull(),
+    consentAt: text("consent_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("push_device_unique").on(t.deviceId),
+    uniqueIndex("push_endpoint_unique").on(t.endpointHash),
+  ],
+);
+export const pushOpenings = sqliteTable(
+  "push_openings",
+  {
+    id: text("id").primaryKey(),
+    bashoId: text("basho_id")
+      .notNull()
+      .references(() => pushPilots.bashoId, { onDelete: "cascade" }),
+    ownerKey: text("owner_key").notNull(),
+    day: integer("day").notNull(),
+    status: text("status").notNull(),
+    reason: text("reason"),
+    attempted: integer("attempted").notNull().default(0),
+    subscriptionRevision: text("subscription_revision"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("push_opening_unique").on(t.bashoId, t.ownerKey, t.day),
+    check("push_opening_day", sql`${t.day} BETWEEN 1 AND 15`),
+    check("push_opening_attempted", sql`${t.attempted} IN (0,1)`),
+  ],
+);
