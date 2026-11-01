@@ -982,6 +982,15 @@ function RoutedApp() {
                       </div>
                     )}
                     <MyStablePanel
+                      rikishiNames={Object.fromEntries(
+                        rikishi.map((r) => [r.id, r.shikona]),
+                      )}
+                      onRefresh={() =>
+                        refreshPlayerData({
+                          mode: authMode ?? "local",
+                          user: sessionUser,
+                        })
+                      }
                       basho={basho!}
                       myTeam={myTeam}
                       onEdit={openTeamEditor}
@@ -1214,6 +1223,7 @@ function mergeLeaderboardBasho(
   return {
     ...leaderboardResponse.basho,
     scoringMode: leaderboardResponse.scoringMode ?? currentBasho?.scoringMode,
+    jokerTrial: leaderboardResponse.jokerTrial,
     specialPrizesStatus: leaderboardResponse.specialPrizesStatus,
     teamSize: currentBasho?.teamSize ?? 0,
   };

@@ -2,9 +2,10 @@
 
 Product decision for #93, agreed with the owner on 31 October 2026.
 Implementation is tracked in #114; notification feasibility is #115.
-This is the contract for a future opt-in trial; jokers are not implemented or
-enabled by this documentation change. See [Scoring rules](SCORING.md) for the
-currently implemented modes.
+This is the contract for the opt-in demo trial. See
+[Joker demo implementation](JOKER_IMPLEMENTATION.md) for persistence, operation and
+validation. Live activation and production release remain separate approvals;
+existing tournaments retain their [saved scoring rules](SCORING.md).
 
 ## Player rules
 

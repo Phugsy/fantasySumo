@@ -1,0 +1,980 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "5b8d2088-764e-4e05-b2ba-96d915995a6a",
+  "prevId": "8c5e8c13-1fe4-44d8-ba39-1d71fe101c2d",
+  "tables": {
+    "banzuke_entries": {
+      "name": "banzuke_entries",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "basho_id": {
+          "name": "basho_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rikishi_id": {
+          "name": "rikishi_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "shikona": {
+          "name": "shikona",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "heya": {
+          "name": "heya",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "rank": {
+          "name": "rank",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rank_order": {
+          "name": "rank_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "banzuke_entries_basho_rikishi_idx": {
+          "name": "banzuke_entries_basho_rikishi_idx",
+          "columns": ["basho_id", "rikishi_id"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "banzuke_entries_basho_id_basho_id_fk": {
+          "name": "banzuke_entries_basho_id_basho_id_fk",
+          "tableFrom": "banzuke_entries",
+          "tableTo": "basho",
+          "columnsFrom": ["basho_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "banzuke_entries_rikishi_id_rikishi_id_fk": {
+          "name": "banzuke_entries_rikishi_id_rikishi_id_fk",
+          "tableFrom": "banzuke_entries",
+          "tableTo": "rikishi",
+          "columnsFrom": ["rikishi_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "basho": {
+      "name": "basho",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "is_demo": {
+          "name": "is_demo",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "start_date": {
+          "name": "start_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "end_date": {
+          "name": "end_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "current_day": {
+          "name": "current_day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "basho_game_config": {
+      "name": "basho_game_config",
+      "columns": {
+        "basho_id": {
+          "name": "basho_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "team_size": {
+          "name": "team_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 2
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "basho_game_config_basho_id_basho_id_fk": {
+          "name": "basho_game_config_basho_id_basho_id_fk",
+          "tableFrom": "basho_game_config",
+          "tableTo": "basho",
+          "columnsFrom": ["basho_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "basho_game_config_team_size_positive": {
+          "name": "basho_game_config_team_size_positive",
+          "value": "\"basho_game_config\".\"team_size\" > 0"
+        }
+      }
+    },
+    "basho_joker_trial": {
+      "name": "basho_joker_trial",
+      "columns": {
+        "basho_id": {
+          "name": "basho_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "preset": {
+          "name": "preset",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "base_mode": {
+          "name": "base_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "clock": {
+          "name": "clock",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "clock_set_at": {
+          "name": "clock_set_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "basho_joker_trial_basho_id_basho_id_fk": {
+          "name": "basho_joker_trial_basho_id_basho_id_fk",
+          "tableFrom": "basho_joker_trial",
+          "tableTo": "basho",
+          "columnsFrom": ["basho_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "joker_preset": {
+          "name": "joker_preset",
+          "value": "\"basho_joker_trial\".\"preset\" = 'three-joker-v1'"
+        },
+        "joker_base_mode": {
+          "name": "joker_base_mode",
+          "value": "\"basho_joker_trial\".\"base_mode\" IN ('wins-v0', 'achievements-v1')"
+        }
+      }
+    },
+    "basho_scoring_config": {
+      "name": "basho_scoring_config",
+      "columns": {
+        "basho_id": {
+          "name": "basho_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'wins-v0'"
+        },
+        "locked": {
+          "name": "locked",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "basho_scoring_config_basho_id_basho_id_fk": {
+          "name": "basho_scoring_config_basho_id_basho_id_fk",
+          "tableFrom": "basho_scoring_config",
+          "tableTo": "basho",
+          "columnsFrom": ["basho_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "bout_results": {
+      "name": "bout_results",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "basho_id": {
+          "name": "basho_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "day": {
+          "name": "day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "winner_rikishi_id": {
+          "name": "winner_rikishi_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "loser_rikishi_id": {
+          "name": "loser_rikishi_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kimarite": {
+          "name": "kimarite",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "winner_absent": {
+          "name": "winner_absent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "loser_absent": {
+          "name": "loser_absent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "bout_results_basho_id_basho_id_fk": {
+          "name": "bout_results_basho_id_basho_id_fk",
+          "tableFrom": "bout_results",
+          "tableTo": "basho",
+          "columnsFrom": ["basho_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "bout_results_winner_rikishi_id_rikishi_id_fk": {
+          "name": "bout_results_winner_rikishi_id_rikishi_id_fk",
+          "tableFrom": "bout_results",
+          "tableTo": "rikishi",
+          "columnsFrom": ["winner_rikishi_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "bout_results_loser_rikishi_id_rikishi_id_fk": {
+          "name": "bout_results_loser_rikishi_id_rikishi_id_fk",
+          "tableFrom": "bout_results",
+          "tableTo": "rikishi",
+          "columnsFrom": ["loser_rikishi_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "fantasy_picks": {
+      "name": "fantasy_picks",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "team_id": {
+          "name": "team_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rikishi_id": {
+          "name": "rikishi_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "fantasy_picks_team_rikishi_idx": {
+          "name": "fantasy_picks_team_rikishi_idx",
+          "columns": ["team_id", "rikishi_id"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "fantasy_picks_team_id_fantasy_teams_id_fk": {
+          "name": "fantasy_picks_team_id_fantasy_teams_id_fk",
+          "tableFrom": "fantasy_picks",
+          "tableTo": "fantasy_teams",
+          "columnsFrom": ["team_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fantasy_picks_rikishi_id_rikishi_id_fk": {
+          "name": "fantasy_picks_rikishi_id_rikishi_id_fk",
+          "tableFrom": "fantasy_picks",
+          "tableTo": "rikishi",
+          "columnsFrom": ["rikishi_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "fantasy_teams": {
+      "name": "fantasy_teams",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "basho_id": {
+          "name": "basho_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_name": {
+          "name": "owner_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "owner_user_id": {
+          "name": "owner_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "locked_at": {
+          "name": "locked_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "fantasy_teams_basho_owner_user_idx": {
+          "name": "fantasy_teams_basho_owner_user_idx",
+          "columns": ["basho_id", "owner_user_id"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "fantasy_teams_basho_id_basho_id_fk": {
+          "name": "fantasy_teams_basho_id_basho_id_fk",
+          "tableFrom": "fantasy_teams",
+          "tableTo": "basho",
+          "columnsFrom": ["basho_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "joker_allocations": {
+      "name": "joker_allocations",
+      "columns": {
+        "basho_id": {
+          "name": "basho_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "team_id": {
+          "name": "team_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "day": {
+          "name": "day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload_json": {
+          "name": "payload_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "joker_allocations_basho_id_basho_id_fk": {
+          "name": "joker_allocations_basho_id_basho_id_fk",
+          "tableFrom": "joker_allocations",
+          "tableTo": "basho",
+          "columnsFrom": ["basho_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "joker_allocations_team_id_fantasy_teams_id_fk": {
+          "name": "joker_allocations_team_id_fantasy_teams_id_fk",
+          "tableFrom": "joker_allocations",
+          "tableTo": "fantasy_teams",
+          "columnsFrom": ["team_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "joker_allocations_team_id_day_pk": {
+          "columns": ["team_id", "day"],
+          "name": "joker_allocations_team_id_day_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "joker_day": {
+          "name": "joker_day",
+          "value": "\"joker_allocations\".\"day\" BETWEEN 1 AND 15"
+        }
+      }
+    },
+    "joker_events": {
+      "name": "joker_events",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "basho_id": {
+          "name": "basho_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "team_id": {
+          "name": "team_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "request_id": {
+          "name": "request_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "fingerprint": {
+          "name": "fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload_json": {
+          "name": "payload_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "joker_event_request_idx": {
+          "name": "joker_event_request_idx",
+          "columns": ["team_id", "request_id"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "joker_events_basho_id_basho_id_fk": {
+          "name": "joker_events_basho_id_basho_id_fk",
+          "tableFrom": "joker_events",
+          "tableTo": "basho",
+          "columnsFrom": ["basho_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "joker_events_team_id_fantasy_teams_id_fk": {
+          "name": "joker_events_team_id_fantasy_teams_id_fk",
+          "tableFrom": "joker_events",
+          "tableTo": "fantasy_teams",
+          "columnsFrom": ["team_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "rikishi": {
+      "name": "rikishi",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "shikona": {
+          "name": "shikona",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "heya": {
+          "name": "heya",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "rikishi_source_identities": {
+      "name": "rikishi_source_identities",
+      "columns": {
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_rikishi_id": {
+          "name": "source_rikishi_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rikishi_id": {
+          "name": "rikishi_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "rikishi_source_identity_idx": {
+          "name": "rikishi_source_identity_idx",
+          "columns": ["source", "source_rikishi_id"],
+          "isUnique": true
+        },
+        "rikishi_source_canonical_idx": {
+          "name": "rikishi_source_canonical_idx",
+          "columns": ["source", "rikishi_id"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "rikishi_source_identities_rikishi_id_rikishi_id_fk": {
+          "name": "rikishi_source_identities_rikishi_id_rikishi_id_fk",
+          "tableFrom": "rikishi_source_identities",
+          "tableTo": "rikishi",
+          "columnsFrom": ["rikishi_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "rikishi_source_valid": {
+          "name": "rikishi_source_valid",
+          "value": "\"rikishi_source_identities\".\"source\" IN ('jsa', 'sumo-api')"
+        }
+      }
+    },
+    "scheduled_bout_publications": {
+      "name": "scheduled_bout_publications",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "basho_id": {
+          "name": "basho_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "day": {
+          "name": "day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "scheduled_bout_publications_basho_day_idx": {
+          "name": "scheduled_bout_publications_basho_day_idx",
+          "columns": ["basho_id", "day"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "scheduled_bout_publications_basho_id_basho_id_fk": {
+          "name": "scheduled_bout_publications_basho_id_basho_id_fk",
+          "tableFrom": "scheduled_bout_publications",
+          "tableTo": "basho",
+          "columnsFrom": ["basho_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "scheduled_bouts": {
+      "name": "scheduled_bouts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "basho_id": {
+          "name": "basho_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "day": {
+          "name": "day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "east_rikishi_id": {
+          "name": "east_rikishi_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "west_rikishi_id": {
+          "name": "west_rikishi_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "withdrawn_rikishi_id": {
+          "name": "withdrawn_rikishi_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "scheduled_bouts_basho_id_basho_id_fk": {
+          "name": "scheduled_bouts_basho_id_basho_id_fk",
+          "tableFrom": "scheduled_bouts",
+          "tableTo": "basho",
+          "columnsFrom": ["basho_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "scheduled_bouts_east_rikishi_id_rikishi_id_fk": {
+          "name": "scheduled_bouts_east_rikishi_id_rikishi_id_fk",
+          "tableFrom": "scheduled_bouts",
+          "tableTo": "rikishi",
+          "columnsFrom": ["east_rikishi_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "scheduled_bouts_west_rikishi_id_rikishi_id_fk": {
+          "name": "scheduled_bouts_west_rikishi_id_rikishi_id_fk",
+          "tableFrom": "scheduled_bouts",
+          "tableTo": "rikishi",
+          "columnsFrom": ["west_rikishi_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "scheduled_bouts_withdrawn_rikishi_id_rikishi_id_fk": {
+          "name": "scheduled_bouts_withdrawn_rikishi_id_rikishi_id_fk",
+          "tableFrom": "scheduled_bouts",
+          "tableTo": "rikishi",
+          "columnsFrom": ["withdrawn_rikishi_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "special_prize_snapshots": {
+      "name": "special_prize_snapshots",
+      "columns": {
+        "basho_id": {
+          "name": "basho_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fetched_at": {
+          "name": "fetched_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "awards_json": {
+          "name": "awards_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "special_prize_snapshots_basho_id_basho_id_fk": {
+          "name": "special_prize_snapshots_basho_id_basho_id_fk",
+          "tableFrom": "special_prize_snapshots",
+          "tableTo": "basho",
+          "columnsFrom": ["basho_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

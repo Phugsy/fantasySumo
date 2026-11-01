@@ -38,7 +38,7 @@ export async function startDemoBasho(
   await repositories.lockBashoAndFantasyTeams(basho.id, now().toISOString());
   await repositories.updateBasho(nextBasho);
 
-  return describeDemoProgression(repositories, nextBasho);
+  return describeDemoProgression(repositories, nextBasho, now);
 }
 
 export async function advanceDemoBashoDay(
@@ -55,15 +55,19 @@ export async function advanceDemoBashoDay(
   const currentDay = currentBasho.currentDay ?? 0;
 
   if (currentBasho.status === "complete" || currentDay >= DEMO_FINAL_DAY) {
-    return describeDemoProgression(repositories, {
-      ...currentBasho,
-      status: "complete",
-      currentDay: DEMO_FINAL_DAY,
-    });
+    return describeDemoProgression(
+      repositories,
+      {
+        ...currentBasho,
+        status: "complete",
+        currentDay: DEMO_FINAL_DAY,
+      },
+      now,
+    );
   }
 
   const nextDay = currentDay + 1;
-  const dayResults = demoBoutResults.filter((result) => result.day === nextDay);
+  const dayResults = await getDemoDayResults(repositories, nextDay, now);
   const nextBasho: Basho = {
     ...currentBasho,
     status: nextDay >= DEMO_FINAL_DAY ? "complete" : "active",
@@ -78,7 +82,7 @@ export async function advanceDemoBashoDay(
   });
   await repositories.updateBasho(nextBasho);
 
-  return describeDemoProgression(repositories, nextBasho);
+  return describeDemoProgression(repositories, nextBasho, now);
 }
 
 export async function completeDemoBasho(
@@ -94,7 +98,7 @@ export async function completeDemoBasho(
   await repositories.deleteBoutResultsForBasho(basho.id);
 
   for (let day = 1; day <= DEMO_FINAL_DAY; day += 1) {
-    const dayResults = demoBoutResults.filter((result) => result.day === day);
+    const dayResults = await getDemoDayResults(repositories, day, now);
 
     await publishDemoWithdrawalMarkers(repositories, day, dayResults);
     await repositories.applyBoutResultsImport({
@@ -112,7 +116,7 @@ export async function completeDemoBasho(
 
   await repositories.updateBasho(nextBasho);
 
-  return describeDemoProgression(repositories, nextBasho);
+  return describeDemoProgression(repositories, nextBasho, now);
 }
 
 async function publishDemoWithdrawalMarkers(
@@ -157,6 +161,7 @@ async function requireDemoBasho(repositories: Repositories): Promise<Basho> {
 async function describeDemoProgression(
   repositories: Repositories,
   basho: Basho,
+  now: () => Date,
 ): Promise<DemoProgressionResult> {
   if (basho.status === "complete") {
     await repositories.replaceSpecialPrizeSnapshot({
@@ -173,6 +178,7 @@ async function describeDemoProgression(
   const results = await repositories.listBoutResultsForBasho(basho.id);
   const scoring = await repositories.getBashoScoringConfig(basho.id);
   const specialPrizes = await repositories.getSpecialPrizeSnapshot(basho.id);
+  const jokers = await repositories.getJokerSnapshot(basho.id, now);
 
   return {
     basho,
@@ -182,6 +188,13 @@ async function describeDemoProgression(
       await repositories.listFantasyPicksForBasho(basho.id),
       results,
       {
+        ...(jokers
+          ? {
+              jokerSelections: jokers.allocations.filter(
+                (a) => a.state === "consumed",
+              ),
+            }
+          : {}),
         throughDay: basho.currentDay,
         scoringMode: scoring?.mode ?? "wins-v0",
         banzukeEntries: await repositories.listBanzukeEntriesForBasho(basho.id),
@@ -189,4 +202,21 @@ async function describeDemoProgression(
       },
     ),
   };
+}
+
+async function getDemoDayResults(
+  repositories: Repositories,
+  day: number,
+  now: () => Date,
+) {
+  const trial = await repositories.getJokerSnapshot(DEMO_BASHO_ID, now);
+  const results = demoBoutResults.filter((r) => r.day === day);
+  if (!trial) return results;
+  return results.map((r) =>
+    r.id === `${DEMO_BASHO_ID}-day-2-bout-1`
+      ? { ...r, kimarite: "fusen", loserAbsent: true }
+      : r.id === `${DEMO_BASHO_ID}-day-4-bout-1`
+        ? { ...r, winnerRikishiId: "ura", loserRikishiId: "onosato" }
+        : r,
+  );
 }

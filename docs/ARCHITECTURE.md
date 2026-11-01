@@ -622,3 +622,16 @@ compatible during migration-before-deploy. Retain the alias table during
 application rollback. A later contract release may remove obsolete code only
 after aliases have been adopted; never use a down migration or bulk name-based
 foreign-key rewrite. See [identity adoption and collision handling](DATA_IMPORT_STRATEGY.md#canonical-identity-and-legacy-adoption).
+
+## Opt-in joker demo
+
+The `three-joker-v1` preset is separate from its saved base scoring mode. Only
+the fixed flagged demo can enable it; existing/live bashos have no preset row.
+Additive trial/clock, team-day allocation and audit tables retain original
+matchup identities and immutable event updates. A shared SQL statement generator
+runs inside a synchronous SQLite immediate transaction or an asynchronous
+Postgres transaction holding the basho row lock. Player ownership, picks, card,
+deadline, revision and pending budget are rechecked within that transaction.
+Correction-driven budget overages are exposed without deleting accepted choices.
+Team scores/history add a separate joker category through verified result days;
+public per-rikishi scores remain base-only. See `JOKER_IMPLEMENTATION.md`.
