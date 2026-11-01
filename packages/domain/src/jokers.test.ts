@@ -120,6 +120,46 @@ describe("joker window and resolution", () => {
       ),
     ).toBe("locked");
   });
+  it("refunds an exact attested cancellation even when an old contested result remains", () => {
+    const cancelled: JokerFacts = {
+      ...facts,
+      bouts: [
+        { ...facts.bouts[0]!, status: "cancelled" },
+        {
+          ...facts.bouts[0]!,
+          id: "other-bout",
+          eastRikishiId: "a",
+          westRikishiId: "b",
+        },
+      ],
+      results: [
+        {
+          id: "stale-win",
+          bashoId: "b",
+          day: 1,
+          winnerRikishiId: "m",
+          loserRikishiId: "y",
+        },
+        {
+          id: "other-result",
+          bashoId: "b",
+          day: 1,
+          winnerRikishiId: "a",
+          loserRikishiId: "b",
+        },
+      ],
+    };
+    expect(resolveJoker(selection, cancelled, "2026-05-10T04:00:00.000Z")).toBe(
+      "refunded",
+    );
+    expect(
+      resolveJoker(
+        selection,
+        { ...cancelled, publications: [] },
+        "2026-05-10T04:00:00.000Z",
+      ),
+    ).toBe("locked");
+  });
   it("doubles only the selected team win+kinboshi, keeps kachi-koshi unchanged, and bounds history", () => {
     const results: BoutResult[] = Array.from({ length: 8 }, (_, i) => ({
       id: String(i),

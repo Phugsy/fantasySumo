@@ -90,6 +90,9 @@ export function resolveJoker(
   const attested = facts.publications.some(
     (p) => p.day === allocation.day && isAttestedCard(facts, p),
   );
+  // Schedule-only corrections retain old results. An exact attested cancellation
+  // overrides that stale result before it can consume or boost the joker.
+  if (attested && card?.status === "cancelled") return "refunded";
   const result =
     allocation.day <= jokerVerifiedDay(facts)
       ? facts.results.find(
@@ -104,7 +107,6 @@ export function resolveJoker(
       result.kimarite?.trim().toLowerCase() === "fusen"
       ? "refunded"
       : "consumed";
-  if (attested && card?.status === "cancelled") return "refunded";
   return "locked";
 }
 
