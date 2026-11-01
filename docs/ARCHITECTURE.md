@@ -1,5 +1,15 @@
 # Architecture Notes
 
+The optional, disabled Web Push backend is described in
+[`WEB_PUSH_BACKEND.md`](WEB_PUSH_BACKEND.md). It reuses the joker statement
+generators inside serialized claim transactions and adds three additive tables
+for fixed pilot counters, private consent/device capabilities and retained
+opening statuses. The production entrypoint supplies no runtime configuration;
+no activation API or environment switch is provided. Its post-commit observer,
+bounded pinned transport and authenticated same-origin API are tested with
+synthetic data only. Live pre-bout attestation and browser integration remain
+separate launch gates; no browser subscription connector is included.
+
 ## Rebuild decision
 
 The accepted rebuild decision is recorded in [ADR 0001: Rebuild architecture and app foundation](adr/0001-rebuild-architecture.md).

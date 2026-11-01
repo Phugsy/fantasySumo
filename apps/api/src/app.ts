@@ -1,3 +1,5 @@
+import { registerPushRoutes } from "./routes/push.js";
+import { installPushPublicationObserver, type PushRuntime } from "./push.js";
 import { registerJokerRoutes } from "./routes/jokers.js";
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
@@ -32,6 +34,7 @@ import { registerBashoRoutes } from "./routes/basho.js";
 import { registerScheduledImportRoutes } from "./routes/scheduled-imports.js";
 
 interface AppOptions {
+  pushRuntime?: PushRuntime;
   db?: AppDatabase;
   now?: () => Date;
   sourceFetch?: typeof fetch;
@@ -60,6 +63,20 @@ export function buildApp(options: AppOptions = {}) {
   });
   const db = options.db ?? ownedClient!;
   const repositories = createRepositories(db);
+  if (options.pushRuntime) {
+    const origin = new URL(options.pushRuntime.origin);
+    if (
+      origin.origin !== options.pushRuntime.origin ||
+      (origin.protocol !== "https:" &&
+        !["localhost", "127.0.0.1"].includes(origin.hostname))
+    )
+      throw new Error("invalid-push-origin");
+    installPushPublicationObserver(
+      repositories,
+      options.pushRuntime,
+      options.now ?? (() => new Date()),
+    );
+  }
   const defaultTeamSize = options.teamSize ?? getTeamSize();
   const auth = createAuthService({
     adminUserIds: options.adminUserIds ?? getAdminUserIds(),
@@ -84,6 +101,12 @@ export function buildApp(options: AppOptions = {}) {
     domain: "core-ready",
   }));
 
+  registerPushRoutes(app, {
+    auth,
+    repositories,
+    now: options.now ?? (() => new Date()),
+    runtime: options.pushRuntime,
+  });
   registerAuthRoutes(app, auth, {
     authClientSessionFailureReporter: options.authClientSessionFailureReporter,
   });
