@@ -44,7 +44,7 @@ format: ## Format files with Prettier.
 format-check: ## Check Prettier formatting.
 	$(PNPM) format:check
 
-check: deployment-verify pilot-test ## Run the main pre-PR validation suite.
+check: deployment-verify pilot-test push-pilot-rehearsal ## Run the main pre-PR validation suite.
 	$(PNPM) lint
 	$(PNPM) format:check
 	$(PNPM) test
@@ -67,6 +67,10 @@ pilot-status: ## Show the shared pilot session and its current checkpoint.
 
 pilot-test: ## Verify pilot expiry, stop, ownership, and release allowance.
 	node --test scripts/pilot-session.test.mjs
+
+.PHONY: push-pilot-rehearsal
+push-pilot-rehearsal: ## Run the offline Web Push pilot policy rehearsal (no sends).
+	node --test scripts/push-pilot-rehearsal.test.mjs
 
 e2e: ## Run Playwright E2E tests against deterministic demo data.
 	$(PNPM) e2e

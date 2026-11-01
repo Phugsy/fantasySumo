@@ -1,5 +1,8 @@
 # Fantasy Sumo
 
+The proposed bounded notification experiment and offline policy rehearsal are
+documented in [the Web Push pilot plan](docs/WEB_PUSH_PILOT.md).
+
 Fantasy Sumo is an unfinished fantasy sports app for professional sumo.
 
 Players should be able to choose a team of rikishi at the start of a basho, then score points based on those rikishi's results during the tournament.
