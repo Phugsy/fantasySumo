@@ -90,9 +90,12 @@ export function resolveJoker(
   const attested = facts.publications.some(
     (p) => p.day === allocation.day && isAttestedCard(facts, p),
   );
+  // A verified day can still contain extra results retained from an older card.
+  // Never resolve those unless the original exact matchup remains attested.
+  if (!attested || !card) return "locked";
   // Schedule-only corrections retain old results. An exact attested cancellation
   // overrides that stale result before it can consume or boost the joker.
-  if (attested && card?.status === "cancelled") return "refunded";
+  if (card.status === "cancelled") return "refunded";
   const result =
     allocation.day <= jokerVerifiedDay(facts)
       ? facts.results.find(

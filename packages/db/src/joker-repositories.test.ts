@@ -249,6 +249,31 @@ for (const provider of ["sqlite", "postgres"] as const)
         );
         expect(events.length).toBe(3); // locked -> consumed -> refunded, once each.
       });
+      it("keeps a removed original matchup pending even when its old result remains", async () => {
+        const selected = await apply(command(await state(), 1));
+        const allocation = selected.allocations[0]!;
+        await repos.configureDemoJokers("2026-05-10T04:00:00.000Z", wall);
+        await advanceDemoBashoDay(repos, wall);
+        expect((await state()).allocations[0]?.state).toBe("consumed");
+        const results = await repos.listBoutResultsForBasho(id);
+        const bouts = (await repos.listScheduledBoutsForBasho(id)).filter(
+          (b) => b.day === 1 && b.id !== allocation.boutId,
+        );
+        const publication = (
+          await repos.listScheduledBoutPublicationsForBasho(id)
+        ).find((p) => p.day === 1)!;
+        expect(
+          await repos.applyScheduledBoutsImport({
+            publication: { ...publication, source: "demo:complete" },
+            bouts,
+          }),
+        ).toBe("applied");
+        expect(await repos.listBoutResultsForBasho(id)).toEqual(results);
+        const reconciled = await state();
+        expect(reconciled.allocations[0]?.state).toBe("locked");
+        expect(reconciled.remaining).toBe(2);
+        expect((await state()).allocations).toEqual(reconciled.allocations);
+      });
       it("does not enable a live collision, resets only demo trial data, and keeps the old schema API usable", async () => {
         await repos.upsertBasho({
           id: "live",

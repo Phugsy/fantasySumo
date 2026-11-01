@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   jokerDeadline,
   jokerWindow,
+  jokerVerifiedDay,
   resolveJoker,
   type JokerAllocation,
   type JokerFacts,
@@ -159,6 +160,37 @@ describe("joker window and resolution", () => {
         "2026-05-10T04:00:00.000Z",
       ),
     ).toBe("locked");
+  });
+  it("keeps removed or changed original cards pending despite retained results on a verified day", () => {
+    const otherBout = {
+      ...facts.bouts[0]!,
+      id: "other",
+      eastRikishiId: "a",
+      westRikishiId: "b",
+    };
+    const results: BoutResult[] = [
+      {
+        id: "stale",
+        bashoId: "b",
+        day: 1,
+        winnerRikishiId: "m",
+        loserRikishiId: "y",
+      },
+      {
+        id: "current",
+        bashoId: "b",
+        day: 1,
+        winnerRikishiId: "a",
+        loserRikishiId: "b",
+      },
+    ];
+    for (const current of [otherBout, { ...otherBout, id: selection.boutId }]) {
+      const corrected = { ...facts, bouts: [current], results };
+      expect(jokerVerifiedDay(corrected)).toBe(1);
+      expect(
+        resolveJoker(selection, corrected, "2026-05-10T04:00:00.000Z"),
+      ).toBe("locked");
+    }
   });
   it("doubles only the selected team win+kinboshi, keeps kachi-koshi unchanged, and bounds history", () => {
     const results: BoutResult[] = Array.from({ length: 8 }, (_, i) => ({
