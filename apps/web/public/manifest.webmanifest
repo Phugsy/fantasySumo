@@ -1,0 +1,10 @@
+{
+  "id": "/",
+  "name": "Fantasy Sumo",
+  "short_name": "Fantasy Sumo",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fffdf8",
+  "theme_color": "#183247"
+}

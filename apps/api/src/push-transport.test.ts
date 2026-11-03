@@ -30,6 +30,7 @@ const claim: PushClaim = {
     timezone: "Asia/Tokyo",
   },
   payload: {
+    revision: "r",
     title: "Fantasy Sumo",
     body: "synthetic-message",
     tag: "pick-window:b:1",

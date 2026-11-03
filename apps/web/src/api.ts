@@ -265,7 +265,7 @@ async function putJson<T>(url: string, body: unknown): Promise<T> {
 async function sendJson<T>(
   url: string,
   body: unknown,
-  method: "POST" | "PUT",
+  method: "POST" | "PUT" | "DELETE",
 ): Promise<T> {
   const response = await fetch(url, {
     body: JSON.stringify(body),
@@ -281,8 +281,51 @@ async function sendJson<T>(
     throw await createApiRequestError(response);
   }
 
-  return response.json() as Promise<T>;
+  return response.status === 204
+    ? (undefined as T)
+    : (response.json() as Promise<T>);
 }
+
+export interface PushPreferences {
+  available: boolean;
+  subscribed: boolean;
+  revision: string | null;
+  deviceId?: string;
+  timezone?: string;
+  ownerId?: string;
+  bashoId?: string;
+  endsAt?: string;
+  publicKey?: string;
+}
+
+export const fetchPushPreferences = () =>
+  getJson<PushPreferences>("/api/push/preferences");
+export const savePushSubscription = (body: {
+  expectedOwnerId: string;
+  deviceId: string;
+  expectedRevision: string | null;
+  subscription: {
+    endpoint: string;
+    expirationTime: number | null;
+    keys: { p256dh: string; auth: string };
+    timezone: string;
+  };
+}) =>
+  putJson<{ revision: string; revokeToken: string }>(
+    "/api/push/subscription",
+    body,
+  );
+export const revokePushDevice = (deviceId: string, revokeToken: string) =>
+  postJson<void>("/api/push/revoke-device", { deviceId, revokeToken });
+export const deletePushDevice = (
+  deviceId: string | undefined,
+  expectedOwnerId: string,
+) =>
+  sendJson<void>(
+    "/api/push/subscription",
+    { deviceId, expectedOwnerId },
+    "DELETE",
+  );
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   if (authTokenProvider === null) {

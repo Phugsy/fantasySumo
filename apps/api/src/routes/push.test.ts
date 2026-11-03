@@ -206,6 +206,27 @@ it("stores one owned subscription and allows only capability-proven device revoc
     await api.inject({ url: "/api/push/preferences", headers: headers() })
   ).json();
   expect(own.subscribed).toBe(true);
+  expect(own).toMatchObject({
+    ownerId: "alice",
+    bashoId,
+    endsAt: "2026-05-24T15:00:00.000Z",
+    publicKey: subscription.keys.p256dh,
+  });
+  const claim = await repos.claimPushOpening(bashoId, 1, "alice", now);
+  expect(claim!.payload.revision).toBe(own.revision);
+  expect(
+    (
+      await api.inject({
+        method: "DELETE",
+        url: "/api/push/subscription",
+        headers: headers("bob"),
+        payload: { deviceId, expectedOwnerId: "alice" },
+      })
+    ).statusCode,
+  ).toBe(409);
+  expect(
+    (await repos.getPushPreferences(bashoId, "alice", now)).subscribed,
+  ).toBe(true);
   expect(JSON.stringify(own)).not.toContain("endpoint");
   expect(JSON.stringify(own)).not.toContain("revokeToken");
   expect(

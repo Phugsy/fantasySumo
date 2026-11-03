@@ -27,7 +27,7 @@ export interface PushClaim {
   revision: string;
   subscription: PushSubscriptionData;
   ttl: number;
-  payload: ReturnType<typeof pushPayload>;
+  payload: ReturnType<typeof pushPayload> & { revision: string };
 }
 export interface PushPreferences {
   available: boolean;
@@ -285,7 +285,10 @@ export function createPushRepositories(database: AppDatabase) {
             revision: String(s!.revision),
             subscription: data!,
             ttl,
-            payload: pushPayload(id, day, window!.deadline),
+            payload: {
+              ...pushPayload(id, day, window!.deadline),
+              revision: String(s!.revision),
+            },
           };
         })(),
       ),

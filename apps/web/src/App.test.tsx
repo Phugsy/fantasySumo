@@ -8,6 +8,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import * as authClient from "./authClient";
+import * as pushBrowser from "./push-browser";
 import type { LeaderboardEntry } from "./types";
 
 const currentBasho = {
@@ -151,6 +152,22 @@ afterEach(() => {
 });
 
 describe("App", () => {
+  it("loads the game when optional reminder CacheStorage is unavailable", async () => {
+    vi.stubGlobal("caches", {
+      open: vi.fn(async () => {
+        throw new Error("storage unavailable");
+      }),
+    });
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "No team for this basho yet",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "My stable" }),
+    ).toBeInTheDocument();
+  });
   it("loads the current basho and rikishi", async () => {
     render(<App />);
 
@@ -381,6 +398,29 @@ describe("App", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("keeps credentials when reminder cleanup fails before sign-out", async () => {
+    const cleanup = vi
+      .spyOn(pushBrowser, "withPushAccountChange")
+      .mockRejectedValue(new Error("Reminder cleanup needs a retry."));
+    const fetchMock = vi.fn(mockSuccessfulFetch);
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    await screen.findByRole("heading", { name: "No team for this basho yet" });
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(
+      await screen.findByText("Reminder cleanup needs a retry."),
+    ).toBeInTheDocument();
+    expect(cleanup).toHaveBeenCalledWith("local-user", expect.any(Function));
+    expect(
+      fetchMock.mock.calls.some(
+        ([input, init]) =>
+          String(input) === "/api/session" &&
+          (init as RequestInit | undefined)?.method === "DELETE",
+      ),
+    ).toBe(false);
+    expect(window.location.pathname).toBe("/stable");
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled();
+  });
   it("stays on the private page and reports a failed sign-out", async () => {
     vi.stubGlobal(
       "fetch",
