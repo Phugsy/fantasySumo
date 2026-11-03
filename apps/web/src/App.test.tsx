@@ -152,6 +152,22 @@ afterEach(() => {
 });
 
 describe("App", () => {
+  it("loads the game when optional reminder CacheStorage is unavailable", async () => {
+    vi.stubGlobal("caches", {
+      open: vi.fn(async () => {
+        throw new Error("storage unavailable");
+      }),
+    });
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "No team for this basho yet",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "My stable" }),
+    ).toBeInTheDocument();
+  });
   it("loads the current basho and rikishi", async () => {
     render(<App />);
 
@@ -384,7 +400,7 @@ describe("App", () => {
 
   it("keeps credentials when reminder cleanup fails before sign-out", async () => {
     const cleanup = vi
-      .spyOn(pushBrowser, "suspendPush")
+      .spyOn(pushBrowser, "withPushAccountChange")
       .mockRejectedValue(new Error("Reminder cleanup needs a retry."));
     const fetchMock = vi.fn(mockSuccessfulFetch);
     vi.stubGlobal("fetch", fetchMock);
@@ -394,7 +410,7 @@ describe("App", () => {
     expect(
       await screen.findByText("Reminder cleanup needs a retry."),
     ).toBeInTheDocument();
-    expect(cleanup).toHaveBeenCalledWith("local-user");
+    expect(cleanup).toHaveBeenCalledWith("local-user", expect.any(Function));
     expect(
       fetchMock.mock.calls.some(
         ([input, init]) =>

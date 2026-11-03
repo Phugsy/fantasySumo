@@ -3,6 +3,7 @@ import * as api from "./api";
 import {
   enablePush,
   disableAllPush,
+  withPushAccountChange,
   readPushConsent,
   reconcilePushSession,
   suspendPush,
@@ -140,11 +141,57 @@ it("disables the server even when native notification cleanup fails", async () =
     new Error("browser cleanup failed"),
   );
   await expect(disableAllPush("alice")).rejects.toThrow(
-    "Unable to silence reminders",
+    "disabled on the server",
   );
   expect(api.deletePushDevice).toHaveBeenCalledWith(undefined, "alice");
   expect(api.revokePushDevice).toHaveBeenCalledOnce();
   expect(await readPushConsent()).toMatchObject({ enabled: false });
+});
+it("performs account-wide server opt-out even when CacheStorage fails", async () => {
+  vi.stubGlobal("caches", {
+    open: vi.fn(async () => {
+      throw new Error("storage blocked");
+    }),
+  });
+  await expect(disableAllPush("alice")).rejects.toThrow(
+    "disabled on the server",
+  );
+  expect(api.deletePushDevice).toHaveBeenCalledWith(undefined, "alice");
+});
+it("does not block game startup when optional CacheStorage fails", async () => {
+  vi.stubGlobal("caches", {
+    open: vi.fn(async () => {
+      throw new Error("storage blocked");
+    }),
+  });
+  await expect(reconcilePushSession("alice")).resolves.toBeUndefined();
+  expect(register).not.toHaveBeenCalled();
+});
+it("keeps enrollment excluded throughout a delayed sign-out auth transition", async () => {
+  await enablePush("alice", base);
+  let finish!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const authChange = vi.fn(async () => {
+    await pending;
+    vi.mocked(api.fetchPushPreferences).mockResolvedValue({
+      ...base,
+      available: false,
+      ownerId: undefined,
+    });
+  });
+  const signingOut = withPushAccountChange("alice", authChange);
+  await vi.waitFor(() => expect(authChange).toHaveBeenCalledOnce());
+  const queuedEnrollment = enablePush("alice", base);
+  const handledEnrollment =
+    expect(queuedEnrollment).rejects.toThrow("not available");
+  expect(await readPushConsent()).toBeUndefined();
+  finish();
+  await signingOut;
+  await handledEnrollment;
+  expect(await readPushConsent()).toBeUndefined();
+  expect(api.savePushSubscription).toHaveBeenCalledOnce();
 });
 it("ignores corrupt local metadata without enabling or blocking an anonymous session", async () => {
   stored = "not-json";

@@ -79,7 +79,7 @@ import type {
 } from "./types";
 import { canEditFantasyPicks, getPickLockMessage } from "./lifecycle";
 import { DisplayPreferencesProvider } from "./DisplayPreferences";
-import { reconcilePushSession, suspendPush } from "./push-browser";
+import { reconcilePushSession, withPushAccountChange } from "./push-browser";
 import { PushSettings } from "./components/PushSettings";
 
 const PASSWORD_RESET_SESSION_ERROR_MESSAGE =
@@ -401,20 +401,21 @@ function RoutedApp() {
     setSessionErrorMessage(null);
 
     try {
-      if (sessionUser) await suspendPush(sessionUser.id);
-      else await reconcilePushSession(null);
-      const session =
-        authMode === "neon"
-          ? await submitNeonAccount({
-              displayName: accountDisplayName.trim(),
-              email: accountEmail.trim(),
-              intent,
-              password: accountPassword,
-            })
-          : await createSession({
-              email: accountEmail.trim(),
-              displayName: accountDisplayName.trim(),
-            });
+      const session = await withPushAccountChange(
+        sessionUser?.id ?? null,
+        () =>
+          authMode === "neon"
+            ? submitNeonAccount({
+                displayName: accountDisplayName.trim(),
+                email: accountEmail.trim(),
+                intent,
+                password: accountPassword,
+              })
+            : createSession({
+                email: accountEmail.trim(),
+                displayName: accountDisplayName.trim(),
+              }),
+      );
 
       await reconcilePushSession(session.user?.id ?? null);
       setAuthMode(session.mode);
@@ -447,12 +448,10 @@ function RoutedApp() {
     setSessionErrorMessage(null);
 
     try {
-      await suspendPush(sessionUser?.id ?? null);
-      if (authMode === "neon") {
-        await signOutNeon();
-      } else {
-        await clearSession();
-      }
+      await withPushAccountChange(sessionUser?.id ?? null, async () => {
+        if (authMode === "neon") await signOutNeon();
+        else await clearSession();
+      });
       navigate(appPaths.home, { replace: true });
       await wait(0);
       clearAuthenticatedPlayerState();
@@ -475,9 +474,7 @@ function RoutedApp() {
 
   async function handlePasswordReset(newPassword: string, token: string) {
     try {
-      if (sessionUser) await suspendPush(sessionUser.id);
-      else await reconcilePushSession(null);
-      await signOutNeon();
+      await withPushAccountChange(sessionUser?.id ?? null, signOutNeon);
     } catch {
       // Do not consume the single-use reset token unless the previous provider
       // session is confirmed closed. The player can safely retry this step.

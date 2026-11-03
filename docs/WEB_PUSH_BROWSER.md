@@ -38,12 +38,16 @@ and a 15-bit displayed-day mask. No endpoint, push encryption key, password or
 auth bearer token is copied there. Native subscription data remains browser
 managed and is sent only to the existing authenticated same-origin API.
 
-Opt-out first mutes local display and closes existing notifications, then revokes
-the server binding and unsubscribes the native endpoint. Sign-out and password
-reset call cleanup before discarding credentials. The shared lock also covers
-enrollment before it creates a local record, preventing a concurrent sign-out
-from missing that enrollment. Cleanup failure leaves the device muted and the
-proof available for retry; explicit sign-out does not silently discard it.
+Device opt-out first mutes local display and closes existing notifications, then
+revokes the server binding and unsubscribes the native endpoint. Account-wide
+server deletion precedes all optional storage/browser work, so storage failure
+cannot prevent it. Sign-in/out and reset cleanup hold the shared lock through the
+awaited auth mutation, preventing another tab from enrolling during a delayed
+sign-out. The same lock covers enrollment before it creates local metadata.
+Active/unknown consent cleanup failures preserve credentials and recovery proof.
+Ordinary game startup isolates optional storage errors and attempts native
+disconnection; it never enrolls or renews. Server opt-out remains accessible when
+local storage is unavailable, while device enrollment is disabled.
 
 Restoring an anonymous session silences/disconnects locally and retains the proof
 for the next authenticated cleanup. A changed signed-in account can use that

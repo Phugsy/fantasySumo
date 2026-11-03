@@ -80,3 +80,26 @@ it("keeps cleanup available after a failed enrollment writes muted recovery stat
     screen.getByRole("button", { name: "Turn off on this device" }),
   ).toBeEnabled();
 });
+it("offers independent server opt-out when optional local storage is blocked", async () => {
+  vi.mocked(api.fetchPushPreferences).mockResolvedValue({
+    available: true,
+    ownerId: "alice",
+    subscribed: true,
+    revision: "r",
+  });
+  vi.mocked(browser.readPushConsent).mockRejectedValue(
+    new Error("storage blocked"),
+  );
+  render(<PushSettings ownerId="alice" sessionBusy={false} />);
+  const disable = await screen.findByRole("button", {
+    name: "Disable reminders everywhere",
+  });
+  expect(disable).toBeEnabled();
+  expect(
+    screen.getByRole("button", { name: "Enable on this device" }),
+  ).toBeDisabled();
+  fireEvent.click(disable);
+  await waitFor(() =>
+    expect(browser.disableAllPush).toHaveBeenCalledWith("alice"),
+  );
+});

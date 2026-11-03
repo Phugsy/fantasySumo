@@ -20,6 +20,7 @@ export function PushSettings({
   const [preferences, setPreferences] = useState<PushPreferences | null>(null);
   const [device, setDevice] = useState<DeviceConsent>();
   const [busy, setBusy] = useState(false);
+  const [storageReady, setStorageReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pending = useRef(false);
   const requestId = useRef(0);
@@ -28,11 +29,18 @@ export function PushSettings({
     const refresh = () => {
       if (pending.current) return;
       const request = ++requestId.current;
-      return Promise.all([fetchPushPreferences(), readPushConsent()])
+      return Promise.all([
+        fetchPushPreferences(),
+        readPushConsent().then(
+          (device) => ({ device, ready: true }),
+          () => ({ device: undefined, ready: false }),
+        ),
+      ])
         .then(([p, d]) => {
           if (current && requestId.current === request && !pending.current) {
             setPreferences(p);
-            setDevice(d);
+            setDevice(d.device);
+            setStorageReady(d.ready);
           }
         })
         .catch(() => {
@@ -47,7 +55,9 @@ export function PushSettings({
       window.removeEventListener("focus", refresh);
     };
   }, [ownerId]);
-  const supported = pushSupport();
+  const supported = storageReady
+    ? pushSupport()
+    : "Reminder storage is unavailable in this browser. You can still disable server reminders.";
   const active =
     preferences?.subscribed &&
     device?.enabled &&

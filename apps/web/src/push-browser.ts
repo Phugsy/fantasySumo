@@ -96,6 +96,23 @@ async function ownRegistration() {
     ? registration
     : undefined;
 }
+async function disconnectNative() {
+  const registration = await ownRegistration();
+  let closeFailed = false;
+  try {
+    for (const notification of (await registration?.getNotifications()) ?? [])
+      notification.close();
+  } catch {
+    closeFailed = true;
+  }
+  const subscription = await registration?.pushManager.getSubscription();
+  if (subscription && !(await subscription.unsubscribe()))
+    throw new Error(
+      "Unable to disconnect this device. Try again before signing out.",
+    );
+  if (closeFailed)
+    throw new Error("Unable to close existing reminders. Try again.");
+}
 async function silence(record: DeviceConsent) {
   await writeConsent({ ...record, enabled: false });
   const registration = await ownRegistration();
@@ -139,46 +156,79 @@ export async function suspendPush(owner: string | null) {
   if (!navigator.locks && !(await readPushConsent())) return;
   await exclusive(() => suspendLocked(owner, true));
 }
+// Keep enrollment excluded until the awaited auth mutation has actually ended.
+export async function withPushAccountChange<T>(
+  owner: string | null,
+  change: () => Promise<T>,
+): Promise<T> {
+  const work = async () => {
+    try {
+      await suspendLocked(owner, owner !== null);
+    } catch (error) {
+      // Inactive optional storage must not block ordinary accounts that have no
+      // server subscription. Active/unknown consent still requires safe cleanup.
+      if (owner !== null) {
+        const p = await fetchPushPreferences().catch(() => undefined);
+        if (!p || p.available || p.subscribed) throw error;
+      }
+      await disconnectNative();
+    }
+    return change();
+  };
+  if (!navigator.locks && !(await readPushConsent().catch(() => undefined)))
+    return change();
+  return exclusive(work);
+}
 export async function disableAllPush(owner: string) {
   // Account-wide server opt-out remains available without native browser APIs.
   const work = async () => {
-    const record = await readPushConsent();
+    // This must precede every optional CacheStorage/native operation.
     await deletePushDevice(undefined, owner);
-    if (record?.ownerId === owner) await suspendLocked(owner, true);
+    try {
+      const record = await readPushConsent();
+      if (record?.ownerId === owner) await suspendLocked(owner, true);
+    } catch {
+      throw new Error(
+        "Reminders are disabled on the server, but browser cleanup needs a retry.",
+      );
+    }
   };
   if (navigator.locks) await exclusive(work);
-  else {
-    if (await readPushConsent())
-      throw new Error("This browser cannot safely manage reminders.");
-    await work();
-  }
+  else await work();
 }
 // A restored/externally changed session must not inherit the old account's opt-in.
 // Anonymous startup silences locally and retains only the proof for next login.
 export async function reconcilePushSession(owner: string | null) {
-  if (!navigator.locks && !(await readPushConsent())) return;
-  await exclusive(async () => {
-    const record = await readPushConsent();
-    if (!record) return;
-    if (record.ownerId !== owner) {
-      await suspendLocked(owner, owner !== null);
-      return;
-    }
-    try {
-      const p = await fetchPushPreferences();
-      if (
-        !available(p, owner!) ||
-        !p.subscribed ||
-        p.revision !== record.revision ||
-        p.deviceId !== record.deviceId ||
-        Notification.permission !== "granted"
-      ) {
+  try {
+    if (!navigator.locks && !(await readPushConsent())) return;
+    await exclusive(async () => {
+      const record = await readPushConsent();
+      if (!record) return;
+      if (record.ownerId !== owner) {
+        await suspendLocked(owner, owner !== null);
+        return;
+      }
+      try {
+        const p = await fetchPushPreferences();
+        if (
+          !available(p, owner!) ||
+          !p.subscribed ||
+          p.revision !== record.revision ||
+          p.deviceId !== record.deviceId ||
+          Notification.permission !== "granted"
+        ) {
+          await silence(record);
+        }
+      } catch {
         await silence(record);
       }
-    } catch {
-      await silence(record);
-    }
-  });
+    });
+  } catch {
+    // Optional reminder storage must not prevent the game from loading. The
+    // worker also rejects unreadable storage; disconnect existing native push
+    // best-effort while retaining recovery proof for a later authenticated retry.
+    await disconnectNative().catch(() => {});
+  }
 }
 function publicKey(value: string): Uint8Array<ArrayBuffer> {
   if (!/^[A-Za-z0-9_-]+$/.test(value))
