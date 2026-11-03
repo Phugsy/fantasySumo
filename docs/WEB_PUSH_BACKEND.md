@@ -82,16 +82,14 @@ contract and live joker opt-in are separately reviewed. The existing adapter's
 resolved-winner attestation must not be weakened to make this work. That source
 dependency is described in `WEB_PUSH_PILOT.md`; this backend does not solve it.
 
-Automatic approval review rejected authoring the browser connector because the
-patch would add real permission requests, service-worker registration and
-PushManager subscription calls before separately approved activation/collection.
-That patch was not applied. No browser connector, permission prompt, service
-worker, browser subscription storage or client collection call is included here.
-Ask the owner explicitly before authoring that follow-up; do not bypass the
-rejection through another tool or indirect implementation.
+The owner separately authorized browser source-code preparation on 3 November
+2026 after the initial connector patch had been withheld. Its explicit gesture
+flow, persistent local consent, worker and synthetic-only validation are described
+in [the browser preparation](WEB_PUSH_BROWSER.md). That authorization does not
+permit real permission prompts, registrations, subscriptions or delivery tests.
 
-Before any real pilot, the remaining gates are browser-code authorization and
-implementation (including account switching and staleness), trustworthy live
+Before any real pilot, the remaining gates are completed browser/security review
+and real-device validation (including account switching and staleness), trustworthy live
 card attestation, account-deletion cleanup, named roster/basho/operator selection,
 secret configuration, ownership/CSRF/SSRF/security review, actual deployment-SHA
 approval, activation and explicit consenting-device delivery tests. No real

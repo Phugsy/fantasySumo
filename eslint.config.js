@@ -11,6 +11,10 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    files: ["apps/web/public/push-worker.js"],
+    languageOptions: { globals: globals.serviceworker },
+  },
+  {
     files: ["scripts/**/*.mjs"],
     languageOptions: {
       globals: globals.node,

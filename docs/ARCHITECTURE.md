@@ -8,7 +8,9 @@ opening statuses. The production entrypoint supplies no runtime configuration;
 no activation API or environment switch is provided. Its post-commit observer,
 bounded pinned transport and authenticated same-origin API are tested with
 synthetic data only. Live pre-bout attestation and browser integration remain
-separate launch gates; no browser subscription connector is included.
+separate launch gates. The [browser connector preparation](WEB_PUSH_BROWSER.md)
+adds explicit opt-in/opt-out, serialized local consent and a guarded worker,
+tested only with simulated browser APIs. Production remains unavailable.
 
 ## Rebuild decision
 

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { PushError, type Repositories } from "@fantasy-sumo/db";
+import { pushBashoEnd } from "@fantasy-sumo/domain";
 import type { AuthService } from "../auth.js";
 import { validatePushSubscription } from "../push-transport.js";
 import type { PushRuntime } from "../push.js";
@@ -48,7 +49,15 @@ export function registerPushRoutes(
     return {
       ...preferences,
       ...(preferences.available
-        ? { publicKey: context.runtime.publicKey }
+        ? {
+            publicKey: context.runtime.publicKey,
+            ownerId: user.id,
+            bashoId: context.runtime.bashoId,
+            endsAt: pushBashoEnd(
+              (await context.repositories.getBasho(context.runtime.bashoId))!
+                .endDate,
+            ),
+          }
         : {}),
     };
   });
@@ -140,11 +149,19 @@ export function registerPushRoutes(
       )
         return reply.code(403).send({ error: "same-origin-required" });
       const parsed = z
-        .object({ deviceId: z.string().uuid().optional() })
+        .object({
+          deviceId: z.string().uuid().optional(),
+          expectedOwnerId: z.string().min(1).max(200).optional(),
+        })
         .strict()
         .safeParse(request.body);
       if (!parsed.success)
         return reply.code(400).send({ error: "invalid-request" });
+      if (
+        parsed.data.expectedOwnerId !== undefined &&
+        parsed.data.expectedOwnerId !== user.id
+      )
+        return reply.code(409).send({ error: "session-changed" });
       await context.repositories.disablePushSubscriptions(
         runtime.bashoId,
         user.id,

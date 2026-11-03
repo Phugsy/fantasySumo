@@ -79,6 +79,8 @@ import type {
 } from "./types";
 import { canEditFantasyPicks, getPickLockMessage } from "./lifecycle";
 import { DisplayPreferencesProvider } from "./DisplayPreferences";
+import { reconcilePushSession, suspendPush } from "./push-browser";
+import { PushSettings } from "./components/PushSettings";
 
 const PASSWORD_RESET_SESSION_ERROR_MESSAGE =
   "We could not securely end the current session. Check your connection and try again.";
@@ -399,6 +401,8 @@ function RoutedApp() {
     setSessionErrorMessage(null);
 
     try {
+      if (sessionUser) await suspendPush(sessionUser.id);
+      else await reconcilePushSession(null);
       const session =
         authMode === "neon"
           ? await submitNeonAccount({
@@ -412,6 +416,7 @@ function RoutedApp() {
               displayName: accountDisplayName.trim(),
             });
 
+      await reconcilePushSession(session.user?.id ?? null);
       setAuthMode(session.mode);
       setSessionUser(session.user);
       setAccountPassword("");
@@ -442,6 +447,7 @@ function RoutedApp() {
     setSessionErrorMessage(null);
 
     try {
+      await suspendPush(sessionUser?.id ?? null);
       if (authMode === "neon") {
         await signOutNeon();
       } else {
@@ -469,6 +475,8 @@ function RoutedApp() {
 
   async function handlePasswordReset(newPassword: string, token: string) {
     try {
+      if (sessionUser) await suspendPush(sessionUser.id);
+      else await reconcilePushSession(null);
       await signOutNeon();
     } catch {
       // Do not consume the single-use reset token unless the previous provider
@@ -705,6 +713,7 @@ function RoutedApp() {
           return;
         }
 
+        await reconcilePushSession(session.user?.id ?? null);
         setAuthMode(session.mode);
         setSessionUser(session.user);
         setAccountEmail(session.user?.email ?? "");
@@ -998,6 +1007,13 @@ function RoutedApp() {
                       scheduleLoadState={scheduleLoadState}
                       user={sessionUser}
                     />
+                    {sessionUser !== null && (
+                      <PushSettings
+                        key={sessionUser.id}
+                        ownerId={sessionUser.id}
+                        sessionBusy={sessionState !== "ready"}
+                      />
+                    )}
                   </>,
                 )}
               </ProtectedRoute>
