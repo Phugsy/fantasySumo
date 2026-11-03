@@ -66,6 +66,10 @@ export function PushSettings({
     preferences.revision === device.revision &&
     preferences.deviceId === device.deviceId;
   const available = preferences?.available && preferences.ownerId === ownerId;
+  const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const reminderTimezone = preferences?.subscribed
+    ? (preferences.timezone ?? device?.timezone ?? currentTimezone)
+    : currentTimezone;
   async function change(action: "enable" | "device" | "all") {
     if (pending.current || sessionBusy) return;
     pending.current = true;
@@ -116,10 +120,16 @@ export function PushSettings({
       {available && (
         <>
           <p className={styles.text}>
-            Quiet hours: 22:00–08:00 (
-            {Intl.DateTimeFormat().resolvedOptions().timeZone}). Reminders
-            during quiet hours are skipped.
+            Quiet hours: 22:00–08:00 ({reminderTimezone}). Reminders during
+            quiet hours are skipped.
           </p>
+          {preferences?.subscribed && reminderTimezone !== currentTimezone && (
+            <p className={styles.text}>
+              {active
+                ? `Turn off on this device, then enable again to use ${currentTimezone}.`
+                : `Enabling on this device will use ${currentTimezone}.`}
+            </p>
+          )}
           {supported && <p className={styles.text}>{supported}</p>}
           <div className={styles.controls}>
             <button

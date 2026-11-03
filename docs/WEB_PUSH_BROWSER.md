@@ -16,8 +16,14 @@ a worker or subscribes a device.
 When separately activated in a later approved release, **Enable on this device**
 requests permission directly from the click. Secure context, Notification,
 PushManager, service workers, CacheStorage and Web Locks are required. iPhone/iPad
-also requires Home Screen installation. Unsupported or denied permission keeps
-the game usable without reminders. The browser's current IANA timezone is shown;
+also requires Home Screen installation. A minimal linked web manifest supplies stable
+app identity, scope and standalone display for that installation; it adds no
+install prompt or offline caching. The OS can supply its fallback monogram icon.
+See [WebKit's Home Screen requirements](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/).
+Unsupported or denied permission keeps
+the game usable without reminders. Existing reminders show their saved IANA
+timezone, including after travel. New enrollment uses the browser's current zone;
+turn off and re-enable to change the selected device's zone. Quiet hours are shown;
 quiet openings are skipped rather than deferred. Enabling replaces the account's
 previous selected device. **Turn off on this device** and **Disable reminders
 everywhere** are explicit controls; the latter works without native Push APIs.

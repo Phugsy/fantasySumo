@@ -98,6 +98,18 @@ test("default backend never requests notification permissions or device registra
   page,
 }) => {
   await signIn(page);
+  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
+    "href",
+    "/manifest.webmanifest",
+  );
+  const manifest = await page.request.get("/manifest.webmanifest");
+  expect(manifest.ok()).toBe(true);
+  expect(await manifest.json()).toMatchObject({
+    id: "/",
+    start_url: "/",
+    scope: "/",
+    display: "standalone",
+  });
   await expect(
     page.getByText("Reminders are not available for this account yet."),
   ).toBeVisible();

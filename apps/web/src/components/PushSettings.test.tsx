@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import * as api from "../api";
 import * as browser from "../push-browser";
 import { PushSettings } from "./PushSettings";
@@ -11,6 +11,7 @@ vi.mock("../push-browser", () => ({
   pushSupport: vi.fn(),
   readPushConsent: vi.fn(),
 }));
+afterEach(() => vi.restoreAllMocks());
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(browser.pushSupport).mockReturnValue(null);
@@ -102,4 +103,44 @@ it("offers independent server opt-out when optional local storage is blocked", a
   await waitFor(() =>
     expect(browser.disableAllPush).toHaveBeenCalledWith("alice"),
   );
+});
+it("shows the saved quiet-hours zone after the browser timezone changes", async () => {
+  vi.spyOn(Intl, "DateTimeFormat").mockReturnValue({
+    resolvedOptions: () => ({ timeZone: "Europe/London" }),
+  } as Intl.DateTimeFormat);
+  vi.mocked(api.fetchPushPreferences).mockResolvedValue({
+    available: true,
+    ownerId: "alice",
+    subscribed: true,
+    revision: "r",
+    deviceId: "device",
+    timezone: "Asia/Tokyo",
+  });
+  vi.mocked(browser.readPushConsent).mockResolvedValue({
+    ownerId: "alice",
+    deviceId: "device",
+    enabled: true,
+    revision: "r",
+    timezone: "Asia/Tokyo",
+  });
+  const view = render(<PushSettings ownerId="alice" sessionBusy={false} />);
+  expect(
+    await screen.findByText("Reminders are on for this device."),
+  ).toBeInTheDocument();
+  expect(screen.getByText(/Quiet hours:/)).toHaveTextContent("Asia/Tokyo");
+  expect(
+    screen.getByText(
+      "Turn off on this device, then enable again to use Europe/London.",
+    ),
+  ).toBeInTheDocument();
+  view.unmount();
+  vi.mocked(browser.readPushConsent).mockResolvedValue(undefined);
+  render(<PushSettings ownerId="alice" sessionBusy={false} />);
+  expect(
+    await screen.findByText(/Enabling here replaces it/),
+  ).toBeInTheDocument();
+  expect(screen.getByText(/Quiet hours:/)).toHaveTextContent("Asia/Tokyo");
+  expect(
+    screen.getByText("Enabling on this device will use Europe/London."),
+  ).toBeInTheDocument();
 });
