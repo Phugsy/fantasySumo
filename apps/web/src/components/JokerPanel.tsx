@@ -18,8 +18,10 @@ export function JokerPanel({
   onRefresh?: () => Promise<void>;
 }) {
   const [data, setData] = useState<Snapshot | null>(null);
-  const [day, setDay] = useState(1);
-  const [target, setTarget] = useState("");
+  const [selection, setSelection] = useState<{
+    day: number;
+    target: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [elapsed, setElapsed] = useState<{
@@ -41,18 +43,7 @@ export function JokerPanel({
       .then((r) => {
         if (!current) return;
         setData(r.snapshot);
-
-        const initial =
-          r.snapshot?.windows.find((w) => w.status === "open")?.day ?? 1;
-        setDay(initial);
-        const allocation = r.snapshot?.allocations.find(
-          (a) => a.day === initial && a.state !== "removed",
-        );
-        setTarget(
-          allocation
-            ? JSON.stringify([allocation.boutId, allocation.rikishiId])
-            : "",
-        );
+        setSelection(null);
       })
       .catch((e) => {
         if (current) setError(getErrorMessage(e));
@@ -71,19 +62,33 @@ export function JokerPanel({
       window.clearInterval(timer);
     };
   }, [bashoId]);
-  const pickWindow = data?.windows.find((w) => w.day === day);
-  const current = data?.allocations.find((a) => a.day === day);
   const clock = data
     ? new Date(data.now).getTime() +
       (elapsed.anchor === data.now ? elapsed.ms : 0)
     : 0;
+  // Deadlines are noon JST. Match today's Japan date, even after cutoff,
+  // rather than skipping to a future window that happens to be open.
+  const japanDate = new Date(clock + 9 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  const pickWindow = data?.windows.find(
+    (w) => w.deadline.slice(0, 10) === japanDate,
+  );
+  const day = pickWindow?.day;
+  const current = data?.allocations.find((a) => a.day === day);
+  const target =
+    selection && selection.day === day
+      ? selection.target
+      : current && current.state !== "removed"
+        ? JSON.stringify([current.boutId, current.rikishiId])
+        : "";
   const open =
     pickWindow?.status === "open" &&
     clock < new Date(pickWindow.deadline).getTime();
   const canReserve =
     !!current && current.state !== "removed" && current.state !== "refunded";
   async function save(remove = false) {
-    if (!data || !pickWindow || busy) return;
+    if (!data || !pickWindow || day === undefined || busy) return;
     const selected = pickWindow.targets.find(
       (t) => JSON.stringify([t.boutId, t.rikishiId]) === target,
     );
@@ -101,8 +106,7 @@ export function JokerPanel({
       });
       if (!mounted.current) return;
       setData(result.snapshot);
-
-      if (remove) setTarget("");
+      setSelection(null);
     } catch (e) {
       if (!mounted.current) return;
       setError(getErrorMessage(e));
@@ -110,6 +114,7 @@ export function JokerPanel({
         const latest = await fetchMyJokers(bashoId);
         if (mounted.current) {
           setData(latest.snapshot);
+          setSelection(null);
         }
       } catch {
         /* Preserve the authoritative action error. */
@@ -125,6 +130,7 @@ export function JokerPanel({
       const latest = await fetchMyJokers(bashoId);
       if (mounted.current) {
         setData(latest.snapshot);
+        setSelection(null);
         await onRefresh?.();
       }
     } catch (e) {
@@ -149,29 +155,9 @@ export function JokerPanel({
           are preserved; new allocations are blocked pending reconciliation.
         </p>
       )}
-      <label className={styles.field}>
-        Basho day
-        <select
-          value={day}
-          disabled={busy}
-          onChange={(e) => {
-            const d = Number(e.target.value);
-            setDay(d);
-            const a = data.allocations.find(
-              (a) => a.day === d && a.state !== "removed",
-            );
-            setTarget(a ? JSON.stringify([a.boutId, a.rikishiId]) : "");
-          }}
-        >
-          {data.windows.map((w) => (
-            <option key={w.day} value={w.day}>
-              Day {w.day}
-            </option>
-          ))}
-        </select>
-      </label>
       {pickWindow && (
         <>
+          <p>Current basho day: {day} (Japan time).</p>
           <p role="status">
             Pick Window:{" "}
             {open
@@ -204,7 +190,9 @@ export function JokerPanel({
             <select
               value={target}
               disabled={!open || busy}
-              onChange={(e) => setTarget(e.target.value)}
+              onChange={(e) =>
+                setSelection({ day: pickWindow.day, target: e.target.value })
+              }
             >
               <option value="">Choose from your stable</option>
               {pickWindow.targets.map((t) => (
@@ -212,8 +200,8 @@ export function JokerPanel({
                   value={JSON.stringify([t.boutId, t.rikishiId])}
                   key={JSON.stringify([t.boutId, t.rikishiId])}
                 >
-                  {names[t.rikishiId] ?? t.rikishiId} vs{" "}
-                  {names[t.opponentId] ?? t.opponentId}
+                  {names[t.rikishiId] ?? t.rikishiId} (fights{" "}
+                  {names[t.opponentId] ?? t.opponentId})
                 </option>
               ))}
             </select>
@@ -259,6 +247,14 @@ export function JokerPanel({
               .
             </p>
           )}
+        </>
+      )}
+      {!pickWindow && (
+        <>
+          <p>No Pick Window today. Jokers follow the basho dates in Japan.</p>
+          <button type="button" disabled={busy} onClick={() => void refresh()}>
+            Refresh joker window
+          </button>
         </>
       )}
       {error && <p role="alert">{error}</p>}

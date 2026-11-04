@@ -52,9 +52,13 @@ corresponding owner approvals.
    it then advances with elapsed server time. Base scoring can change only until
    the existing permanent scoring-rule lock, and the preset follows it.
 3. Create a normal stable, then start the demo to lock original picks. My Stable
-   shows each daily Pick Window, deadline/countdown, owned targets, current
-   allocation, remaining allowance and allocation history. Refresh the window to
-   reconcile newly imported facts. Original picks cannot be replaced by a joker.
+   shows today's Pick Window using the server clock's Japan date, with a
+   deadline/countdown, owned targets labelled "Ura (fights Takayasu)", current
+   allocation, remaining allowance and allocation history. Players cannot choose
+   a different basho day; after noon today's window stays closed until the next
+   Japan date, even when a future card is already published. Outside the basho
+   dates there is no current window. Refresh the window to reconcile newly
+   imported facts. Original picks cannot be replaced by a joker.
 4. The administrator can advance the UTC ISO demo clock, then advance results.
    Time cannot rewind. Day 2's first bout is a synthetic fusen win (refund); day
    4's first bout is a synthetic Ura win over Onosato (gold star). These changes

@@ -45,14 +45,30 @@ test("plays the demo joker journey through edits, deadline, refund, budget and g
   await expect(
     panel.getByText("Pick Window: Open", { exact: true }),
   ).toBeVisible();
+  await expect(
+    panel.getByText("Current basho day: 1 (Japan time)."),
+  ).toBeVisible();
+  await expect(panel.getByLabel("Basho day", { exact: true })).toHaveCount(0);
+  await expect(
+    panel.getByRole("option", { name: "Ura (fights Takayasu)", exact: true }),
+  ).toHaveCount(1);
   async function snapshot() {
     return (await (await page.request.get(`/api/basho/${id}/my-jokers`)).json())
       .snapshot;
   }
   async function select(rikishiId: string) {
     const s = await snapshot();
-    const day = Number(await panel.getByLabel("Basho day").inputValue());
-    const target = s.windows[day - 1].targets.find(
+    const japanDate = new Date(Date.parse(s.now) + 9 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    const today = s.windows.find(
+      (w: { deadline: string }) => w.deadline.slice(0, 10) === japanDate,
+    );
+    const day = today.day;
+    await expect(
+      panel.getByText(`Current basho day: ${day} (Japan time).`),
+    ).toBeVisible();
+    const target = today.targets.find(
       (t: { rikishiId: string }) => t.rikishiId === rikishiId,
     );
     await panel
@@ -93,7 +109,9 @@ test("plays the demo joker journey through edits, deadline, refund, budget and g
   await expect(panel.getByText(/3 of 3 jokers remaining/)).toBeVisible();
   await select("onosato");
   await clock("2026-05-10T03:00:00.000Z");
-  await panel.getByLabel("Basho day").selectOption("1");
+  await expect(
+    panel.getByText("Current basho day: 1 (Japan time)."),
+  ).toBeVisible();
   await expect(
     panel.getByText("Pick Window: Closed", { exact: true }),
   ).toBeVisible();
