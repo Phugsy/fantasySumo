@@ -1,5 +1,6 @@
 import {
   check,
+  primaryKey,
   integer,
   sqliteTable,
   text,
@@ -201,3 +202,60 @@ export const specialPrizeSnapshots = sqliteTable("special_prize_snapshots", {
   fetchedAt: text("fetched_at").notNull(),
   awardsJson: text("awards_json").notNull(),
 });
+
+// Opt-in trial tables are additive; normal bashos have no row here.
+export const bashoJokerTrial = sqliteTable(
+  "basho_joker_trial",
+  {
+    bashoId: text("basho_id")
+      .primaryKey()
+      .references(() => basho.id, { onDelete: "cascade" }),
+    preset: text("preset").notNull(),
+    baseMode: text("base_mode").notNull(),
+    clock: text("clock").notNull(),
+    clockSetAt: text("clock_set_at").notNull(),
+  },
+  (table) => [
+    check("joker_preset", sql`${table.preset} = 'three-joker-v1'`),
+    check(
+      "joker_base_mode",
+      sql`${table.baseMode} IN ('wins-v0', 'achievements-v1')`,
+    ),
+  ],
+);
+export const jokerAllocations = sqliteTable(
+  "joker_allocations",
+  {
+    bashoId: text("basho_id")
+      .notNull()
+      .references(() => basho.id, { onDelete: "cascade" }),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => fantasyTeams.id, { onDelete: "cascade" }),
+    day: integer("day").notNull(),
+    payloadJson: text("payload_json").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.teamId, table.day] }),
+    check("joker_day", sql`${table.day} BETWEEN 1 AND 15`),
+  ],
+);
+export const jokerEvents = sqliteTable(
+  "joker_events",
+  {
+    id: text("id").primaryKey(),
+    bashoId: text("basho_id")
+      .notNull()
+      .references(() => basho.id, { onDelete: "cascade" }),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => fantasyTeams.id, { onDelete: "cascade" }),
+    requestId: text("request_id"),
+    fingerprint: text("fingerprint").notNull(),
+    payloadJson: text("payload_json").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("joker_event_request_idx").on(table.teamId, table.requestId),
+  ],
+);

@@ -1,4 +1,8 @@
 import {
+  createJokerRepositories,
+  type JokerRepositories,
+} from "./joker-repositories.js";
+import {
   getIdentityRosterKey,
   type IdentityRosterExpectation,
 } from "./identity-roster.js";
@@ -123,7 +127,7 @@ export type OwnedFantasyTeamSaveResult =
       teamSize: number;
     };
 
-export interface Repositories extends ScoringRepositories {
+export interface Repositories extends ScoringRepositories, JokerRepositories {
   /** Clears every game record. Production and admin paths must never call this. */
   resetAllDataForLocalFixtures: () => Promise<void>;
   replaceDemoBashosData: (
@@ -216,19 +220,24 @@ export function createRepositories(database: AppDatabase): Repositories {
     return {
       ...createPostgresRepositories(database.db),
       ...createScoringRepositories(database),
+      ...createJokerRepositories(database),
     };
   }
 
   return {
     ...createSqliteRepositories(database.db),
     ...createScoringRepositories(database),
+    ...createJokerRepositories(database),
   };
 }
 
 function createSqliteRepositories(
   db: SqliteDatabase,
-): Omit<Repositories, keyof ScoringRepositories> {
-  const repositories: Omit<Repositories, keyof ScoringRepositories> = {
+): Omit<Repositories, keyof ScoringRepositories | keyof JokerRepositories> {
+  const repositories: Omit<
+    Repositories,
+    keyof ScoringRepositories | keyof JokerRepositories
+  > = {
     resetAllDataForLocalFixtures: async () => {
       db.delete(sqlite.fantasyPicks).run();
       db.delete(sqlite.fantasyTeams).run();
@@ -1251,8 +1260,11 @@ function createSqliteRepositories(
 
 function createPostgresRepositories(
   db: PostgresDatabase,
-): Omit<Repositories, keyof ScoringRepositories> {
-  const repositories: Omit<Repositories, keyof ScoringRepositories> = {
+): Omit<Repositories, keyof ScoringRepositories | keyof JokerRepositories> {
+  const repositories: Omit<
+    Repositories,
+    keyof ScoringRepositories | keyof JokerRepositories
+  > = {
     resetAllDataForLocalFixtures: async () => {
       await db.delete(pg.fantasyPicks);
       await db.delete(pg.fantasyTeams);

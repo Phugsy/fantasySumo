@@ -70,3 +70,11 @@ export {
   countPickedRikishiWins,
 } from "./scoring.js";
 export { validateFantasyPicks } from "./validation.js";
+export {
+  JOKER_PRESET,
+  jokerDeadline,
+  jokerWindow,
+  jokerVerifiedDay,
+  resolveJoker,
+} from "./jokers.js";
+export type { JokerSelection, JokerAllocation, JokerFacts } from "./jokers.js";

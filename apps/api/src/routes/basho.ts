@@ -113,7 +113,11 @@ export function registerBashoRoutes(
           basho,
           teams,
           leaderboard: calculateLeaderboard(teams, picks, boutResults, {
-            ...(await getBashoScoringOptions(context.repositories, basho.id)),
+            ...(await getBashoScoringOptions(
+              context.repositories,
+              basho.id,
+              context.now,
+            )),
             throughDay: verifiedThroughDay,
           }),
         };
@@ -213,7 +217,11 @@ export function registerBashoRoutes(
             context.repositories.listBanzukeEntriesForBasho(basho.id),
           ]);
         const teamScore = calculateTeamScore(team, picks, boutResults, {
-          ...(await getBashoScoringOptions(context.repositories, basho.id)),
+          ...(await getBashoScoringOptions(
+            context.repositories,
+            basho.id,
+            context.now,
+          )),
           throughDay: verifiedThroughDay,
         });
         const scoresByRikishiId = new Map(
@@ -324,6 +332,7 @@ export function registerBashoRoutes(
     const scoringOptions = await getBashoScoringOptions(
       context.repositories,
       basho.id,
+      context.now,
     );
     const rikishi = banzukeEntries.map((entry) => {
       const rikishiEntry = rikishiById.get(entry.rikishiId);
@@ -603,6 +612,7 @@ export function registerBashoRoutes(
     const scoringOptions = await getBashoScoringOptions(
       context.repositories,
       basho.id,
+      context.now,
     );
     const photoIdentities =
       await context.repositories.listRikishiSourceIdentities();
@@ -624,6 +634,7 @@ export function registerBashoRoutes(
       basho,
       team,
       totalScore: teamScore.score,
+      jokerTrial: scoringOptions.jokerSelections !== undefined,
       breakdown: teamScore.breakdown,
       scoringMode: scoringOptions.scoringMode,
       specialPrizesStatus:
@@ -841,6 +852,7 @@ export function registerBashoRoutes(
     const scoringOptions = await getBashoScoringOptions(
       context.repositories,
       basho.id,
+      context.now,
     );
     const prizeSnapshot = await context.repositories.getSpecialPrizeSnapshot(
       basho.id,
@@ -855,6 +867,7 @@ export function registerBashoRoutes(
     return {
       basho,
       bashoId: basho.id,
+      jokerTrial: scoringOptions.jokerSelections !== undefined,
       scoringMode: scoringOptions.scoringMode,
       specialPrizesStatus:
         prizeSnapshot === undefined ? "pending" : "confirmed",

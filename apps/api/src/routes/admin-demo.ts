@@ -1,3 +1,5 @@
+import { z } from "zod";
+import { JokerError } from "@fantasy-sumo/db";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Repositories } from "@fantasy-sumo/db";
 import {
@@ -29,6 +31,38 @@ export function registerAdminDemoRoutes(
 
     return authorizeDemoAdmin(request, reply, context);
   });
+
+  app.get("/api/admin/demo/jokers", async () => {
+    const snapshot = await context.repositories.getJokerSnapshot(
+      DEMO_BASHO_ID,
+      context.now,
+    );
+    return { trial: snapshot?.trial ?? null };
+  });
+  app.put<{ Body: unknown }>(
+    "/api/admin/demo/jokers",
+    async (request, reply) => {
+      const parsed = z
+        .object({ clock: z.string().optional() })
+        .strict()
+        .safeParse(request.body);
+      if (!parsed.success)
+        return reply
+          .code(400)
+          .send({ error: "invalid-clock", message: "Invalid demo clock." });
+      try {
+        return {
+          trial: await context.repositories.configureDemoJokers(
+            parsed.data.clock,
+            context.now,
+          ),
+        };
+      } catch (error) {
+        if (!(error instanceof JokerError)) throw error;
+        return reply.code(409).send({ error: error.code, message: error.code });
+      }
+    },
+  );
 
   app.post("/api/admin/demo/reset", async () => {
     await resetDemoProgression(context.repositories);

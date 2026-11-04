@@ -64,6 +64,13 @@
       "when": 1793232000000,
       "tag": "0008_rikishi_source_identities",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1793529735972,
+      "tag": "0009_joker_trial",
+      "breakpoints": true
     }
   ]
 }
