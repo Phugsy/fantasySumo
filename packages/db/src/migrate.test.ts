@@ -140,6 +140,7 @@ describe("Postgres migration ledger", () => {
       "0006_scoring_modes.sql",
       "0007_rikishi_source_identities.sql",
       "0008_joker_trial.sql",
+      "0009_push_pilot.sql",
     ]);
     const initialMigration = readFileSync(
       join(migrationsFolder, "0000_initial.sql"),

@@ -1,4 +1,8 @@
 import {
+  createPushRepositories,
+  type PushRepositories,
+} from "./push-repositories.js";
+import {
   createJokerRepositories,
   type JokerRepositories,
 } from "./joker-repositories.js";
@@ -127,7 +131,8 @@ export type OwnedFantasyTeamSaveResult =
       teamSize: number;
     };
 
-export interface Repositories extends ScoringRepositories, JokerRepositories {
+export interface Repositories
+  extends ScoringRepositories, JokerRepositories, PushRepositories {
   /** Clears every game record. Production and admin paths must never call this. */
   resetAllDataForLocalFixtures: () => Promise<void>;
   replaceDemoBashosData: (
@@ -221,6 +226,7 @@ export function createRepositories(database: AppDatabase): Repositories {
       ...createPostgresRepositories(database.db),
       ...createScoringRepositories(database),
       ...createJokerRepositories(database),
+      ...createPushRepositories(database),
     };
   }
 
@@ -228,15 +234,19 @@ export function createRepositories(database: AppDatabase): Repositories {
     ...createSqliteRepositories(database.db),
     ...createScoringRepositories(database),
     ...createJokerRepositories(database),
+    ...createPushRepositories(database),
   };
 }
 
 function createSqliteRepositories(
   db: SqliteDatabase,
-): Omit<Repositories, keyof ScoringRepositories | keyof JokerRepositories> {
+): Omit<
+  Repositories,
+  keyof ScoringRepositories | keyof JokerRepositories | keyof PushRepositories
+> {
   const repositories: Omit<
     Repositories,
-    keyof ScoringRepositories | keyof JokerRepositories
+    keyof ScoringRepositories | keyof JokerRepositories | keyof PushRepositories
   > = {
     resetAllDataForLocalFixtures: async () => {
       db.delete(sqlite.fantasyPicks).run();
@@ -1260,10 +1270,13 @@ function createSqliteRepositories(
 
 function createPostgresRepositories(
   db: PostgresDatabase,
-): Omit<Repositories, keyof ScoringRepositories | keyof JokerRepositories> {
+): Omit<
+  Repositories,
+  keyof ScoringRepositories | keyof JokerRepositories | keyof PushRepositories
+> {
   const repositories: Omit<
     Repositories,
-    keyof ScoringRepositories | keyof JokerRepositories
+    keyof ScoringRepositories | keyof JokerRepositories | keyof PushRepositories
   > = {
     resetAllDataForLocalFixtures: async () => {
       await db.delete(pg.fantasyPicks);
