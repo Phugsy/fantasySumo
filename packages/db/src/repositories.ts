@@ -26,6 +26,7 @@ import type {
 import {
   getBashoLifecycleTransition,
   isCompleteScheduledBoutPublicationSource,
+  isPreBoutScheduleSource,
   preserveBashoLifecycleProgress,
 } from "@fantasy-sumo/domain";
 import type {
@@ -76,6 +77,7 @@ export interface ScheduledBoutsAndBoutResultsImportData {
 
 export type ScheduledBoutsImportOutcome =
   | "applied"
+  | "pre-bout-eligibility-revoked"
   | "preserved-existing-complete"
   | "preserved-existing-fuller-schedule";
 
@@ -1011,6 +1013,30 @@ function createSqliteRepositories(
             importData.publication.source,
           )
         ) {
+          if (
+            existingPublication &&
+            isPreBoutScheduleSource(existingPublication.source)
+          ) {
+            // A shorter retry is not evidence that omitted pairings disappeared.
+            // Preserve the display card, but suspend its use for joker picks.
+            transaction
+              .update(sqlite.scheduledBoutPublications)
+              .set({ source: "sumo-api-schedule" })
+              .where(
+                and(
+                  eq(
+                    sqlite.scheduledBoutPublications.bashoId,
+                    importData.publication.bashoId,
+                  ),
+                  eq(
+                    sqlite.scheduledBoutPublications.day,
+                    importData.publication.day,
+                  ),
+                ),
+              )
+              .run();
+            return "pre-bout-eligibility-revoked";
+          }
           return "preserved-existing-fuller-schedule";
         }
 
@@ -2035,6 +2061,27 @@ function createPostgresRepositories(
             importData.publication.source,
           )
         ) {
+          if (
+            existingPublication &&
+            isPreBoutScheduleSource(existingPublication.source)
+          ) {
+            await transaction
+              .update(pg.scheduledBoutPublications)
+              .set({ source: "sumo-api-schedule" })
+              .where(
+                and(
+                  eq(
+                    pg.scheduledBoutPublications.bashoId,
+                    importData.publication.bashoId,
+                  ),
+                  eq(
+                    pg.scheduledBoutPublications.day,
+                    importData.publication.day,
+                  ),
+                ),
+              );
+            return "pre-bout-eligibility-revoked";
+          }
           return "preserved-existing-fuller-schedule";
         }
 

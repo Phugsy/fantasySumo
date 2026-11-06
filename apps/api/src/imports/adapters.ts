@@ -8,6 +8,7 @@ import type {
   BoutResultsImportCommand,
   ScheduledBoutsImportCommand,
 } from "./types.js";
+import { SUMO_API_PRE_BOUT_SOURCE } from "@fantasy-sumo/domain";
 import { toCompactBashoId, toLocalBashoId } from "./ids.js";
 
 const JSA_BANZUKE_BASE_URL =
@@ -46,6 +47,7 @@ interface SumoApiTorikumiRow {
   id?: string;
   bashoId?: string;
   day?: number;
+  division?: string;
   matchNo?: number;
   eastId?: number;
   eastShikona?: string;
@@ -204,7 +206,61 @@ export async function fetchSumoApiScheduleImport(
     `${SUMO_API_BASE_URL}/basho/${sourceBashoId}/torikumi/${division}/${options.day}`,
   );
 
-  return mapSumoApiSchedulePayload(payload, options);
+  const command = mapSumoApiSchedulePayload(payload, options);
+  return isPublishedPreBoutCard(
+    payload.torikumi ?? [],
+    sourceBashoId,
+    options.day,
+    division,
+  )
+    ? { ...command, source: SUMO_API_PRE_BOUT_SOURCE }
+    : command;
+}
+
+// Schedule-only evidence. Require the feed to explicitly identify the requested
+// card and both sides of every listed bout. Omitted rikishi are never inferred
+// to be absent. A result-bearing or ambiguous payload can't open a pick window.
+function isPublishedPreBoutCard(
+  rows: readonly SumoApiTorikumiRow[],
+  sourceBashoId: string,
+  day: number,
+  division: string,
+): boolean {
+  // The live game imports and settles Makuuchi results.
+  if (division.toLowerCase() !== "makuuchi") return false;
+  const matchNumbers = new Set<number>();
+  const participants = new Set<number>();
+  for (const row of rows) {
+    const { matchNo, eastId, westId } = row;
+    if (
+      row.bashoId !== sourceBashoId ||
+      row.day !== day ||
+      typeof row.division !== "string" ||
+      row.division.toLowerCase() !== division.toLowerCase() ||
+      row.winnerId !== 0 ||
+      (row.winnerEn !== undefined && row.winnerEn !== "") ||
+      (row.kimarite !== undefined && row.kimarite !== "") ||
+      typeof matchNo !== "number" ||
+      !Number.isSafeInteger(matchNo) ||
+      matchNo < 1 ||
+      matchNo > rows.length ||
+      matchNumbers.has(matchNo) ||
+      typeof eastId !== "number" ||
+      !Number.isSafeInteger(eastId) ||
+      eastId < 1 ||
+      typeof westId !== "number" ||
+      !Number.isSafeInteger(westId) ||
+      westId < 1 ||
+      eastId === westId ||
+      participants.has(eastId) ||
+      participants.has(westId)
+    )
+      return false;
+    matchNumbers.add(matchNo);
+    participants.add(eastId);
+    participants.add(westId);
+  }
+  return rows.length > 0;
 }
 
 export function mapSumoApiSchedulePayload(

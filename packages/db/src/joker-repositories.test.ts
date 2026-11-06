@@ -10,6 +10,7 @@ import { runMigrations } from "./migrate.js";
 import { seedDemoDatabase } from "./seed.js";
 import { startDemoBasho, advanceDemoBashoDay } from "./demo-progression.js";
 import type { JokerCommand, JokerSnapshot } from "./joker-repositories.js";
+import { SUMO_API_PRE_BOUT_SOURCE } from "@fantasy-sumo/domain";
 const id = "demo-2026-05";
 const wall = () => new Date("2026-11-01T10:30:00.000Z");
 const postgresUrl = process.env.JOKER_TEST_POSTGRES_URL;
@@ -91,6 +92,64 @@ for (const provider of ["sqlite", "postgres"] as const)
         await peer.close();
         await client.close();
         rmSync(directory, { recursive: true, force: true });
+      });
+      it("accepts a verified pre-bout pairing and settles only after result verification", async () => {
+        const publication = (
+          await repos.listScheduledBoutPublicationsForBasho(id)
+        ).find((entry) => entry.day === 1)!;
+        const bouts = (await repos.listScheduledBoutsForBasho(id)).filter(
+          (entry) => entry.day === 1,
+        );
+        const preBout = { ...publication, source: SUMO_API_PRE_BOUT_SOURCE };
+        await repos.applyScheduledBoutsImport({ publication: preBout, bouts });
+        expect((await state()).windows[0]?.status).toBe("open");
+
+        // Even a syntactically valid shorter retry cannot prove the omitted
+        // matchups. Keep the fuller display card but suspend joker picks.
+        for (const source of [SUMO_API_PRE_BOUT_SOURCE, "sumo-api-schedule"]) {
+          expect(
+            await repos.applyScheduledBoutsImport({
+              publication: { ...publication, source },
+              bouts: bouts.slice(0, 1),
+            }),
+          ).toBe("pre-bout-eligibility-revoked");
+          expect(
+            (await repos.listScheduledBoutsForBasho(id)).filter(
+              (entry) => entry.day === 1,
+            ),
+          ).toEqual(bouts);
+          expect((await state()).windows[0]?.status).toBe("unavailable");
+          await repos.applyScheduledBoutsImport({
+            publication: preBout,
+            bouts,
+          });
+        }
+        const reserved = await apply(command(await state(), 1));
+        expect(reserved.allocations[0]?.state).toBe("reserved");
+        await repos.configureDemoJokers("2026-05-10T03:00:00.000Z", wall);
+        expect((await state()).windows[0]?.status).toBe("closed");
+        const results = bouts.map((bout) => ({
+          id: `result-${bout.id}`,
+          bashoId: id,
+          day: 1,
+          winnerRikishiId: bout.eastRikishiId,
+          loserRikishiId: bout.westRikishiId,
+        }));
+        for (const result of results) await repos.insertBoutResult(result);
+        expect((await state()).allocations[0]?.state).toBe("locked");
+        const verified = {
+          ...publication,
+          source: "sumo-api-schedule:complete",
+        };
+        await repos.applyScheduledBoutsImport({ publication: verified, bouts });
+        expect((await state()).allocations[0]?.state).toBe("consumed");
+        expect(
+          await repos.applyScheduledBoutsImport({
+            publication: preBout,
+            bouts,
+          }),
+        ).toBe("preserved-existing-complete");
+        expect((await state()).allocations[0]?.state).toBe("consumed");
       });
       it("rejects unowned/stale matchups and stale revisions; replays commands once", async () => {
         const initial = await state();

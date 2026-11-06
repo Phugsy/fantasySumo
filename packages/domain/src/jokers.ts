@@ -5,7 +5,10 @@ import type {
   ScheduledBoutPublication,
 } from "./types.js";
 import { getVerifiedBoutResultsThroughDay } from "./bout-result-completeness.js";
-import { isCompleteScheduledBoutPublicationSource } from "./scheduled-bout-publication.js";
+import {
+  isCompleteScheduledBoutPublicationSource,
+  isPreBoutScheduleSource,
+} from "./scheduled-bout-publication.js";
 
 export const JOKER_PRESET = "three-joker-v1" as const;
 export interface JokerSelection {
@@ -59,7 +62,10 @@ export function jokerWindow(
   )
     return "closed";
   const published = facts.publications.some(
-    (p) => p.day === day && p.publishedAt <= now && isAttestedCard(facts, p),
+    (p) =>
+      p.day === day &&
+      p.publishedAt <= now &&
+      (isPreBoutScheduleSource(p.source) || isAttestedCard(facts, p)),
   );
   if (!published || !facts.bouts.some((b) => b.day === day))
     return "unavailable";
