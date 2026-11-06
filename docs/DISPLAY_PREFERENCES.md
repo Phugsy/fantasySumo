@@ -19,23 +19,21 @@ and charts. Existing component CSS consumes the same stable theme variables.
 
 ## Optional photos
 
-Photos are off by default. When enabled, a small curated catalog maps established
-Sumo API source identities to canonical rikishi IDs; mutable names are never used
-to match images. Initial coverage is Onosato (provider ID 8850) and Hoshoryu (19).
-Other rikishi show a bounded **No photo** placeholder, as do failed image loads.
-Images are decorative, lazy loaded, and displayed uncropped in fixed-size frames.
-Photo credits below each list link to the file, author, and licence:
+Photos are off by default. When enabled, the API looks up a curated portrait
+by the rikishi's established Sumo API ID. A change of shikona keeps that link.
+The November 2026 Makuuchi roster has 33 portraits for 42 rikishi. Rikishi without
+a verified photo show **No photo**, as do failed image loads.
 
-- [Onosato, Nigtkn](https://commons.wikimedia.org/wiki/File:Oonosato.jpg),
-  [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
-- [Hoshoryu, TSUBAME98](https://commons.wikimedia.org/wiki/File:Hoshoryu_Tomokatsu20220115.jpg),
-  [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+The web build serves the thumbnails from `/rikishi-photos/`. Each filename
+includes the provider ID and a hash of the thumbnail bytes. The app loads them
+on demand from its own origin. Each image fits in a fixed frame with its
+original thumbnail aspect ratio. **Photo credits** below each list links to the
+Wikimedia Commons file and its licence and names the credited author.
 
-Source pages and provider identities were checked on 31 October 2026. Images load
-directly from Wikimedia only when enabled; availability depends on that service
-and client network restrictions. Thumbnail checks from the development runner
-returned HTTP 403, so external delivery is not asserted by the deterministic
-suite. There is no new API provider, image subscription, or paid service.
+To add a portrait, verify the file depicts the wrestler tied to the provider
+ID and check its reuse licence on Commons. Store the resized Commons JPEG
+in `apps/web/public/rikishi-photos/` and register its path, file page, author,
+and licence in `apps/api/src/rikishi-photos.ts`.
 
 The demo uses a local synthetic SVG, a deliberately unavailable image, and
 unmapped rows. Component and browser tests exercise successful images and both
