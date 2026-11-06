@@ -8,7 +8,10 @@ import {
   runMigrations,
   type DatabaseClient,
 } from "@fantasy-sumo/db";
-import { calculateTeamScore } from "@fantasy-sumo/domain";
+import {
+  calculateTeamScore,
+  SUMO_API_PRE_BOUT_SOURCE,
+} from "@fantasy-sumo/domain";
 import type {
   BanzukeImportCommand,
   ScheduledBoutsImportCommand,
@@ -76,6 +79,57 @@ afterEach(async () => {
 });
 
 describe("import service", () => {
+  it("suspends picks on a shorter pre-bout correction without replacing the display card", async () => {
+    const repositories = createRepositories(client);
+    await importBanzuke(repositories, banzukeCommand);
+    const bashoId = "2026-05";
+    const card: ScheduledBoutsImportCommand = {
+      bashoId,
+      day: 1,
+      source: SUMO_API_PRE_BOUT_SOURCE,
+      rikishi: [
+        { id: "guest-a", shikona: "Guest A" },
+        { id: "guest-b", shikona: "Guest B" },
+      ],
+      bouts: [
+        {
+          id: "slot-1",
+          bashoId,
+          day: 1,
+          eastRikishiId: "onosato",
+          westRikishiId: "guest-a",
+          status: "scheduled",
+        },
+        {
+          id: "slot-2",
+          bashoId,
+          day: 1,
+          eastRikishiId: "kotozakura",
+          westRikishiId: "guest-b",
+          status: "scheduled",
+        },
+      ],
+    };
+    await importScheduledBouts(repositories, card);
+    const corrected: ScheduledBoutsImportCommand = {
+      ...card,
+      rikishi: [{ id: "guest-c", shikona: "Guest C" }],
+      bouts: [{ ...card.bouts[0]!, westRikishiId: "guest-c" }],
+    };
+    await importScheduledBouts(repositories, corrected, { dryRun: true });
+    expect(
+      (await repositories.listScheduledBoutPublicationsForBasho(bashoId))[0]
+        ?.source,
+    ).toBe(SUMO_API_PRE_BOUT_SOURCE);
+    await importScheduledBouts(repositories, corrected);
+    expect(
+      (await repositories.listScheduledBoutPublicationsForBasho(bashoId))[0]
+        ?.source,
+    ).toBe("sumo-api-schedule");
+    expect(await repositories.listScheduledBoutsForBasho(bashoId)).toEqual(
+      card.bouts,
+    );
+  });
   it("dry-runs banzuke imports without writing rows", async () => {
     const repositories = createRepositories(client);
     const result = await importBanzuke(repositories, banzukeCommand, {

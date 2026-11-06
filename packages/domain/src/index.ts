@@ -39,6 +39,8 @@ export {
 export { deriveRikishiTournamentNotes } from "./tournament-notes.js";
 export {
   isCompleteScheduledBoutPublicationSource,
+  isPreBoutScheduleSource,
+  SUMO_API_PRE_BOUT_SOURCE,
   toCompleteScheduledBoutPublicationSource,
 } from "./scheduled-bout-publication.js";
 export {

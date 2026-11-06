@@ -8,6 +8,7 @@ import type {
 import {
   hasCompleteBoutResultsForEveryDayThrough,
   hasCompleteBoutResultsForScheduledDay,
+  isPreBoutScheduleSource,
   preserveBashoLifecycleProgress,
 } from "@fantasy-sumo/domain";
 import type {
@@ -312,8 +313,14 @@ export async function importScheduledBouts(
     const outcome = await repositories.applyScheduledBoutsImport(prepared.data);
 
     if (outcome !== "applied") {
-      return (await prepareScheduledBoutsImport(repositories, command, options))
-        .result;
+      return (
+        await prepareScheduledBoutsImport(
+          repositories,
+          command,
+          options,
+          outcome === "pre-bout-eligibility-revoked",
+        )
+      ).result;
     }
   }
 
@@ -327,6 +334,7 @@ async function prepareScheduledBoutsImport(
     identityRoster?: IdentityRosterExpectation;
   },
   options: ImportOptions = {},
+  eligibilityRevoked = false,
 ): Promise<PreparedScheduledBoutsImport> {
   const issues = await validateScheduledBoutsImport(repositories, command);
 
@@ -356,6 +364,8 @@ async function prepareScheduledBoutsImport(
     command.bouts.every((bout) => existingScheduledBoutsById.has(bout.id));
   if (
     isPartialSubset &&
+    !eligibilityRevoked &&
+    !isPreBoutScheduleSource(existingPublication.source) &&
     !command.bouts.every((bout) =>
       isEqualScheduledBout(existingScheduledBoutsById.get(bout.id)!, bout),
     )

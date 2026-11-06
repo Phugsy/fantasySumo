@@ -74,6 +74,14 @@ an idempotency request ID. The existing protected demo-admin boundary guards
 clock. No browser timestamp can override player deadlines. This has no live
 activation endpoint.
 
+Published Sumo API matchups can qualify for the Pick Window independently
+of verified results. This uses the existing schedule-only import, including
+the following day's card in the daily import. Before a live trial, verify
+Day 1 separately and check that later cards arrive before noon JST. Missing
+or unverified outcomes stay pending. Live activation is a separate release:
+its opt-in must freeze before the normal rule lock and must not break reads
+by the previous application version during rollback.
+
 SQLite migration `0009_joker_trial.sql` and Postgres migration
 `0008_joker_trial.sql` add three tables. Existing schema/data are retained. Audit
 updates are rejected by database triggers; repository operations only append.
