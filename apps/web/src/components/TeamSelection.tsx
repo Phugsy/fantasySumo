@@ -86,7 +86,12 @@ export function TeamSelection({
               >
                 <span className="rank-pill">{entry.rank}</span>
                 <span className={identity}>
-                  {preferences.photos && <RikishiPhoto photo={entry.photo} />}
+                  {preferences.photos && (
+                    <RikishiPhoto
+                      photo={entry.photo}
+                      illustration={entry.illustration}
+                    />
+                  )}
                   <span>
                     <strong>{entry.shikona}</strong>
                     {entry.heya !== undefined && <small>{entry.heya}</small>}

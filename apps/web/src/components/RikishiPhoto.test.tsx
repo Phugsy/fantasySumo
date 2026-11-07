@@ -1,6 +1,13 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
+import { DisplayPreferencesProvider } from "../DisplayPreferences";
+import { DisplaySettings } from "./DisplaySettings";
 import { PhotoCredits, RikishiPhoto } from "./RikishiPhoto";
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 it("keeps missing/failed photos bounded and decorative, with attributed sources", () => {
   const photo = {
@@ -27,4 +34,30 @@ it("keeps missing/failed photos bounded and decorative, with attributed sources"
     "href",
     photo.licenseUrl,
   );
+});
+
+it("switches to illustrations with a distinct failed-image fallback and generated label", () => {
+  vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => {} });
+  const view = render(
+    <DisplayPreferencesProvider>
+      <DisplaySettings />
+      <RikishiPhoto illustration={{ url: "/ink.webp" }} />
+      <PhotoCredits photos={[]} />
+    </DisplayPreferencesProvider>,
+  );
+  fireEvent.change(screen.getByLabelText("Portrait style"), {
+    target: { value: "illustrations" },
+  });
+  const image = view.container.querySelector("img")!;
+  expect(image).toHaveAttribute("src", "/ink.webp");
+  expect(
+    screen.getByText("AI-generated ink illustrations"),
+  ).toBeInTheDocument();
+  fireEvent.error(image);
+  expect(screen.getByText("No illustration")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Portrait style"), {
+    target: { value: "photos" },
+  });
+  expect(screen.getByText("No photo")).toBeInTheDocument();
+  expect(screen.queryByText("AI-generated ink illustrations")).toBeNull();
 });

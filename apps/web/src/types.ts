@@ -21,6 +21,7 @@ export interface RankedRikishi {
   rankOrder: number;
   score?: number;
   photo?: RikishiPhoto;
+  illustration?: { url: string };
   previousBashoRecord?: PreviousBashoRecordState;
   tournamentNotes?: RikishiTournamentNotes;
 }
@@ -105,6 +106,7 @@ export interface MyTeamResponse {
       wins: number;
       score: number;
       photo?: RikishiPhoto;
+      illustration?: { url: string };
       breakdown?: ScoreBreakdown;
       tournamentNotes?: RikishiTournamentNotes;
     }

@@ -47,7 +47,11 @@ describe("display settings", () => {
     );
     fireEvent.click(screen.getByText("Display"));
     expect(document.documentElement).toHaveAttribute("data-theme", "dark");
-    expect(screen.getByLabelText("Show rikishi photos")).toBeChecked();
+    expect(screen.getByLabelText("Show rikishi portraits")).toBeChecked();
+    expect(screen.getByLabelText("Portrait style")).toHaveValue("photos");
+    fireEvent.change(screen.getByLabelText("Portrait style"), {
+      target: { value: "illustrations" },
+    });
     expect(screen.getByLabelText("Rikishi order")).toHaveValue("score");
     matches = false;
     changed();
@@ -63,7 +67,11 @@ describe("display settings", () => {
     });
     expect(
       JSON.parse(window.localStorage.getItem(DISPLAY_STORAGE_KEY)!),
-    ).toMatchObject({ theme: "dark", order: "name" });
+    ).toMatchObject({
+      theme: "dark",
+      order: "name",
+      portraitStyle: "illustrations",
+    });
     view.unmount();
     render(
       <DisplayPreferencesProvider>
@@ -71,6 +79,9 @@ describe("display settings", () => {
       </DisplayPreferencesProvider>,
     );
     expect(screen.getByLabelText("Rikishi order")).toHaveValue("name");
+    expect(screen.getByLabelText("Portrait style")).toHaveValue(
+      "illustrations",
+    );
   });
 
   it("allows changes when storage is blocked", () => {
