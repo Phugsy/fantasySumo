@@ -390,7 +390,19 @@ match the resolved winner/loser and the torikumi marks the bout's kimarite as
 `fusen`. A forfeit loss remains an absence in stored results and historical
 W-L-A records; it is not converted to an ordinary loss. Unknown outcome labels
 and contradictory forfeit evidence remain unverified.
-The card is attested only when the coverage checks pass and every bout has a
+A schedule-only Sumo API import can attest published Makuuchi pre-bout matchups
+independently. Every listed bout must explicitly match the requested basho,
+division and day, have two distinct participants who appear only once, have
+a unique consecutive bout number, and carry no outcome. Ordinary canonical
+identity and banzuke validation still apply. Only listed pairings are eligible;
+an omitted rikishi is not treated as absent. A later valid schedule import
+replaces those pairings and may close the window if its evidence is weaker.
+A shorter subset preserves the fuller display card but suspends joker
+eligibility until a later import revalidates it.
+The marker can open a joker window for a basho that has opted in; it cannot
+advance the verified scoring day, resolve a joker, or replace a verified card.
+
+For scoring, the card is attested only when the coverage checks pass and every bout has a
 resolved winner; day 15 additionally requires the division yusho signal
 described below. The service rejects schedule/result command pairs whose
 matchups differ, then writes the matching card and results in one transaction.

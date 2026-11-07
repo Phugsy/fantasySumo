@@ -1,13 +1,57 @@
 import { describe, expect, it } from "vitest";
-import { deriveRikishiTournamentNotes } from "@fantasy-sumo/domain";
+import {
+  deriveRikishiTournamentNotes,
+  SUMO_API_PRE_BOUT_SOURCE,
+} from "@fantasy-sumo/domain";
 import {
   fetchSumoApiDailyImport,
+  fetchSumoApiScheduleImport,
   mapJsaBanzukePayload,
   mapSumoApiSchedulePayload,
   mapSumoApiTorikumiPayload,
 } from "./adapters.js";
 
 describe("source import adapters", () => {
+  it("recognizes published Day 15 matchups without winners or a yusho", async () => {
+    const row = {
+      bashoId: "202611",
+      division: "Makuuchi",
+      day: 15,
+      matchNo: 1,
+      eastId: 378,
+      eastShikona: "East",
+      westId: 8855,
+      westShikona: "West",
+      winnerId: 0,
+      winnerEn: "",
+      kimarite: "",
+    };
+    const next = (torikumi: Array<Partial<typeof row>>, division?: string) =>
+      fetchSumoApiScheduleImport(async () => Response.json({ torikumi }), {
+        bashoId: "2026-11",
+        day: 15,
+        division,
+      });
+    expect(await next([row])).toMatchObject({
+      source: SUMO_API_PRE_BOUT_SOURCE,
+      bouts: [{ day: 15, status: "scheduled" }],
+    });
+    expect((await next([row])).isComplete).toBeUndefined();
+    expect((await next([{ ...row, division: "Juryo" }], "Juryo")).source).toBe(
+      "sumo-api-schedule",
+    );
+    for (const invalid of [
+      [{ ...row, division: "Juryo" }],
+      [{ ...row, day: 14 }],
+      [{ ...row, bashoId: undefined }],
+      [{ ...row, matchNo: 2 }],
+      [{ ...row, winnerId: 378 }],
+      [{ ...row, winnerEn: "East" }],
+      [row, { ...row, matchNo: 2 }],
+    ]) {
+      expect((await next(invalid)).source).toBe("sumo-api-schedule");
+    }
+  });
   it("maps JSA banzuke payloads into local import commands", () => {
     const command = mapJsaBanzukePayload({
       basho_name: "May Grand Sumo Tournament",

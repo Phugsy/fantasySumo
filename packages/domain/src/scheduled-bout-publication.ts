@@ -1,4 +1,9 @@
 const COMPLETE_SCHEDULE_SOURCE_SUFFIX = ":complete";
+export const SUMO_API_PRE_BOUT_SOURCE = "sumo-api-schedule:pre-bout";
+
+export function isPreBoutScheduleSource(source: string): boolean {
+  return source === SUMO_API_PRE_BOUT_SOURCE;
+}
 
 export function toCompleteScheduledBoutPublicationSource(
   source: string,
