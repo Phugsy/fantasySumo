@@ -19,12 +19,15 @@ import type {
   BoutResult,
   FantasyPick,
   FantasyTeam,
+  PickValidationError,
   Rikishi,
   ScheduledBout,
   ScheduledBoutPublication,
 } from "@fantasy-sumo/domain";
 import {
   getBashoLifecycleTransition,
+  getPickCompositionMode,
+  validateFantasyPicks,
   isCompleteScheduledBoutPublicationSource,
   isPreBoutScheduleSource,
   preserveBashoLifecycleProgress,
@@ -116,6 +119,7 @@ export type BashoGameConfigUpdateResult =
     };
 
 export type OwnedFantasyTeamSaveResult =
+  | { status: "invalid-picks"; errors: PickValidationError[] }
   | {
       status: "saved";
       team: FantasyTeam;
@@ -570,7 +574,7 @@ function createSqliteRepositories(
     ) =>
       db.transaction((transaction) => {
         const basho = transaction
-          .select({ status: sqlite.basho.status })
+          .select()
           .from(sqlite.basho)
           .where(eq(sqlite.basho.id, team.bashoId))
           .get();
@@ -586,6 +590,21 @@ function createSqliteRepositories(
           .get();
 
         if (picks.length !== (config?.teamSize ?? defaultTeamSize)) {
+          return false;
+        }
+
+        const pickErrors =
+          getPickCompositionMode(basho) === "heya-sanyaku-v1"
+            ? validateFantasyPicks(picks, {
+                compositionRoster: transaction
+                  .select()
+                  .from(sqlite.banzukeEntries)
+                  .where(eq(sqlite.banzukeEntries.bashoId, team.bashoId))
+                  .all()
+                  .map(toBanzukeEntry),
+              })
+            : [];
+        if (pickErrors.length > 0) {
           return false;
         }
 
@@ -617,7 +636,7 @@ function createSqliteRepositories(
     ) =>
       db.transaction((transaction) => {
         const basho = transaction
-          .select({ status: sqlite.basho.status })
+          .select()
           .from(sqlite.basho)
           .where(eq(sqlite.basho.id, team.bashoId))
           .get();
@@ -650,6 +669,21 @@ function createSqliteRepositories(
 
         if (existingTeam !== undefined && existingTeam.lockedAt !== null) {
           return { status: "picks-locked" };
+        }
+
+        const pickErrors =
+          getPickCompositionMode(basho) === "heya-sanyaku-v1"
+            ? validateFantasyPicks(picks, {
+                compositionRoster: transaction
+                  .select()
+                  .from(sqlite.banzukeEntries)
+                  .where(eq(sqlite.banzukeEntries.bashoId, team.bashoId))
+                  .all()
+                  .map(toBanzukeEntry),
+              })
+            : [];
+        if (pickErrors.length > 0) {
+          return { status: "invalid-picks", errors: pickErrors };
         }
 
         if (config === undefined) {
@@ -1609,7 +1643,7 @@ function createPostgresRepositories(
       db.transaction(async (transaction) => {
         const basho = (
           await transaction
-            .select({ status: pg.basho.status })
+            .select()
             .from(pg.basho)
             .where(eq(pg.basho.id, team.bashoId))
             .for("update")
@@ -1627,6 +1661,21 @@ function createPostgresRepositories(
         ).at(0);
 
         if (picks.length !== (config?.teamSize ?? defaultTeamSize)) {
+          return false;
+        }
+
+        const pickErrors =
+          getPickCompositionMode(basho) === "heya-sanyaku-v1"
+            ? validateFantasyPicks(picks, {
+                compositionRoster: (
+                  await transaction
+                    .select()
+                    .from(pg.banzukeEntries)
+                    .where(eq(pg.banzukeEntries.bashoId, team.bashoId))
+                ).map(toBanzukeEntry),
+              })
+            : [];
+        if (pickErrors.length > 0) {
           return false;
         }
 
@@ -1656,7 +1705,7 @@ function createPostgresRepositories(
       db.transaction(async (transaction) => {
         const basho = (
           await transaction
-            .select({ status: pg.basho.status })
+            .select()
             .from(pg.basho)
             .where(eq(pg.basho.id, team.bashoId))
             .for("update")
@@ -1693,6 +1742,21 @@ function createPostgresRepositories(
 
         if (existingTeam !== undefined && existingTeam.lockedAt !== null) {
           return { status: "picks-locked" };
+        }
+
+        const pickErrors =
+          getPickCompositionMode(basho) === "heya-sanyaku-v1"
+            ? validateFantasyPicks(picks, {
+                compositionRoster: (
+                  await transaction
+                    .select()
+                    .from(pg.banzukeEntries)
+                    .where(eq(pg.banzukeEntries.bashoId, team.bashoId))
+                ).map(toBanzukeEntry),
+              })
+            : [];
+        if (pickErrors.length > 0) {
+          return { status: "invalid-picks", errors: pickErrors };
         }
 
         if (config === undefined) {

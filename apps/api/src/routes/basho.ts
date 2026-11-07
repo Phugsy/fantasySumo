@@ -25,6 +25,7 @@ import {
   getVerifiedBoutResultsThroughDay,
   hasBoutResultForScheduledBout,
   getPickLockMessage,
+  getPickCompositionMode,
   validateFantasyPicks,
 } from "@fantasy-sumo/domain";
 
@@ -87,6 +88,7 @@ export function registerBashoRoutes(
         ...currentBasho,
         teamSize: gameConfig.teamSize,
         scoringMode: gameConfig.scoringMode,
+        pickCompositionMode: getPickCompositionMode(currentBasho),
       };
     },
   );
@@ -341,7 +343,10 @@ export function registerBashoRoutes(
       return {
         id: entry.rikishiId,
         shikona: entry.shikona ?? rikishiEntry?.shikona ?? entry.rikishiId,
-        heya: entry.heya ?? rikishiEntry?.heya,
+        heya:
+          getPickCompositionMode(basho) === "heya-sanyaku-v1"
+            ? entry.heya
+            : (entry.heya ?? rikishiEntry?.heya),
         rank: entry.rank,
         rankOrder: entry.rankOrder,
         score: calculateRikishiScore(entry.rikishiId, boutResults, {
@@ -370,7 +375,7 @@ export function registerBashoRoutes(
     });
 
     return {
-      basho,
+      basho: { ...basho, pickCompositionMode: getPickCompositionMode(basho) },
       rikishi,
     };
   });
@@ -535,6 +540,14 @@ export function registerBashoRoutes(
             currentUser.id,
           ),
         );
+    }
+
+    if (savedTeamWithPicks.status === "invalid-picks") {
+      return reply.code(400).send({
+        error: "invalid-picks",
+        message: "Fantasy team picks are invalid. Review your selections.",
+        details: savedTeamWithPicks.errors,
+      });
     }
 
     if (savedTeamWithPicks.status === "invalid-team-size") {
@@ -791,6 +804,14 @@ export function registerBashoRoutes(
         );
     }
 
+    if (updatedTeamWithPicks.status === "invalid-picks") {
+      return reply.code(400).send({
+        error: "invalid-picks",
+        message: "Fantasy team picks are invalid. Review your selections.",
+        details: updatedTeamWithPicks.errors,
+      });
+    }
+
     if (updatedTeamWithPicks.status === "invalid-team-size") {
       return reply.code(409).send({
         error: "team-size-changed",
@@ -876,7 +897,7 @@ export function registerBashoRoutes(
     );
 
     return {
-      basho,
+      basho: { ...basho, pickCompositionMode: getPickCompositionMode(basho) },
       bashoId: basho.id,
       jokerTrial: scoringOptions.jokerSelections !== undefined,
       scoringMode: scoringOptions.scoringMode,

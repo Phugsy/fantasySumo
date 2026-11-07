@@ -1,3 +1,4 @@
+import { validatePickComposition } from "./pick-composition.js";
 import type {
   FantasyPick,
   PickValidationError,
@@ -12,6 +13,12 @@ export function validateFantasyPicks(
   return [
     ...validateTeamSize(picks, options),
     ...validateDuplicatePicks(picks),
+    ...(options.compositionRoster === undefined
+      ? []
+      : validatePickComposition(
+          picks.map((pick) => pick.rikishiId),
+          options.compositionRoster,
+        )),
   ];
 }
 

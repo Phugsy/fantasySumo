@@ -644,3 +644,12 @@ unchanged base mode and leaves original picks/lifecycle alone. Live snapshots
 use server time; only the demo uses a controllable clock. Previous readers
 ignore the live table and show base scores on rollback. See
 [November trial runbook](NOVEMBER_JOKER_TRIAL.md).
+
+## Tournament selection composition
+
+[Team selection rules](TEAM_SELECTION.md) defines `open-v0` for live bashos
+through November 2026 and `heya-sanyaku-v1` from January 2027 (also exercised by
+the demo). The shared domain validates tournament-snapshot ranks and heyas;
+both database save implementations recheck inside the lifecycle transaction.
+The API exposes the mode and structured errors, and the editor mirrors it.
+There is no schema change or historical team rewrite.

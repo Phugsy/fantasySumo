@@ -11,6 +11,7 @@ The current codebase has been reset onto the clean rebuild foundation described 
 At present, the app has the first local playable foundations:
 
 - A routed Vite + React front end with current and all-time leaderboards, a tournament archive, a dedicated login page, and authenticated team, stable, and personal-history views.
+- Tournament-scoped selection limits from January 2027: at most two sanyaku and one rikishi per heya; the current tournament is preserved. See `docs/TEAM_SELECTION.md`.
 - A picks editor that shows each rikishi's verified previous-basho W-L-A record
   and historical rank, with distinct neutral states for unavailable history and
   confirmed non-participation.

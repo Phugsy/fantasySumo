@@ -77,6 +77,68 @@ const createdTeam: CreatedTeamResponse = {
 };
 
 describe("TeamSelection", () => {
+  it("explains the sanyaku cap while keeping selected rikishi removable", () => {
+    renderTeamSelection({
+      pickCompositionMode: "heya-sanyaku-v1",
+      teamSize: 4,
+      selectedIds: ["onosato", "kotozakura"],
+      selectedRikishi: [onosato, kotozakura],
+    });
+    expect(screen.getByText(/Choose at most two sanyaku/)).toBeVisible();
+    expect(screen.getByRole("button", { name: /Hoshoryu/ })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /Hoshoryu/ }),
+    ).toHaveAccessibleName(/no more than two sanyaku/);
+    expect(screen.getByRole("button", { name: /Tobizaru/ })).toBeEnabled();
+    expect(
+      within(screen.getByRole("region", { name: "Choose rikishi" })).getByRole(
+        "button",
+        { name: /Onosato/ },
+      ),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Remove Onosato" }),
+    ).toBeEnabled();
+  });
+
+  it("explains duplicate heya and missing data, and blocks saving invalid existing selections", () => {
+    renderTeamSelection({
+      pickCompositionMode: "heya-sanyaku-v1",
+      teamSize: 4,
+      selectedIds: ["onosato", "kotozakura", "hoshoryu"],
+      selectedRikishi: rikishi.slice(0, 3),
+      rikishi: [
+        ...rikishi,
+        {
+          id: "same",
+          shikona: "Same Heya",
+          rank: "Maegashira #2",
+          rankOrder: 5,
+          heya: "Nishonoseki-beya",
+        },
+        {
+          id: "unknown",
+          shikona: "Unknown Heya",
+          rank: "Maegashira #3",
+          rankOrder: 6,
+        },
+      ],
+    });
+    expect(
+      screen.getByRole("button", { name: /Same Heya/ }),
+    ).toHaveAccessibleName(/one rikishi from each heya/);
+    expect(
+      screen.getByRole("button", { name: /Unknown Heya/ }),
+    ).toHaveAccessibleName(/Verified rank and heya unavailable/);
+    expect(screen.getByRole("button", { name: "Submit team" })).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      /no more than two sanyaku/,
+    );
+    expect(
+      screen.getByRole("button", { name: "Remove Hoshoryu" }),
+    ).toBeEnabled();
+  });
+
   it("shows selection state and disables extra picks when the team is full", () => {
     renderTeamSelection({
       selectedIds: ["onosato", "kotozakura"],
@@ -224,6 +286,7 @@ function renderTeamSelection(
       selectedRikishi={selectedRikishi}
       submitState={props.submitState ?? "idle"}
       teamSize={props.teamSize ?? 2}
+      pickCompositionMode={props.pickCompositionMode}
     />,
   );
 }

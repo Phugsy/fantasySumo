@@ -73,6 +73,16 @@ export {
 } from "./scoring.js";
 export { validateFantasyPicks } from "./validation.js";
 export {
+  getPickCompositionMode,
+  classifySelectionRank,
+  normalizeHeya,
+  validatePickComposition,
+} from "./pick-composition.js";
+export type {
+  PickCompositionMode,
+  PickCompositionEntry,
+} from "./pick-composition.js";
+export {
   JOKER_PRESET,
   jokerDeadline,
   jokerWindow,
