@@ -579,6 +579,11 @@ notes.
 
 ## Scoring configuration and final prizes
 
+The owner-approved November live joker opt-in has its own additive table and
+an explicit admin confirmation. It is never activated by deployment itself.
+Review its actual merged migration-bearing SHA and follow
+[November trial operation](NOVEMBER_JOKER_TRIAL.md) before enabling it.
+
 The additive scoring migration preserves existing `wins-v0` rules and freezes
 non-upcoming bashos, including previously locked teams. Lifecycle triggers cover
 older application writes during rollout. Admin scoring changes serialize with

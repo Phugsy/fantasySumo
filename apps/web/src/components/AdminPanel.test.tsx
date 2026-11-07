@@ -610,7 +610,8 @@ describe("AdminPanel", () => {
       )
       .mockResolvedValueOnce(
         jsonResponse(gameConfigResponse(discoveredBasho.id)),
-      );
+      )
+      .mockResolvedValueOnce(jsonResponse({ trial: null }));
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
 
     vi.stubGlobal("fetch", fetchMock);
@@ -653,7 +654,11 @@ describe("AdminPanel", () => {
         method: "POST",
       },
     );
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/admin/basho/2026-11/jokers",
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(5);
   });
 
   it("keeps a newly imported banzuke selected when an older basho is still active", async () => {
@@ -698,9 +703,8 @@ describe("AdminPanel", () => {
           targetBashoId: importedBasho.id,
         }),
       )
-      .mockResolvedValueOnce(
-        jsonResponse(gameConfigResponse(importedBasho.id)),
-      );
+      .mockResolvedValueOnce(jsonResponse(gameConfigResponse(importedBasho.id)))
+      .mockResolvedValueOnce(jsonResponse({ trial: null }));
 
     vi.stubGlobal("fetch", fetchMock);
     vi.spyOn(window, "confirm").mockReturnValue(true);
@@ -719,11 +723,12 @@ describe("AdminPanel", () => {
     expect(
       await screen.findByRole("heading", { name: importedBasho.name }),
     ).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenLastCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
       `/api/admin/basho/${importedBasho.id}/game-config`,
       expect.objectContaining({ credentials: "same-origin" }),
     );
-    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
   });
 });
 

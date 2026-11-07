@@ -1,4 +1,5 @@
 import { DemoJokerControls } from "./DemoJokerControls";
+import { LiveJokerControls } from "./LiveJokerControls";
 import type { ScoringMode } from "@fantasy-sumo/domain";
 import { scoringModeLabel } from "../scoring-view";
 import { useEffect, useRef, useState } from "react";
@@ -642,6 +643,17 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
             <DemoJokerControls
               key={`${basho.id}-${basho.status}-${demoRefreshKey}-${pendingAction ?? "idle"}`}
               onRefresh={onPlayerDataRefresh}
+            />
+          )}
+          {!basho.isDemo && basho.id === "2026-11" && (
+            <LiveJokerControls
+              key={basho.id}
+              onRefresh={async () => {
+                const config = await fetchAdminGameConfig(basho.id);
+                if (!isMountedRef.current) return;
+                setGameConfig(config);
+                await onPlayerDataRefresh();
+              }}
             />
           )}
           {basho.isDemo ? (

@@ -23,6 +23,13 @@ export interface JokerTrial {
   baseMode: ScoringMode;
   clock: string;
 }
+export interface LiveJokerTrial {
+  bashoId: string;
+  preset: typeof JOKER_PRESET;
+  baseMode: ScoringMode;
+  enabledAt: string;
+  enabledBy: string;
+}
 export interface JokerCommand {
   ownerUserId: string;
   day: number;
@@ -47,6 +54,12 @@ export interface JokerSnapshot {
   budgetDiscrepancy: boolean;
 }
 export interface JokerRepositories {
+  getLiveJokerTrial: (id: string) => Promise<LiveJokerTrial | undefined>;
+  enableNovemberJokers: (
+    id: string,
+    enabledBy: string,
+    now: () => Date,
+  ) => Promise<LiveJokerTrial>;
   configureDemoJokers: (
     clock?: string,
     now?: () => Date,
@@ -99,7 +112,67 @@ export function createJokerRepositories(
       currentDay: row.current_day == null ? undefined : Number(row.current_day),
     };
   }
+  function decodeLive(row: Row | undefined): LiveJokerTrial | undefined {
+    return row
+      ? {
+          bashoId: String(row.basho_id),
+          preset: JOKER_PRESET,
+          baseMode: row.base_mode as ScoringMode,
+          enabledAt: String(row.enabled_at),
+          enabledBy: String(row.enabled_by),
+        }
+      : undefined;
+  }
   return {
+    getLiveJokerTrial: (id) =>
+      execute(
+        (function* (): Generator<SQL, LiveJokerTrial | undefined, Row[]> {
+          const [row] =
+            yield sql`SELECT * FROM basho_live_joker_trial WHERE basho_id=${id}`;
+          return decodeLive(row);
+        })(),
+      ),
+    enableNovemberJokers: (id, enabledBy, realNow) =>
+      execute(
+        (function* (): Generator<SQL, LiveJokerTrial, Row[]> {
+          const basho = yield* loadBasho(id);
+          if (
+            id !== "2026-11" ||
+            basho.isDemo ||
+            basho.startDate !== "2026-11-08" ||
+            basho.endDate !== "2026-11-22"
+          )
+            throw new JokerError("november-trial-only");
+          const [old] =
+            yield sql`SELECT * FROM basho_live_joker_trial WHERE basho_id=${id}`;
+          if (old) return decodeLive(old)!;
+          const now = realNow().toISOString();
+          const [result] =
+            yield sql`SELECT id FROM bout_results WHERE basho_id=${id} LIMIT 1`;
+          if (
+            !["upcoming", "locked"].includes(basho.status) ||
+            (basho.currentDay ?? 0) !== 0 ||
+            result ||
+            now >= jokerDeadline(basho.startDate, 1)
+          )
+            throw new JokerError("trial-setup-closed");
+          if (!enabledBy) throw new JokerError("not-owner");
+          const [base] =
+            yield sql`SELECT * FROM basho_scoring_config WHERE basho_id=${id}`;
+          if (!base) throw new JokerError("rules-unavailable");
+          // Owner-approved pre-start exception to the usual rule lock. It neither
+          // reopens stable picks nor changes their saved base mode.
+          yield sql`UPDATE basho_scoring_config SET locked=TRUE WHERE basho_id=${id} RETURNING basho_id`;
+          yield sql`INSERT INTO basho_live_joker_trial(basho_id,preset,base_mode,enabled_at,enabled_by) VALUES(${id},${JOKER_PRESET},${base.mode},${now},${enabledBy}) RETURNING basho_id`;
+          return {
+            bashoId: id,
+            preset: JOKER_PRESET,
+            baseMode: base.mode as ScoringMode,
+            enabledAt: now,
+            enabledBy,
+          };
+        })(),
+      ),
     configureDemoJokers: (clock, realNow = () => new Date()) =>
       execute(
         (function* (): Generator<SQL, JokerTrial, Row[]> {
@@ -138,12 +211,12 @@ export function createJokerRepositories(
       execute(
         (function* (): Generator<SQL, JokerSnapshot | undefined, Row[]> {
           const basho = yield* loadBasho(id);
-          const [config] =
-            yield sql`SELECT * FROM basho_joker_trial WHERE basho_id=${id}`;
+          const [config] = basho.isDemo
+            ? yield sql`SELECT * FROM basho_joker_trial WHERE basho_id=${id}`
+            : yield sql`SELECT * FROM basho_live_joker_trial WHERE basho_id=${id}`;
           if (!config) return undefined;
           if (
-            id !== DEMO_BASHO_ID ||
-            !basho.isDemo ||
+            (basho.isDemo ? id !== DEMO_BASHO_ID : id !== "2026-11") ||
             config.preset !== JOKER_PRESET
           )
             throw new JokerError("demo-only");
@@ -152,7 +225,10 @@ export function createJokerRepositories(
           if (!base || base.mode !== config.base_mode)
             throw new JokerError("base-mode-mismatch");
           // Read time after acquiring the row lock, never trust a request timestamp.
-          const now = effectiveClock(config, realNow().toISOString());
+          const serverNow = realNow().toISOString();
+          const now = basho.isDemo
+            ? effectiveClock(config, serverNow)
+            : serverNow;
           const trial: JokerTrial = {
             bashoId: id,
             preset: JOKER_PRESET,

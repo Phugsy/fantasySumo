@@ -15,7 +15,7 @@ export const field = style({
   fontWeight: 700,
 });
 export const actions = style({ display: "flex", flexWrap: "wrap", gap: 10 });
-globalStyle(`${panel} select, ${panel} input`, {
+globalStyle(`${panel} select, ${panel} input:not([type="checkbox"])`, {
   minHeight: 44,
   width: "100%",
   padding: 8,
@@ -24,6 +24,19 @@ globalStyle(`${panel} select, ${panel} input`, {
   border: `1px solid ${vars.clay}`,
   borderRadius: 6,
   font: "inherit",
+});
+export const confirmation = style({
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  minHeight: 44,
+  marginBottom: 12,
+  cursor: "pointer",
+});
+globalStyle(`${confirmation} input[type="checkbox"]`, {
+  width: 20,
+  height: 20,
+  flexShrink: 0,
 });
 globalStyle(`${panel} button`, {
   minHeight: 44,

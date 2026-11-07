@@ -2,11 +2,60 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { JokerError, type Repositories } from "@fantasy-sumo/db";
 import type { AuthService } from "../auth.js";
+import { isAuthenticatedAdmin, sendAdminForbidden } from "../admin-auth.js";
 
 export function registerJokerRoutes(
   app: FastifyInstance,
   context: { repositories: Repositories; auth: AuthService; now: () => Date },
 ) {
+  app.get<{ Params: { bashoId: string } }>(
+    "/api/admin/basho/:bashoId/jokers",
+    async (request, reply) => {
+      if (!(await isAuthenticatedAdmin(request, context.auth)))
+        return sendAdminForbidden(reply);
+      return {
+        trial:
+          (await context.repositories.getLiveJokerTrial(
+            request.params.bashoId,
+          )) ?? null,
+      };
+    },
+  );
+  app.post<{ Params: { bashoId: string }; Body: unknown }>(
+    "/api/admin/basho/:bashoId/jokers",
+    async (request, reply) => {
+      if (!(await isAuthenticatedAdmin(request, context.auth)))
+        return sendAdminForbidden(reply);
+      const parsed = z
+        .object({
+          confirmBashoId: z.literal("2026-11"),
+          acceptPreStartTrial: z.literal(true),
+        })
+        .strict()
+        .safeParse(request.body);
+      if (
+        !parsed.success ||
+        request.params.bashoId !== parsed.data.confirmBashoId
+      )
+        return reply.code(400).send({ error: "confirmation-required" });
+      const user = await context.auth.getCurrentUser(request);
+      try {
+        return {
+          trial: await context.repositories.enableNovemberJokers(
+            request.params.bashoId,
+            user!.id,
+            context.now,
+          ),
+        };
+      } catch (error) {
+        if (!(error instanceof JokerError)) throw error;
+        return reply.code(error.code === "basho-not-found" ? 404 : 409).send({
+          error: error.code,
+          message: `Joker trial cannot be enabled: ${error.code}.`,
+        });
+      }
+    },
+  );
   const commandSchema = z
     .object({
       day: z.number().int().min(1).max(15),
