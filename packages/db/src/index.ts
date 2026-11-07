@@ -74,3 +74,8 @@ export type {
   JokerSnapshot,
   JokerCommand,
 } from "./joker-repositories.js";
+
+export type {
+  ScoringOverrideInput,
+  ScoringOverrideEntry,
+} from "./scoring-overrides.js";

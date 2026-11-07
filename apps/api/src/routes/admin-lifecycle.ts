@@ -21,7 +21,7 @@ export function registerAdminLifecycleRoutes(
   context: RouteContext,
 ) {
   app.addHook("preHandler", async (request, reply) => {
-    if (!isLifecycleAdminUrl(request.url)) {
+    if (!isLifecycleAdminUrl(request.routeOptions.url ?? "")) {
       return;
     }
 
@@ -64,7 +64,9 @@ export function registerAdminLifecycleRoutes(
   );
 
   registerLifecycleAction(app, context, "open-picks");
+  registerLifecycleAction(app, context, "lock-picks");
   registerLifecycleAction(app, context, "start");
+  registerLifecycleAction(app, context, "undo-start");
   registerLifecycleAction(app, context, "close");
 }
 
@@ -123,6 +125,8 @@ function sendInvalidTransition(
 function isLifecycleAdminUrl(url: string): boolean {
   return (
     url.startsWith("/api/admin/basho/current") ||
-    /^\/api\/admin\/basho\/[^/]+\/(open-picks|start|close)(?:\?|$)/.test(url)
+    /^\/api\/admin\/basho\/[^/]+\/(open-picks|lock-picks|start|undo-start|close)(?:\?|$)/.test(
+      url,
+    )
   );
 }

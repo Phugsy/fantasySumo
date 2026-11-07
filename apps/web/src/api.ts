@@ -369,9 +369,11 @@ async function readApiError(response: Response): Promise<{
 export async function updateAdminScoringMode(
   bashoId: string,
   scoringMode: ScoringMode,
+  override?: { reason: string; expectedMode: ScoringMode },
 ): Promise<void> {
   await putJson(`/api/admin/basho/${bashoId}/game-config/scoring`, {
     scoringMode,
+    ...(override ? { override } : {}),
   });
 }
 export async function runAdminPrizesImport(

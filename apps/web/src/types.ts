@@ -139,6 +139,7 @@ export interface SessionUser {
   email?: string;
   displayName?: string;
   isAdmin?: boolean;
+  isSuperAdmin?: boolean;
 }
 
 export interface SessionResponse {
@@ -239,7 +240,12 @@ export interface AdminBashoResponse {
   basho: Omit<Basho, "teamSize">;
 }
 
-export type AdminLifecycleAction = "open-picks" | "start" | "close";
+export type AdminLifecycleAction =
+  | "open-picks"
+  | "lock-picks"
+  | "start"
+  | "undo-start"
+  | "close";
 export type AdminDemoAction = "reset" | "start" | "advance-day" | "complete";
 
 export interface AdminActionResponse extends AdminBashoResponse {
@@ -253,6 +259,15 @@ export interface AdminGameConfigResponse {
   changed?: boolean;
   canChangeTeamSize: boolean;
   canChangeScoringMode?: boolean;
+  canOverrideScoringMode?: boolean;
+  scoringOverrides?: Array<{
+    id: string;
+    fromMode: ScoringMode;
+    toMode: ScoringMode;
+    actorUserId: string;
+    changedAt: string;
+    reason: string;
+  }>;
   gameConfig: {
     teamSize: number;
     teamSizeSource: "basho" | "default";

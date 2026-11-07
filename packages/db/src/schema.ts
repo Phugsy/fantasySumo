@@ -278,3 +278,17 @@ export const jokerEvents = sqliteTable(
     uniqueIndex("joker_event_request_idx").on(table.teamId, table.requestId),
   ],
 );
+
+export const bashoScoringOverrides = sqliteTable("basho_scoring_overrides", {
+  id: text("id").primaryKey(),
+  bashoId: text("basho_id")
+    .notNull()
+    .references(() => basho.id, { onDelete: "cascade" }),
+  fromMode: text("from_mode", {
+    enum: ["wins-v0", "achievements-v1"],
+  }).notNull(),
+  toMode: text("to_mode", { enum: ["wins-v0", "achievements-v1"] }).notNull(),
+  actorUserId: text("actor_user_id").notNull(),
+  reason: text("reason").notNull(),
+  changedAt: text("changed_at").notNull(),
+});

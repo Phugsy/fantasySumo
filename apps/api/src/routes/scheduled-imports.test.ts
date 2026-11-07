@@ -944,3 +944,131 @@ function jsonResponse(payload: unknown) {
     },
   });
 }
+
+describe("independent morning schedule refresh", () => {
+  const path = "/api/cron/import-schedule";
+  async function refresh(instance: FastifyInstance) {
+    return instance.inject({
+      url: path,
+      headers: { authorization: `Bearer ${CRON_SECRET}` },
+    });
+  }
+  const upcomingCard: typeof fetch = async (url) => {
+    const day = dayFromUrl(url);
+    return jsonResponse({
+      torikumi: [
+        {
+          id: `card-${day}`,
+          bashoId: "202605",
+          division: "Makuuchi",
+          day,
+          matchNo: 1,
+          eastId: 4227,
+          eastShikona: "Onosato",
+          westId: 3661,
+          westShikona: "Kotozakura",
+          winnerId: 0,
+          winnerEn: "",
+          kimarite: "",
+        },
+      ],
+    });
+  };
+  it("requires the cron credential and stays disabled without one", async () => {
+    app = createApp();
+    expect((await app.inject(path)).statusCode).toBe(401);
+    const disabled = buildApp({ db: client, cronSecret: undefined });
+    expect((await disabled.inject(path)).statusCode).toBe(404);
+    await disabled.close();
+  });
+  it("prepares the opening cards before the basho without changing picks, results or lifecycle", async () => {
+    await seedLiveBasho("2026-05", {
+      status: "upcoming",
+      currentDay: 0,
+      withTeam: true,
+    });
+    app = createApp(upcomingCard, new Date("2026-05-09T01:00:00.000Z"));
+    const response = await refresh(app);
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "complete",
+      bashoId: "2026-05",
+      schedules: [
+        { status: "imported", day: 1 },
+        { status: "imported", day: 2 },
+      ],
+    });
+    const repos = createRepositories(client);
+    expect(await repos.getBasho("2026-05")).toMatchObject({
+      status: "upcoming",
+      currentDay: 0,
+    });
+    expect(await repos.listBoutResultsForBasho("2026-05")).toEqual([]);
+    expect(
+      (await repos.getFantasyTeam("team-day-zero"))!.lockedAt,
+    ).toBeUndefined();
+    expect(
+      (await repos.listScheduledBoutPublicationsForBasho("2026-05"))
+        .map((row) => row.day)
+        .sort(),
+    ).toEqual([1, 2]);
+    const cards = await repos.listScheduledBoutsForBasho("2026-05");
+    await refresh(app);
+    expect(await repos.listScheduledBoutsForBasho("2026-05")).toEqual(cards);
+  });
+  it("retries missing cards independently of results and preserves a published card on an unavailable retry", async () => {
+    await seedLiveBasho("2026-05", { status: "locked", currentDay: 0 });
+    let unavailable = false;
+    app = createApp(
+      async (url, init) =>
+        unavailable ? jsonResponse({ torikumi: [] }) : upcomingCard(url, init),
+      new Date("2026-05-10T01:00:00.000Z"),
+    );
+    expect((await refresh(app)).json().status).toBe("complete");
+    const repos = createRepositories(client);
+    const cards = await repos.listScheduledBoutsForBasho("2026-05");
+    unavailable = true;
+    expect((await refresh(app)).json().status).toBe("partial");
+    expect(await repos.listScheduledBoutsForBasho("2026-05")).toEqual(cards);
+    expect(await repos.getBasho("2026-05")).toMatchObject({
+      status: "locked",
+      currentDay: 0,
+    });
+    expect(await repos.listBoutResultsForBasho("2026-05")).toEqual([]);
+  });
+  it("does not downgrade an already scored day or touch demo bashos", async () => {
+    await seedLiveBasho("2026-05", {
+      importedDays: [1, 2],
+      status: "active",
+      currentDay: 2,
+    });
+    app = createApp(upcomingCard, new Date("2026-05-11T01:00:00.000Z"));
+    const repos = createRepositories(client);
+    const results = await repos.listBoutResultsForBasho("2026-05");
+    const publication = (
+      await repos.listScheduledBoutPublicationsForBasho("2026-05")
+    ).find((row) => row.day === 2);
+    await refresh(app);
+    expect(await repos.listBoutResultsForBasho("2026-05")).toEqual(results);
+    expect(
+      (await repos.listScheduledBoutPublicationsForBasho("2026-05")).find(
+        (row) => row.day === 2,
+      ),
+    ).toEqual(publication);
+  });
+});
+
+it("skips morning schedule requests for demo-only data", async () => {
+  await seedLiveBasho(DEMO_BASHO_ID, { isDemo: true });
+  app = createApp(async () => {
+    throw new Error("Must not fetch demo schedules");
+  });
+  const response = await app.inject({
+    url: "/api/cron/import-schedule",
+    headers: { authorization: `Bearer ${CRON_SECRET}` },
+  });
+  expect(response.json()).toMatchObject({
+    status: "skipped",
+    reason: "no-eligible-basho",
+  });
+});

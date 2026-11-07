@@ -43,6 +43,42 @@ settings and the direct type dependency; each deployment also runs
 
 ## Automated release path
 
+### Schedule recovery and owner corrections
+
+`GET /api/cron/import-schedule` uses the same server-only `CRON_SECRET` bearer
+boundary as results imports. Its separate daily job runs at **01:00 UTC
+(10:00 JST)**, ahead of the noon JST joker deadline. It attempts the current and
+following published Makuuchi cards, including opening cards from two days before
+the basho. It does not start/lock a basho or import outcomes. Demo and completed
+bashos are excluded. Already scored days are skipped; existing transactional
+import guards also preserve complete result-verification cards against a racing
+schedule-only retry. Unavailable responses preserve stored schedules and return
+a logged partial result. Manual Admin schedule import remains available for
+late publications or source outages. The 11:00 UTC results job and its
+following-card attempt remain in place. This adds one daily job on the existing
+Vercel project, without another service; cron timing is not the joker authority.
+Server time and persisted schedule evidence still enforce every deadline.
+
+`SUPER_ADMIN_USER_IDS` is a separate, comma-separated allowlist of verified auth
+user IDs. Empty means owner scoring overrides are disabled. Never use email
+addresses, client-provided role fields or a public `VITE_` variable for it.
+Super-admin IDs also have normal admin access; ordinary `ADMIN_USER_IDS` entries
+cannot override locked scoring. Configure the owner's actual **Preview account
+ID** for UAT and the Production account ID only with the release. Do not assume
+separate auth tenants use the same user ID. Existing deployment configurations
+work unchanged when this optional variable is absent.
+
+For this UAT batch, keep one branch/PR Preview and update it in place. Preserve
+its test accounts and fixture state across ordinary code updates; reset test
+data only deliberately. Owner acceptance is separate from automated checks;
+use [the test card](UAT.md) before requesting a production release.
+
+Live Admin now has **Lock picks** independently of **Start the basho**. **Undo
+start** returns active → locked only at day 0 with no stored results; it retains
+team lock timestamps, picks, rules and jokers. Reopening original picks remains
+the separate **Open picks** action. These transitions recheck their guards in
+the same repository transaction used for the lifecycle update.
+
 Hosted deployments are owned by GitHub Actions:
 
 - `.github/workflows/deploy-preview.yml` runs for same-repository pull request

@@ -9,6 +9,7 @@ import {
 import {
   getAdminImportToken,
   getAdminUserIds,
+  getSuperAdminUserIds,
   getAuthMode,
   getCronSecret,
   getDemoAdminToken,
@@ -40,6 +41,7 @@ interface AppOptions {
   demoAdminToken?: string;
   adminImportToken?: string;
   adminUserIds?: readonly string[];
+  superAdminUserIds?: readonly string[];
   authMode?: "local" | "neon";
   neonAuthAudience?: string;
   neonAuthIssuer?: string;
@@ -63,6 +65,7 @@ export function buildApp(options: AppOptions = {}) {
   const defaultTeamSize = options.teamSize ?? getTeamSize();
   const auth = createAuthService({
     adminUserIds: options.adminUserIds ?? getAdminUserIds(),
+    superAdminUserIds: options.superAdminUserIds ?? getSuperAdminUserIds(),
     mode: options.authMode ?? getAuthMode(),
     neonAuthAudience: options.neonAuthAudience ?? getNeonAuthAudience(),
     neonAuthIssuer: options.neonAuthIssuer ?? getNeonAuthIssuer(),
@@ -101,6 +104,7 @@ export function buildApp(options: AppOptions = {}) {
   });
   registerAdminGameConfigRoutes(app, {
     auth,
+    now: options.now ?? (() => new Date()),
     defaultTeamSize,
     repositories,
   });
