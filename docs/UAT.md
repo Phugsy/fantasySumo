@@ -13,6 +13,10 @@ an emulated mobile browser does not exercise an iPhone's software keyboard.
 3. Open a ready PR. Wait for its migration-gated preview to finish, then provide
    the exact preview URL and commit, the fixture/account/role to use, and a
    short numbered test card. State any scenario that is not available there.
+   For owner UAT use https://fantasy-sumo-uat-phuggo.vercel.app, with the
+   repository `UAT_BRANCH` variable selecting the PR branch. Its exact origin
+   must be trusted by the Preview Neon Auth branch. Verify real sign-in on that
+   address before calling the preview ready; see [fixed UAT setup](DEPLOYMENT.md#fixed-address-for-owner-uat).
 4. Use test accounts and isolated data. The reusable environment is described in
    [Shared Demo Playtests](PLAYTEST.md); the external setup remains tracked in
    #91. Ordinary previews must not be treated as disposable until their database

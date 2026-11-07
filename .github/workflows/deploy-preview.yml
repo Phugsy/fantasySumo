@@ -39,7 +39,7 @@ jobs:
       - name: Record immutable commit
         id: commit
         env:
-          PREVIEW_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || '' }}
+          PREVIEW_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || (inputs.ref == vars.UAT_BRANCH && vars.UAT_BRANCH || '') }}
         run: |
           playwright_version=$(awk '/@playwright\/test/{found=1; next} found && $1 == "version:" {version=$2; sub(/\(.*/, "", version); print version; exit}' pnpm-lock.yaml)
           if [[ ! "$playwright_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -206,12 +206,34 @@ jobs:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: node .workflow-tools/scripts/smoke-deployment.mjs "$DEPLOYMENT_URL"
 
+      - name: Update stable UAT address
+        id: uat
+        if: vars.UAT_BRANCH != '' && needs.resolve.outputs.branch == vars.UAT_BRANCH
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+          UAT_BRANCH: ${{ vars.UAT_BRANCH }}
+          GH_TOKEN: ${{ github.token }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [[ "$UAT_BRANCH" == "master" ]]; then
+            echo "The UAT address must track a preview branch, not master." >&2
+            exit 1
+          fi
+          current_sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$UAT_BRANCH" --jq .sha)
+          if [[ "$current_sha" != "$DEPLOY_SHA" ]]; then
+            echo "Refusing to replace UAT with stale commit $DEPLOY_SHA; $UAT_BRANCH is now $current_sha." >&2
+            exit 1
+          fi
+          pnpm dlx vercel@56.3.2 alias set "$DEPLOYMENT_URL" fantasy-sumo-uat-phuggo.vercel.app --scope="$VERCEL_ORG_ID" --token="$VERCEL_TOKEN"
+          echo "url=https://fantasy-sumo-uat-phuggo.vercel.app" >> "$GITHUB_OUTPUT"
+
       - name: Write preview deployment summary
         if: always()
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
           MIGRATION_RESULT: ${{ steps.migrate.outcome }}
           SMOKE_RESULT: ${{ steps.smoke.outcome }}
+          UAT_URL: ${{ steps.uat.outputs.url }}
         run: |
           echo "## Preview deployment" >> "$GITHUB_STEP_SUMMARY"
           echo "- Environment: preview" >> "$GITHUB_STEP_SUMMARY"
@@ -219,6 +241,7 @@ jobs:
           echo "- Migration result: ${MIGRATION_RESULT:-not-run}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Deployment URL: ${DEPLOYMENT_URL:-not-created}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Smoke-test result: ${SMOKE_RESULT:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Stable UAT URL: ${UAT_URL:-not-updated-for-this-run}" >> "$GITHUB_STEP_SUMMARY"
           if [[ "$MIGRATION_RESULT" == "success" && "$SMOKE_RESULT" != "success" ]]; then
             echo "- Recovery: the database may already be ahead; fix forward or redeploy code compatible with the advanced schema. Do not run down migrations automatically." >> "$GITHUB_STEP_SUMMARY"
           fi

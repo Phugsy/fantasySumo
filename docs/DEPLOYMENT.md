@@ -288,7 +288,41 @@ contain request-derived values; runtime logs also persist and may later be
 forwarded to other systems. The stable error name and code provide the useful
 failure classification without that exposure.
 
-Neon Auth also requires each deployed app origin to be added as a trusted domain in Neon Console -> Auth -> Configuration -> Domains. Add the exact production and preview origins with protocol and no trailing slash, for example `https://fantasy-sumo.vercel.app`. Wildcard subdomains are not supported, so each Vercel preview domain that needs auth testing must be added explicitly.
+Neon Auth requires the browser's origin in the correct branch's trusted domains
+(Neon Console → Auth → Configuration → Domains). Include `https://` and omit
+the trailing slash. An API health check alone does not verify this setting.
+
+### Fixed address for owner UAT
+
+Use **https://fantasy-sumo-uat-phuggo.vercel.app** for owner UAT, rather than the
+new immutable deployment URL from each build. Add that one exact origin to the
+**Preview auth branch** once. Keep the existing Production origins in their
+own auth configuration. The alias serves the Preview deployment directly, so
+email verification and `/reset-password` links use the same fixed origin.
+
+Set the **repository** Actions variable `UAT_BRANCH` to the branch currently
+under owner review, for example `codex/uat-feedback-fixes`. Do not make this an
+environment-only variable: the resolve job also needs it. Only that branch's
+successful preview run updates the fixed address, after validation, browser
+E2E, migrations and deployment smoke checks. A fresh branch-head check rejects
+stale builds before alias assignment. Other PR previews keep their own URLs;
+an unset variable leaves the fixed address unchanged. `master` is rejected.
+
+For an environment-only redeploy, dispatch Deploy Preview with `ref` set to the
+selected **branch name**. This resolves and validates its immutable SHA, pulls
+that branch's Preview configuration, and updates UAT after the same gates.
+Dispatching an exact SHA still creates an immutable preview but does not move
+the UAT alias. The workflow summary records both URLs and the deployed SHA.
+
+Changing the selected branch deliberately replaces the build under review;
+record the new SHA and preserve the Preview accounts/data across code updates.
+This uses an alias on the existing Vercel project and adds no service or data
+reset. Confirm sign-in/register on the fixed address before handing it to the
+owner; a missing trusted origin remains a UAT blocker even when smoke is green.
+
+Neon's current [domain documentation](https://neon.com/docs/auth/guides/configure-domains)
+also supports scoped wildcard patterns, but this setup uses one exact UAT
+origin. Do not trust a shared suffix such as `https://*.vercel.app`.
 
 ### Password-reset email and redirect setup
 
@@ -320,8 +354,8 @@ For every production or preview branch used for auth testing:
    reset for an unknown address and confirm the UI shows the same neutral
    acknowledgement.
 
-Preview origins are not wildcarded. Each preview used for a real email test
-must be trusted explicitly, and its Neon Auth branch/email configuration must
+Use the fixed UAT origin for real email tests. An immutable preview URL used
+instead must also be trusted, and its Neon Auth branch/email configuration must
 be checked independently. Local `AUTH_MODE=local` deliberately has no password
 reset flow.
 
