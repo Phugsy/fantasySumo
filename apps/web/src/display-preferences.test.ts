@@ -11,10 +11,29 @@ describe("display preferences", () => {
       expect(parsePreferences(value)).toEqual(defaultPreferences);
     expect(
       parsePreferences('{"theme":"dark","order":"delete","photos":"true"}'),
-    ).toEqual({ theme: "dark", order: "rank", photos: false });
+    ).toEqual({
+      theme: "dark",
+      order: "rank",
+      photos: false,
+      portraitStyle: "photos",
+    });
     expect(
       parsePreferences('{"theme":"light","order":"score","photos":true}'),
-    ).toEqual({ theme: "light", order: "score", photos: true });
+    ).toEqual({
+      theme: "light",
+      order: "score",
+      photos: true,
+      portraitStyle: "photos",
+    });
+  });
+
+  it("accepts illustrations and defaults unsupported styles to photos", () => {
+    expect(
+      parsePreferences('{"portraitStyle":"illustrations","photos":true}'),
+    ).toMatchObject({ portraitStyle: "illustrations", photos: true });
+    expect(parsePreferences('{"portraitStyle":"unknown"}').portraitStyle).toBe(
+      "photos",
+    );
   });
 
   it("uses persisted banzuke order, descending scores and stable name/identity ties without mutating", () => {

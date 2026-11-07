@@ -20,6 +20,8 @@ export const frame = style({
   border: `1px solid ${vars.clayLight}`,
   fontSize: ".7rem",
   fontWeight: 700,
+  textAlign: "center",
+  overflowWrap: "anywhere",
 });
 export const image = style({
   display: "block",

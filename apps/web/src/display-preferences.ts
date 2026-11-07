@@ -1,14 +1,17 @@
 export const DISPLAY_STORAGE_KEY = "fantasy-sumo-display-v1";
 export type RikishiOrder = "rank" | "score" | "name";
 export type ColourTheme = "system" | "light" | "dark";
+export type PortraitStyle = "photos" | "illustrations";
 export interface DisplayPreferences {
   order: RikishiOrder;
   photos: boolean;
+  portraitStyle: PortraitStyle;
   theme: ColourTheme;
 }
 export const defaultPreferences: DisplayPreferences = {
   order: "rank",
   photos: false,
+  portraitStyle: "photos",
   theme: "system",
 };
 
@@ -24,6 +27,8 @@ export function parsePreferences(value: string | null): DisplayPreferences {
           ? input.order
           : "rank",
       photos: input.photos === true,
+      portraitStyle:
+        input.portraitStyle === "illustrations" ? "illustrations" : "photos",
       theme:
         input.theme === "light" || input.theme === "dark"
           ? input.theme

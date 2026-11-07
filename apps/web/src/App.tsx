@@ -1315,6 +1315,8 @@ function createMyTeamResponse(
           ...(rikishi?.rankOrder === undefined
             ? {}
             : { rankOrder: rikishi.rankOrder }),
+          photo: rikishi?.photo,
+          illustration: rikishi?.illustration,
           wins: 0,
           score: 0,
           tournamentNotes: rikishi?.tournamentNotes ?? {

@@ -19,6 +19,19 @@ and charts. Existing component CSS consumes the same stable theme variables.
 
 ## Optional photos
 
+**Show rikishi portraits** controls visibility. **Portrait style** selects
+**Photos** or **Ink illustrations**, independently of the colour theme. Both
+choices apply to the picks list and My Stable and are saved between visits.
+Existing saved preferences keep their photo visibility and default to Photos.
+The original storage key remains valid; an absent or unsupported style defaults
+to Photos.
+
+Ink illustrations cover all 42 November 2026 Makuuchi rikishi and are labelled
+as AI-generated. The local WebP assets use verified JSA or Sumo API aliases;
+missing or failed artwork shows **No illustration**. See
+[artwork and generation details](RIKISHI_ILLUSTRATIONS.md) for the reference
+identities, prompt and maintenance process.
+
 Photos are off by default. When enabled, the API looks up a curated portrait
 by the rikishi's established Sumo API ID. A change of shikona keeps that link.
 The November 2026 Makuuchi roster has 33 portraits for 42 rikishi. Rikishi without

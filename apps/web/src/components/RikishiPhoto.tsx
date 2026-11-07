@@ -1,31 +1,45 @@
 import { useState } from "react";
+import { useDisplayPreferences } from "../DisplayPreferences";
 import type { RikishiPhoto as Photo } from "../types";
 import * as styles from "./RikishiPhoto.css";
 
-export function RikishiPhoto({ photo }: { photo?: Photo }) {
+export function RikishiPhoto({
+  photo,
+  illustration,
+}: {
+  photo?: Photo;
+  illustration?: { url: string };
+}) {
+  const { preferences } = useDisplayPreferences();
+  const illustrated = preferences.portraitStyle === "illustrations";
+  const portrait = illustrated ? illustration : photo;
   const [failedUrl, setFailedUrl] = useState<string>();
   return (
     <span className={styles.frame} aria-hidden="true">
-      {photo !== undefined && failedUrl !== photo.url ? (
+      {portrait !== undefined && failedUrl !== portrait.url ? (
         <img
           className={styles.image}
-          src={photo.url}
+          src={portrait.url}
           alt=""
           width={48}
           height={56}
           loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"
-          onError={() => setFailedUrl(photo.url)}
+          onError={() => setFailedUrl(portrait.url)}
         />
       ) : (
-        <span>No photo</span>
+        <span>{illustrated ? "No illustration" : "No photo"}</span>
       )}
     </span>
   );
 }
 
 export function PhotoCredits({ photos }: { photos: Array<Photo | undefined> }) {
+  const { preferences } = useDisplayPreferences();
+  if (preferences.portraitStyle === "illustrations") {
+    return <p className={styles.credits}>AI-generated ink illustrations</p>;
+  }
   const unique = [
     ...new Map(
       photos

@@ -1,6 +1,10 @@
 import { useId } from "react";
 import { useDisplayPreferences } from "../DisplayPreferences";
-import type { ColourTheme, RikishiOrder } from "../display-preferences";
+import type {
+  ColourTheme,
+  PortraitStyle,
+  RikishiOrder,
+} from "../display-preferences";
 import * as styles from "./DisplaySettings.css";
 
 export function DisplaySettings() {
@@ -47,7 +51,21 @@ export function DisplaySettings() {
             checked={preferences.photos}
             onChange={(event) => update({ photos: event.target.checked })}
           />
-          Show rikishi photos
+          Show rikishi portraits
+        </label>
+        <label className={styles.field} htmlFor={`${id}-portraits`}>
+          Portrait style
+          <select
+            className={styles.select}
+            id={`${id}-portraits`}
+            value={preferences.portraitStyle}
+            onChange={(event) =>
+              update({ portraitStyle: event.target.value as PortraitStyle })
+            }
+          >
+            <option value="photos">Photos</option>
+            <option value="illustrations">Ink illustrations</option>
+          </select>
         </label>
       </div>
     </details>

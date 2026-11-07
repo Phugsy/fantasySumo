@@ -1,4 +1,5 @@
 import { getBashoScoringOptions } from "../scoring.js";
+import { getRikishiIllustration } from "../rikishi-illustrations.js";
 import { getRikishiPhoto } from "../rikishi-photos.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -348,6 +349,11 @@ export function registerBashoRoutes(
           throughDay: verifiedThroughDay,
         }).score,
         photo: getRikishiPhoto(entry.rikishiId, basho.isDemo, sourceIdentities),
+        illustration: getRikishiIllustration(
+          entry.rikishiId,
+          basho.isDemo,
+          sourceIdentities,
+        ),
         previousBashoRecord: getPreviousBashoRecordState({
           previousBasho,
           previousBashoData,
@@ -662,6 +668,11 @@ export function registerBashoRoutes(
                 }),
             wins: score?.wins ?? 0,
             photo: getRikishiPhoto(
+              pick.rikishiId,
+              basho.isDemo,
+              photoIdentities,
+            ),
+            illustration: getRikishiIllustration(
               pick.rikishiId,
               basho.isDemo,
               photoIdentities,

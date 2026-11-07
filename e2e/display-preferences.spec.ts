@@ -20,7 +20,7 @@ test("persists list preferences and theme while preserving picks and leaderboard
   await page.getByText("Display", { exact: true }).click();
   await page.getByLabel("Rikishi order").selectOption("name");
   await expect(rows.first()).toContainText("Hoshoryu");
-  await page.getByLabel("Show rikishi photos").check();
+  await page.getByLabel("Show rikishi portraits").check();
   await page.getByLabel("Colour theme").selectOption("dark");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.getByText("Display", { exact: true }).click();
@@ -40,17 +40,29 @@ test("persists list preferences and theme while preserving picks and leaderboard
   await page.getByText("Display", { exact: true }).click();
   await page.getByLabel("Rikishi order").selectOption("score");
   await expect(onosato).toHaveAttribute("aria-pressed", "true");
+  await page.getByLabel("Portrait style").selectOption("illustrations");
+  await expect(onosato).toHaveAttribute("aria-pressed", "true");
+  await page.getByText("Display", { exact: true }).click();
+  await onosato.scrollIntoViewIfNeeded();
+  await expect(onosato.locator("img")).toHaveAttribute(
+    "src",
+    /^\/rikishi-illustrations\//,
+  );
+  await expect(onosato.locator("img")).toHaveJSProperty("naturalWidth", 384);
+  await expect(page.getByText("AI-generated ink illustrations")).toBeVisible();
+  await expect(page.getByText("Photo credits", { exact: true })).toHaveCount(0);
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.getByText("Display", { exact: true }).click();
-  await expect(page.getByLabel("Show rikishi photos")).toBeChecked();
+  await expect(page.getByLabel("Show rikishi portraits")).toBeChecked();
+  await expect(page.getByLabel("Portrait style")).toHaveValue("illustrations");
   await expect(page.getByLabel("Rikishi order")).toHaveValue("score");
   await page.getByLabel("Colour theme").selectOption("system");
   await page.emulateMedia({ colorScheme: "light" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await page.getByLabel("Show rikishi photos").uncheck();
+  await page.getByLabel("Show rikishi portraits").uncheck();
   await expect(rows.locator("img")).toHaveCount(0);
   await page.getByText("Display", { exact: true }).click();
   await onosato.click();
@@ -67,7 +79,31 @@ test("persists list preferences and theme while preserving picks and leaderboard
   await expect(picks.first()).toContainText("Hoshoryu");
   await page.getByLabel("Rikishi order").selectOption("rank");
   await expect(picks.first()).toContainText("Onosato");
+  await page.getByLabel("Show rikishi portraits").check();
   await page.getByText("Display", { exact: true }).click();
+  await picks.first().scrollIntoViewIfNeeded();
+  await expect(picks.first().locator("img")).toHaveJSProperty(
+    "naturalWidth",
+    384,
+  );
+  await page.getByText("Display", { exact: true }).click();
+  await page.getByLabel("Portrait style").selectOption("photos");
+  await page.getByText("Display", { exact: true }).click();
+  await picks.first().scrollIntoViewIfNeeded();
+  await expect(picks.first().locator("img")).toHaveJSProperty(
+    "naturalWidth",
+    120,
+  );
+  await expect(page.getByText("Photo credits", { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByText("Display", { exact: true }).click();
+  await page.getByLabel("Portrait style").selectOption("illustrations");
+  await page.getByText("Display", { exact: true }).click();
+  await picks.first().scrollIntoViewIfNeeded();
+  await expect(picks.first().locator("img")).toHaveJSProperty(
+    "naturalWidth",
+    384,
+  );
   await page.getByRole("link", { name: "Leaderboard", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Leaderboard", exact: true }),

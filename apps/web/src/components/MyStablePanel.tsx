@@ -150,7 +150,12 @@ export function MyStablePanel({
             <div className="stable-rikishi">
               <span className="rank-pill">{pick.rank ?? "Unranked"}</span>
               <span className={identity}>
-                {preferences.photos && <RikishiPhoto photo={pick.photo} />}
+                {preferences.photos && (
+                  <RikishiPhoto
+                    photo={pick.photo}
+                    illustration={pick.illustration}
+                  />
+                )}
                 <span>
                   <strong>{pick.shikona}</strong>
                   {pick.heya !== undefined && <small>{pick.heya}</small>}
