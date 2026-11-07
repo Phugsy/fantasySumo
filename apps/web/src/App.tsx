@@ -1,3 +1,4 @@
+import { useMobileInputVisibility } from "./useMobileInputVisibility";
 import type {
   Dispatch,
   FormEvent,
@@ -94,6 +95,7 @@ export function App() {
 }
 
 function RoutedApp() {
+  useMobileInputVisibility();
   const location = useLocation();
   const navigate = useNavigate();
   const [loadState, setLoadState] = useState<LoadState>("loading");
@@ -736,6 +738,13 @@ function RoutedApp() {
     document.title = `${getPageTitle(activeView)} | Fantasy Sumo`;
 
     const focusTimer = window.setTimeout(() => {
+      // A slow route paint must not steal focus/scroll after typing has begun.
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLElement &&
+        (active.matches("input, textarea, select") || active.isContentEditable)
+      )
+        return;
       const pageTitle = document.getElementById("page-title");
 
       if (pageTitle === null) {

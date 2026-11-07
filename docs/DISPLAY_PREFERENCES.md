@@ -19,9 +19,10 @@ and charts. Existing component CSS consumes the same stable theme variables.
 
 ## Optional photos
 
-**Show rikishi portraits** controls visibility. **Portrait style** selects
-**Photos** or **Ink illustrations**, independently of the colour theme. Both
-choices apply to the picks list and My Stable and are saved between visits.
+**Portrait style** selects **Hidden**, **Photos** or **Ink illustrations** in
+one control, independently of the colour theme. Selecting artwork makes it
+visible immediately. The choice applies to the picks list, My Stable and
+expanded leaderboard rikishi, and is saved between visits.
 Existing saved preferences keep their photo visibility and default to Photos.
 The original storage key remains valid; an absent or unsupported style defaults
 to Photos.

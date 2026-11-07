@@ -1,3 +1,4 @@
+import { selectControl } from "../styles/select.css";
 import { useEffect, useRef, useState } from "react";
 import {
   fetchMyJokers,
@@ -188,6 +189,7 @@ export function JokerPanel({
           <label className={styles.field}>
             Joker rikishi
             <select
+              className={selectControl}
               value={target}
               disabled={!open || busy}
               onChange={(e) =>

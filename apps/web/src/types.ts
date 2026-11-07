@@ -165,6 +165,7 @@ export interface AllTimeLeaderboardResponse {
   leaderboard: Array<{
     rank: number;
     displayName: string;
+    ownerName?: string;
     score: number;
     tournamentsPlayed: number;
     bashos: Array<{
@@ -202,6 +203,7 @@ export interface LeaderboardEntry {
   rank: number;
   teamId: string;
   displayName: string;
+  ownerName?: string;
   score: number;
   breakdown?: ScoreBreakdown;
   rikishiScores: RikishiScore[];

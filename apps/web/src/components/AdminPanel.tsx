@@ -1,3 +1,4 @@
+import { selectControl } from "../styles/select.css";
 import { DemoJokerControls } from "./DemoJokerControls";
 import { LiveJokerControls } from "./LiveJokerControls";
 import type { ScoringMode } from "@fantasy-sumo/domain";
@@ -592,6 +593,7 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
                 >
                   <label htmlFor="admin-scoring-mode">Scoring mode</label>
                   <select
+                    className={selectControl}
                     id="admin-scoring-mode"
                     value={scoringModeDraft}
                     disabled={pending || !gameConfig.canChangeScoringMode}

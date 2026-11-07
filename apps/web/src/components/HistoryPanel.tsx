@@ -101,6 +101,7 @@ export function HistoryPanel({ signedIn }: HistoryPanelProps) {
                 <span className="history-rank">#{entry.rank}</span>
                 <span>
                   <strong>{entry.displayName}</strong>
+                  <small>{entry.ownerName ?? "Owner unavailable"}</small>
                   <small>{entry.tournamentsPlayed} tournaments</small>
                 </span>
                 <strong>{entry.score} pts</strong>

@@ -20,7 +20,7 @@ test("persists list preferences and theme while preserving picks and leaderboard
   await page.getByText("Display", { exact: true }).click();
   await page.getByLabel("Rikishi order").selectOption("name");
   await expect(rows.first()).toContainText("Hoshoryu");
-  await page.getByLabel("Show rikishi portraits").check();
+  await page.getByLabel("Portrait style").selectOption("photos");
   await page.getByLabel("Colour theme").selectOption("dark");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.getByText("Display", { exact: true }).click();
@@ -54,7 +54,6 @@ test("persists list preferences and theme while preserving picks and leaderboard
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.getByText("Display", { exact: true }).click();
-  await expect(page.getByLabel("Show rikishi portraits")).toBeChecked();
   await expect(page.getByLabel("Portrait style")).toHaveValue("illustrations");
   await expect(page.getByLabel("Rikishi order")).toHaveValue("score");
   await page.getByLabel("Colour theme").selectOption("system");
@@ -62,7 +61,7 @@ test("persists list preferences and theme while preserving picks and leaderboard
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await page.getByLabel("Show rikishi portraits").uncheck();
+  await page.getByLabel("Portrait style").selectOption("hidden");
   await expect(rows.locator("img")).toHaveCount(0);
   await page.getByText("Display", { exact: true }).click();
   await onosato.click();
@@ -79,7 +78,7 @@ test("persists list preferences and theme while preserving picks and leaderboard
   await expect(picks.first()).toContainText("Hoshoryu");
   await page.getByLabel("Rikishi order").selectOption("rank");
   await expect(picks.first()).toContainText("Onosato");
-  await page.getByLabel("Show rikishi portraits").check();
+  await page.getByLabel("Portrait style").selectOption("illustrations");
   await page.getByText("Display", { exact: true }).click();
   await picks.first().scrollIntoViewIfNeeded();
   await expect(picks.first().locator("img")).toHaveJSProperty(
@@ -104,14 +103,88 @@ test("persists list preferences and theme while preserving picks and leaderboard
     "naturalWidth",
     384,
   );
+  await request.post("/api/admin/demo/start", {
+    headers: {
+      "x-demo-admin-token":
+        process.env.DEMO_ADMIN_TOKEN ?? "playwright-demo-admin-token",
+    },
+  });
   await page.getByRole("link", { name: "Leaderboard", exact: true }).click();
+  await page.reload();
   await expect(
     page.getByRole("heading", { name: "Leaderboard", exact: true }),
   ).toBeVisible();
+  const stable = page
+    .locator(".leaderboard-entry")
+    .filter({ hasText: "Preference Stable" });
+  await expect(
+    stable.getByText("Preferences Player", { exact: true }),
+  ).toBeVisible();
+  const summary = stable.locator(".leaderboard-summary");
+  if ((await summary.getAttribute("aria-expanded")) === "false")
+    await summary.click();
+  const scoreRow = stable
+    .locator(".rikishi-score-summary")
+    .filter({ hasText: "Onosato" });
+  await scoreRow.scrollIntoViewIfNeeded();
+  await expect(scoreRow.locator("img")).toHaveJSProperty("naturalWidth", 384);
+  await page.getByText("Display", { exact: true }).click();
+  await page.getByLabel("Portrait style").selectOption("photos");
+  await page.getByText("Display", { exact: true }).click();
+  await scoreRow.scrollIntoViewIfNeeded();
+  await expect(scoreRow.locator("img")).toHaveJSProperty("naturalWidth", 120);
+  await page.getByText("Display", { exact: true }).click();
+  await page.getByLabel("Portrait style").selectOption("hidden");
+  await expect(stable.locator("img")).toHaveCount(0);
   // The list preference must never sort official standings alphabetically.
   const leaderboard = await request.get("/api/basho/demo-2026-05/leaderboard");
   const { leaderboard: entries } = await leaderboard.json();
   expect(entries.length).toBeGreaterThan(0);
   const scores = entries.map((entry: { score: number }) => entry.score);
   expect(scores).toEqual([...scores].sort((a, b) => b - a));
+});
+
+test("keeps the mobile team-name field visible when the editing viewport shrinks", async ({
+  page,
+  request,
+}) => {
+  await request.post("/api/admin/demo/reset", {
+    headers: {
+      "x-demo-admin-token":
+        process.env.DEMO_ADMIN_TOKEN ?? "playwright-demo-admin-token",
+    },
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/login?returnTo=%2Fteam");
+  await page.getByLabel("Email").fill("keyboard@example.com");
+  await page.getByLabel("Display name").fill("Keyboard Player");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page).toHaveURL(/\/team$/);
+  const input = page.getByLabel("Team name");
+  await input.focus();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mobile-input-focused",
+    "true",
+  );
+  await page.setViewportSize({ width: 390, height: 380 });
+  await input.fill("Visible while typing");
+  await expect
+    .poll(() =>
+      input.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const viewport = window.visualViewport!;
+        return (
+          rect.top >= viewport.offsetTop + 15 &&
+          rect.bottom <= viewport.offsetTop + viewport.height - 15
+        );
+      }),
+    )
+    .toBe(true);
+  await expect(page.locator(".app-header")).toHaveCSS("position", "static");
+  await page.locator("#page-title").focus();
+  await expect(page.locator("html")).not.toHaveAttribute(
+    "data-mobile-input-focused",
+    "true",
+  );
+  await expect(page.locator(".app-header")).toHaveCSS("position", "sticky");
 });

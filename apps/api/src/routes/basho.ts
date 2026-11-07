@@ -128,6 +128,7 @@ export function registerBashoRoutes(
       string,
       {
         displayName: string;
+        ownerName?: string;
         score: number;
         bashos: Array<{ bashoId: string; bashoName: string; score: number }>;
       }
@@ -149,6 +150,7 @@ export function registerBashoRoutes(
         };
 
         standing.displayName = entry.displayName;
+        standing.ownerName = team?.ownerName ?? standing.ownerName;
         standing.score += entry.score;
         standing.bashos.push({
           bashoId: scoredBasho.basho.id,
@@ -171,6 +173,9 @@ export function registerBashoRoutes(
         .map((standing, index) => ({
           rank: index + 1,
           displayName: standing.displayName,
+          ...(standing.ownerName === undefined
+            ? {}
+            : { ownerName: standing.ownerName }),
           score: standing.score,
           tournamentsPlayed: standing.bashos.length,
           bashos: [...standing.bashos].reverse(),

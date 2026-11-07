@@ -1,3 +1,4 @@
+import { selectControl } from "../styles/select.css";
 import { useId } from "react";
 import { useDisplayPreferences } from "../DisplayPreferences";
 import type {
@@ -17,7 +18,7 @@ export function DisplaySettings() {
         <label className={styles.field} htmlFor={`${id}-theme`}>
           Colour theme
           <select
-            className={styles.select}
+            className={`${styles.select} ${selectControl}`}
             id={`${id}-theme`}
             value={preferences.theme}
             onChange={(event) =>
@@ -32,7 +33,7 @@ export function DisplaySettings() {
         <label className={styles.field} htmlFor={`${id}-order`}>
           Rikishi order
           <select
-            className={styles.select}
+            className={`${styles.select} ${selectControl}`}
             id={`${id}-order`}
             value={preferences.order}
             onChange={(event) =>
@@ -44,25 +45,24 @@ export function DisplaySettings() {
             <option value="name">Name</option>
           </select>
         </label>
-        <label className={styles.checkbox}>
-          <input
-            className={styles.input}
-            type="checkbox"
-            checked={preferences.photos}
-            onChange={(event) => update({ photos: event.target.checked })}
-          />
-          Show rikishi portraits
-        </label>
         <label className={styles.field} htmlFor={`${id}-portraits`}>
           Portrait style
           <select
-            className={styles.select}
+            className={`${styles.select} ${selectControl}`}
             id={`${id}-portraits`}
-            value={preferences.portraitStyle}
+            value={preferences.photos ? preferences.portraitStyle : "hidden"}
             onChange={(event) =>
-              update({ portraitStyle: event.target.value as PortraitStyle })
+              update(
+                event.target.value === "hidden"
+                  ? { photos: false }
+                  : {
+                      photos: true,
+                      portraitStyle: event.target.value as PortraitStyle,
+                    },
+              )
             }
           >
+            <option value="hidden">Hidden</option>
             <option value="photos">Photos</option>
             <option value="illustrations">Ink illustrations</option>
           </select>
