@@ -56,6 +56,7 @@ Start here:
 - `docs/SCORING.md` - scoring modes, category points, rule locking, and special-prize imports.
 - `docs/JOKER_TRIAL.md` - agreed three-joker trial, daily Pick Window, scoring/refunds, and validation requirements.
 - `docs/JOKER_IMPLEMENTATION.md` - opt-in isolated joker demo, additive model, clock controls, and verification.
+- `docs/NOVEMBER_JOKER_TRIAL.md` - owner-approved November pre-start live opt-in, release guards and recovery.
 - `docs/ARCHITECTURE.md` - current architecture and suggested future boundaries.
 - `docs/adr/0001-rebuild-architecture.md` - accepted rebuild architecture decision.
 - `docs/DATA_IMPORT_STRATEGY.md` - MVP data-source investigation and import recommendation.

@@ -143,7 +143,7 @@ export function JokerPanel({
     return error ? <p role="alert">{error}</p> : <p>Loading joker window…</p>;
   return (
     <section className={styles.panel} aria-labelledby="joker-title">
-      <p className="eyebrow">Demo trial · three jokers</p>
+      <p className="eyebrow">Trial · three jokers</p>
       <h2 id="joker-title">Daily joker</h2>
       <p>
         {data.remaining} of 3 jokers remaining · maximum one per day. Double win

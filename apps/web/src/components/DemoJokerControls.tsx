@@ -56,7 +56,7 @@ export function DemoJokerControls({
       <p>
         Enable before starting the demo. This opt-in uses three jokers and a
         forward-only demo clock. Reset removes trial data. Live bashos cannot
-        enable this trial.
+        use these demo clock controls.
       </p>
       {clock && (
         <label className={styles.field}>

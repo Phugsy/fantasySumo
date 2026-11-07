@@ -219,6 +219,25 @@ export const bashoJokerTrial = pgTable(
     ),
   ],
 );
+export const bashoLiveJokerTrial = pgTable(
+  "basho_live_joker_trial",
+  {
+    bashoId: text("basho_id")
+      .primaryKey()
+      .references(() => basho.id, { onDelete: "cascade" }),
+    preset: text("preset").notNull(),
+    baseMode: text("base_mode").notNull(),
+    enabledAt: text("enabled_at").notNull(),
+    enabledBy: text("enabled_by").notNull(),
+  },
+  (table) => [
+    check("live_joker_preset", sql`${table.preset} = 'three-joker-v1'`),
+    check(
+      "live_joker_base_mode",
+      sql`${table.baseMode} IN ('wins-v0', 'achievements-v1')`,
+    ),
+  ],
+);
 export const jokerAllocations = pgTable(
   "joker_allocations",
   {

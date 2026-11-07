@@ -5,7 +5,10 @@ Implementation is tracked in #114; notification feasibility is #115.
 This is the contract for the opt-in demo trial. See
 [Joker demo implementation](JOKER_IMPLEMENTATION.md) for persistence, operation and
 validation. Live activation and production release remain separate approvals;
-existing tournaments retain their [saved scoring rules](SCORING.md).
+existing tournaments retain their [saved scoring rules](SCORING.md). The owner
+approved a specific pre-start November live trial on 7 November; its exception
+to the normal setup lock and operational guards are in
+[November trial operation](NOVEMBER_JOKER_TRIAL.md).
 
 ## Player rules
 
@@ -76,6 +79,9 @@ day if the player still has a joker available.
   base scoring mode and joker/window policy. Freeze those rules at the normal
   permanent scoring-rule lock; do not change `wins-v0`, `achievements-v1`, or
   existing tournaments. A daily joker action is distinct from changing rules.
+  The documented November 2026 owner exception permits one explicit pre-start
+  activation after the usual setup lock, before Day 1's deadline and any
+  result. It does not reopen daily windows or alter the saved base mode.
 - Retain original stable picks and canonical rikishi identity. Store each
   allocation's team, basho/day, target rikishi and matchup identity, rule
   version, server timestamp, and lifecycle state. Preserve an audit history

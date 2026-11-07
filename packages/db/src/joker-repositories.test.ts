@@ -366,5 +366,183 @@ for (const provider of ["sqlite", "postgres"] as const)
         await startDemoBasho(repos, wall);
         expect(await repos.setBashoScoringMode(id, "wins-v0")).toBe("locked");
       });
+      async function november() {
+        const live = "2026-11";
+        await repos.upsertBasho({
+          id: live,
+          name: "November",
+          isDemo: false,
+          status: "upcoming",
+          startDate: "2026-11-08",
+          endDate: "2026-11-22",
+          currentDay: 0,
+        });
+        for (const entry of await repos.listBanzukeEntriesForBasho(id)) {
+          await repos.insertBanzukeEntry({
+            ...entry,
+            id: "live-" + entry.id,
+            bashoId: live,
+          });
+        }
+        for (const [teamId, owner] of [
+          ["live-alice", "alice"],
+          ["live-bob", "bob"],
+        ]) {
+          await repos.insertFantasyTeamWithPicksIfBashoUpcoming(
+            {
+              id: teamId!,
+              bashoId: live,
+              displayName: teamId!,
+              ownerUserId: owner!,
+            },
+            [
+              { teamId: teamId!, rikishiId: "onosato" },
+              { teamId: teamId!, rikishiId: "ura" },
+            ],
+          );
+        }
+        return live;
+      }
+      it("enables only the November pre-start exception and freezes the unchanged base", async () => {
+        const live = await november();
+        const before = () => new Date("2026-11-07T14:59:59.000Z");
+        await repos.lockBashoAndFantasyTeams(live, before().toISOString());
+        const base = await repos.getBashoScoringConfig(live);
+        const trial = await repos.enableNovemberJokers(live, "admin", before);
+        expect(trial).toMatchObject({
+          bashoId: live,
+          enabledBy: "admin",
+          baseMode: base?.mode,
+        });
+        expect(await repos.getBashoScoringConfig(live)).toMatchObject({
+          locked: true,
+          mode: base?.mode,
+        });
+        expect(await repos.setBashoScoringMode(live, "achievements-v1")).toBe(
+          "locked",
+        );
+        expect((await repos.getBasho(live))?.status).toBe("locked");
+        // The previous application checks only its original table and ignores
+        // this live opt-in rather than throwing a demo-only scoring error.
+        expect(
+          await query(
+            sql`SELECT * FROM basho_joker_trial WHERE basho_id=${live}`,
+          ),
+        ).toHaveLength(0);
+        expect(
+          await repos.enableNovemberJokers(live, "other-admin", wall),
+        ).toEqual(trial);
+      });
+      it("rejects activation at the cutoff, after any result, for other bashos or active play", async () => {
+        const live = await november();
+        await expect(
+          repos.enableNovemberJokers(
+            live,
+            "admin",
+            () => new Date("2026-11-08T03:00:00.000Z"),
+          ),
+        ).rejects.toThrow("trial-setup-closed");
+        await expect(
+          repos.enableNovemberJokers(id, "admin", wall),
+        ).rejects.toThrow("november-trial-only");
+        const before = () => new Date("2026-11-07T10:00:00.000Z");
+        await repos.insertBoutResult({
+          id: "live-result",
+          bashoId: live,
+          day: 1,
+          winnerRikishiId: "onosato",
+          loserRikishiId: "ura",
+        });
+        await expect(
+          repos.enableNovemberJokers(live, "admin", before),
+        ).rejects.toThrow("trial-setup-closed");
+        expect(await repos.getLiveJokerTrial(live)).toBeUndefined();
+      });
+      it("uses real server time and keeps live player ownership and cutoff enforcement", async () => {
+        const live = await november();
+        const before = () => new Date("2026-11-07T10:00:00.000Z");
+        await repos.enableNovemberJokers(live, "admin", before);
+        await repos.lockBashoAndFantasyTeams(live, before().toISOString());
+        await repos.applyScheduledBoutsImport({
+          publication: {
+            id: "live-card",
+            bashoId: live,
+            day: 1,
+            source: SUMO_API_PRE_BOUT_SOURCE,
+            publishedAt: before().toISOString(),
+          },
+          bouts: [
+            {
+              id: "live-bout",
+              bashoId: live,
+              day: 1,
+              eastRikishiId: "onosato",
+              westRikishiId: "hoshoryu",
+              status: "scheduled",
+            },
+          ],
+        });
+        const today = () => new Date("2026-11-08T02:59:59.999Z");
+        const snapshot = (await repos.getJokerSnapshot(live, today, "alice"))!;
+        expect(snapshot.now).toBe(today().toISOString());
+        const saved = (await repos.getJokerSnapshot(
+          live,
+          today,
+          "alice",
+          command(snapshot, 1),
+        ))!;
+        expect(saved.remaining).toBe(2);
+        expect(
+          (await repos.getJokerSnapshot(live, today, "bob"))?.remaining,
+        ).toBe(3);
+        await expect(
+          repos.getJokerSnapshot(live, today, "bob", command(snapshot, 1)),
+        ).rejects.toThrow("not-owner");
+        await expect(
+          repos.getJokerSnapshot(
+            live,
+            () => new Date("2026-11-08T03:00:00.000Z"),
+            "alice",
+            {
+              ...command(saved, 1),
+              rikishiId: null,
+              boutId: null,
+              opponentId: null,
+            },
+          ),
+        ).rejects.toThrow("window-not-open");
+      });
+      it("serializes concurrent live activation and keeps its original administrator", async () => {
+        const live = await november();
+        const before = () => new Date("2026-11-07T10:00:00.000Z");
+        const [first, second] = await Promise.all([
+          repos.enableNovemberJokers(live, "admin-a", before),
+          peerRepos.enableNovemberJokers(live, "admin-b", before),
+        ]);
+        expect(first).toEqual(second);
+        expect(
+          await query(
+            sql`SELECT * FROM basho_live_joker_trial WHERE basho_id=${live}`,
+          ),
+        ).toHaveLength(1);
+      });
+      it.each(["active", "complete", "nonzero-day"] as const)(
+        "rejects pre-start activation for %s even without results",
+        async (condition) => {
+          const live = await november();
+          await repos.updateBasho({
+            ...(await repos.getBasho(live))!,
+            status: condition === "nonzero-day" ? "upcoming" : condition,
+            currentDay: condition === "nonzero-day" ? 1 : 0,
+          });
+          await expect(
+            repos.enableNovemberJokers(
+              live,
+              "admin",
+              () => new Date("2026-11-07T10:00:00.000Z"),
+            ),
+          ).rejects.toThrow("trial-setup-closed");
+        },
+      );
     },
   );

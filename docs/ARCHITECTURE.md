@@ -635,3 +635,12 @@ deadline, revision and pending budget are rechecked within that transaction.
 Correction-driven budget overages are exposed without deleting accepted choices.
 Team scores/history add a separate joker category through verified result days;
 public per-rikishi scores remain base-only. See `JOKER_IMPLEMENTATION.md`.
+
+The owner's November live exception uses a separate additive
+basho_live_joker_trial table. Authenticated administrators explicitly confirm
+the exact November basho; activation checks day 0, no results, supported
+lifecycle and the Day 1 deadline under the shared basho lock. It freezes the
+unchanged base mode and leaves original picks/lifecycle alone. Live snapshots
+use server time; only the demo uses a controllable clock. Previous readers
+ignore the live table and show base scores on rollback. See
+[November trial runbook](NOVEMBER_JOKER_TRIAL.md).

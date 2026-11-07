@@ -420,6 +420,26 @@ export const saveMyJoker = (
 ) => sendJson<JokerSnapshotResponse>(`/api/basho/${id}/my-jokers`, body, "PUT");
 export const fetchDemoJokerTrial = () =>
   getJson<{ trial: { clock: string } | null }>("/api/admin/demo/jokers");
+export interface LiveJokerTrialResponse {
+  trial: {
+    bashoId: string;
+    preset: string;
+    baseMode: ScoringMode;
+    enabledAt: string;
+    enabledBy: string;
+  } | null;
+}
+export const fetchLiveJokerTrial = (id: string) =>
+  getJson<LiveJokerTrialResponse>(`/api/admin/basho/${id}/jokers`);
+export const enableLiveJokerTrial = (id: string) =>
+  sendJson<LiveJokerTrialResponse>(
+    `/api/admin/basho/${id}/jokers`,
+    {
+      confirmBashoId: id,
+      acceptPreStartTrial: true,
+    },
+    "POST",
+  );
 export const configureDemoJokerTrial = (clock?: string) =>
   sendJson<{ trial: { clock: string } }>(
     "/api/admin/demo/jokers",

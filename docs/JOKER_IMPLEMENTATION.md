@@ -72,15 +72,17 @@ include day, canonical rikishi, original opponent/bout IDs, expected revision an
 an idempotency request ID. The existing protected demo-admin boundary guards
 `GET/PUT /api/admin/demo/jokers`; the only write options are enable or advance
 clock. No browser timestamp can override player deadlines. This has no live
-activation endpoint.
+activation endpoint. The separate owner-approved November live path is
+documented in [November trial operation](NOVEMBER_JOKER_TRIAL.md).
 
 Published Sumo API matchups can qualify for the Pick Window independently
 of verified results. This uses the existing schedule-only import, including
 the following day's card in the daily import. Before a live trial, verify
 Day 1 separately and check that later cards arrive before noon JST. Missing
 or unverified outcomes stay pending. Live activation is a separate release:
-its opt-in must freeze before the normal rule lock and must not break reads
-by the previous application version during rollback.
+its opt-in must not break reads by the previous application version during
+rollback. The owner approved a one-off pre-start November exception to the
+normal setup lock; see the November runbook for its exact guards.
 
 SQLite migration `0009_joker_trial.sql` and Postgres migration
 `0008_joker_trial.sql` add three tables. Existing schema/data are retained. Audit

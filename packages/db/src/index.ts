@@ -70,6 +70,7 @@ export type { IdentityRosterExpectation } from "./identity-roster.js";
 export { JokerError } from "./joker-repositories.js";
 export type {
   JokerTrial,
+  LiveJokerTrial,
   JokerSnapshot,
   JokerCommand,
 } from "./joker-repositories.js";
