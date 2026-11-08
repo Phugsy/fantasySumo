@@ -387,7 +387,8 @@ export const inkImage = style({
   width: "100%",
   height: "100%",
   display: "block",
-  objectFit: "contain",
+  objectFit: "cover",
+  transform: "scale(1.04)",
 });
 export const photoImage = style({
   width: "100%",

@@ -77,10 +77,10 @@ responsive layouts and rendered CSS, run `make check`, and obtain independent
 review before handing over the trial. Any later application rollout needs the
 owner's design decision, a focused PR and relevant game-loop E2E validation.
 
-Recorded validation on 8 November 2026: `make check` passed (494 application
-tests, 23 default Postgres-only skips, six pilot checks, lint/format/build);
-the separate trial entry also built successfully. The normal production bundle
-hashes stayed unchanged and excluded the trial. Browser checks covered 36
+Recorded validation on 8 November 2026: `make check` passed, including application
+tests, pilot checks, lint, formatting and build; the separate trial entry also
+built successfully. Application inputs outside the trial match the reviewed
+master base, and the normal production output excludes the trial. Browser checks covered 36
 screen/theme/portrait/width combinations at 320, 390 and 1280px with no horizontal
 overflow or broken portraits. Mirrored selection, the five-pick sample cap,
 keyboard Enter and visible focus passed. A fresh load had no console errors.
