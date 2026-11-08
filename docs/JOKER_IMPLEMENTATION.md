@@ -54,11 +54,14 @@ corresponding owner approvals.
 3. Create a normal stable, then start the demo to lock original picks. My Stable
    shows today's Pick Window using the server clock's Japan date, with a
    deadline/countdown, owned targets labelled "Ura (fights Takayasu)", current
-   allocation, remaining allowance and allocation history. Players cannot choose
-   a different basho day; after noon today's window stays closed until the next
-   Japan date, even when a future card is already published. Outside the basho
-   dates there is no current window. Refresh the window to reconcile newly
-   imported facts. Original picks cannot be replaced by a joker.
+   allocation, remaining allowance and allocation history. The **Basho day**
+   selector offers today and tomorrow in Japan, including Day 1 on the previous
+   evening. After today's noon cutoff it defaults to tomorrow, even if that card
+   is still unavailable. A player can inspect today's closed window but cannot
+   reopen it. Tomorrow's validated card is eligible immediately after publication;
+   result-import progress and Japan midnight do not gate it. Later days are not
+   exposed by this selector. Refresh reconciles newly imported facts. Original
+   picks cannot be replaced by a joker.
 4. The administrator can advance the UTC ISO demo clock, then advance results.
    Time cannot rewind. Day 2's first bout is a synthetic fusen win (refund); day
    4's first bout is a synthetic Ura win over Onosato (gold star). These changes

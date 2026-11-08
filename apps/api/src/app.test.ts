@@ -26,6 +26,7 @@ describe("GET /api/health", () => {
     });
 
     expect(response.statusCode).toBe(200);
+    expect(response.headers["server-timing"]).toMatch(/^app;dur=\d+\.\d$/);
     expect(response.json()).toEqual({
       ok: true,
       service: "fantasy-sumo-api",

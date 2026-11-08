@@ -142,6 +142,7 @@ describe("Postgres migration ledger", () => {
       "0008_joker_trial.sql",
       "0009_live_joker_trial.sql",
       "0010_scoring_overrides.sql",
+      "0011_achievement_focus.sql",
     ]);
     const initialMigration = readFileSync(
       join(migrationsFolder, "0000_initial.sql"),
@@ -208,5 +209,62 @@ describe("Postgres migration ledger", () => {
     ).toThrow(
       'Migration checksum mismatch for "0002_example.sql". The database recorded different SQL under the same migration filename.',
     );
+  });
+});
+
+describe("achievement focus expansion", () => {
+  it("preserves existing trial and audit rows, old writes, and foreign keys while accepting v2", () => {
+    const db = new Database(":memory:");
+    db.pragma("foreign_keys = ON");
+    const folder = join(packageRoot, "drizzle");
+    for (const file of readdirSync(folder)
+      .filter((file) => file.endsWith(".sql") && file < "0012")
+      .sort())
+      db.exec(
+        readFileSync(join(folder, file), "utf8").replaceAll(
+          "--> statement-breakpoint",
+          "",
+        ),
+      );
+    db.exec(`INSERT INTO basho (id,name,start_date,end_date,status,is_demo) VALUES ('demo','Demo','2026-05-10','2026-05-24','upcoming',1);
+      INSERT INTO basho_joker_trial VALUES ('demo','three-joker-v1','wins-v0','2026-05-10T02:00:00.000Z','2026-05-10T02:00:00.000Z');
+      INSERT INTO basho_live_joker_trial VALUES ('demo','three-joker-v1','achievements-v1','2026-05-10T02:00:00.000Z','owner');
+      INSERT INTO basho_scoring_overrides VALUES ('audit','demo','wins-v0','achievements-v1','owner','Approved scoring correction','2026-05-10T02:00:00.000Z');`);
+    const tables = [
+      "basho_joker_trial",
+      "basho_live_joker_trial",
+      "basho_scoring_overrides",
+    ];
+    const before = tables.map((table) =>
+      db.prepare(`SELECT * FROM ${table}`).all(),
+    );
+    db.transaction(() =>
+      db.exec(
+        readFileSync(
+          join(folder, "0012_achievement_focus.sql"),
+          "utf8",
+        ).replaceAll("--> statement-breakpoint", ""),
+      ),
+    )();
+    expect(
+      tables.map((table) => db.prepare(`SELECT * FROM ${table}`).all()),
+    ).toEqual(before);
+    // The old application can keep reading and writing its original modes.
+    db.exec(
+      "UPDATE basho_joker_trial SET base_mode='achievements-v1'; UPDATE basho_live_joker_trial SET base_mode='wins-v0';",
+    );
+    db.exec(
+      "UPDATE basho_joker_trial SET base_mode='achievements-v2'; UPDATE basho_live_joker_trial SET base_mode='achievements-v2'; INSERT INTO basho_scoring_overrides VALUES ('new-audit','demo','achievements-v1','achievements-v2','owner','Approved next scoring preset','2026-05-10T03:00:00.000Z');",
+    );
+    expect(db.pragma("foreign_key_check")).toEqual([]);
+    expect(() =>
+      db.exec("UPDATE basho_joker_trial SET base_mode='unknown'"),
+    ).toThrow();
+    expect(
+      db
+        .prepare("SELECT * FROM basho_scoring_overrides WHERE id='audit'")
+        .get(),
+    ).toEqual(before[2]![0]);
+    db.close();
   });
 });

@@ -1,3 +1,4 @@
+import { scoringPreset } from "@fantasy-sumo/domain";
 import type {
   ScoreBreakdown as Breakdown,
   ScoringMode,
@@ -14,7 +15,7 @@ export function ScoreBreakdown({
   label?: string;
 }) {
   if (!breakdown) return null;
-  const bonuses = mode === "achievements-v1";
+  const bonuses = scoringPreset(mode).achievements;
   return (
     <div
       className="score-categories"

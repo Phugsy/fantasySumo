@@ -1,3 +1,4 @@
+import { SCORING_MODES } from "@fantasy-sumo/domain";
 import { randomUUID } from "node:crypto";
 import { desc, eq } from "drizzle-orm";
 import type { ScoringMode } from "@fantasy-sumo/domain";
@@ -132,8 +133,8 @@ export function createScoringOverrideRepositories(
 
 function validate(mode: ScoringMode, input: ScoringOverrideInput) {
   if (
-    !["wins-v0", "achievements-v1"].includes(mode) ||
-    !["wins-v0", "achievements-v1"].includes(input.expectedMode) ||
+    !SCORING_MODES.includes(mode) ||
+    !SCORING_MODES.includes(input.expectedMode) ||
     !input.actorUserId.trim() ||
     input.reason.trim().length < 8 ||
     input.reason.length > 500 ||

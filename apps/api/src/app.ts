@@ -60,6 +60,11 @@ export function buildApp(options: AppOptions = {}) {
   const app = Fastify({
     logger: true,
   });
+  // Browser Network tools can distinguish handler time from transport/cold-start time.
+  app.addHook("onSend", async (_request, reply, payload) => {
+    reply.header("Server-Timing", `app;dur=${reply.elapsedTime.toFixed(1)}`);
+    return payload;
+  });
   const db = options.db ?? ownedClient!;
   const repositories = createRepositories(db);
   const defaultTeamSize = options.teamSize ?? getTeamSize();

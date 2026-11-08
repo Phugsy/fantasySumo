@@ -6,12 +6,12 @@ does not change existing tournament scores.
 
 Decision for #92, agreed 6 September 2026. Each basho has its own persisted,
 versioned mode. New and migrated bashos default to `wins-v0`. Administrators
-may select `achievements-v1` until picks first lock, including after teams have
+may select `achievements-v1` or `achievements-v2` until picks first lock, including after teams have
 been submitted. This agreed lock point supersedes the issue's initial suggestion
 to freeze rules before picks open. Once locked, ordinary administrators cannot
 change the mode, including when picks reopen. The explicit site-owner override
 below is the owner-approved exception added after 7 November UAT. Different future values require a new
-versioned mode; never change the meaning of either existing identifier.
+versioned mode; never change the meaning of an existing identifier.
 
 ## Site-owner correction
 
@@ -35,18 +35,40 @@ The additive `basho_scoring_overrides` table is introduced by SQLite migration
 0011 and Postgres migration 0010. Older application code ignores the table and
 continues respecting the saved lock; rollback never removes the audit schema.
 
-| Event                                              |       `wins-v0` | `achievements-v1` | Timing and conditions                                                                               |
-| -------------------------------------------------- | --------------: | ----------------: | --------------------------------------------------------------------------------------------------- |
-| Regulation win                                     |              +1 |                +1 | On the verified result day.                                                                         |
-| Default/fusen win                                  |              +1 |                +1 | Counts toward eight wins; never a kinboshi.                                                         |
-| Kinboshi                                           |               0 |          +2 extra | Each non-default maegashira victory over a yokozuna, using this basho's stored banzuke.             |
-| Kachi-koshi                                        |               0 |           +3 once | On the day of the eighth verified win. No further bonus for nine or more wins.                      |
-| Outstanding Performance / Shukun-sho               |               0 |                +1 | Confirmed final award, applied to day 15.                                                           |
-| Fighting Spirit / Kanto-sho                        |               0 |                +1 | Confirmed final award, applied to day 15.                                                           |
-| Technique / Gino-sho                               |               0 |                +1 | Confirmed final award, applied to day 15.                                                           |
-| Loss, fusen loss, absence, withdrawal, make-koshi  |               0 |                 0 | No penalty; previously earned wins/bonuses remain.                                                  |
-| Missing result                                     | 0 provisionally |   0 provisionally | Never infer a win, absence, or achievement. Live scoring stops at the last contiguous verified day. |
-| Other rank upsets, championship, streaks, playoffs |         0 extra |           0 extra | No additional bonuses. The import boundary accepts regulation bouts only.                           |
+| Event                                         |       `wins-v0` | `achievements-v1` | `achievements-v2` (achievement focus) | Timing and conditions                                                                 |
+| --------------------------------------------- | --------------: | ----------------: | ------------------------------------: | ------------------------------------------------------------------------------------- |
+| Regulation or default/fusen win               |              +1 |                +1 |                                    +1 | On the verified result day. Default wins count toward eight wins, but never kinboshi. |
+| Kinboshi                                      |               0 |          +2 extra |                              +3 extra | Each non-default maegashira win over a yokozuna, using the saved banzuke.             |
+| Kachi-koshi                                   |               0 |           +3 once |                               +1 once | On the eighth distinct verified winning day.                                          |
+| Outstanding Performance / Shukun-sho          |               0 |                +1 |                                    +3 | Confirmed final award, on day 15.                                                     |
+| Fighting Spirit / Kanto-sho                   |               0 |                +1 |                                    +3 | Confirmed final award, on day 15.                                                     |
+| Technique / Gino-sho                          |               0 |                +1 |                                    +3 | Confirmed final award, on day 15.                                                     |
+| Loss, absence, withdrawal, make-koshi         |               0 |                 0 |                                     0 | No penalty; earned points remain.                                                     |
+| Missing result                                | 0 provisionally |   0 provisionally |                       0 provisionally | Never infer an outcome; live scoring stops at the contiguous verified boundary.       |
+| Other upsets, championship, streaks, playoffs |         0 extra |           0 extra |                               0 extra | Regulation bouts only; no extra award.                                                |
+
+`achievements-v2` is the owner-approved achievement-focused alternative added
+on 8 November 2026, labelled **Wins + achievements · achievement focus**.
+A kinboshi is worth four points in total: one for the win and three bonus.
+A joker doubles those bout contributions to eight; it does not multiply the
+one-point eighth-win milestone or the three-point special prizes. Existing
+presets, default `wins-v0`, selected tournaments and historical results retain
+their current meaning. Adding this option does not activate it for any basho.
+
+All three presets are defined centrally in `packages/domain/src/scoring-presets.ts`.
+The read-only comparison reweights category points from the official source
+preset into the selected target preset, including joker kinboshi and daily
+history. Displaying a comparison does not save or rescore official rules.
+
+### Future configurable values
+
+An admin UI for category values can build on this catalogue, but is not included
+in this change. Store a complete, versioned weight snapshot per basho, show the
+saved values to players, and freeze it at the existing scoring lock. Any owner
+correction must use the existing explicit full-rescore confirmation and audited
+old/new values. Never mutate a named preset globally or apply later edits to
+historical bashos. The shared evaluator, joker exclusions, comparison and history
+must all consume the same snapshot before arbitrary custom values are enabled.
 
 Special prizes stack across distinct categories. Several recipients can receive
 the same prize. Reimporting an award never adds it twice. A confirmed final
@@ -75,7 +97,7 @@ schedule publications, even if an administrator closes a basho early. Stored
 wins beyond that boundary contribute no points or achievements until verified.
 Only completed, non-demo bashos contribute to cumulative totals; active bashos
 remain visible in personal history with their verified individual scores. The leaderboard's explicitly labelled
-“What if” selector projects the same categories under either mode. This changes
+“What if” selector projects the same categories under any supported mode. This changes
 only the displayed totals, ordering, and score chart. It makes no write request,
 does not change official history, and resets to official when the page reloads
 or a different basho is selected. In wins-only views, bonus columns remain
@@ -139,3 +161,17 @@ per basho. The two additive tables and triggers preserve the old application
 schema and behavior. Deploy through the existing migration-gated workflows;
 never recover using a down migration. The Postgres trigger function is one SQL
 line because the current runner splits statements at semicolon/newline boundaries.
+
+### Achievement-focus schema expansion
+
+SQLite migration `0012_achievement_focus.sql` widens the mode checks on the two
+joker trial tables and scoring override audit table by copying all rows into
+equivalent tables in the migration transaction. Their columns, foreign keys,
+original modes, allocations and joker events are preserved. Postgres migration
+`0011_achievement_focus.sql` widens the corresponding check constraints in place.
+No migration activates the new preset or changes existing scores.
+
+The expansion accepts old application reads and writes while an old preset is
+selected. An older application does not understand `achievements-v2`; once it
+is explicitly selected, keep a compatible application deployed and use forward
+fixes. Do not assume a schema rollback or silently reinterpret its points.

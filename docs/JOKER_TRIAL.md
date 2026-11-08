@@ -35,6 +35,10 @@ bout's Japan calendar date**. Derive the calendar date from the basho start date
 and day number, not the result-import time or the player's timezone. Display
 the deadline in the player's local time, with the Japan date/day clearly shown.
 
+The UI offers today and tomorrow in Japan. Once today's cutoff passes it
+selects tomorrow by default, and shows "Unavailable" until that card is published.
+Changing the displayed day never advances results or changes a deadline.
+
 The server accepts a change only strictly before the deadline; a request at or
 after it is late. Notifications, browser clocks, delayed cron runs, or an admin
 reopening original stable picks cannot extend or reopen the daily window.

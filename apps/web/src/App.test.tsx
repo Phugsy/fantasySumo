@@ -151,6 +151,30 @@ afterEach(() => {
 });
 
 describe("App", () => {
+  it("starts standings, schedule and private-team reads while the slower roster request is pending", async () => {
+    const roster = createDeferred<Response>();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+      String(input) === "/api/basho/2026-05/rikishi"
+        ? roster.promise
+        : mockSuccessfulFetch(input, init),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    await waitFor(() => {
+      for (const endpoint of ["leaderboard", "schedule", "my-team"]) {
+        expect(
+          fetchMock.mock.calls.some(
+            ([input]) => String(input) === `/api/basho/2026-05/${endpoint}`,
+          ),
+        ).toBe(true);
+      }
+    });
+    await act(async () =>
+      roster.resolve(await mockSuccessfulFetch("/api/basho/2026-05/rikishi")),
+    );
+    await screen.findByRole("heading", { name: "May 2026 Sample Basho" });
+  });
+
   it("loads the current basho and rikishi", async () => {
     render(<App />);
 

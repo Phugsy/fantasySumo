@@ -6,6 +6,8 @@ import {
 // Stable names let existing colocated CSS share the typed contract during
 // incremental conversion. Semantic tokens support the user's colour theme.
 export const vars = createGlobalThemeContract({
+  sectionGap: "section-gap",
+  gutter: "gutter",
   ink: "ink",
   indigo: "indigo",
   indigoDeep: "indigo-deep",
@@ -50,6 +52,8 @@ export const vars = createGlobalThemeContract({
 });
 
 const light = {
+  sectionGap: "20px",
+  gutter: "24px",
   ink: "#20282d",
   indigo: "#183247",
   indigoDeep: "#102638",

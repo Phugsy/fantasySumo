@@ -23,6 +23,10 @@ export function JokerPanel({
     day: number;
     target: string;
   } | null>(null);
+  const [selectedDay, setSelectedDay] = useState<{
+    japanDate: string;
+    day: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [elapsed, setElapsed] = useState<{
@@ -67,14 +71,27 @@ export function JokerPanel({
     ? new Date(data.now).getTime() +
       (elapsed.anchor === data.now ? elapsed.ms : 0)
     : 0;
-  // Deadlines are noon JST. Match today's Japan date, even after cutoff,
-  // rather than skipping to a future window that happens to be open.
+  // Offer today and tomorrow using the server clock, independently of results.
   const japanDate = new Date(clock + 9 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
-  const pickWindow = data?.windows.find(
-    (w) => w.deadline.slice(0, 10) === japanDate,
+  const tomorrowDate = new Date(clock + 33 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  const windows =
+    data?.windows.filter((w) =>
+      [japanDate, tomorrowDate].includes(w.deadline.slice(0, 10)),
+    ) ?? [];
+  const today = windows.find((w) => w.deadline.slice(0, 10) === japanDate);
+  const tomorrow = windows.find(
+    (w) => w.deadline.slice(0, 10) === tomorrowDate,
   );
+  const defaultWindow =
+    today && clock < Date.parse(today.deadline) ? today : (tomorrow ?? today);
+  const pickWindow =
+    (selectedDay?.japanDate === japanDate
+      ? windows.find((w) => w.day === selectedDay.day)
+      : undefined) ?? defaultWindow;
   const day = pickWindow?.day;
   const current = data?.allocations.find((a) => a.day === day);
   const target =
@@ -158,7 +175,30 @@ export function JokerPanel({
       )}
       {pickWindow && (
         <>
-          <p>Current basho day: {day} (Japan time).</p>
+          <p>Current basho day: {today?.day ?? "Not started"} (Japan time).</p>
+          <label className={styles.field}>
+            Basho day
+            <select
+              aria-label="Basho day"
+              value={day}
+              disabled={busy}
+              onChange={(event) => {
+                setSelectedDay({ japanDate, day: Number(event.target.value) });
+                setSelection(null);
+              }}
+            >
+              {windows.map((w) => (
+                <option key={w.day} value={w.day}>
+                  Day {w.day} ·{" "}
+                  {w.deadline.slice(0, 10) === japanDate ? "Today" : "Tomorrow"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p>
+            Choosing joker for Day {day}. Tomorrow’s card is available as soon
+            as it is published.
+          </p>
           <p role="status">
             Pick Window:{" "}
             {open
@@ -266,18 +306,10 @@ export function JokerPanel({
       )}
       {!pickWindow && (
         <>
-          <p>No Pick Window today. Jokers follow the basho dates in Japan.</p>
-          {data.windows.find(
-            (window) => window.deadline.slice(0, 10) > japanDate,
-          ) && (
-            <p>
-              The next Japan day's window is{" "}
-              {data.windows
-                .find((window) => window.deadline.slice(0, 10) > japanDate)!
-                .deadline.slice(0, 10)}
-              . Future cards cannot be selected in this panel.
-            </p>
-          )}
+          <p>
+            No Pick Window today or tomorrow. Jokers follow the basho dates in
+            Japan.
+          </p>
           <button type="button" disabled={busy} onClick={() => void refresh()}>
             Refresh joker window
           </button>

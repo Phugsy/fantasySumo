@@ -35,16 +35,16 @@ Physical-device UAT is still required for that scenario.
 
 ## 7 November feedback acceptance card
 
-| Report                 | Required observable result                                                                                                                                                                                                                                |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Portrait switch        | Hidden / Photos / Ink illustrations immediately changes picks, My Stable and expanded leaderboard rikishi; reload preserves it and credits match.                                                                                                         |
-| Empty joker choices    | Only the current Japan day's window is selectable. Published owned bouts populate choices; missing schedules and no eligible owned bouts have distinct explanations. Manual import and independent scheduled retry recover missing cards.                 |
-| Close picks            | Lock picks without starting scoring. Team saves fail while locked.                                                                                                                                                                                        |
-| Undo start             | Before any stored result or day progress, return active → locked while retaining picks, rules and joker allocations. Reject after progress/results and serialize with imports. Reopening picks remains a separate deliberate action.                      |
-| Owner scoring override | A separate owner permission can explicitly change the official mode and rescore the whole basho, including existing results, joker bonuses, history and cumulative standings. Ordinary admins remain locked; record actor, reason, old/new mode and time. |
-| Select arrows          | Arrow has a readable inset in all app select controls, both themes and narrow screens, with native accessibility retained.                                                                                                                                |
-| iOS keyboard           | Focus and type in Team name with the real keyboard open; the field remains visible and header behaviour returns after blur.                                                                                                                               |
-| Team owners            | Public owner display name appears under team names on tournament and all-time boards; account IDs and email addresses are not exposed. Unknown historical owners are labelled honestly.                                                                   |
+| Report                 | Required observable result                                                                                                                                                                                                                                                              |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Portrait switch        | Hidden / Photos / Ink illustrations immediately changes picks, My Stable and expanded leaderboard rikishi; reload preserves it and credits match.                                                                                                                                       |
+| Empty joker choices    | Today and tomorrow in Japan are selectable; after today’s cutoff the panel defaults to tomorrow. Published owned bouts populate choices; missing schedules and no eligible owned bouts have distinct explanations. Manual import and independent scheduled retry recover missing cards. |
+| Close picks            | Lock picks without starting scoring. Team saves fail while locked.                                                                                                                                                                                                                      |
+| Undo start             | Before any stored result or day progress, return active → locked while retaining picks, rules and joker allocations. Reject after progress/results and serialize with imports. Reopening picks remains a separate deliberate action.                                                    |
+| Owner scoring override | A separate owner permission can explicitly change the official mode and rescore the whole basho, including existing results, joker bonuses, history and cumulative standings. Ordinary admins remain locked; record actor, reason, old/new mode and time.                               |
+| Select arrows          | Arrow has a readable inset in all app select controls, both themes and narrow screens, with native accessibility retained.                                                                                                                                                              |
+| iOS keyboard           | Focus and type in Team name with the real keyboard open; the field remains visible and header behaviour returns after blur.                                                                                                                                                             |
+| Team owners            | Public owner display name appears under team names on tournament and all-time boards; account IDs and email addresses are not exposed. Unknown historical owners are labelled honestly.                                                                                                 |
 
 Current baseline observations: production has November schedule days 1 and 2;
 the observed lifecycle is active at day 0. UI reports must distinguish the
@@ -79,3 +79,23 @@ stable loaded successfully in both styles on the fixed UAT address. The data
 repair was checked against fresh July source evidence, reviewed independently,
 and exercised locally for wrong-fixture, roster-mismatch, conflicting-alias,
 zero-write preview and safe-rerun cases. No application fallback rule changed.
+
+## Achievement-focus acceptance card
+
+These local changes require a migration-gated Preview before owner UAT; local
+validation does not place them on the fixed UAT address.
+
+1. In an open test basho, Admin offers **Wins + achievements · achievement focus**.
+   Save it and confirm +1 per win, +3 kinboshi bonus, +1 eighth-win milestone and
+   +3 per special prize are shown to players.
+2. Confirm the existing wins-only and original achievement presets remain
+   selectable with their original totals. After picks lock, ordinary admins
+   cannot change the preset; owner corrections retain confirmation and audit.
+3. Complete an isolated demo with Takayasu and Wakatakakage: official v2 total
+   is 24, original achievement comparison is 20, wins-only comparison is 14.
+   Switching comparisons and reloading must leave the saved v2 total unchanged.
+4. With a joker on a contested maegashira win over a yokozuna, v2 gives eight
+   bout points. Milestone and final-prize bonuses stay outside the multiplier.
+5. Compare roster/standings request timing with the earlier measurements using
+   the response Server-Timing header; local statement-count improvement alone
+   does not establish hosted latency improvement.

@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sql } from "drizzle-orm";
 import { createDatabaseClient, type DatabaseClient } from "./client.js";
 import { createRepositories, type Repositories } from "./repositories.js";
@@ -92,6 +92,65 @@ for (const provider of ["sqlite", "postgres"] as const)
         await peer.close();
         await client.close();
         rmSync(directory, { recursive: true, force: true });
+      });
+      it("loads tournament picks in one query with matching order and no cross-basho leakage", async () => {
+        await november();
+        const teams = await repos.listFantasyTeamsForBasho(id);
+        const expected = (
+          await Promise.all(
+            teams.map((team) => repos.listFantasyPicksForTeam(team.id)),
+          )
+        ).flat();
+        let count = 0;
+        const sqlite = client.provider === "sqlite" ? client.sqlite : undefined;
+        const prepare = sqlite?.prepare.bind(sqlite);
+        const spy =
+          sqlite &&
+          vi.spyOn(sqlite, "prepare").mockImplementation((query) => {
+            count++;
+            return prepare!(query);
+          });
+        try {
+          expect(await repos.listFantasyPicksForBasho(id)).toEqual(expected);
+          if (sqlite) expect(count).toBe(1);
+        } finally {
+          spy?.mockRestore();
+        }
+        expect(await repos.listFantasyPicksForBasho("missing")).toEqual([]);
+      });
+      it("preserves allocations and audit when the owner selects achievement focus on both providers", async () => {
+        const before = await apply(command(await state(), 1));
+        expect(
+          await repos.overrideBashoScoringMode(id, "achievements-v2", {
+            actorUserId: "owner",
+            reason: "Approved achievement-focused scoring",
+            expectedMode: "wins-v0",
+            changedAt: wall().toISOString(),
+          }),
+        ).toBe("updated");
+        const after = await state();
+        expect(after.allocations).toEqual(before.allocations);
+        expect(after.trial.baseMode).toBe("achievements-v2");
+        expect(await repos.listBashoScoringOverrides(id)).toMatchObject([
+          { fromMode: "wins-v0", toMode: "achievements-v2" },
+        ]);
+        expect(await repos.setBashoScoringMode(id, "achievements-v1")).toBe(
+          "locked",
+        );
+        const live = await november();
+        expect(await repos.setBashoScoringMode(live, "achievements-v2")).toBe(
+          "updated",
+        );
+        await repos.lockBashoAndFantasyTeams(live, wall().toISOString());
+        expect(
+          (
+            await repos.enableNovemberJokers(
+              live,
+              "owner",
+              () => new Date("2026-11-07T14:00:00.000Z"),
+            )
+          ).baseMode,
+        ).toBe("achievements-v2");
       });
       it("accepts a verified pre-bout pairing and settles only after result verification", async () => {
         const publication = (

@@ -48,7 +48,7 @@ test("plays the demo joker journey through edits, deadline, refund, budget and g
   await expect(
     panel.getByText("Current basho day: 1 (Japan time)."),
   ).toBeVisible();
-  await expect(panel.getByLabel("Basho day", { exact: true })).toHaveCount(0);
+  await expect(panel.getByLabel("Basho day", { exact: true })).toHaveValue("1");
   await expect(
     panel.getByRole("option", { name: "Ura (fights Takayasu)", exact: true }),
   ).toHaveCount(1);
@@ -112,6 +112,16 @@ test("plays the demo joker journey through edits, deadline, refund, budget and g
   await expect(
     panel.getByText("Current basho day: 1 (Japan time)."),
   ).toBeVisible();
+  await expect(panel.getByLabel("Basho day", { exact: true })).toHaveValue("2");
+  // The deterministic next-day card is published at 08:00 UTC on Day 1.
+  await clock("2026-05-10T10:00:00.000Z");
+  // Tomorrow is selectable before Japan midnight, while today's deadline is enforced.
+  await panel
+    .getByLabel("Joker rikishi")
+    .selectOption({ label: "Onosato (fights Kotozakura)" });
+  await panel.getByRole("button", { name: "Save joker", exact: true }).click();
+  await expect(panel.getByText(/Day 2 selection:/)).toContainText("reserved");
+  await panel.getByLabel("Basho day", { exact: true }).selectOption("1");
   await expect(
     panel.getByText("Pick Window: Closed", { exact: true }),
   ).toBeVisible();

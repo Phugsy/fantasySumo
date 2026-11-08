@@ -1,12 +1,14 @@
 import { getSelectionErrors } from "../pick-composition";
 import type { PickCompositionMode, ScoringMode } from "@fantasy-sumo/domain";
-import { scoringModeLabel } from "../scoring-view";
+import { scoringModeLabel, scoringModeSummary } from "../scoring-view";
 import type { FormEvent } from "react";
 import type { CreatedTeamResponse, RankedRikishi } from "../types";
 import "./TeamSelection.css";
 import { useDisplayPreferences } from "../DisplayPreferences";
 import { sortRikishi } from "../display-preferences";
-import { PhotoCredits, RikishiPhoto } from "./RikishiPhoto";
+import { PhotoCredits } from "./RikishiPhoto";
+import { RankBadge, RankedPortrait } from "./RankBadge";
+import { rankedPortrait } from "./RankBadge.css";
 import { identity } from "./RikishiPhoto.css";
 
 interface TeamSelectionProps {
@@ -68,9 +70,7 @@ export function TeamSelection({
         </div>
         <p>
           Official scoring: {scoringModeLabel(scoringMode)}.{" "}
-          {scoringMode === "achievements-v1"
-            ? "+1 per win, +2 per kinboshi, +3 at eight wins, +1 per special prize."
-            : "Losses and absences score zero."}
+          {scoringModeSummary(scoringMode)}
         </p>
         {pickCompositionMode === "heya-sanyaku-v1" && (
           <p>
@@ -100,17 +100,18 @@ export function TeamSelection({
 
             return (
               <button
-                className="rikishi-row"
+                className={`rikishi-row ${preferences.photos ? rankedPortrait : ""}`}
                 disabled={isDisabled}
                 key={entry.id}
                 onClick={() => onToggleRikishi(entry.id)}
                 type="button"
                 aria-pressed={isSelected}
               >
-                <span className="rank-pill">{entry.rank}</span>
+                <RankBadge rank={entry.rank} />
                 <span className={identity}>
                   {preferences.photos && (
-                    <RikishiPhoto
+                    <RankedPortrait
+                      rank={entry.rank}
                       photo={entry.photo}
                       illustration={entry.illustration}
                     />

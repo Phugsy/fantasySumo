@@ -653,3 +653,80 @@ the demo). The shared domain validates tournament-snapshot ranks and heyas;
 both database save implementations recheck inside the lifecycle transaction.
 The API exposes the mode and structured errors, and the editor mirrors it.
 There is no schema change or historical team rewrite.
+
+## Request latency diagnosis
+
+The browser starts roster, schedule, leaderboard and (when authenticated)
+private-team reads concurrently once the current basho ID is known. A slow
+roster/history request no longer delays starting the other requests; rendering
+still uses the authoritative roster and session responses.
+
+API responses expose `Server-Timing: app;dur=<milliseconds>` for time spent in
+Fastify through response serialization. Compare this with the browser's request
+waterfall and TTFB for repeated warm requests. This excludes platform startup
+before Fastify injection and browser transport. It does not isolate SQL time.
+
+Code inspection identifies further candidates; these are not measured production
+root causes:
+
+- `packages/db/src/client.ts` uses one Postgres connection per process (`max: 1`),
+  so concurrent queries queue on that connection.
+- Scoring loads a joker snapshot in a transaction. The snapshot locks the basho
+  row, reads facts sequentially and reconciles allocation/audit state. Concurrent
+  leaderboard, roster and stable reads can serialize behind that lock. Keep
+  atomic deadline/budget enforcement when separating this from scoring reads.
+- Routes and scoring reload some of the same banzuke/results/prize facts. Request
+  scoped reuse and fewer database round trips should be investigated before
+  increasing connection counts or adding shared caches.
+- No function region is pinned in `vercel.json`. Verify the actual deployed
+  function and Neon compute regions before selecting one. Vercel documents
+  `iad1` as the default; Neon describes client/database round trips as a separate
+  latency contributor. Production inspection on 8 November confirmed `iad1`;
+  the Neon compute region and any mismatch remain unconfirmed.
+
+References: [Vercel function regions](https://vercel.com/docs/functions/configuring-functions/region),
+[Neon latency factors](https://neon.com/faster).
+
+The evening results job already imports the next card after results. An independent
+01:00 UTC schedule cron also refreshes today and tomorrow before the cutoff. Joker writes
+check the Japan-date deadline transactionally, and reads reconcile locked states,
+so a missed cron cannot leave a pick open. No extra close/refresh cron is needed
+for eligibility. These jobs retain the existing authenticated, idempotent import paths. Observe
+publication failures before changing their frequency.
+
+A small public production sample on 8 November 2026 (three sequential rounds,
+no user session) found warm TTFB of 0.14–0.23s for health, 0.52–0.53s for
+current basho, 3.67–3.84s for November roster, and 3.99s for leaderboard. The
+first health request took 2.31s. This supports repeated database-backed work
+as a contributor beyond cold starts, but does not prove Neon throttling or a
+specific SQL execution bottleneck. An isolated in-memory SQLite demo with the
+joker trial enabled prepared 24 statements for roster and 23 for leaderboard,
+versus zero for health and three for current basho. Those counts illustrate
+round-trip potential; SQLite timings do not model hosted Postgres latency.
+
+The 8 November round-trip investigation identified a concrete redundant path:
+roster loaded its current/previous-basho facts, then the scoring helper reloaded
+the current banzuke and ran the nine-statement joker reconciliation transaction.
+Public rikishi scores are base scores, so roster now skips team joker state and
+reuses its banzuke. My Stable also reuses its banzuke; My Stable and leaderboard
+reuse the prize snapshot for both scoring and confirmation status. Authoritative
+team joker scoring and writes keep their transactional reconciliation, deadline
+and budget checks. No cross-request cache or extra database connections are added.
+
+The detailed trace also exposed an N+1 in `listFantasyPicksForBasho`: it loaded
+teams again and then selected picks once per team. This is now one
+basho-filtered join in both providers, retaining team-name/team-ID/pick-ID order.
+The number of queries no longer grows with team count. Tests cover ordering,
+empty bashos, cross-basho isolation, and a single SQLite statement; the same
+repository behaviour runs against the disposable local Postgres database.
+
+Repeating the same isolated demo measurement after both fixes gives **14 roster
+statements (previously 24)** and **18 leaderboard statements (previously 23)**
+with four seeded teams and no allocations. The leaderboard's pick-loading
+portion is now one statement regardless of team count. Remaining statements
+include verified schedule/results, saved rules/awards and the transactional
+joker snapshot (which still reloads some of the same facts). A future separation
+of read-only scoring from reconciliation must preserve correction, refund,
+audit and concurrent-allocation semantics. Neither these local counts nor
+SQLite execution times demonstrate a hosted latency improvement; verify warm
+UAT timings after deployment before attributing a change to Neon or regions.

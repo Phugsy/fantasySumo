@@ -60,7 +60,7 @@ it("distinguishes two owned rikishi in the same bout and sends the selected immu
   });
   render(<JokerPanel bashoId="demo" names={{ a: "Alpha", b: "Beta" }} />);
   await screen.findByText("Pick Window: Open");
-  expect(screen.queryByLabelText("Basho day")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Basho day")).toHaveValue("1");
   expect(
     screen.getByRole("option", { name: "Alpha (fights Beta)" }),
   ).toBeInTheDocument();
@@ -121,6 +121,10 @@ it("closes the displayed window at cutoff independently of the browser wall-cloc
   await act(async () => {
     vi.advanceTimersByTime(1000);
   });
+  expect(screen.getByLabelText("Basho day")).toHaveValue("2");
+  fireEvent.change(screen.getByLabelText("Basho day"), {
+    target: { value: "1" },
+  });
   expect(screen.getByText("Pick Window: Closed")).toBeInTheDocument();
   expect(
     screen.getByText("Current basho day: 1 (Japan time)."),
@@ -140,7 +144,7 @@ it("uses the server's Japan date rather than the first open future window", asyn
   expect(screen.getByLabelText("Joker rikishi")).toHaveValue("");
 });
 
-it("keeps today's closed window on load even when tomorrow's card is already open", async () => {
+it("offers tomorrow after today closes and still permits inspecting the closed window", async () => {
   const data = snapshot("2026-05-10T04:00:00.000Z");
   data.windows[0]!.status = "closed";
   vi.mocked(fetchMyJokers).mockResolvedValue({ snapshot: data });
@@ -148,11 +152,16 @@ it("keeps today's closed window on load even when tomorrow's card is already ope
   expect(
     await screen.findByText("Current basho day: 1 (Japan time)."),
   ).toBeInTheDocument();
+  expect(screen.getByLabelText("Basho day")).toHaveValue("2");
+  expect(screen.getByText("Pick Window: Open")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Basho day"), {
+    target: { value: "1" },
+  });
   expect(screen.getByText("Pick Window: Closed")).toBeInTheDocument();
   expect(screen.getByLabelText("Joker rikishi")).toBeDisabled();
 });
 
-it.each(["2026-05-09T02:00:00.000Z", "2026-05-12T02:00:00.000Z"])(
+it.each(["2026-05-08T02:00:00.000Z", "2026-05-12T02:00:00.000Z"])(
   "offers no other day's window outside the basho dates (%s)",
   async (now) => {
     vi.mocked(fetchMyJokers).mockResolvedValue({ snapshot: snapshot(now) });
@@ -180,6 +189,9 @@ it("follows Japan midnight while the panel stays open without reusing yesterday'
   expect(
     screen.getByText("Current basho day: 1 (Japan time)."),
   ).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Basho day"), {
+    target: { value: "1" },
+  });
   expect(screen.getByLabelText("Joker rikishi")).toHaveValue(
     JSON.stringify(["bout", "b"]),
   );
@@ -234,4 +246,43 @@ it("refreshes to today's authoritative allocation and saves against today's revi
       }),
     ),
   );
+});
+
+it("saves tomorrow's published matchup before Japan midnight without changing today's deadline", async () => {
+  const data = snapshot("2026-05-10T10:00:00.000Z");
+  data.windows[0]!.status = "closed";
+  vi.mocked(fetchMyJokers).mockResolvedValue({ snapshot: data });
+  vi.mocked(saveMyJoker).mockResolvedValue({ snapshot: data });
+  render(<JokerPanel bashoId="demo" names={{ a: "Alpha", b: "Beta" }} />);
+  await screen.findByText("Current basho day: 1 (Japan time).");
+  expect(screen.getByLabelText("Basho day")).toHaveValue("2");
+  fireEvent.change(screen.getByLabelText("Joker rikishi"), {
+    target: { value: JSON.stringify(["bout-2", "a"]) },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save joker" }));
+  await waitFor(() =>
+    expect(saveMyJoker).toHaveBeenCalledWith(
+      "demo",
+      expect.objectContaining({ day: 2, boutId: "bout-2", rikishiId: "a" }),
+    ),
+  );
+});
+it("shows an unavailable next-day card rather than offering an arbitrary later open window", async () => {
+  const data = snapshot("2026-05-10T10:00:00.000Z");
+  data.windows[0]!.status = "closed";
+  data.windows[1]!.status = "unavailable";
+  data.windows.push({
+    ...data.windows[1]!,
+    day: 3,
+    deadline: "2026-05-12T03:00:00.000Z",
+    status: "open",
+  });
+  vi.mocked(fetchMyJokers).mockResolvedValue({ snapshot: data });
+  render(<JokerPanel bashoId="demo" names={{}} />);
+  await screen.findByText("Pick Window: Unavailable");
+  expect(screen.getByLabelText("Basho day")).toHaveValue("2");
+  expect(
+    screen.queryByRole("option", { name: /Day 3/ }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Joker rikishi")).toBeDisabled();
 });

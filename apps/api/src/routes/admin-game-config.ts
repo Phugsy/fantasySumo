@@ -1,3 +1,4 @@
+import { SCORING_MODES } from "@fantasy-sumo/domain";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { Repositories } from "@fantasy-sumo/db";
@@ -141,11 +142,11 @@ export function registerAdminGameConfigRoutes(
     async (request, reply) => {
       const body = z
         .object({
-          scoringMode: z.enum(["wins-v0", "achievements-v1"]),
+          scoringMode: z.enum(SCORING_MODES),
           override: z
             .object({
               reason: z.string().trim().min(8).max(500),
-              expectedMode: z.enum(["wins-v0", "achievements-v1"]),
+              expectedMode: z.enum(SCORING_MODES),
             })
             .strict()
             .optional(),

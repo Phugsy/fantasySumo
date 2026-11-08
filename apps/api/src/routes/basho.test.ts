@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createRepositories,
   createDatabaseClient,
@@ -1809,3 +1809,23 @@ async function verifyStoredResultDays(
     });
   }
 }
+
+it("loads public rikishi base scores without querying team joker reconciliation", async () => {
+  if (client.provider !== "sqlite") throw new Error("SQLite fixture expected");
+  const prepare = client.sqlite.prepare.bind(client.sqlite);
+  const queries: string[] = [];
+  const spy = vi.spyOn(client.sqlite, "prepare").mockImplementation((query) => {
+    queries.push(query);
+    return prepare(query);
+  });
+  try {
+    const response = await app.inject(`/api/basho/${sampleBasho.id}/rikishi`);
+    expect(response.statusCode).toBe(200);
+    expect(response.json().rikishi.length).toBeGreaterThan(0);
+    expect(
+      queries.some((query) => /joker_(?:trial|allocations|events)/.test(query)),
+    ).toBe(false);
+  } finally {
+    spy.mockRestore();
+  }
+});

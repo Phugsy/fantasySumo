@@ -185,7 +185,9 @@ export const bashoScoringConfig = pgTable("basho_scoring_config", {
   bashoId: text("basho_id")
     .primaryKey()
     .references(() => basho.id, { onDelete: "cascade" }),
-  mode: text("mode", { enum: ["wins-v0", "achievements-v1"] })
+  mode: text("mode", {
+    enum: ["wins-v0", "achievements-v1", "achievements-v2"],
+  })
     .notNull()
     .default("wins-v0"),
   locked: boolean("locked").notNull().default(false),
@@ -215,7 +217,7 @@ export const bashoJokerTrial = pgTable(
     check("joker_preset", sql`${table.preset} = 'three-joker-v1'`),
     check(
       "joker_base_mode",
-      sql`${table.baseMode} IN ('wins-v0', 'achievements-v1')`,
+      sql`${table.baseMode} IN ('wins-v0', 'achievements-v1', 'achievements-v2')`,
     ),
   ],
 );
@@ -234,7 +236,7 @@ export const bashoLiveJokerTrial = pgTable(
     check("live_joker_preset", sql`${table.preset} = 'three-joker-v1'`),
     check(
       "live_joker_base_mode",
-      sql`${table.baseMode} IN ('wins-v0', 'achievements-v1')`,
+      sql`${table.baseMode} IN ('wins-v0', 'achievements-v1', 'achievements-v2')`,
     ),
   ],
 );
@@ -281,9 +283,11 @@ export const bashoScoringOverrides = pgTable("basho_scoring_overrides", {
     .notNull()
     .references(() => basho.id, { onDelete: "cascade" }),
   fromMode: text("from_mode", {
-    enum: ["wins-v0", "achievements-v1"],
+    enum: ["wins-v0", "achievements-v1", "achievements-v2"],
   }).notNull(),
-  toMode: text("to_mode", { enum: ["wins-v0", "achievements-v1"] }).notNull(),
+  toMode: text("to_mode", {
+    enum: ["wins-v0", "achievements-v1", "achievements-v2"],
+  }).notNull(),
   actorUserId: text("actor_user_id").notNull(),
   reason: text("reason").notNull(),
   changedAt: text("changed_at").notNull(),
