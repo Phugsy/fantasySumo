@@ -1,5 +1,8 @@
 import { globalStyle, style } from "@vanilla-extract/css";
+import { vars } from "../styles/theme.css";
 export const badge = style({});
+export const inlineBadge = style({});
+export const overlayBadge = style({});
 export const full = style({});
 export const compact = style({ display: "none" });
 export const rankedPortrait = style({});
@@ -21,7 +24,7 @@ export const overlay = style({
     },
   },
 });
-globalStyle(`${rankedPortrait}${rankedPortrait} > ${badge}`, {
+globalStyle(`${rankedPortrait} ${inlineBadge}`, {
   "@media": { [mobile]: { display: "none" } },
 });
 globalStyle(`button${rankedPortrait}${rankedPortrait}`, {
@@ -36,6 +39,8 @@ globalStyle(`${overlay} > ${badge}`, {
   "@media": {
     [mobile]: {
       gridArea: "auto",
+      background: vars.indigo,
+      color: "#fff",
       minWidth: 0,
       padding: "2px 5px",
       fontSize: ".65rem",

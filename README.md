@@ -55,6 +55,7 @@ Start here:
 - `skills/fantasy-sumo-issue-loop/SKILL.md` - repo-local issue-to-PR loop for agents. Invoke it with a prompt like: "Use the Fantasy Sumo issue loop on #44."
 - `docs/PROJECT_BRIEF.md` - product intent and MVP definition.
 - `docs/SCORING.md` - scoring modes, category points, rule locking, and special-prize imports.
+- `docs/FANTASY_TITLES.md` - verified fantasy yusho/jun-yusho, shared titles, announcements and history.
 - `docs/JOKER_TRIAL.md` - agreed three-joker trial, daily Pick Window, scoring/refunds, and validation requirements.
 - `docs/JOKER_IMPLEMENTATION.md` - opt-in isolated joker demo, additive model, clock controls, and verification.
 - `docs/NOVEMBER_JOKER_TRIAL.md` - owner-approved November pre-start live opt-in, release guards and recovery.
@@ -65,6 +66,7 @@ Start here:
 - `docs/PLAYTEST.md` - isolated shared-demo setup, round operation, and teardown.
 - `docs/E2E_TESTING.md` - intended Playwright E2E strategy for the MVP game loop.
 - `docs/STYLING.md` - vanilla-extract conventions, shared tokens, and incremental conversion of existing component CSS.
+- `docs/PAPER_INK_STYLE.md` - owner-selected paper and ink direction, feedback scope and reversible rollout.
 - `docs/DISPLAY_PREFERENCES.md` - browser-local sorting, photos, attribution, and system/light/dark themes.
 - `docs/UAT.md` - owner acceptance, preview-in-place workflow and regression test card.
 - `docs/MODERNISATION_PLAN.md` - safe path for updating or rebuilding the app.

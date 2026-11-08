@@ -4,10 +4,10 @@ export const toggle = style({
   display: "none",
   minWidth: 44,
   minHeight: 44,
-  borderRadius: 8,
-  border: "1px solid rgb(255 255 255 / 28%)",
+  borderRadius: 4,
+  border: `1px solid ${vars.clayLight}`,
   background: "transparent",
-  color: "white",
+  color: vars.heading,
   fontSize: "1.4rem",
   selectors: {
     "&:focus-visible": { outline: `3px solid ${vars.focus}`, outlineOffset: 3 },

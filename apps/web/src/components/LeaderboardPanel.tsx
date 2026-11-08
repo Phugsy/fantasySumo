@@ -23,6 +23,7 @@ import { DailyScoreBadge } from "./DailyScoreBadge";
 import { RikishiTournamentBadges } from "./RikishiTournamentBadges";
 import { TournamentProgressChart } from "./TournamentProgressChart";
 import "./LeaderboardPanel.css";
+import { BashoFinishSummary } from "./BashoFinish";
 
 interface LeaderboardPanelProps {
   basho: Basho;
@@ -86,6 +87,7 @@ export function LeaderboardPanel({
         <p className="eyebrow">Standings</p>
         <h2 id="standings-title">Leaderboard</h2>
       </div>
+      <BashoFinishSummary finish={basho.finish} />
       <div className="leaderboard-context" aria-label="Basho status">
         <strong>{formatBashoHeadline(basho, totalDays)}</strong>
         <span>{getLeaderboardStatusCopy(basho)}</span>

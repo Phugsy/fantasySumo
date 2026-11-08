@@ -32,6 +32,12 @@ export type {
   TeamScore,
   TeamScoreHistoryEntry,
 } from "./types.js";
+export { deriveFantasyFinish } from "./fantasy-finish.js";
+export type {
+  FantasyFinish,
+  FantasyFinishRecipient,
+  BashoFantasyFinish,
+} from "./fantasy-finish.js";
 export {
   derivePreviousBashoRecord,
   findPreviousCompletedBasho,

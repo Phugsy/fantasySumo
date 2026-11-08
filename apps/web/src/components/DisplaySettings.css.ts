@@ -5,12 +5,12 @@ export const root = style({ position: "relative", color: vars.ink });
 export const summary = style({
   minHeight: 42,
   padding: "10px 12px",
-  border: "1px solid rgb(255 255 255 / 28%)",
-  borderRadius: 8,
-  color: "#fff",
+  border: `1px solid ${vars.clayLight}`,
+  borderRadius: 4,
+  color: vars.heading,
   cursor: "pointer",
   fontSize: ".82rem",
-  fontWeight: 800,
+  fontWeight: 650,
   selectors: {
     "&:focus-visible": { outline: `3px solid ${vars.focus}`, outlineOffset: 3 },
   },

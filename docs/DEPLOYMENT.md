@@ -314,6 +314,16 @@ that branch's Preview configuration, and updates UAT after the same gates.
 Dispatching an exact SHA still creates an immutable preview but does not move
 the UAT alias. The workflow summary records both URLs and the deployed SHA.
 
+The selected UAT branch's smoke step also compares the old fixed UAT build and
+new immutable preview against the same current basho before moving the alias.
+It reuses the smoke step's existing protected HTTP authentication, performs one
+warm-up plus three paired samples for health/current/roster/leaderboard, and
+uploads only timing aggregates and samples as `uat-api-timings-<sha>`. It never
+creates a share link, changes protection, signs in as an application user, or
+logs the credential or response bodies. Server-Timing is recorded when present.
+This makes the before/after measurements comparable within one CI runner;
+results are not directly comparable with a browser or curl in another region.
+
 Changing the selected branch deliberately replaces the build under review;
 record the new SHA and preserve the Preview accounts/data across code updates.
 This uses an alias on the existing Vercel project and adds no service or data

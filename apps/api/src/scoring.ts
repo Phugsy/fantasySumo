@@ -1,5 +1,9 @@
 import type { Repositories } from "@fantasy-sumo/db";
-import type { BanzukeEntry, ScoringOptions } from "@fantasy-sumo/domain";
+import {
+  scoringPreset,
+  type BanzukeEntry,
+  type ScoringOptions,
+} from "@fantasy-sumo/domain";
 
 interface ScoringLoadOptions {
   // Public rikishi scores never include a team's joker selections.
@@ -12,6 +16,24 @@ export async function getBashoScoringOptions(
   now: () => Date = () => new Date(),
   loaded: ScoringLoadOptions = {},
 ): Promise<ScoringOptions & { specialPrizesStatus: "pending" | "confirmed" }> {
+  const context = await getBashoScoringContext(
+    repositories,
+    bashoId,
+    now,
+    loaded,
+  );
+  return {
+    ...context.options,
+    specialPrizesStatus: context.specialPrizesStatus,
+  };
+}
+
+export async function getBashoScoringContext(
+  repositories: Repositories,
+  bashoId: string,
+  now: () => Date = () => new Date(),
+  loaded: ScoringLoadOptions = {},
+) {
   const [config, banzukeEntries, prizes, jokers] = await Promise.all([
     repositories.getBashoScoringConfig(bashoId),
     loaded.banzukeEntries ?? repositories.listBanzukeEntriesForBasho(bashoId),
@@ -20,7 +42,7 @@ export async function getBashoScoringOptions(
       ? undefined
       : repositories.getJokerSnapshot(bashoId, now),
   ]);
-  return {
+  const options: ScoringOptions = {
     ...(jokers
       ? {
           jokerSelections: jokers.allocations.filter(
@@ -31,6 +53,18 @@ export async function getBashoScoringOptions(
     scoringMode: config?.mode ?? "wins-v0",
     banzukeEntries,
     specialPrizes: prizes?.awards ?? [],
-    specialPrizesStatus: prizes === undefined ? "pending" : "confirmed",
+  };
+  return {
+    options,
+    specialPrizesStatus:
+      prizes === undefined ? ("pending" as const) : ("confirmed" as const),
+    finalInputsReady:
+      (!scoringPreset(options.scoringMode ?? "wins-v0").achievements ||
+        prizes !== undefined) &&
+      (!jokers ||
+        (!jokers.budgetDiscrepancy &&
+          jokers.allocations.every((a) =>
+            ["removed", "refunded", "consumed"].includes(a.state),
+          ))),
   };
 }

@@ -2,7 +2,13 @@ import type { ComponentProps } from "react";
 import { RikishiPhoto } from "./RikishiPhoto";
 import * as styles from "./RankBadge.css";
 
-export function RankBadge({ rank }: { rank: string }) {
+export function RankBadge({
+  rank,
+  overlay = false,
+}: {
+  rank: string;
+  overlay?: boolean;
+}) {
   const compact = rank
     .replace("Yokozuna", "Y")
     .replace("Ozeki", "O")
@@ -11,7 +17,7 @@ export function RankBadge({ rank }: { rank: string }) {
     .replace(/Maegashira\s*#?/, "M");
   return (
     <span
-      className={`rank-pill ${styles.badge}`}
+      className={`rank-pill ${styles.badge} ${overlay ? styles.overlayBadge : styles.inlineBadge}`}
       aria-label={rank}
       title={rank}
     >
@@ -31,7 +37,7 @@ export function RankedPortrait({
     <span className={styles.portrait}>
       <RikishiPhoto {...props} />
       <span className={styles.overlay}>
-        <RankBadge rank={rank} />
+        <RankBadge rank={rank} overlay />
       </span>
     </span>
   );

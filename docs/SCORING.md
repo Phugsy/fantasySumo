@@ -175,3 +175,13 @@ The expansion accepts old application reads and writes while an old preset is
 selected. An older application does not understand `achievements-v2`; once it
 is explicitly selected, keep a compatible application deployed and use forward
 fixes. Do not assume a schema rollback or silently reinterpret its points.
+
+## Fantasy competition titles
+
+Fantasy yusho/jun-yusho are recognition, with no extra points. The owner approved
+shared titles on 8 November 2026: equal official totals share first; shared first
+has no runner-up; otherwise tied second shares jun-yusho. At least two entrants,
+completed live play, full contiguous result verification and all relevant final
+scoring inputs are required. Display ordering never breaks a title tie. See
+[Fantasy titles](FANTASY_TITLES.md) for correction-safe counts, historical
+eligibility, popup dismissal and permanent final standings.

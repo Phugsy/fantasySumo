@@ -1,4 +1,4 @@
-import { getBashoScoringOptions } from "../scoring.js";
+import { getBashoScoringContext, getBashoScoringOptions } from "../scoring.js";
 import { getRikishiIllustration } from "../rikishi-illustrations.js";
 import { getRikishiPhoto } from "../rikishi-photos.js";
 import type { FastifyInstance } from "fastify";
@@ -16,6 +16,7 @@ import { getEffectiveBashoGameConfig } from "../game-config.js";
 import { isCompleteScheduledBoutPublicationSource } from "../imports/types.js";
 import {
   calculateLeaderboard,
+  deriveFantasyFinish,
   calculateRikishiScore,
   calculateTeamScore,
   canEditFantasyPicks,
@@ -112,17 +113,25 @@ export function registerBashoRoutes(
             loadVerifiedScoringResults(context.repositories, basho),
           ]);
 
+        const scoring = await getBashoScoringContext(
+          context.repositories,
+          basho.id,
+          context.now,
+        );
+        const leaderboard = calculateLeaderboard(teams, picks, boutResults, {
+          ...scoring.options,
+          throughDay: verifiedThroughDay,
+        });
         return {
           basho,
           teams,
-          leaderboard: calculateLeaderboard(teams, picks, boutResults, {
-            ...(await getBashoScoringOptions(
-              context.repositories,
-              basho.id,
-              context.now,
-            )),
-            throughDay: verifiedThroughDay,
-          }),
+          leaderboard,
+          finish: fantasyFinish(
+            basho,
+            leaderboard,
+            verifiedThroughDay,
+            scoring.finalInputsReady,
+          ),
         };
       }),
     );
@@ -132,6 +141,8 @@ export function registerBashoRoutes(
         displayName: string;
         ownerName?: string;
         score: number;
+        yushoCount: number;
+        junYushoCount: number;
         bashos: Array<{ bashoId: string; bashoName: string; score: number }>;
       }
     >();
@@ -148,12 +159,26 @@ export function registerBashoRoutes(
         const standing = standings.get(playerKey) ?? {
           displayName: entry.displayName,
           score: 0,
+          yushoCount: 0,
+          junYushoCount: 0,
           bashos: [],
         };
 
         standing.displayName = entry.displayName;
         standing.ownerName = team?.ownerName ?? standing.ownerName;
         standing.score += entry.score;
+        if (scoredBasho.finish.outcome.status === "confirmed") {
+          standing.yushoCount += Number(
+            scoredBasho.finish.outcome.yusho.some(
+              (recipient) => recipient.teamId === entry.teamId,
+            ),
+          );
+          standing.junYushoCount += Number(
+            scoredBasho.finish.outcome.junYusho.some(
+              (recipient) => recipient.teamId === entry.teamId,
+            ),
+          );
+        }
         standing.bashos.push({
           bashoId: scoredBasho.basho.id,
           bashoName: scoredBasho.basho.name,
@@ -165,6 +190,18 @@ export function registerBashoRoutes(
 
     return {
       bashoCount: bashos.length,
+      honoursBashoCount: scoredBashos.filter(
+        (entry) => entry.finish.outcome.status === "confirmed",
+      ).length,
+      latestFinish:
+        [...scoredBashos]
+          .reverse()
+          .find((entry) => entry.finish.outcome.status === "confirmed")
+          ?.finish ?? null,
+      finishes: [...scoredBashos]
+        .reverse()
+        .filter((entry) => entry.finish.outcome.status === "confirmed")
+        .map((entry) => entry.finish),
       leaderboard: [...standings.values()]
         .sort(
           (left, right) =>
@@ -179,6 +216,8 @@ export function registerBashoRoutes(
             ? {}
             : { ownerName: standing.ownerName }),
           score: standing.score,
+          yushoCount: standing.yushoCount,
+          junYushoCount: standing.junYushoCount,
           tournamentsPlayed: standing.bashos.length,
           bashos: [...standing.bashos].reverse(),
         })),
@@ -884,11 +923,12 @@ export function registerBashoRoutes(
     const { boutResults, verifiedThroughDay } =
       await loadVerifiedScoringResults(context.repositories, basho);
 
-    const scoringOptions = await getBashoScoringOptions(
+    const scoring = await getBashoScoringContext(
       context.repositories,
       basho.id,
       context.now,
     );
+    const scoringOptions = scoring.options;
     const leaderboard = calculateLeaderboard(
       await context.repositories.listFantasyTeamsForBasho(basho.id),
       await context.repositories.listFantasyPicksForBasho(basho.id),
@@ -901,7 +941,13 @@ export function registerBashoRoutes(
       bashoId: basho.id,
       jokerTrial: scoringOptions.jokerSelections !== undefined,
       scoringMode: scoringOptions.scoringMode,
-      specialPrizesStatus: scoringOptions.specialPrizesStatus,
+      specialPrizesStatus: scoring.specialPrizesStatus,
+      finish: fantasyFinish(
+        basho,
+        leaderboard,
+        verifiedThroughDay,
+        scoring.finalInputsReady,
+      ),
       totalDays: getBashoTotalDays(basho),
       leaderboard:
         basho.status === "upcoming"
@@ -1203,6 +1249,27 @@ function getBashoTotalDays(basho: { startDate: string; endDate: string }) {
 
   const millisecondsPerDay = 24 * 60 * 60 * 1000;
   return Math.floor((endDate - startDate) / millisecondsPerDay) + 1;
+}
+
+function fantasyFinish(
+  basho: Basho,
+  leaderboard: Parameters<typeof deriveFantasyFinish>[0]["leaderboard"],
+  verifiedThroughDay: number,
+  finalInputsReady: boolean,
+) {
+  return {
+    bashoId: basho.id,
+    bashoName: basho.name,
+    startDate: basho.startDate,
+    endDate: basho.endDate,
+    outcome: deriveFantasyFinish({
+      basho,
+      leaderboard,
+      verifiedThroughDay,
+      totalDays: getBashoTotalDays(basho),
+      finalInputsReady,
+    }),
+  };
 }
 
 export async function findCurrentBasho(repositories: Repositories) {

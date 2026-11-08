@@ -16,7 +16,7 @@ web toolchain when a separate upgrade is intended.
   its exported classes with `import * as styles from "./Component.css"`.
 - Use `style()` for scoped classes and `className={styles.root}` in React.
   `components/PageHeader.css.ts` is the small working example.
-- `styles/theme.css.ts` owns the shared color, radius, focus, and shadow tokens.
+- `styles/theme.css.ts` owns the shared color, display-font, portrait-mount, radius, focus, and shadow tokens.
   Import `vars` and use, for example, `color: vars.indigo`. Add a token only for
   a real shared value. Keep unique one-off layout values next to the component.
 - Keep `styles/global.css.ts` limited to reset, base typography, document/body,
@@ -45,11 +45,16 @@ explicit compatibility boundary for their current consumers and cascade, not
 a place to add new global component classes. Move a shared rule into an owned
 scoped module when its consumers are deliberately migrated. The entry point
 loads document/shell globals followed by shared presentation after the app,
-preserving the existing cascade. Page-header classes are already scoped.
+preserving the existing cascade. It also owns the pre-existing cross-component
+form controls, rank label and screen-reader-only selector moved out of the
+selection stylesheet during the paper/ink adoption. Page-header, header,
+navigation, selection and stable roots are scoped.
 
-Keep the current visual design, interactions, and semantic markup when converting
-styles. Do not introduce themes, new palettes, layout redesigns, or abstraction
-packages as incidental cleanup. The explicitly requested display preferences in
+Preserve interactions and semantic markup when converting styles. Do not
+introduce new palettes, layout redesigns, or abstraction packages as incidental
+cleanup. The owner-approved [paper and ink style](PAPER_INK_STYLE.md) is the
+explicit visual direction for the application; its scoped adoption retains the
+existing game rules and display preferences. The explicitly requested display preferences in
 issue #73 add system/light/dark themes through shared semantic tokens; see
 `DISPLAY_PREFERENCES.md`. Use foreground/background token pairs so all themes
 retain readable controls, messages, charts, and focus states.

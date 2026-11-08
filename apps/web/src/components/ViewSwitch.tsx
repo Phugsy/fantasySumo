@@ -1,7 +1,7 @@
 import { NavLink } from "react-router";
 import { appPaths } from "../routing";
 import type { SessionUser } from "../types";
-import "./ViewSwitch.css";
+import { root as paperRoot } from "./ViewSwitch.css";
 
 interface ViewSwitchProps {
   sessionState: "loading" | "ready" | "submitting";
@@ -17,7 +17,7 @@ export function ViewSwitch({
   user,
 }: ViewSwitchProps) {
   return (
-    <nav className="view-switch" aria-label="Primary navigation">
+    <nav className={`view-switch ${paperRoot}`} aria-label="Primary navigation">
       <NavLink to={appPaths.home} end>
         Leaderboard
       </NavLink>

@@ -18,7 +18,7 @@ import {
   getPickLockMessage,
 } from "../lifecycle";
 import { RikishiTournamentBadges } from "./RikishiTournamentBadges";
-import "./MyStablePanel.css";
+import { root as paperRoot } from "./MyStablePanel.css";
 import { useDisplayPreferences } from "../DisplayPreferences";
 import { sortRikishi } from "../display-preferences";
 import { PhotoCredits } from "./RikishiPhoto";
@@ -57,7 +57,7 @@ export function MyStablePanel({
   if (user === null) {
     return (
       <section
-        className="stable-panel stable-empty"
+        className={`stable-panel stable-empty ${paperRoot}`}
         aria-labelledby="stable-title"
       >
         <div className="section-heading">
@@ -75,7 +75,7 @@ export function MyStablePanel({
   if (myTeam === null) {
     return (
       <section
-        className="stable-panel stable-empty"
+        className={`stable-panel stable-empty ${paperRoot}`}
         aria-labelledby="stable-title"
       >
         <div className="section-heading">
@@ -93,7 +93,10 @@ export function MyStablePanel({
   }
 
   return (
-    <section className={`stable-panel ${stack}`} aria-labelledby="stable-title">
+    <section
+      className={`stable-panel ${paperRoot} ${stack}`}
+      aria-labelledby="stable-title"
+    >
       <div className="stable-heading">
         <div>
           <p className="eyebrow">Your stable</p>
@@ -154,7 +157,6 @@ export function MyStablePanel({
             <div
               className={`stable-rikishi ${preferences.photos ? rankedPortrait : ""}`}
             >
-              <RankBadge rank={pick.rank ?? "Unranked"} />
               <span className={identity}>
                 {preferences.photos && (
                   <RankedPortrait
@@ -164,6 +166,7 @@ export function MyStablePanel({
                   />
                 )}
                 <span>
+                  <RankBadge rank={pick.rank ?? "Unranked"} />
                   <strong>{pick.shikona}</strong>
                   {pick.heya !== undefined && <small>{pick.heya}</small>}
                   <RikishiTournamentBadges
