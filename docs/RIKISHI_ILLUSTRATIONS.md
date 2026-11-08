@@ -18,6 +18,10 @@ Runtime assets are 384 × 448 WebP files in
 `apps/web/public/rikishi-illustrations/`. They retain the full composition and
 load lazily from the same origin in the existing 48 × 56 frame. Filenames carry
 the JSA ID and the first 12 hexadecimal characters of the file's SHA-256 hash.
+The UI slightly enlarges illustrations (4%) inside the clipping portrait frame
+to trim their baked-in paper edge. The frame controls the visible corner shape;
+licensed photos retain their uncropped contain fit. The original artwork files
+are preserved.
 The API's `rikishi-illustration-catalog.ts` records both provider namespaces.
 Only established aliases can resolve live artwork; unknown or conflicting
 identities return no illustration. The deterministic demo has explicit
