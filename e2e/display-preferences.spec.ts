@@ -65,7 +65,7 @@ test("persists list preferences and theme while preserving picks and leaderboard
   );
   await expect(onosato.locator("img")).toHaveJSProperty("naturalWidth", 384);
   if (page.viewportSize()!.width <= 640) {
-    const portrait = await onosato.locator("img").boundingBox();
+    const portrait = await onosato.locator("img").locator("..").boundingBox();
     const rank = await onosato.locator(".rank-pill:visible").boundingBox();
     expect(portrait).not.toBeNull();
     expect(rank).not.toBeNull();
