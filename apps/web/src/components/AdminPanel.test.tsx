@@ -654,9 +654,12 @@ describe("AdminPanel", () => {
         method: "POST",
       },
     );
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/admin/basho/2026-11/jokers",
-      expect.objectContaining({ credentials: "same-origin" }),
+    // The heading can render before LiveJokerControls runs its mount effect.
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/admin/basho/2026-11/jokers",
+        expect.objectContaining({ credentials: "same-origin" }),
+      ),
     );
     expect(fetchMock).toHaveBeenCalledTimes(5);
   });
@@ -728,7 +731,7 @@ describe("AdminPanel", () => {
       `/api/admin/basho/${importedBasho.id}/game-config`,
       expect.objectContaining({ credentials: "same-origin" }),
     );
-    expect(fetchMock).toHaveBeenCalledTimes(6);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6));
   });
 });
 

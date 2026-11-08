@@ -1,5 +1,10 @@
-import type { ScoreBreakdown, ScoringMode } from "@fantasy-sumo/domain";
+import type {
+  PickCompositionMode,
+  ScoreBreakdown,
+  ScoringMode,
+} from "@fantasy-sumo/domain";
 export interface Basho {
+  pickCompositionMode?: PickCompositionMode;
   jokerTrial?: boolean;
   id: string;
   isDemo: boolean;

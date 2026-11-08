@@ -1,4 +1,6 @@
 import type { JokerSelection } from "./jokers.js";
+import type { PickCompositionEntry } from "./pick-composition.js";
+
 export type BashoStatus = "upcoming" | "locked" | "active" | "complete";
 
 export interface Basho {
@@ -196,7 +198,13 @@ export interface LeaderboardEntry extends TeamScore {
   scoreHistory: TeamScoreHistoryEntry[];
 }
 
-export type PickValidationErrorCode = "duplicate-pick" | "invalid-team-size";
+export type PickValidationErrorCode =
+  | "duplicate-pick"
+  | "invalid-team-size"
+  | "unknown-rikishi"
+  | "invalid-selection-data"
+  | "duplicate-heya"
+  | "sanyaku-limit";
 
 export interface PickValidationError {
   code: PickValidationErrorCode;
@@ -208,4 +216,5 @@ export interface PickValidationError {
 
 export interface PickValidationOptions {
   teamSize?: number;
+  compositionRoster?: readonly PickCompositionEntry[];
 }

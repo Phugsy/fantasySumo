@@ -57,7 +57,7 @@ The first useful version should be intentionally small:
 These should be decided before implementing the full MVP:
 
 1. Team size: how many rikishi does a player choose?
-2. Selection constraints: can players pick any ranks, or must they choose from rank bands?
+2. Selection constraints: from January 2027, at most two sanyaku (including Yokozuna and Ozeki) and one rikishi per heya. Earlier live bashos retain their original rules; see [Team selection](TEAM_SELECTION.md).
 3. Scoring:
    - 1 point per win only?
    - Bonus for kinboshi/upsets?

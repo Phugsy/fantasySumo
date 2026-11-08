@@ -325,3 +325,11 @@ The deterministic game-loop suite selects achievement scoring in the admin UI,
 completes the demo with fake prize awards, verifies the rules are locked, and
 compares wins-only standings before restoring the identical official leaderboard.
 It verifies category columns and that refresh defaults back to official scoring.
+
+## Selection composition
+
+`pick-composition.spec.ts` tests both composition limits with a three-slot demo
+fixture, then saves corrected picks, edits the team and verifies lifecycle
+locking. Fixture setup writes only the flagged demo configuration in the
+dedicated E2E SQLite file, restores the original size in `finally`, and refuses
+the default developer database. See [Team selection](TEAM_SELECTION.md).

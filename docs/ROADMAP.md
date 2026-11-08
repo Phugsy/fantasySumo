@@ -53,6 +53,7 @@ Goal: make it usable by a small group of friends.
 - [ ] Add private league concept if needed.
 - [x] Add basic admin flow for importing data.
 - [x] Show verified previous-basho records while creating or editing picks.
+- [x] Enforce two-sanyaku and one-per-heya selection limits for future bashos (#132; see `TEAM_SELECTION.md`).
 - [ ] Improve responsive UI.
 - [x] Add error/loading/empty states.
 

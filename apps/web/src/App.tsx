@@ -77,6 +77,7 @@ import type {
   SessionResponse,
   SessionUser,
 } from "./types";
+import { getSelectionErrors } from "./pick-composition";
 import { canEditFantasyPicks, getPickLockMessage } from "./lifecycle";
 import { DisplayPreferencesProvider } from "./DisplayPreferences";
 
@@ -188,7 +189,9 @@ function RoutedApp() {
     canEditPicks &&
     submitState === "idle" &&
     displayName.trim().length > 0 &&
-    selectedIds.length === teamSize;
+    selectedIds.length === teamSize &&
+    getSelectionErrors(basho?.pickCompositionMode, selectedIds, rikishi)
+      .length === 0;
 
   function toggleRikishi(rikishiId: string) {
     if (!canEditPicks) {
@@ -202,7 +205,14 @@ function RoutedApp() {
         return current.filter((id) => id !== rikishiId);
       }
 
-      if (current.length >= teamSize) {
+      if (
+        current.length >= teamSize ||
+        getSelectionErrors(
+          basho?.pickCompositionMode,
+          [...current, rikishiId],
+          rikishi,
+        ).length > 0
+      ) {
         return current;
       }
 
@@ -1034,6 +1044,7 @@ function RoutedApp() {
                     submitState={submitState}
                     teamSize={teamSize}
                     scoringMode={basho?.scoringMode}
+                    pickCompositionMode={basho?.pickCompositionMode}
                   />,
                 )}
               </ProtectedRoute>
@@ -1222,6 +1233,11 @@ function mergeLeaderboardBasho(
 ): Basho {
   return {
     ...leaderboardResponse.basho,
+    pickCompositionMode:
+      leaderboardResponse.basho.pickCompositionMode ??
+      (currentBasho?.id === leaderboardResponse.basho.id
+        ? currentBasho.pickCompositionMode
+        : undefined),
     scoringMode: leaderboardResponse.scoringMode ?? currentBasho?.scoringMode,
     jokerTrial: leaderboardResponse.jokerTrial,
     specialPrizesStatus: leaderboardResponse.specialPrizesStatus,

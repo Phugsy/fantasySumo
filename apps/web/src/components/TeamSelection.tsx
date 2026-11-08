@@ -1,4 +1,5 @@
-import type { ScoringMode } from "@fantasy-sumo/domain";
+import { getSelectionErrors } from "../pick-composition";
+import type { PickCompositionMode, ScoringMode } from "@fantasy-sumo/domain";
 import { scoringModeLabel } from "../scoring-view";
 import type { FormEvent } from "react";
 import type { CreatedTeamResponse, RankedRikishi } from "../types";
@@ -26,6 +27,7 @@ interface TeamSelectionProps {
   submitState: "idle" | "submitting";
   teamSize: number;
   scoringMode?: ScoringMode;
+  pickCompositionMode?: PickCompositionMode;
 }
 
 export function TeamSelection({
@@ -46,7 +48,13 @@ export function TeamSelection({
   submitState,
   teamSize,
   scoringMode = "wins-v0",
+  pickCompositionMode = "open-v0",
 }: TeamSelectionProps) {
+  const compositionErrors = getSelectionErrors(
+    pickCompositionMode,
+    selectedIds,
+    rikishi,
+  );
   const picksRemaining = Math.max(teamSize - selectedIds.length, 0);
   const { preferences } = useDisplayPreferences();
   const displayedRikishi = sortRikishi(rikishi, preferences.order);
@@ -64,6 +72,12 @@ export function TeamSelection({
             ? "+1 per win, +2 per kinboshi, +3 at eight wins, +1 per special prize."
             : "Losses and absences score zero."}
         </p>
+        {pickCompositionMode === "heya-sanyaku-v1" && (
+          <p>
+            Choose at most two sanyaku (Yokozuna, Ozeki, Sekiwake or Komusubi)
+            and one rikishi per heya.
+          </p>
+        )}
         {isLocked && lockMessage !== undefined && (
           <p className="form-message" role="status">
             {lockMessage}
@@ -72,8 +86,17 @@ export function TeamSelection({
         <div className="rikishi-list">
           {displayedRikishi.map((entry) => {
             const isSelected = selectedIds.includes(entry.id);
+            const reason = isSelected
+              ? undefined
+              : getSelectionErrors(
+                  pickCompositionMode,
+                  [...selectedIds, entry.id],
+                  rikishi,
+                )[0]?.message;
             const isDisabled =
-              isLocked || (!isSelected && selectedIds.length >= teamSize);
+              isLocked ||
+              (!isSelected &&
+                (selectedIds.length >= teamSize || reason !== undefined));
 
             return (
               <button
@@ -96,6 +119,7 @@ export function TeamSelection({
                     <strong>{entry.shikona}</strong>
                     {entry.heya !== undefined && <small>{entry.heya}</small>}
                     <PreviousBashoRecord entry={entry} />
+                    {reason !== undefined && <small>{reason}</small>}
                   </span>
                 </span>
                 <span
@@ -166,7 +190,7 @@ export function TeamSelection({
           )}
           <button
             className="submit-button"
-            disabled={isLocked || !canSubmit}
+            disabled={isLocked || !canSubmit || compositionErrors.length > 0}
             type="submit"
           >
             {submitState === "submitting"
@@ -178,6 +202,12 @@ export function TeamSelection({
                 : "Submit team"}
           </button>
         </div>
+
+        {compositionErrors.length > 0 && (
+          <p className="form-message error-state" role="alert">
+            {compositionErrors.map((error) => error.message).join(" ")}
+          </p>
+        )}
 
         {errorMessage !== null && (
           <p className="form-message error-state" role="alert">
