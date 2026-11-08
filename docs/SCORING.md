@@ -139,3 +139,13 @@ per basho. The two additive tables and triggers preserve the old application
 schema and behavior. Deploy through the existing migration-gated workflows;
 never recover using a down migration. The Postgres trigger function is one SQL
 line because the current runner splits statements at semicolon/newline boundaries.
+
+## Fantasy competition titles
+
+Fantasy yusho/jun-yusho are recognition, with no extra points. The owner approved
+shared titles on 8 November 2026: equal official totals share first; shared first
+has no runner-up; otherwise tied second shares jun-yusho. At least two entrants,
+completed live play, full contiguous result verification and all relevant final
+scoring inputs are required. Display ordering never breaks a title tie. See
+[Fantasy titles](FANTASY_TITLES.md) for correction-safe counts, historical
+eligibility, popup dismissal and permanent final standings.

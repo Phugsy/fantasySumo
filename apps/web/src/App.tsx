@@ -51,6 +51,7 @@ import { AppHeader } from "./components/AppHeader";
 import { BashoPanel } from "./components/BashoPanel";
 import { LeaderboardPanel } from "./components/LeaderboardPanel";
 import { HistoryPanel } from "./components/HistoryPanel";
+import { FinishAnnouncement } from "./components/BashoFinish";
 import { MyStablePanel } from "./components/MyStablePanel";
 import { PageHeader } from "./components/PageHeader";
 import { ResetPasswordPanel } from "./components/ResetPasswordPanel";
@@ -841,6 +842,13 @@ function RoutedApp() {
       />
       <main className="app-shell">
         <PageHeader activeView={activeView} />
+        {sessionUser !== null && (
+          <FinishAnnouncement
+            key={sessionUser.id}
+            userId={sessionUser.id}
+            refreshKey={`${basho?.id ?? ""}:${basho?.status ?? ""}:${basho?.currentDay ?? 0}`}
+          />
+        )}
         {sessionUser !== null && sessionErrorMessage !== null && (
           <section className="state-panel error-state" role="alert">
             {sessionErrorMessage}
@@ -949,7 +957,14 @@ function RoutedApp() {
           />
           <Route
             path={appPaths.history}
-            element={<HistoryPanel signedIn={sessionUser !== null} />}
+            element={
+              <HistoryPanel
+                signedIn={sessionUser !== null}
+                selectedBashoId={
+                  new URLSearchParams(location.search).get("basho") ?? undefined
+                }
+              />
+            }
           />
           <Route
             path={appPaths.resetPassword}
@@ -1250,6 +1265,7 @@ function mergeLeaderboardBasho(
     scoringMode: leaderboardResponse.scoringMode ?? currentBasho?.scoringMode,
     jokerTrial: leaderboardResponse.jokerTrial,
     specialPrizesStatus: leaderboardResponse.specialPrizesStatus,
+    finish: leaderboardResponse.finish,
     teamSize: currentBasho?.teamSize ?? 0,
   };
 }
