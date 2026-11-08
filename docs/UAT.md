@@ -49,3 +49,33 @@ Physical-device UAT is still required for that scenario.
 Current baseline observations: production has November schedule days 1 and 2;
 the observed lifecycle is active at day 0. UI reports must distinguish the
 current Japan date, stored schedule publication and verified scoring progress.
+
+## Portrait data in the persistent Preview fixture
+
+The July-only Preview fixture predates the manual production identity backfill.
+Portrait APIs intentionally omit images until verified provider aliases exist;
+shipping image assets or passing migration smoke checks does not populate those
+aliases. Do not fix this by matching runtime names or changing local rikishi IDs.
+
+The manual [July Preview repair](operations/preview-202607-portrait-aliases.sql)
+attaches Sumo API identities verified against the July source roster and exact
+stored names, ranks and ordering. Run it only on the persistent `preview` branch
+(`br-cold-union-abi8tnee`). Its default is a zero-write preview; require no
+blockers before changing `settings.apply` to true. The statement refuses any
+other basho set, roster mismatch or conflicting existing provider alias and is
+idempotent. Compare team, pick, result, basho and roster fingerprints before and
+after. It is an operator data repair, not an automatic deployment migration.
+
+After preparing or restoring a UAT fixture, check actual portrait metadata in
+`/api/basho/<id>/rikishi` and loaded images in My Stable and expanded boards,
+using both styles. July includes eight wrestlers outside the curated November
+illustration set; those retain the honest unavailable state. Existing licensed
+photos likewise cover only part of the roster.
+
+Applied on 8 November 2026: 42 aliases inserted; a retry inserted zero. All five
+game-data fingerprints matched before/after. The deployed API then returned
+31 photos and 34 illustrations. All five portraits in the owner's existing
+stable loaded successfully in both styles on the fixed UAT address. The data
+repair was checked against fresh July source evidence, reviewed independently,
+and exercised locally for wrong-fixture, roster-mismatch, conflicting-alias,
+zero-write preview and safe-rerun cases. No application fallback rule changed.
