@@ -14,7 +14,7 @@ import {
   getPickLockMessage,
 } from "../lifecycle";
 import { RikishiTournamentBadges } from "./RikishiTournamentBadges";
-import "./MyStablePanel.css";
+import { root as paperRoot } from "./MyStablePanel.css";
 import { useDisplayPreferences } from "../DisplayPreferences";
 import { sortRikishi } from "../display-preferences";
 import { PhotoCredits, RikishiPhoto } from "./RikishiPhoto";
@@ -53,7 +53,7 @@ export function MyStablePanel({
   if (user === null) {
     return (
       <section
-        className="stable-panel stable-empty"
+        className={`stable-panel stable-empty ${paperRoot}`}
         aria-labelledby="stable-title"
       >
         <div className="section-heading">
@@ -71,7 +71,7 @@ export function MyStablePanel({
   if (myTeam === null) {
     return (
       <section
-        className="stable-panel stable-empty"
+        className={`stable-panel stable-empty ${paperRoot}`}
         aria-labelledby="stable-title"
       >
         <div className="section-heading">
@@ -89,7 +89,10 @@ export function MyStablePanel({
   }
 
   return (
-    <section className="stable-panel" aria-labelledby="stable-title">
+    <section
+      className={`stable-panel ${paperRoot}`}
+      aria-labelledby="stable-title"
+    >
       <div className="stable-heading">
         <div>
           <p className="eyebrow">Your stable</p>
@@ -148,7 +151,6 @@ export function MyStablePanel({
         {displayedPicks.map((pick) => (
           <li key={pick.rikishiId}>
             <div className="stable-rikishi">
-              <span className="rank-pill">{pick.rank ?? "Unranked"}</span>
               <span className={identity}>
                 {preferences.photos && (
                   <RikishiPhoto
@@ -157,6 +159,7 @@ export function MyStablePanel({
                   />
                 )}
                 <span>
+                  <span className="rank-pill">{pick.rank ?? "Unranked"}</span>
                   <strong>{pick.shikona}</strong>
                   {pick.heya !== undefined && <small>{pick.heya}</small>}
                   <RikishiTournamentBadges

@@ -4,7 +4,7 @@ import { appPaths } from "../routing";
 import type { SessionUser } from "../types";
 import { ViewSwitch } from "./ViewSwitch";
 import { DisplaySettings } from "./DisplaySettings";
-import "./AppHeader.css";
+import { root as paperRoot } from "./AppHeader.css";
 
 interface AppHeaderProps {
   onSignOut: () => void;
@@ -24,7 +24,7 @@ export function AppHeader({
   user,
 }: AppHeaderProps) {
   return (
-    <header className={`app-header ${mobileInputHeader}`}>
+    <header className={`app-header ${paperRoot} ${mobileInputHeader}`}>
       <div className="app-header-inner">
         <Link className="wordmark" to={appPaths.home} aria-label="Fantasy Sumo">
           <span className="wordmark-mark" aria-hidden="true">

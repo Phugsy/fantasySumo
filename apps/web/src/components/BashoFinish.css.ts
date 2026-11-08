@@ -3,8 +3,8 @@ import { vars } from "../styles/theme.css";
 
 export const summary = style({
   border: `1px solid ${vars.clayLight}`,
-  borderTop: `4px solid ${vars.vermilion}`,
-  borderRadius: 10,
+  borderTop: `2px solid ${vars.vermilion}`,
+  borderRadius: vars.radius,
   background: vars.panel,
   color: vars.ink,
   padding: 20,
@@ -61,7 +61,7 @@ export const dialog = style({
   maxHeight: "85vh",
   overflowY: "auto",
   padding: 24,
-  borderRadius: 12,
+  borderRadius: 6,
   border: `1px solid ${vars.clay}`,
   background: vars.paper,
   color: vars.ink,

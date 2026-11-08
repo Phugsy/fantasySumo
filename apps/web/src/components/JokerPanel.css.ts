@@ -4,7 +4,7 @@ export const panel = style({
   marginTop: 20,
   padding: 20,
   border: `1px solid ${vars.clayLight}`,
-  borderRadius: 12,
+  borderRadius: vars.radius,
   background: vars.panel,
   color: vars.ink,
 });
