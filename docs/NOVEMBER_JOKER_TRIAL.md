@@ -41,10 +41,17 @@ server. Only the isolated demo uses its controllable clock.
 7. Existing result imports settle jokers and update standings. Check the saved
    base mode: wins-only does not introduce a gold-star bonus.
 
-The daily job imports results and then attempts the next card. Day 1 needs
-the explicit initial schedule import above; failed/unpublished following cards
-need the existing manual schedule retry. No new cron, billing, notifications,
-or third-party integration is introduced.
+The results job imports outcomes and then attempts the next card. The independent
+01:00 UTC morning schedule job also retries the current/following cards before
+the joker deadline, including day 1 before the basho begins. Manual schedule
+import remains the recovery path for late publication or outages. Only the
+current Japan day's joker window is selectable; a future card is not an early
+pick window in the player UI. No notifications or third-party integration is added.
+
+The separately configured site owner can now correct locked base scoring using
+the explicit, audited full-tournament override in [Scoring rules](SCORING.md).
+The base mode and live trial mode change atomically; accepted allocations and
+their event history remain intact. Normal administrators cannot make that change.
 
 ## Additive persistence and recovery
 

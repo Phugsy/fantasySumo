@@ -491,7 +491,7 @@ function createSqliteRepositories(
           .where(eq(sqlite.basho.id, bashoId))
           .run();
 
-        if (action === "start") {
+        if (action === "start" || action === "lock-picks") {
           transaction
             .update(sqlite.fantasyTeams)
             .set({ lockedAt: changedAt })
@@ -1567,7 +1567,7 @@ function createPostgresRepositories(
           .set({ status: transition.nextStatus })
           .where(eq(pg.basho.id, bashoId));
 
-        if (action === "start") {
+        if (action === "start" || action === "lock-picks") {
           await transaction
             .update(pg.fantasyTeams)
             .set({ lockedAt: changedAt })

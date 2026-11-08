@@ -117,8 +117,18 @@ async function attemptFollowingDayScheduleImport(
     };
   }
 
-  const day = options.day + 1;
+  return attemptPublishedScheduleImport(repositories, sourceFetch, {
+    ...options,
+    day: options.day + 1,
+  });
+}
 
+export async function attemptPublishedScheduleImport(
+  repositories: Repositories,
+  sourceFetch: SourceFetch,
+  options: DailyUpdateImportOptions,
+): Promise<FollowingDayScheduleImportResult> {
+  const day = options.day;
   try {
     const scheduleCommand = await fetchSumoApiScheduleImport(sourceFetch, {
       bashoId: options.bashoId,

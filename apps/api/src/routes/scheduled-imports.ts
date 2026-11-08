@@ -1,3 +1,4 @@
+import { runScheduledScheduleImport } from "../imports/scheduled-schedules.js";
 import { attemptSpecialPrizeImport } from "../imports/special-prizes.js";
 import type { FastifyInstance } from "fastify";
 import type { Repositories } from "@fantasy-sumo/db";
@@ -15,6 +16,36 @@ export function registerScheduledImportRoutes(
   app: FastifyInstance,
   context: RouteContext,
 ) {
+  app.get("/api/cron/import-schedule", async (request, reply) => {
+    if (context.cronSecret === undefined)
+      return reply.code(404).send({
+        error: "scheduled-import-disabled",
+        message: "Scheduled imports are not enabled.",
+      });
+    if (request.headers.authorization !== `Bearer ${context.cronSecret}`)
+      return reply.code(401).send({
+        error: "scheduled-import-unauthorized",
+        message: "A valid cron secret is required.",
+      });
+    try {
+      const result = await runScheduledScheduleImport(
+        context.repositories,
+        context.sourceFetch,
+        context.now,
+      );
+      if (result.status === "partial")
+        request.log.warn(result, "Published schedule refresh needs a retry.");
+      else request.log.info(result, "Published schedule refresh finished.");
+      return result;
+    } catch (error) {
+      request.log.error({ err: error }, "Published schedule refresh failed.");
+      return reply.code(500).send({
+        error: "scheduled-schedule-import-failed",
+        message:
+          error instanceof Error ? error.message : "Schedule refresh failed.",
+      });
+    }
+  });
   app.get("/api/cron/import-results", async (request, reply) => {
     if (context.cronSecret === undefined) {
       return reply.code(404).send({

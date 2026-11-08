@@ -7,6 +7,7 @@ import { getEffectiveBashoGameConfig } from "../game-config.js";
 
 interface RouteContext {
   auth: AuthService;
+  now: () => Date;
   defaultTeamSize: number;
   repositories: Repositories;
 }
@@ -52,9 +53,19 @@ export function registerAdminGameConfigRoutes(
         context.repositories.listFantasyTeamsForBasho(basho.id),
       ]);
 
+      const currentUser = await context.auth.getCurrentUser(request);
+      const owner =
+        currentUser !== undefined && context.auth.isSuperAdmin(currentUser);
       return {
         bashoId: basho.id,
         gameConfig,
+        ...(owner
+          ? {
+              canOverrideScoringMode: true,
+              scoringOverrides:
+                await context.repositories.listBashoScoringOverrides(basho.id),
+            }
+          : {}),
         canChangeScoringMode:
           basho.status === "upcoming" && !gameConfig.scoringLocked,
         canChangeTeamSize: basho.status === "upcoming" && teams.length === 0,
@@ -129,7 +140,16 @@ export function registerAdminGameConfigRoutes(
     "/api/admin/basho/:bashoId/game-config/scoring",
     async (request, reply) => {
       const body = z
-        .object({ scoringMode: z.enum(["wins-v0", "achievements-v1"]) })
+        .object({
+          scoringMode: z.enum(["wins-v0", "achievements-v1"]),
+          override: z
+            .object({
+              reason: z.string().trim().min(8).max(500),
+              expectedMode: z.enum(["wins-v0", "achievements-v1"]),
+            })
+            .strict()
+            .optional(),
+        })
         .strict()
         .safeParse(request.body);
       if (!body.success)
@@ -137,10 +157,39 @@ export function registerAdminGameConfigRoutes(
           error: "invalid-request",
           message: "Select a supported scoring mode.",
         });
-      const result = await context.repositories.setBashoScoringMode(
-        request.params.bashoId,
-        body.data.scoringMode,
-      );
+      const currentUser = await context.auth.getCurrentUser(request);
+      if (
+        body.data.override &&
+        (!currentUser || !context.auth.isSuperAdmin(currentUser))
+      ) {
+        return reply.code(403).send({
+          error: "owner-forbidden",
+          message:
+            "Only the configured site owner can override locked scoring.",
+        });
+      }
+      const result =
+        body.data.override && currentUser
+          ? await context.repositories.overrideBashoScoringMode(
+              request.params.bashoId,
+              body.data.scoringMode,
+              {
+                actorUserId: currentUser.id,
+                reason: body.data.override.reason,
+                expectedMode: body.data.override.expectedMode,
+                changedAt: context.now().toISOString(),
+              },
+            )
+          : await context.repositories.setBashoScoringMode(
+              request.params.bashoId,
+              body.data.scoringMode,
+            );
+      if (result === "conflict")
+        return reply.code(409).send({
+          error: "scoring-conflict",
+          message:
+            "The scoring mode changed while you were reviewing it. Refresh and confirm the new current mode.",
+        });
       if (result === "not-found")
         return reply
           .code(404)

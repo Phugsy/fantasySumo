@@ -6,6 +6,7 @@ const e2eDatabaseUrl =
 const demoAdminToken =
   process.env.DEMO_ADMIN_TOKEN ?? "playwright-demo-admin-token";
 const adminEmail = "e2e-admin@example.com";
+const ownerUserId = `local-${createHash("sha256").update("e2e-owner@example.com").digest("base64url").slice(0, 24)}`;
 const adminUserId = `local-${createHash("sha256")
   .update(adminEmail)
   .digest("base64url")
@@ -65,6 +66,7 @@ export default defineConfig({
         DATABASE_URL: e2eDatabaseUrl,
         DEMO_ADMIN_TOKEN: demoAdminToken,
         ADMIN_USER_IDS: adminUserId,
+        SUPER_ADMIN_USER_IDS: ownerUserId,
       },
       url: "http://127.0.0.1:3000/api/health",
       reuseExistingServer: !process.env.CI,

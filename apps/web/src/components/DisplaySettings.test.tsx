@@ -24,6 +24,26 @@ afterEach(() => {
   delete document.documentElement.dataset.theme;
 });
 describe("display settings", () => {
+  it("shows the chosen portrait style without a separate visibility switch", () => {
+    render(
+      <DisplayPreferencesProvider>
+        <DisplaySettings />
+      </DisplayPreferencesProvider>,
+    );
+    expect(screen.getByLabelText("Portrait style")).toHaveValue("hidden");
+    fireEvent.change(screen.getByLabelText("Portrait style"), {
+      target: { value: "illustrations" },
+    });
+    expect(
+      JSON.parse(window.localStorage.getItem(DISPLAY_STORAGE_KEY)!),
+    ).toMatchObject({ photos: true, portraitStyle: "illustrations" });
+    fireEvent.change(screen.getByLabelText("Portrait style"), {
+      target: { value: "hidden" },
+    });
+    expect(
+      JSON.parse(window.localStorage.getItem(DISPLAY_STORAGE_KEY)!),
+    ).toMatchObject({ photos: false, portraitStyle: "illustrations" });
+  });
   it("restores preferences, follows system changes and preserves an explicit choice", () => {
     let matches = true;
     let changed = () => {};
@@ -47,7 +67,6 @@ describe("display settings", () => {
     );
     fireEvent.click(screen.getByText("Display"));
     expect(document.documentElement).toHaveAttribute("data-theme", "dark");
-    expect(screen.getByLabelText("Show rikishi portraits")).toBeChecked();
     expect(screen.getByLabelText("Portrait style")).toHaveValue("photos");
     fireEvent.change(screen.getByLabelText("Portrait style"), {
       target: { value: "illustrations" },

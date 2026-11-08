@@ -18,7 +18,7 @@ export function RikishiPhoto({
     <span className={styles.frame} aria-hidden="true">
       {portrait !== undefined && failedUrl !== portrait.url ? (
         <img
-          className={styles.image}
+          className={illustrated ? styles.illustrationImage : styles.image}
           src={portrait.url}
           alt=""
           width={48}

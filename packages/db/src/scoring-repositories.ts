@@ -1,3 +1,7 @@
+import {
+  createScoringOverrideRepositories,
+  type ScoringOverrideRepositories,
+} from "./scoring-overrides.js";
 import { sql, eq } from "drizzle-orm";
 import type { ScoringMode, SpecialPrizeAward } from "@fantasy-sumo/domain";
 import type { AppDatabase } from "./client.js";
@@ -15,7 +19,7 @@ export interface SpecialPrizeSnapshot {
   fetchedAt: string;
   awards: SpecialPrizeAward[];
 }
-export interface ScoringRepositories {
+export interface ScoringRepositories extends ScoringOverrideRepositories {
   getBashoScoringConfig: (
     bashoId: string,
   ) => Promise<BashoScoringConfig | undefined>;
@@ -37,6 +41,7 @@ export function createScoringRepositories(
   if (database.provider === "sqlite") {
     const db = database.db;
     return {
+      ...createScoringOverrideRepositories(database),
       getBashoScoringConfig: async (id) =>
         db
           .select()
@@ -111,6 +116,7 @@ export function createScoringRepositories(
   }
   const db = database.db;
   return {
+    ...createScoringOverrideRepositories(database),
     getBashoScoringConfig: async (id) =>
       (
         await db

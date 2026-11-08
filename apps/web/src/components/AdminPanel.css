@@ -310,3 +310,15 @@
 .admin-config-card select {
   width: 100%;
 }
+
+.admin-owner-confirmation {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-block: 12px;
+}
+.admin-owner-confirmation input[type="checkbox"] {
+  width: 20px;
+  min-height: 20px;
+  flex-shrink: 0;
+}

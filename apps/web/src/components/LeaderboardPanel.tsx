@@ -1,4 +1,8 @@
+import { selectControl } from "../styles/select.css";
 import type { ScoringMode } from "@fantasy-sumo/domain";
+import { useDisplayPreferences } from "../DisplayPreferences";
+import { PhotoCredits, RikishiPhoto } from "./RikishiPhoto";
+import { identity } from "./RikishiPhoto.css";
 import { ScoreBreakdown } from "./ScoreBreakdown";
 import { compareScoringMode, scoringModeLabel } from "../scoring-view";
 import { useId, useMemo, useState } from "react";
@@ -40,6 +44,7 @@ export function LeaderboardPanel({
   rikishi,
   totalDays,
 }: LeaderboardPanelProps) {
+  const { preferences } = useDisplayPreferences();
   const [comparison, setComparison] = useState<{
     bashoId: string;
     mode: ScoringMode;
@@ -90,6 +95,7 @@ export function LeaderboardPanel({
       <div className="scoring-view">
         <label htmlFor="leaderboard-scoring-view">Scoring view</label>
         <select
+          className={selectControl}
           id="leaderboard-scoring-view"
           value={comparisonMode ?? "official"}
           onChange={(event) =>
@@ -151,28 +157,15 @@ export function LeaderboardPanel({
         <div className="state-panel leaderboard-empty">
           {getEmptyLeaderboardMessage(basho)}
         </div>
-      ) : isPreScoringLeaderboard(basho, leaderboard) ? (
-        <>
-          <div className="state-panel leaderboard-empty">
-            {getEmptyScoringMessage(basho)}
-          </div>
-          {renderLeaderboardList({
-            scoringMode: displayMode,
-            currentTeamId,
-            expandedTeamId,
-            leaderboard,
-            onToggleTeam,
-            rikishiById,
-            tiedScoreCounts,
-          })}
-          <TournamentProgressChart
-            currentTeamId={currentTeamId ?? undefined}
-            leaderboard={leaderboard}
-          />
-        </>
       ) : (
         <>
+          {isPreScoringLeaderboard(basho, leaderboard) && (
+            <div className="state-panel leaderboard-empty">
+              {getEmptyScoringMessage(basho)}
+            </div>
+          )}
           {renderLeaderboardList({
+            picksHidden: basho.status === "upcoming",
             scoringMode: displayMode,
             currentTeamId,
             expandedTeamId,
@@ -181,6 +174,16 @@ export function LeaderboardPanel({
             rikishiById,
             tiedScoreCounts,
           })}
+          {preferences.photos &&
+            (leaderboard.find((entry) => entry.teamId === expandedTeamId)
+              ?.rikishiScores.length ?? 0) > 0 && (
+              <PhotoCredits
+                photos={(
+                  leaderboard.find((entry) => entry.teamId === expandedTeamId)
+                    ?.rikishiScores ?? []
+                ).map((score) => rikishiById.get(score.rikishiId)?.photo)}
+              />
+            )}
           <TournamentProgressChart
             currentTeamId={currentTeamId ?? undefined}
             leaderboard={leaderboard}
@@ -192,6 +195,7 @@ export function LeaderboardPanel({
 }
 
 function renderLeaderboardList({
+  picksHidden,
   scoringMode,
   currentTeamId,
   expandedTeamId,
@@ -200,6 +204,7 @@ function renderLeaderboardList({
   rikishiById,
   tiedScoreCounts,
 }: {
+  picksHidden: boolean;
   scoringMode: ScoringMode;
   currentTeamId?: string | null;
   expandedTeamId: string | null;
@@ -233,6 +238,7 @@ function renderLeaderboardList({
               <span className="leaderboard-rank">#{entry.rank}</span>
               <span className="leaderboard-team">
                 <strong>{entry.displayName}</strong>
+                <small>{entry.ownerName ?? "Owner unavailable"}</small>
                 {isCurrentTeam && <small>Your team</small>}
                 {isTied && <small>Tied on score</small>}
                 <RecentForm scoreHistory={entry.scoreHistory} />
@@ -273,7 +279,11 @@ function renderLeaderboardList({
                   </p>
                 )}
                 {entry.rikishiScores.length === 0 ? (
-                  <p>No picks recorded for this team.</p>
+                  <p>
+                    {picksHidden
+                      ? "Original picks are hidden until picks lock."
+                      : "No picks recorded for this team."}
+                  </p>
                 ) : (
                   <ul className="score-totals-list">
                     {entry.rikishiScores.map((score) => (
@@ -317,6 +327,7 @@ function RikishiScoreRow({
   score: LeaderboardEntry["rikishiScores"][number];
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const { preferences } = useDisplayPreferences();
   const historyId = useId();
   const shikona = pickedRikishi?.shikona ?? score.rikishiId;
 
@@ -329,15 +340,23 @@ function RikishiScoreRow({
         aria-controls={historyId}
         aria-expanded={isExpanded}
       >
-        <span className="rikishi-identity">
-          <strong>{shikona}</strong>
-          <small>{pickedRikishi?.rank ?? "Unranked pick"}</small>
-          {pickedRikishi !== undefined && (
-            <RikishiTournamentBadges
-              notes={pickedRikishi.tournamentNotes}
-              shikona={shikona}
+        <span className={identity}>
+          {preferences.photos && (
+            <RikishiPhoto
+              photo={pickedRikishi?.photo}
+              illustration={pickedRikishi?.illustration}
             />
           )}
+          <span className="rikishi-identity">
+            <strong>{shikona}</strong>
+            <small>{pickedRikishi?.rank ?? "Unranked pick"}</small>
+            {pickedRikishi !== undefined && (
+              <RikishiTournamentBadges
+                notes={pickedRikishi.tournamentNotes}
+                shikona={shikona}
+              />
+            )}
+          </span>
         </span>
         <RecentRikishiResults results={results} shikona={shikona} />
         <span className="rikishi-wins">

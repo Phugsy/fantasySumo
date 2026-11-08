@@ -1,3 +1,4 @@
+import { mobileInputHeader } from "./AppHeader.mobile.css";
 import { Link } from "react-router";
 import { appPaths } from "../routing";
 import type { SessionUser } from "../types";
@@ -23,7 +24,7 @@ export function AppHeader({
   user,
 }: AppHeaderProps) {
   return (
-    <header className="app-header">
+    <header className={`app-header ${mobileInputHeader}`}>
       <div className="app-header-inner">
         <Link className="wordmark" to={appPaths.home} aria-label="Fantasy Sumo">
           <span className="wordmark-mark" aria-hidden="true">

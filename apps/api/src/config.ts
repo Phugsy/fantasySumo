@@ -75,3 +75,14 @@ export function getNeonAuthAudience(): string | undefined {
 
   return audience === undefined || audience.length === 0 ? undefined : audience;
 }
+
+export function getSuperAdminUserIds(): string[] {
+  return Array.from(
+    new Set(
+      (process.env.SUPER_ADMIN_USER_IDS ?? "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean),
+    ),
+  );
+}

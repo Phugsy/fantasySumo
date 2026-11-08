@@ -7,6 +7,16 @@
 - [ ] `make check`
 - [ ] `make e2e`, or a documented reason it does not apply
 
+## Owner UAT for browser changes
+
+- Preview URL and exact commit:
+- Test account/role and fixture state:
+- Numbered acceptance steps and expected results:
+- Physical-device checks still needed (especially iOS keyboard):
+- Owner acceptance or reported failures:
+
+See `docs/UAT.md`. Automated checks and owner acceptance are separate evidence.
+
 ## Database and deployment safety
 
 - [ ] No database schema change

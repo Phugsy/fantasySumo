@@ -1,6 +1,11 @@
 import type { Basho, BashoStatus } from "./types.js";
 
-export type BashoLifecycleAction = "open-picks" | "start" | "close";
+export type BashoLifecycleAction =
+  | "open-picks"
+  | "lock-picks"
+  | "start"
+  | "undo-start"
+  | "close";
 
 export type BashoLifecycleTransition =
   | {
@@ -50,6 +55,40 @@ export function getBashoLifecycleTransition(
       code: "invalid-lifecycle-transition",
       message:
         "Picks can only be reopened for a locked live basho that has not started and has no results.",
+    };
+  }
+
+  if (action === "lock-picks") {
+    if (basho.status === "upcoming" || basho.status === "locked")
+      return {
+        allowed: true,
+        changed: basho.status !== "locked",
+        nextStatus: "locked",
+      };
+    return {
+      allowed: false,
+      code: "invalid-lifecycle-transition",
+      message:
+        "Only an upcoming basho can lock picks without starting scoring.",
+    };
+  }
+
+  if (action === "undo-start") {
+    if (
+      (basho.status === "active" || basho.status === "locked") &&
+      (basho.currentDay ?? 0) === 0 &&
+      !options.hasResults
+    )
+      return {
+        allowed: true,
+        changed: basho.status !== "locked",
+        nextStatus: "locked",
+      };
+    return {
+      allowed: false,
+      code: "invalid-lifecycle-transition",
+      message:
+        "A start can only be undone before any day progress or stored results. Picks remain locked.",
     };
   }
 

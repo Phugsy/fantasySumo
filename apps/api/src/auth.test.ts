@@ -28,6 +28,7 @@ describe("auth routes", () => {
           email: "player@example.com",
           displayName: "East Stand",
           isAdmin: false,
+          isSuperAdmin: false,
         },
       });
 
@@ -44,6 +45,7 @@ describe("auth routes", () => {
         user: {
           email: "player@example.com",
           isAdmin: false,
+          isSuperAdmin: false,
         },
       });
 
@@ -88,6 +90,7 @@ describe("auth routes", () => {
           email: "neon@example.com",
           displayName: "Neon Player",
           isAdmin: false,
+          isSuperAdmin: false,
         },
       });
     } finally {
@@ -291,4 +294,28 @@ describe("auth routes", () => {
       await app.close();
     }
   });
+});
+
+it("grants super-admin only through the verified owner allowlist, ignoring claimed roles", async () => {
+  const app = buildApp({
+    authMode: "neon",
+    adminUserIds: ["admin"],
+    superAdminUserIds: ["owner"],
+    neonJwtVerifier: async (token) => ({ id: token, isSuperAdmin: true }),
+  });
+  try {
+    for (const id of ["player", "admin", "owner"]) {
+      const response = await app.inject({
+        url: "/api/session",
+        headers: { authorization: `Bearer ${id}` },
+      });
+      expect(response.json().user).toMatchObject({
+        id,
+        isAdmin: id !== "player",
+        isSuperAdmin: id === "owner",
+      });
+    }
+  } finally {
+    await app.close();
+  }
 });

@@ -29,6 +29,14 @@ export const image = style({
   height: "100%",
   objectFit: "contain",
 });
+export const illustrationImage = style([
+  image,
+  {
+    // Trim the artwork's thin paper edge; the holding frame owns the silhouette.
+    objectFit: "cover",
+    transform: "scale(1.04)",
+  },
+]);
 export const credits = style({
   marginTop: 12,
   fontSize: ".75rem",

@@ -293,6 +293,35 @@ requireText(
   "reject a stale pull request head before migration and deployment",
   /gh api "repos\/\$GITHUB_REPOSITORY\/pulls\/\$PR_NUMBER" --jq \.head\.sha/,
 );
+const uatStep = preview.slice(
+  preview.indexOf("      - name: Update stable UAT address"),
+  preview.indexOf("      - name: Write preview deployment summary"),
+);
+requireText(
+  uatStep,
+  previewPath,
+  "update UAT only for the explicitly selected branch",
+  /if: vars\.UAT_BRANCH != '' && needs\.resolve\.outputs\.branch == vars\.UAT_BRANCH/,
+);
+requireText(
+  uatStep,
+  previewPath,
+  "reject master and stale branch heads before replacing UAT",
+  /\[\[ "\$UAT_BRANCH" == "master" \]\][\s\S]*exit 1[\s\S]*gh api "repos\/\$GITHUB_REPOSITORY\/commits\/\$UAT_BRANCH" --jq \.sha[\s\S]*\[\[ "\$current_sha" != "\$DEPLOY_SHA" \]\][\s\S]*exit 1/,
+);
+requireText(
+  uatStep,
+  previewPath,
+  "assign only the fixed non-production UAT hostname",
+  /alias set "\$DEPLOYMENT_URL" fantasy-sumo-uat-phuggo\.vercel\.app --scope="\$VERCEL_ORG_ID"/,
+);
+requireOrder(
+  preview,
+  previewPath,
+  "Smoke-test preview deployment",
+  "Update stable UAT address",
+);
+requireOrder(uatStep, previewPath, "exit 1", "alias set");
 requireText(
   playtest,
   playtestPath,

@@ -13,6 +13,7 @@ export type AuthMode = "local" | "neon";
 
 interface AuthServiceOptions {
   adminUserIds?: readonly string[];
+  superAdminUserIds?: readonly string[];
   mode: AuthMode;
   neonAuthAudience?: string;
   neonAuthIssuer?: string;
@@ -49,6 +50,7 @@ export interface AuthService {
     request: FastifyRequest,
   ) => Promise<AuthenticatedUser | undefined>;
   isAdmin: (user: AuthenticatedUser) => boolean;
+  isSuperAdmin: (user: AuthenticatedUser) => boolean;
 }
 
 const LOCAL_AUTH_COOKIE = "fantasy_sumo_dev_user";
@@ -67,6 +69,7 @@ const loginBodySchema = z.object({
 
 export function createAuthService(options: AuthServiceOptions): AuthService {
   const adminUserIds = new Set(options.adminUserIds ?? []);
+  const superAdminUserIds = new Set(options.superAdminUserIds ?? []);
   const neonJwtVerifier =
     options.neonJwtVerifier ??
     createNeonJwtVerifier({
@@ -77,7 +80,9 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
 
   return {
     mode: options.mode,
-    isAdmin: (user) => adminUserIds.has(user.id),
+    isAdmin: (user) =>
+      adminUserIds.has(user.id) || superAdminUserIds.has(user.id),
+    isSuperAdmin: (user) => superAdminUserIds.has(user.id),
     getCurrentUser: async (request) => {
       if (options.mode === "neon") {
         const token = getBearerToken(request);
@@ -144,7 +149,13 @@ export function registerAuthRoutes(
 
     return {
       user:
-        user === undefined ? null : { ...user, isAdmin: auth.isAdmin(user) },
+        user === undefined
+          ? null
+          : {
+              ...user,
+              isAdmin: auth.isAdmin(user),
+              isSuperAdmin: auth.isSuperAdmin(user),
+            },
       mode: auth.mode,
     };
   });
@@ -183,7 +194,11 @@ export function registerAuthRoutes(
     );
 
     return reply.code(201).send({
-      user: { ...user, isAdmin: auth.isAdmin(user) },
+      user: {
+        ...user,
+        isAdmin: auth.isAdmin(user),
+        isSuperAdmin: auth.isSuperAdmin(user),
+      },
       mode: auth.mode,
     });
   });

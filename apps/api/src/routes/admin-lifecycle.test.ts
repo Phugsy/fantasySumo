@@ -211,3 +211,84 @@ function localUserId(email: string): string {
     .digest("base64url");
   return `local-${digest.slice(0, 24)}`;
 }
+
+it("locks picks without starting, then undoes only a result-free start while keeping teams locked", async () => {
+  const repos = createRepositories(client);
+  await seedDatabase(repos);
+  const basho = {
+    id: "2026-07",
+    name: "July",
+    isDemo: false,
+    startDate: "2026-07-12",
+    endDate: "2026-07-26",
+    status: "upcoming" as const,
+    currentDay: 0,
+  };
+  await repos.insertBasho(basho);
+  for (const entry of await repos.listBanzukeEntriesForBasho("2026-05"))
+    await repos.insertBanzukeEntry({
+      ...entry,
+      id: "transition-" + entry.id,
+      bashoId: basho.id,
+    });
+  await repos.insertFantasyTeamWithPicksIfBashoUpcoming(
+    {
+      id: "locked-transition",
+      bashoId: basho.id,
+      displayName: "Locked",
+      ownerUserId: "fixture-owner",
+    },
+    [
+      { teamId: "locked-transition", rikishiId: "onosato" },
+      { teamId: "locked-transition", rikishiId: "kotozakura" },
+    ],
+  );
+  const cookie = await login(adminEmail);
+  for (const action of ["lock-picks", "undo-start"])
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/api/admin/basho/${basho.id}/${action}`,
+        })
+      ).statusCode,
+    ).toBe(403);
+  const action = async (name: string) =>
+    app.inject({
+      method: "POST",
+      url: `/api/admin/basho/${basho.id}/${name}`,
+      headers: { cookie },
+    });
+  expect((await action("lock-picks")).json().basho).toMatchObject({
+    status: "locked",
+    currentDay: 0,
+  });
+  const lockedAt = (await repos.getFantasyTeam("locked-transition"))!.lockedAt;
+  expect(lockedAt).toBeTruthy();
+  expect((await action("start")).statusCode).toBe(200);
+  expect((await action("undo-start")).json().basho.status).toBe("locked");
+  expect((await repos.getFantasyTeam("locked-transition"))!.lockedAt).toBe(
+    lockedAt,
+  );
+  const player = await login("another@example.com");
+  expect(
+    (
+      await app.inject({
+        method: "POST",
+        url: `/api/basho/${basho.id}/teams`,
+        headers: { cookie: player },
+        payload: { displayName: "Late", rikishiIds: ["onosato", "kotozakura"] },
+      })
+    ).statusCode,
+  ).toBe(409);
+  await action("start");
+  await repos.insertBoutResult({
+    id: "partial-result",
+    bashoId: basho.id,
+    day: 1,
+    winnerRikishiId: "onosato",
+    loserRikishiId: "kotozakura",
+  });
+  expect((await action("undo-start")).statusCode).toBe(409);
+  expect((await repos.getBasho(basho.id))!.status).toBe("active");
+});

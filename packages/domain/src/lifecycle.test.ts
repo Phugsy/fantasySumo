@@ -124,3 +124,42 @@ describe("basho lifecycle", () => {
     );
   });
 });
+
+it("locks original picks independently and reverses a result-free start into locked", () => {
+  const basho = {
+    id: "2026-11",
+    isDemo: false,
+    name: "November",
+    startDate: "2026-11-08",
+    endDate: "2026-11-22",
+    currentDay: 0,
+    status: "upcoming" as const,
+  };
+  expect(
+    getBashoLifecycleTransition(basho, "lock-picks", { hasResults: false }),
+  ).toMatchObject({ allowed: true, nextStatus: "locked" });
+  expect(
+    getBashoLifecycleTransition({ ...basho, status: "active" }, "undo-start", {
+      hasResults: false,
+    }),
+  ).toMatchObject({ allowed: true, nextStatus: "locked" });
+  expect(
+    getBashoLifecycleTransition({ ...basho, status: "active" }, "undo-start", {
+      hasResults: true,
+    }).allowed,
+  ).toBe(false);
+  expect(
+    getBashoLifecycleTransition(
+      { ...basho, status: "active", currentDay: 1 },
+      "undo-start",
+      { hasResults: false },
+    ).allowed,
+  ).toBe(false);
+  expect(
+    getBashoLifecycleTransition(
+      { ...basho, status: "complete" },
+      "undo-start",
+      { hasResults: false },
+    ).allowed,
+  ).toBe(false);
+});
