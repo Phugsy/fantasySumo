@@ -27,8 +27,7 @@ globalStyle("body", {
   margin: "0",
   minWidth: "320px",
   minHeight: "100vh",
-  background:
-    "linear-gradient(rgb(255 253 248 / 70%), rgb(255 253 248 / 70%)),\n    repeating-linear-gradient(\n      135deg,\n      transparent 0,\n      transparent 18px,\n      rgb(24 50 71 / 2.5%) 18px,\n      rgb(24 50 71 / 2.5%) 19px\n    )",
+  background: vars.canvas,
 });
 
 globalStyle("button, input", {
@@ -51,6 +50,8 @@ globalStyle("h1", {
   marginBottom: "8px",
   color: "var(--indigo-deep)",
   fontSize: "clamp(2rem, 4vw, 2.75rem)",
+  fontFamily: vars.displayFont,
+  fontWeight: 400,
   letterSpacing: "-0.035em",
   lineHeight: "1.05",
 });
@@ -58,7 +59,9 @@ globalStyle("h1", {
 globalStyle("h2", {
   marginBottom: "0",
   color: vars.heading,
-  fontSize: "1.25rem",
+  fontFamily: vars.displayFont,
+  fontWeight: 500,
+  fontSize: "1.5rem",
   letterSpacing: "-0.01em",
   lineHeight: "1.2",
 });

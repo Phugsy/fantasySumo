@@ -3,7 +3,7 @@ import type { PickCompositionMode, ScoringMode } from "@fantasy-sumo/domain";
 import { scoringModeLabel } from "../scoring-view";
 import type { FormEvent } from "react";
 import type { CreatedTeamResponse, RankedRikishi } from "../types";
-import "./TeamSelection.css";
+import { root as paperRoot } from "./TeamSelection.css";
 import { useDisplayPreferences } from "../DisplayPreferences";
 import { sortRikishi } from "../display-preferences";
 import { PhotoCredits, RikishiPhoto } from "./RikishiPhoto";
@@ -60,7 +60,7 @@ export function TeamSelection({
   const displayedRikishi = sortRikishi(rikishi, preferences.order);
 
   return (
-    <form className="selection-layout" onSubmit={onSubmit}>
+    <form className={`selection-layout ${paperRoot}`} onSubmit={onSubmit}>
       <section className="rikishi-section" aria-labelledby="rikishi-title">
         <div className="section-heading">
           <p className="eyebrow">Banzuke</p>
@@ -107,8 +107,7 @@ export function TeamSelection({
                 type="button"
                 aria-pressed={isSelected}
               >
-                <span className="rank-pill">{entry.rank}</span>
-                <span className={identity}>
+                <span className={`rikishi-identity ${identity}`}>
                   {preferences.photos && (
                     <RikishiPhoto
                       photo={entry.photo}
@@ -116,6 +115,7 @@ export function TeamSelection({
                     />
                   )}
                   <span>
+                    <span className="rank-pill">{entry.rank}</span>
                     <strong>{entry.shikona}</strong>
                     {entry.heya !== undefined && <small>{entry.heya}</small>}
                     <PreviousBashoRecord entry={entry} />
