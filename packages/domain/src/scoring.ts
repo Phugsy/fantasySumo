@@ -61,6 +61,7 @@ export function calculateTeamScore(
   return {
     teamId: team.id,
     displayName: team.displayName,
+    ...(team.ownerName === undefined ? {} : { ownerName: team.ownerName }),
     score: rikishiScores.reduce(
       (total, rikishiScore) => total + rikishiScore.score,
       0,

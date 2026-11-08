@@ -87,6 +87,27 @@ it("distinguishes two owned rikishi in the same bout and sends the selected immu
     await screen.findByText(/2 of 3 jokers remaining/),
   ).toBeInTheDocument();
 });
+
+it("distinguishes an unimported card from a published day with no eligible owned bout", async () => {
+  const missing = snapshot();
+  missing.windows[0]!.status = "unavailable";
+  missing.windows[0]!.targets = [];
+  vi.mocked(fetchMyJokers).mockResolvedValue({ snapshot: missing });
+  const view = render(<JokerPanel bashoId="missing" names={{}} />);
+  expect(
+    await screen.findByText(/published schedule is not available/),
+  ).toBeInTheDocument();
+  expect(screen.getByLabelText("Joker rikishi")).toBeDisabled();
+  view.unmount();
+  const published = snapshot();
+  published.windows[0]!.targets = [];
+  vi.mocked(fetchMyJokers).mockResolvedValue({ snapshot: published });
+  render(<JokerPanel bashoId="no-target" names={{}} />);
+  expect(
+    await screen.findByText(/no eligible published bout/),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Save joker" })).toBeDisabled();
+});
 it("closes the displayed window at cutoff independently of the browser wall-clock date", async () => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-11-01T10:00:00.000Z"));

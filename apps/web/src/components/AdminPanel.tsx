@@ -1,3 +1,4 @@
+import { selectControl } from "../styles/select.css";
 import { DemoJokerControls } from "./DemoJokerControls";
 import { LiveJokerControls } from "./LiveJokerControls";
 import type { ScoringMode } from "@fantasy-sumo/domain";
@@ -48,6 +49,8 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
   const [scoringModeDraft, setScoringModeDraft] =
     useState<ScoringMode>("wins-v0");
   const [teamSizeDraft, setTeamSizeDraft] = useState("2");
+  const [overrideScoring, setOverrideScoring] = useState(false);
+  const [overrideReason, setOverrideReason] = useState("");
   const [importDay, setImportDay] = useState("1");
   const [dryRun, setDryRun] = useState(true);
   const [importReport, setImportReport] = useState<AdminImportResponse | null>(
@@ -83,6 +86,8 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
         if (!isCurrent) return;
         setBasho(response.basho);
         setGameConfig(config);
+        setOverrideScoring(false);
+        setOverrideReason("");
         setScoringModeDraft(config.gameConfig.scoringMode);
         setTeamSizeDraft(String(config.gameConfig.teamSize));
         setLoadState("ready");
@@ -265,12 +270,34 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
   }
 
   async function saveScoringMode() {
-    if (basho === null) return;
+    if (basho === null || gameConfig === null) return;
+    const override = !gameConfig.canChangeScoringMode;
+    if (
+      override &&
+      (!gameConfig.canOverrideScoringMode ||
+        !overrideScoring ||
+        overrideReason.trim().length < 8)
+    )
+      return;
+    if (
+      override &&
+      !window.confirm(
+        `Change official scoring for ${basho.name} from ${scoringModeLabel(gameConfig.gameConfig.scoringMode)} to ${scoringModeLabel(scoringModeDraft)}? This recalculates the whole tournament, joker bonuses, history and cumulative standings. Picks and results stay intact.`,
+      )
+    )
+      return;
     setPendingAction("scoring");
     setErrorMessage(null);
     setMessage(null);
     try {
-      await updateAdminScoringMode(basho.id, scoringModeDraft);
+      if (override)
+        await updateAdminScoringMode(basho.id, scoringModeDraft, {
+          reason: overrideReason.trim(),
+          expectedMode: gameConfig.gameConfig.scoringMode,
+        });
+      else await updateAdminScoringMode(basho.id, scoringModeDraft);
+      setOverrideScoring(false);
+      setOverrideReason("");
       const config = await fetchAdminGameConfig(basho.id);
       if (!isMountedRef.current) return;
       setGameConfig(config);
@@ -592,9 +619,16 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
                 >
                   <label htmlFor="admin-scoring-mode">Scoring mode</label>
                   <select
+                    className={selectControl}
                     id="admin-scoring-mode"
                     value={scoringModeDraft}
-                    disabled={pending || !gameConfig.canChangeScoringMode}
+                    disabled={
+                      pending ||
+                      !(
+                        gameConfig.canChangeScoringMode ||
+                        (gameConfig.canOverrideScoringMode && overrideScoring)
+                      )
+                    }
                     onChange={(event) =>
                       setScoringModeDraft(event.target.value as ScoringMode)
                     }
@@ -609,18 +643,81 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
                   <p>
                     {gameConfig.canChangeScoringMode
                       ? "Rules can change until picks lock. Players see the saved rules."
-                      : "Official scoring is permanently locked for this basho."}
+                      : "Official scoring is locked. Only the configured site owner can explicitly override and recalculate it."}
                   </p>
+                  {!gameConfig.canChangeScoringMode &&
+                    gameConfig.canOverrideScoringMode && (
+                      <>
+                        <label className="admin-owner-confirmation">
+                          <input
+                            type="checkbox"
+                            checked={overrideScoring}
+                            disabled={pending}
+                            onChange={(event) =>
+                              setOverrideScoring(event.target.checked)
+                            }
+                          />
+                          Override locked scoring and recalculate the whole
+                          tournament
+                        </label>
+                        {overrideScoring && (
+                          <>
+                            <label htmlFor="owner-scoring-reason">
+                              Reason for scoring change
+                            </label>
+                            <input
+                              id="owner-scoring-reason"
+                              value={overrideReason}
+                              maxLength={500}
+                              minLength={8}
+                              required
+                              disabled={pending}
+                              onChange={(event) =>
+                                setOverrideReason(event.target.value)
+                              }
+                            />
+                            <p>
+                              This owner action records your account, reason,
+                              old/new mode and time. Ordinary administrator
+                              permissions remain unchanged.
+                            </p>
+                          </>
+                        )}
+                      </>
+                    )}
                   <button
                     type="submit"
                     className="primary-button"
-                    disabled={pending || !gameConfig.canChangeScoringMode}
+                    disabled={
+                      pending ||
+                      !(
+                        gameConfig.canChangeScoringMode ||
+                        (gameConfig.canOverrideScoringMode &&
+                          overrideScoring &&
+                          overrideReason.trim().length >= 8)
+                      )
+                    }
                   >
                     Save scoring mode
                   </button>
                   <span className="admin-config-source">
                     {gameConfig.gameConfig.scoringMode}
                   </span>
+                  {(gameConfig.scoringOverrides?.length ?? 0) > 0 && (
+                    <details>
+                      <summary>Scoring override history</summary>
+                      <ul>
+                        {gameConfig.scoringOverrides!.map((entry) => (
+                          <li key={entry.id}>
+                            {scoringModeLabel(entry.fromMode)} →{" "}
+                            {scoringModeLabel(entry.toMode)} ·{" "}
+                            {new Date(entry.changedAt).toLocaleString()} ·{" "}
+                            {entry.reason} · account {entry.actorUserId}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
                 </form>
               </div>
             </section>
@@ -716,6 +813,34 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
                 onClick={() =>
                   runAction("open-picks", {
                     success: "Picks are open for the live basho.",
+                  })
+                }
+              />
+              <AdminAction
+                description="Close original team selection without starting the basho or importing results."
+                disabled={pending || basho.status !== "upcoming"}
+                label="Lock picks"
+                onClick={() =>
+                  runAction("lock-picks", {
+                    confirmation:
+                      "Lock original team picks without starting scoring?",
+                    success: "Picks locked. The basho has not started.",
+                  })
+                }
+              />
+              <AdminAction
+                description="Return to locked before any day progress or stored result. Original picks stay locked."
+                disabled={
+                  pending ||
+                  basho.status !== "active" ||
+                  (basho.currentDay ?? 0) > 0
+                }
+                label="Undo start"
+                onClick={() =>
+                  runAction("undo-start", {
+                    confirmation:
+                      "Undo this start? This is allowed only with no progress or results. Picks will remain locked.",
+                    success: "Start undone. Picks remain locked.",
                   })
                 }
               />

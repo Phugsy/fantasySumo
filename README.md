@@ -66,6 +66,7 @@ Start here:
 - `docs/E2E_TESTING.md` - intended Playwright E2E strategy for the MVP game loop.
 - `docs/STYLING.md` - vanilla-extract conventions, shared tokens, and incremental conversion of existing component CSS.
 - `docs/DISPLAY_PREFERENCES.md` - browser-local sorting, photos, attribution, and system/light/dark themes.
+- `docs/UAT.md` - owner acceptance, preview-in-place workflow and regression test card.
 - `docs/MODERNISATION_PLAN.md` - safe path for updating or rebuilding the app.
 - `docs/ROADMAP.md` - staged product/engineering roadmap.
 

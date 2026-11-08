@@ -1,3 +1,4 @@
+import { selectControl } from "../styles/select.css";
 import { useEffect, useRef, useState } from "react";
 import {
   fetchMyJokers,
@@ -185,9 +186,23 @@ export function JokerPanel({
               minutes.
             </p>
           )}
+          {pickWindow.status === "unavailable" && (
+            <p>
+              The published schedule is not available for this day. An
+              administrator can import it manually; the morning schedule job
+              also retries.
+            </p>
+          )}
+          {pickWindow.status !== "unavailable" &&
+            pickWindow.targets.length === 0 && (
+              <p>
+                Your stable has no eligible published bout for this Japan day.
+              </p>
+            )}
           <label className={styles.field}>
             Joker rikishi
             <select
+              className={selectControl}
               value={target}
               disabled={!open || busy}
               onChange={(e) =>
@@ -252,6 +267,17 @@ export function JokerPanel({
       {!pickWindow && (
         <>
           <p>No Pick Window today. Jokers follow the basho dates in Japan.</p>
+          {data.windows.find(
+            (window) => window.deadline.slice(0, 10) > japanDate,
+          ) && (
+            <p>
+              The next Japan day's window is{" "}
+              {data.windows
+                .find((window) => window.deadline.slice(0, 10) > japanDate)!
+                .deadline.slice(0, 10)}
+              . Future cards cannot be selected in this panel.
+            </p>
+          )}
           <button type="button" disabled={busy} onClick={() => void refresh()}>
             Refresh joker window
           </button>

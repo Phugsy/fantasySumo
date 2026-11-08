@@ -43,6 +43,42 @@ settings and the direct type dependency; each deployment also runs
 
 ## Automated release path
 
+### Schedule recovery and owner corrections
+
+`GET /api/cron/import-schedule` uses the same server-only `CRON_SECRET` bearer
+boundary as results imports. Its separate daily job runs at **01:00 UTC
+(10:00 JST)**, ahead of the noon JST joker deadline. It attempts the current and
+following published Makuuchi cards, including opening cards from two days before
+the basho. It does not start/lock a basho or import outcomes. Demo and completed
+bashos are excluded. Already scored days are skipped; existing transactional
+import guards also preserve complete result-verification cards against a racing
+schedule-only retry. Unavailable responses preserve stored schedules and return
+a logged partial result. Manual Admin schedule import remains available for
+late publications or source outages. The 11:00 UTC results job and its
+following-card attempt remain in place. This adds one daily job on the existing
+Vercel project, without another service; cron timing is not the joker authority.
+Server time and persisted schedule evidence still enforce every deadline.
+
+`SUPER_ADMIN_USER_IDS` is a separate, comma-separated allowlist of verified auth
+user IDs. Empty means owner scoring overrides are disabled. Never use email
+addresses, client-provided role fields or a public `VITE_` variable for it.
+Super-admin IDs also have normal admin access; ordinary `ADMIN_USER_IDS` entries
+cannot override locked scoring. Configure the owner's actual **Preview account
+ID** for UAT and the Production account ID only with the release. Do not assume
+separate auth tenants use the same user ID. Existing deployment configurations
+work unchanged when this optional variable is absent.
+
+For this UAT batch, keep one branch/PR Preview and update it in place. Preserve
+its test accounts and fixture state across ordinary code updates; reset test
+data only deliberately. Owner acceptance is separate from automated checks;
+use [the test card](UAT.md) before requesting a production release.
+
+Live Admin now has **Lock picks** independently of **Start the basho**. **Undo
+start** returns active → locked only at day 0 with no stored results; it retains
+team lock timestamps, picks, rules and jokers. Reopening original picks remains
+the separate **Open picks** action. These transitions recheck their guards in
+the same repository transaction used for the lifecycle update.
+
 Hosted deployments are owned by GitHub Actions:
 
 - `.github/workflows/deploy-preview.yml` runs for same-repository pull request
@@ -252,7 +288,41 @@ contain request-derived values; runtime logs also persist and may later be
 forwarded to other systems. The stable error name and code provide the useful
 failure classification without that exposure.
 
-Neon Auth also requires each deployed app origin to be added as a trusted domain in Neon Console -> Auth -> Configuration -> Domains. Add the exact production and preview origins with protocol and no trailing slash, for example `https://fantasy-sumo.vercel.app`. Wildcard subdomains are not supported, so each Vercel preview domain that needs auth testing must be added explicitly.
+Neon Auth requires the browser's origin in the correct branch's trusted domains
+(Neon Console → Auth → Configuration → Domains). Include `https://` and omit
+the trailing slash. An API health check alone does not verify this setting.
+
+### Fixed address for owner UAT
+
+Use **https://fantasy-sumo-uat-phuggo.vercel.app** for owner UAT, rather than the
+new immutable deployment URL from each build. Add that one exact origin to the
+**Preview auth branch** once. Keep the existing Production origins in their
+own auth configuration. The alias serves the Preview deployment directly, so
+email verification and `/reset-password` links use the same fixed origin.
+
+Set the **repository** Actions variable `UAT_BRANCH` to the branch currently
+under owner review, for example `codex/uat-feedback-fixes`. Do not make this an
+environment-only variable: the resolve job also needs it. Only that branch's
+successful preview run updates the fixed address, after validation, browser
+E2E, migrations and deployment smoke checks. A fresh branch-head check rejects
+stale builds before alias assignment. Other PR previews keep their own URLs;
+an unset variable leaves the fixed address unchanged. `master` is rejected.
+
+For an environment-only redeploy, dispatch Deploy Preview with `ref` set to the
+selected **branch name**. This resolves and validates its immutable SHA, pulls
+that branch's Preview configuration, and updates UAT after the same gates.
+Dispatching an exact SHA still creates an immutable preview but does not move
+the UAT alias. The workflow summary records both URLs and the deployed SHA.
+
+Changing the selected branch deliberately replaces the build under review;
+record the new SHA and preserve the Preview accounts/data across code updates.
+This uses an alias on the existing Vercel project and adds no service or data
+reset. Confirm sign-in/register on the fixed address before handing it to the
+owner; a missing trusted origin remains a UAT blocker even when smoke is green.
+
+Neon's current [domain documentation](https://neon.com/docs/auth/guides/configure-domains)
+also supports scoped wildcard patterns, but this setup uses one exact UAT
+origin. Do not trust a shared suffix such as `https://*.vercel.app`.
 
 ### Password-reset email and redirect setup
 
@@ -284,8 +354,8 @@ For every production or preview branch used for auth testing:
    reset for an unknown address and confirm the UI shows the same neutral
    acknowledgement.
 
-Preview origins are not wildcarded. Each preview used for a real email test
-must be trusted explicitly, and its Neon Auth branch/email configuration must
+Use the fixed UAT origin for real email tests. An immutable preview URL used
+instead must also be trusted, and its Neon Auth branch/email configuration must
 be checked independently. Local `AUTH_MODE=local` deliberately has no password
 reset flow.
 

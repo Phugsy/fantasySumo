@@ -8,9 +8,32 @@ Decision for #92, agreed 6 September 2026. Each basho has its own persisted,
 versioned mode. New and migrated bashos default to `wins-v0`. Administrators
 may select `achievements-v1` until picks first lock, including after teams have
 been submitted. This agreed lock point supersedes the issue's initial suggestion
-to freeze rules before picks open. Once locked, the mode cannot change, including
-when an administrator reopens picks. Different future values require a new
+to freeze rules before picks open. Once locked, ordinary administrators cannot
+change the mode, including when picks reopen. The explicit site-owner override
+below is the owner-approved exception added after 7 November UAT. Different future values require a new
 versioned mode; never change the meaning of either existing identifier.
+
+## Site-owner correction
+
+Only verified user IDs in the server-only `SUPER_ADMIN_USER_IDS` allowlist may
+override a locked official mode, including after results or completion. The
+owner confirms a full-tournament rescore and gives an 8–500 character reason.
+The request includes the mode they reviewed; a conflicting current mode returns
+409 rather than silently overwriting another correction. Ordinary administrators
+keep the original lock policy, and league-specific roles are not introduced.
+
+The transaction locks the basho row on Postgres (an immediate transaction on
+SQLite), updates its mode and any demo/live joker base mode together, and appends
+an audit entry with actor, reason, old/new mode and server time. Audit failure
+rolls the entire change back. Unchanged retries do not add duplicate entries.
+Picks, stored results and accepted joker allocations are retained. Scores,
+per-day history, My Stable, tournament history and all-time standings are derived
+again from the original facts under the new saved mode. The ordinary scoring-lock
+flag remains set. The owner can inspect the latest 20 override events in Admin.
+
+The additive `basho_scoring_overrides` table is introduced by SQLite migration
+0011 and Postgres migration 0010. Older application code ignores the table and
+continues respecting the saved lock; rollback never removes the audit schema.
 
 | Event                                              |       `wins-v0` | `achievements-v1` | Timing and conditions                                                                               |
 | -------------------------------------------------- | --------------: | ----------------: | --------------------------------------------------------------------------------------------------- |

@@ -731,6 +731,34 @@ describe("basho routes", () => {
     });
   });
 
+  it("shows the owner display name on tournament and all-time boards without exposing account identifiers", async () => {
+    const repositories = createRepositories(client);
+    const headers = await signIn();
+    await app.inject({
+      method: "POST",
+      url: "/api/basho/2026-05/teams",
+      headers,
+      payload: {
+        displayName: "Named Stable",
+        rikishiIds: ["onosato", "kotozakura"],
+      },
+    });
+    const board = (await app.inject("/api/basho/2026-05/leaderboard")).json();
+    const entry = board.leaderboard.find(
+      (row: { displayName: string }) => row.displayName === "Named Stable",
+    );
+    expect(entry).toMatchObject({ ownerName: "New Player" });
+    expect(entry).not.toHaveProperty("ownerUserId");
+    expect(entry).not.toHaveProperty("email");
+    await repositories.updateBasho({ ...sampleBasho, status: "complete" });
+    const allTime = (await app.inject("/api/leaderboard/all-time")).json();
+    expect(
+      allTime.leaderboard.find(
+        (row: { displayName: string }) => row.displayName === "Named Stable",
+      ),
+    ).toMatchObject({ ownerName: "New Player" });
+  });
+
   it("uses the stored upcoming status rather than the current date", async () => {
     await app.close();
     app = buildApp({

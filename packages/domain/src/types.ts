@@ -184,6 +184,7 @@ export interface ScoringOptions {
 export interface TeamScore {
   teamId: FantasyTeam["id"];
   displayName: FantasyTeam["displayName"];
+  ownerName?: string;
   score: number;
   breakdown?: ScoreBreakdown;
   rikishiScores: RikishiScore[];
