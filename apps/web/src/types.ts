@@ -1,9 +1,11 @@
 import type {
   PickCompositionMode,
+  BashoFantasyFinish,
   ScoreBreakdown,
   ScoringMode,
 } from "@fantasy-sumo/domain";
 export interface Basho {
+  finish?: BashoFantasyFinish;
   pickCompositionMode?: PickCompositionMode;
   jokerTrial?: boolean;
   id: string;
@@ -153,6 +155,7 @@ export interface SessionResponse {
 }
 
 export interface LeaderboardResponse {
+  finish?: BashoFantasyFinish;
   jokerTrial?: boolean;
   basho: Omit<Basho, "teamSize">;
   bashoId: string;
@@ -167,6 +170,9 @@ export interface BashoArchiveResponse {
 }
 
 export interface AllTimeLeaderboardResponse {
+  honoursBashoCount?: number;
+  latestFinish?: BashoFantasyFinish | null;
+  finishes?: BashoFantasyFinish[];
   bashoCount: number;
   leaderboard: Array<{
     rank: number;
@@ -174,6 +180,8 @@ export interface AllTimeLeaderboardResponse {
     ownerName?: string;
     score: number;
     tournamentsPlayed: number;
+    yushoCount?: number;
+    junYushoCount?: number;
     bashos: Array<{
       bashoId: string;
       bashoName: string;

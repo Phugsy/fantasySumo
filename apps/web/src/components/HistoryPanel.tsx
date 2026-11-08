@@ -11,12 +11,15 @@ import type {
   MyHistoryResponse,
 } from "../types";
 import "./HistoryPanel.css";
+import { BashoFinishSummary, CompletedBashoStandings } from "./BashoFinish";
+import { counts } from "./BashoFinish.css";
 
 interface HistoryPanelProps {
   signedIn: boolean;
+  selectedBashoId?: string;
 }
 
-export function HistoryPanel({ signedIn }: HistoryPanelProps) {
+export function HistoryPanel({ signedIn, selectedBashoId }: HistoryPanelProps) {
   const [archive, setArchive] = useState<BashoArchiveResponse | null>(null);
   const [allTime, setAllTime] = useState<AllTimeLeaderboardResponse | null>(
     null,
@@ -82,6 +85,12 @@ export function HistoryPanel({ signedIn }: HistoryPanelProps) {
 
   return (
     <div className="history-layout">
+      {selectedBashoId &&
+      archive.bashos.some((basho) => basho.id === selectedBashoId) ? (
+        <CompletedBashoStandings bashoId={selectedBashoId} />
+      ) : (
+        <BashoFinishSummary finish={allTime.latestFinish} />
+      )}
       <section className="history-panel" aria-labelledby="all-time-title">
         <div className="section-heading history-heading">
           <div>
@@ -90,6 +99,10 @@ export function HistoryPanel({ signedIn }: HistoryPanelProps) {
           </div>
           <strong>{allTime.bashoCount} scored tournaments</strong>
         </div>
+        <p className="history-empty">
+          Fantasy titles from {allTime.honoursBashoCount ?? 0} fully verified
+          tournaments. Shared first has no runner-up.
+        </p>
         {allTime.leaderboard.length === 0 ? (
           <p className="history-empty">
             Scores will appear once a basho is complete.
@@ -103,6 +116,10 @@ export function HistoryPanel({ signedIn }: HistoryPanelProps) {
                   <strong>{entry.displayName}</strong>
                   <small>{entry.ownerName ?? "Owner unavailable"}</small>
                   <small>{entry.tournamentsPlayed} tournaments</small>
+                  <span className={counts}>
+                    <span>Yusho: {entry.yushoCount ?? 0}</span>
+                    <span>Jun-yusho: {entry.junYushoCount ?? 0}</span>
+                  </span>
                 </span>
                 <strong>{entry.score} pts</strong>
               </li>
@@ -124,6 +141,11 @@ export function HistoryPanel({ signedIn }: HistoryPanelProps) {
                 <span>
                   {basho.startDate} – {basho.endDate}
                 </span>
+                {basho.status === "complete" && (
+                  <a href={`/history?basho=${encodeURIComponent(basho.id)}`}>
+                    View standings
+                  </a>
+                )}
               </div>
               <span className={`history-status history-status-${basho.status}`}>
                 {basho.status}
