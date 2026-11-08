@@ -88,7 +88,9 @@ describe("TeamSelection", () => {
     expect(screen.getByRole("button", { name: /Hoshoryu/ })).toBeDisabled();
     expect(
       screen.getByRole("button", { name: /Hoshoryu/ }),
-    ).toHaveAccessibleName(/no more than two sanyaku/);
+    ).toHaveAccessibleName(
+      /The sanyaku limit is 2\. Please choose a Maegashira rikishi\./,
+    );
     expect(screen.getByRole("button", { name: /Tobizaru/ })).toBeEnabled();
     expect(
       within(screen.getByRole("region", { name: "Choose rikishi" })).getByRole(
@@ -126,13 +128,13 @@ describe("TeamSelection", () => {
     });
     expect(
       screen.getByRole("button", { name: /Same Heya/ }),
-    ).toHaveAccessibleName(/one rikishi from each heya/);
+    ).toHaveAccessibleName(/Please choose one from another stable\./);
     expect(
       screen.getByRole("button", { name: /Unknown Heya/ }),
     ).toHaveAccessibleName(/Verified rank and heya unavailable/);
     expect(screen.getByRole("button", { name: "Submit team" })).toBeDisabled();
     expect(screen.getByRole("alert")).toHaveTextContent(
-      /no more than two sanyaku/,
+      /The sanyaku limit is 2\. Please choose a Maegashira rikishi\./,
     );
     expect(
       screen.getByRole("button", { name: "Remove Hoshoryu" }),

@@ -86,11 +86,20 @@ describe("selection limits API", () => {
   });
 
   it.each([
-    { ids: ["onosato", "hoshoryu", "kotozakura"], code: "sanyaku-limit" },
-    { ids: ["kirishima", "tobizaru", "ura"], code: "duplicate-heya" },
+    {
+      ids: ["onosato", "hoshoryu", "kotozakura"],
+      code: "sanyaku-limit",
+      message: "The sanyaku limit is 2. Please choose a Maegashira rikishi.",
+    },
+    {
+      ids: ["kirishima", "tobizaru", "ura"],
+      code: "duplicate-heya",
+      message:
+        "You already have a rikishi from this stable (heya). Please choose one from another stable.",
+    },
   ])(
     "rejects $code for create and replacement without losing the existing team",
-    async ({ ids, code }) => {
+    async ({ ids, code, message }) => {
       const post = (rikishiIds: string[], displayName = "Original") =>
         app.inject({
           method: "POST",
@@ -102,7 +111,7 @@ describe("selection limits API", () => {
       expect(rejected.statusCode).toBe(400);
       expect(rejected.json()).toMatchObject({
         error: "invalid-picks",
-        details: [{ code }],
+        details: [{ code, message }],
       });
       expect(
         (await app.inject({ url: `/api/basho/${basho.id}/my-team`, headers }))
@@ -120,7 +129,7 @@ describe("selection limits API", () => {
         expect(response.statusCode).toBe(400);
         expect(response.json()).toMatchObject({
           error: "invalid-picks",
-          details: [{ code }],
+          details: [{ code, message }],
         });
         const saved = (
           await app.inject({ url: `/api/basho/${basho.id}/my-team`, headers })

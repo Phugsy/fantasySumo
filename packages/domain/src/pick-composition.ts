@@ -77,7 +77,8 @@ export function validatePickComposition(
       errors.push({
         code: "duplicate-heya",
         rikishiId,
-        message: "Choose no more than one rikishi from each heya.",
+        message:
+          "You already have a rikishi from this stable (heya). Please choose one from another stable.",
       });
     }
     seenHeya.add(heya);
@@ -85,8 +86,7 @@ export function validatePickComposition(
   if (sanyaku > 2)
     errors.push({
       code: "sanyaku-limit",
-      message:
-        "Choose no more than two sanyaku (Yokozuna, Ozeki, Sekiwake or Komusubi).",
+      message: "The sanyaku limit is 2. Please choose a Maegashira rikishi.",
     });
   return errors;
 }

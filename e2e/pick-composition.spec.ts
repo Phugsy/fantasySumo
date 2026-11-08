@@ -50,13 +50,17 @@ test("explains selection limits, saves corrected picks and preserves locking", a
     await pick("Onosato").click();
     await pick("Hoshoryu").click();
     await expect(pick("Kotozakura")).toBeDisabled();
-    await expect(pick("Kotozakura")).toContainText(/no more than two sanyaku/);
+    await expect(pick("Kotozakura")).toContainText(
+      /The sanyaku limit is 2\. Please choose a Maegashira rikishi\./,
+    );
     await expect(pick("Ura")).toBeEnabled();
     await page.getByRole("button", { name: "Remove Hoshoryu" }).click();
     await expect(pick("Kotozakura")).toBeEnabled();
     await pick("Kirishima").click();
     await expect(pick("Tobizaru")).toBeDisabled();
-    await expect(pick("Tobizaru")).toContainText(/one rikishi from each heya/);
+    await expect(pick("Tobizaru")).toContainText(
+      /Please choose one from another stable\./,
+    );
     await pick("Ura").click();
     await expect(
       page.getByRole("button", { name: "Remove Kirishima" }),
