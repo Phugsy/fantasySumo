@@ -1,3 +1,7 @@
+import { scoringPreset } from "@fantasy-sumo/domain";
+import { stack } from "../styles/flow.css";
+import { RankBadge, RankedPortrait } from "./RankBadge";
+import { rankedPortrait } from "./RankBadge.css";
 import { JokerPanel } from "./JokerPanel";
 import { ScoreBreakdown } from "./ScoreBreakdown";
 import { scoringModeLabel } from "../scoring-view";
@@ -17,7 +21,7 @@ import { RikishiTournamentBadges } from "./RikishiTournamentBadges";
 import { root as paperRoot } from "./MyStablePanel.css";
 import { useDisplayPreferences } from "../DisplayPreferences";
 import { sortRikishi } from "../display-preferences";
-import { PhotoCredits, RikishiPhoto } from "./RikishiPhoto";
+import { PhotoCredits } from "./RikishiPhoto";
 import { identity } from "./RikishiPhoto.css";
 
 interface MyStablePanelProps {
@@ -90,7 +94,7 @@ export function MyStablePanel({
 
   return (
     <section
-      className={`stable-panel ${paperRoot}`}
+      className={`stable-panel ${paperRoot} ${stack}`}
       aria-labelledby="stable-title"
     >
       <div className="stable-heading">
@@ -141,7 +145,7 @@ export function MyStablePanel({
         <h3>Selected rikishi</h3>
         {myTeam.picks.some(hasTournamentNotes) && (
           <p className="tournament-notes-disclaimer">
-            {myTeam.scoringMode === "achievements-v1"
+            {scoringPreset(myTeam.scoringMode ?? "wins-v0").achievements
               ? "Points follow the official scoring rules; the category breakdown shows each bonus."
               : "Tournament badges are informational and do not add fantasy points."}
           </p>
@@ -150,16 +154,19 @@ export function MyStablePanel({
       <ul className="stable-picks" aria-label="Your selected rikishi">
         {displayedPicks.map((pick) => (
           <li key={pick.rikishiId}>
-            <div className="stable-rikishi">
+            <div
+              className={`stable-rikishi ${preferences.photos ? rankedPortrait : ""}`}
+            >
               <span className={identity}>
                 {preferences.photos && (
-                  <RikishiPhoto
+                  <RankedPortrait
+                    rank={pick.rank ?? "Unranked"}
                     photo={pick.photo}
                     illustration={pick.illustration}
                   />
                 )}
                 <span>
-                  <span className="rank-pill">{pick.rank ?? "Unranked"}</span>
+                  <RankBadge rank={pick.rank ?? "Unranked"} />
                   <strong>{pick.shikona}</strong>
                   {pick.heya !== undefined && <small>{pick.heya}</small>}
                   <RikishiTournamentBadges

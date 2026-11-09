@@ -44,7 +44,7 @@ format: ## Format files with Prettier.
 format-check: ## Check Prettier formatting.
 	$(PNPM) format:check
 
-check: deployment-verify pilot-test ## Run the main pre-PR validation suite.
+check: deployment-verify pilot-test timings-test ## Run the main pre-PR validation suite.
 	$(PNPM) lint
 	$(PNPM) format:check
 	$(PNPM) test
@@ -112,3 +112,7 @@ attach-rikishi-identity: ## Attach an operator-verified provider ID to an existi
 
 clean: ## Remove generated build artifacts.
 	rm -rf apps/api/dist apps/web/dist packages/db/dist packages/domain/dist
+
+.PHONY: timings-test
+timings-test: ## Verify protected API timing comparison safety and sampling.
+	node --test scripts/compare-api-timings.test.mjs

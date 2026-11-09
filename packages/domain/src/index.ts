@@ -96,3 +96,10 @@ export {
   resolveJoker,
 } from "./jokers.js";
 export type { JokerSelection, JokerAllocation, JokerFacts } from "./jokers.js";
+
+export { SCORING_MODES } from "./types.js";
+export {
+  SCORING_PRESETS,
+  scoringPreset,
+  projectScoreBreakdown,
+} from "./scoring-presets.js";

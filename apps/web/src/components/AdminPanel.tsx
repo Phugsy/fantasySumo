@@ -2,7 +2,7 @@ import { selectControl } from "../styles/select.css";
 import { DemoJokerControls } from "./DemoJokerControls";
 import { LiveJokerControls } from "./LiveJokerControls";
 import type { ScoringMode } from "@fantasy-sumo/domain";
-import { scoringModeLabel } from "../scoring-view";
+import { scoringModeLabel, scoringModeSummary } from "../scoring-view";
 import { useEffect, useRef, useState } from "react";
 import {
   ApiRequestError,
@@ -28,6 +28,7 @@ import type {
   ImportEntitySummary,
 } from "../types";
 import "./AdminPanel.css";
+import { feedback } from "./AdminFeedback.css";
 
 interface AdminPanelProps {
   onPlayerDataRefresh: () => Promise<void>;
@@ -635,11 +636,11 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
                   >
                     <option value="wins-v0">One point per win</option>
                     <option value="achievements-v1">Wins + achievements</option>
+                    <option value="achievements-v2">
+                      Wins + achievements · achievement focus
+                    </option>
                   </select>
-                  <p>
-                    +1 per win. Achievements add +2 per kinboshi, +3 at eight
-                    wins, and +1 per special prize.
-                  </p>
+                  <p>{scoringModeSummary(scoringModeDraft)}</p>
                   <p>
                     {gameConfig.canChangeScoringMode
                       ? "Rules can change until picks lock. Players see the saved rules."
@@ -875,21 +876,37 @@ export function AdminPanel({ onPlayerDataRefresh }: AdminPanelProps) {
         </>
       )}
 
-      {loadState === "ready" && pendingAction !== null && (
-        <p className="form-message" role="status">
-          Applying {formatAction(pendingAction)}...
-        </p>
-      )}
-      {loadState === "ready" && message !== null && (
-        <p className="confirmation" role="status">
-          {message}
-        </p>
-      )}
-      {loadState === "ready" && errorMessage !== null && (
-        <p className="form-message error-state" role="alert">
-          {errorMessage}
-        </p>
-      )}
+      <div className={feedback}>
+        {loadState === "ready" && pendingAction !== null && (
+          <p className="form-message" role="status">
+            Applying {formatAction(pendingAction)}...
+          </p>
+        )}
+        {loadState === "ready" && message !== null && (
+          <p className="confirmation" role="status">
+            <span>{message}</span>
+            <button
+              type="button"
+              aria-label="Dismiss response"
+              onClick={() => setMessage(null)}
+            >
+              Dismiss
+            </button>
+          </p>
+        )}
+        {loadState === "ready" && errorMessage !== null && (
+          <p className="form-message error-state" role="alert">
+            <span>{errorMessage}</span>
+            <button
+              type="button"
+              aria-label="Dismiss error"
+              onClick={() => setErrorMessage(null)}
+            >
+              Dismiss
+            </button>
+          </p>
+        )}
+      </div>
     </section>
   );
 }

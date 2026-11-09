@@ -314,6 +314,16 @@ that branch's Preview configuration, and updates UAT after the same gates.
 Dispatching an exact SHA still creates an immutable preview but does not move
 the UAT alias. The workflow summary records both URLs and the deployed SHA.
 
+The selected UAT branch's smoke step also compares the old fixed UAT build and
+new immutable preview against the same current basho before moving the alias.
+It reuses the smoke step's existing protected HTTP authentication, performs one
+warm-up plus three paired samples for health/current/roster/leaderboard, and
+uploads only timing aggregates and samples as `uat-api-timings-<sha>`. It never
+creates a share link, changes protection, signs in as an application user, or
+logs the credential or response bodies. Server-Timing is recorded when present.
+This makes the before/after measurements comparable within one CI runner;
+results are not directly comparable with a browser or curl in another region.
+
 Changing the selected branch deliberately replaces the build under review;
 record the new SHA and preserve the Preview accounts/data across code updates.
 This uses an alias on the existing Vercel project and adds no service or data
@@ -503,19 +513,25 @@ flagged deterministic fixture.
 
 ## Scheduled production jobs
 
-The root `vercel.json` configures one daily production cron invocation:
+The root `vercel.json` configures two daily production cron invocations:
 
 ```json
 [
   {
     "path": "/api/cron/import-results",
     "schedule": "0 11 * * *"
+  },
+  {
+    "path": "/api/cron/import-schedule",
+    "schedule": "0 1 * * *"
   }
 ]
 ```
 
 Vercel cron schedules use UTC. Japan does not observe daylight saving time, so
-the job runs once between **11:00-11:59 UTC / 20:00-20:59 JST**. The window
+the results job runs between **11:00-11:59 UTC / 20:00-20:59 JST**.
+The independent schedule job runs between **01:00-01:59 UTC / 10:00-10:59 JST**,
+retrying published cards before the noon JST joker cutoff. The window
 leaves at least two hours after the expected 18:00 JST end of the top-division
 bouts. Sumo API's [webhook timing documentation](https://www.sumo-api.com/webhooks)
 says new Makuuchi torikumi are typically discovered after 18:00 JST and match
@@ -581,13 +597,14 @@ This job necessarily reads and sometimes writes the authoritative Neon
 database. A Redis cache would add another network dependency without removing
 that database wake-up, so it is not used to address cron cold starts. On a
 scale-to-zero plan, occasional Neon connection wake-up latency is expected;
-keeping this as one daily function invocation avoids a second scheduled cold
-start while preserving database correctness.
+both jobs may incur database wake-up latency. The independent schedule job
+protects card availability when the previous results import fails.
 
-Retain this single daily job initially. If production observation shows that
-day N+1 cards are not reliably available in the current window, add a focused
-follow-up for a second retry or schedule-only invocation; do not add that extra
-cron before the timing evidence justifies another scheduled function.
+Retain these two jobs while observing publication timing and failures. Joker
+window closure does not need a separate cron: API writes check each day’s
+absolute deadline transactionally, while reads reconcile allocation state. The
+browser offers today and tomorrow independently of result-import progress. A
+late or missed job cannot extend a deadline or reopen picks.
 
 For a controlled manual check, call the deployed route with the same bearer
 header Vercel uses:

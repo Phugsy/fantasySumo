@@ -1,3 +1,4 @@
+import { scoringPreset } from "./scoring-presets.js";
 import type {
   BoutResult,
   FantasyPick,
@@ -34,7 +35,8 @@ export function calculateRikishiScore(
     rikishiId,
     wins,
     score:
-      options.scoringMode === "achievements-v1"
+      options.scoringMode !== undefined &&
+      scoringPreset(options.scoringMode).achievements
         ? sumBreakdown(breakdown)
         : wins + (breakdown.joker ?? 0),
     ...(options.scoringMode === undefined ? {} : { breakdown }),
@@ -124,7 +126,8 @@ export function calculateTeamScoreHistory(
         ...outcome,
         breakdown,
         score:
-          options.scoringMode === "achievements-v1"
+          options.scoringMode !== undefined &&
+          scoringPreset(options.scoringMode).achievements
             ? sumBreakdown(breakdown)
             : breakdown.wins + (breakdown.joker ?? 0),
       };
@@ -228,6 +231,7 @@ function calculateBreakdown(
   options: ScoringOptions,
 ): ScoreBreakdown {
   const breakdown = emptyBreakdown();
+  const preset = scoringPreset(options.scoringMode);
   const wins = filterResultsForScoring(results, options).filter(
     (result) => result.winnerRikishiId === rikishiId,
   );
@@ -235,7 +239,7 @@ function calculateBreakdown(
   // The import boundary enforces one regulation bout per rikishi per day.
   // Count distinct days for the milestone so a repeated fact cannot award it early.
   breakdown.kachiKoshi =
-    new Set(wins.map((result) => result.day)).size >= 8 ? 3 : 0;
+    new Set(wins.map((result) => result.day)).size >= 8 ? preset.kachiKoshi : 0;
   const ranks = new Map(
     (options.banzukeEntries ?? []).map((entry) => [
       entry.rikishiId,
@@ -244,7 +248,7 @@ function calculateBreakdown(
   );
   if (/^maegashira(?:\s|$)/.test(ranks.get(rikishiId) ?? "")) {
     breakdown.kinboshi =
-      2 *
+      preset.kinboshi *
       new Set(
         wins
           .filter(
@@ -265,10 +269,12 @@ function calculateBreakdown(
         .map((award) => award.type),
     );
     breakdown.outstandingPerformance = awards.has("outstanding-performance")
-      ? 1
+      ? preset.specialPrize
       : 0;
-    breakdown.fightingSpirit = awards.has("fighting-spirit") ? 1 : 0;
-    breakdown.technique = awards.has("technique") ? 1 : 0;
+    breakdown.fightingSpirit = awards.has("fighting-spirit")
+      ? preset.specialPrize
+      : 0;
+    breakdown.technique = awards.has("technique") ? preset.specialPrize : 0;
   }
   if (
     options.jokerSelections !== undefined &&
@@ -293,7 +299,7 @@ function calculateBreakdown(
         /^maegashira(?:\s|$)/.test(ranks.get(rikishiId) ?? "") &&
         /^yokozuna(?:\s|$)/.test(ranks.get(win.loserRikishiId) ?? "")
       )
-        breakdown.jokerKinboshi += 2;
+        breakdown.jokerKinboshi += preset.kinboshi;
     }
   }
   return breakdown;

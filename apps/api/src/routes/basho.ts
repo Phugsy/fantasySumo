@@ -380,6 +380,7 @@ export function registerBashoRoutes(
       context.repositories,
       basho.id,
       context.now,
+      { includeJokers: false, banzukeEntries },
     );
     const rikishi = banzukeEntries.map((entry) => {
       const rikishiEntry = rikishiById.get(entry.rikishiId);
@@ -676,6 +677,7 @@ export function registerBashoRoutes(
       context.repositories,
       basho.id,
       context.now,
+      { banzukeEntries },
     );
     const photoIdentities =
       await context.repositories.listRikishiSourceIdentities();
@@ -700,11 +702,7 @@ export function registerBashoRoutes(
       jokerTrial: scoringOptions.jokerSelections !== undefined,
       breakdown: teamScore.breakdown,
       scoringMode: scoringOptions.scoringMode,
-      specialPrizesStatus:
-        (await context.repositories.getSpecialPrizeSnapshot(basho.id)) ===
-        undefined
-          ? "pending"
-          : "confirmed",
+      specialPrizesStatus: scoringOptions.specialPrizesStatus,
       picks: picks
         .map((pick) => {
           const rikishi = rikishiById.get(pick.rikishiId);

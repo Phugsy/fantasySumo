@@ -133,7 +133,9 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           path: .workflow-tools
-          sparse-checkout: scripts/smoke-deployment.mjs
+          sparse-checkout: |
+            scripts/smoke-deployment.mjs
+            scripts/compare-api-timings.mjs
           sparse-checkout-cone-mode: false
 
       - name: Set up pnpm
@@ -203,8 +205,22 @@ jobs:
         id: smoke
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+          UAT_TIMING_BASE_URL: ${{ vars.UAT_BRANCH != '' && needs.resolve.outputs.branch == vars.UAT_BRANCH && 'https://fantasy-sumo-uat-phuggo.vercel.app' || '' }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: node .workflow-tools/scripts/smoke-deployment.mjs "$DEPLOYMENT_URL"
+        run: |
+          node .workflow-tools/scripts/smoke-deployment.mjs "$DEPLOYMENT_URL"
+          if [[ -n "$UAT_TIMING_BASE_URL" ]]; then
+            node .workflow-tools/scripts/compare-api-timings.mjs "$UAT_TIMING_BASE_URL" "$DEPLOYMENT_URL" > uat-api-timings.json
+            cat uat-api-timings.json
+          fi
+
+      - name: Upload UAT API timing comparison
+        if: always() && vars.UAT_BRANCH != '' && needs.resolve.outputs.branch == vars.UAT_BRANCH
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-api-timings-${{ needs.resolve.outputs.sha }}
+          path: uat-api-timings.json
+          if-no-files-found: ignore
 
       - name: Update stable UAT address
         id: uat

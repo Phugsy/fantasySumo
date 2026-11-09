@@ -1,10 +1,15 @@
+import { scoringPreset } from "@fantasy-sumo/domain";
 import { selectControl } from "../styles/select.css";
 import type { ScoringMode } from "@fantasy-sumo/domain";
 import { useDisplayPreferences } from "../DisplayPreferences";
 import { PhotoCredits, RikishiPhoto } from "./RikishiPhoto";
 import { identity } from "./RikishiPhoto.css";
 import { ScoreBreakdown } from "./ScoreBreakdown";
-import { compareScoringMode, scoringModeLabel } from "../scoring-view";
+import {
+  compareScoringMode,
+  scoringModeLabel,
+  scoringModeSummary,
+} from "../scoring-view";
 import { useId, useMemo, useState } from "react";
 import type {
   Basho,
@@ -59,8 +64,8 @@ export function LeaderboardPanel({
     () =>
       comparisonMode === null
         ? officialLeaderboard
-        : compareScoringMode(officialLeaderboard, comparisonMode),
-    [officialLeaderboard, comparisonMode],
+        : compareScoringMode(officialLeaderboard, comparisonMode, officialMode),
+    [officialLeaderboard, comparisonMode, officialMode],
   );
   const rikishiById = useMemo(
     () => new Map(rikishi.map((entry) => [entry.id, entry])),
@@ -116,6 +121,7 @@ export function LeaderboardPanel({
           </option>
           <option value="wins-v0">What if · wins only</option>
           <option value="achievements-v1">What if · wins + achievements</option>
+          <option value="achievements-v2">What if · achievement focus</option>
         </select>
         {isWhatIf ? (
           <p className="what-if-notice" role="status">
@@ -125,14 +131,11 @@ export function LeaderboardPanel({
         ) : (
           <p>Official rules: {scoringModeLabel(officialMode)}.</p>
         )}
-        {displayMode === "achievements-v1" && (
-          <p>
-            +1 per win · +2 per kinboshi · +3 at eight wins · +1 per special
-            prize.
-          </p>
+        {scoringPreset(displayMode).achievements && (
+          <p>{scoringModeSummary(displayMode)}</p>
         )}
         {basho.specialPrizesStatus === "pending" &&
-          displayMode === "achievements-v1" && (
+          scoringPreset(displayMode).achievements && (
             <p>Special prizes pending. Totals exclude unconfirmed awards.</p>
           )}
       </div>
@@ -275,7 +278,7 @@ function renderLeaderboardList({
                   );
                 }) && (
                   <p className="tournament-notes-disclaimer">
-                    {scoringMode === "achievements-v1"
+                    {scoringPreset(scoringMode).achievements
                       ? "Points follow the selected scoring rules; the category breakdown shows each bonus."
                       : "Tournament badges are informational and do not add fantasy points."}
                   </p>

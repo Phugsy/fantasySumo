@@ -107,6 +107,12 @@ test("lets an authenticated admin run the deterministic demo loop", async ({
     page.getByRole("heading", { name: "Demo May Basho" }),
   ).toBeVisible();
 
+  const pointerFocusedTitle = page.getByRole("heading", {
+    name: "Admin controls",
+  });
+  await expect(pointerFocusedTitle).toBeFocused();
+  await expect(pointerFocusedTitle).toHaveCSS("outline-style", "none");
+  await signOutControl(page);
   const initialHeader = await measureHeaderControls(page);
   expect(initialHeader).not.toBeNull();
   expect(
@@ -114,6 +120,16 @@ test("lets an authenticated admin run the deterministic demo loop", async ({
   ).toBeLessThanOrEqual(1);
 
   await page.setViewportSize({ width: 416, height: 918 });
+  const settings = page.getByRole("button", {
+    name: "Site settings",
+    exact: true,
+  });
+  if ((await settings.getAttribute("aria-expanded")) === "true")
+    await settings.click();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeHidden();
+  await expect(settings).toHaveAttribute("aria-expanded", "false");
+  await settings.click();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
   const compactHeader = await measureHeaderControls(page);
 
   expect(compactHeader).not.toBeNull();
@@ -129,11 +145,11 @@ test("lets an authenticated admin run the deterministic demo loop", async ({
   expect(new Set(compactHeader!.linkTops.map(Math.round)).size).toBe(1);
   expect(compactHeader!.linkHeights.every((height) => height >= 44)).toBe(true);
 
-  const pointerFocusedTitle = page.getByRole("heading", {
-    name: "Admin controls",
-  });
-  await expect(pointerFocusedTitle).toBeFocused();
-  await expect(pointerFocusedTitle).toHaveCSS("outline-style", "none");
+  // Escape from the settings content closes the menu and restores toggle focus.
+  await page.getByText("Display", { exact: true }).focus();
+  await page.keyboard.press("Escape");
+  await expect(settings).toHaveAttribute("aria-expanded", "false");
+  await expect(settings).toBeFocused();
 
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Reset and open picks" }).click();
@@ -677,7 +693,7 @@ test("creates a fantasy team and follows its My Stable score", async ({
     page.getByRole("button", { name: /Codex Stable Updated.*1 pts/ }),
   ).toHaveAttribute("aria-expanded", "true");
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await (await signOutControl(page)).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(
     page.getByRole("heading", { name: "Follow the leaderboard" }),
@@ -706,10 +722,10 @@ test("blocks sign-out while a team save is in flight", async ({ page }) => {
   await page.getByRole("button", { name: /Hoshoryu/ }).click();
   await page.getByRole("button", { name: "Submit team" }).click();
 
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeDisabled();
+  await expect(await signOutControl(page)).toBeDisabled();
   releaseSave();
   await expect(page.getByText("Patient Stable submitted.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeEnabled();
+  await expect(await signOutControl(page)).toBeEnabled();
 });
 
 test("blocks team submission while sign-out is in flight", async ({ page }) => {
@@ -733,10 +749,10 @@ test("blocks team submission while sign-out is in flight", async ({ page }) => {
   await page.getByRole("button", { name: /Hoshoryu/ }).click();
   await expect(page.getByRole("button", { name: "Submit team" })).toBeEnabled();
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await (await signOutControl(page)).click();
 
   await expect(page).toHaveURL(/\/team$/);
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeDisabled();
+  await expect(await signOutControl(page)).toBeDisabled();
   releaseSignOut();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("link", { name: "Log in / Join" })).toHaveCount(
@@ -768,7 +784,7 @@ test("blocks draft editing while sign-in is in flight", async ({ page }) => {
   await expect(page.getByLabel("Email")).toBeDisabled();
   await expect(page.getByLabel("Display name")).toBeDisabled();
   releaseSignIn();
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(await signOutControl(page)).toBeVisible();
   await expect(page).toHaveURL(/\/stable$/);
 });
 
@@ -959,6 +975,12 @@ test("advances the demo basho and refreshes scored leaderboard state", async ({
     page.locator(".progress-chart-detail .daily-score-badge"),
   ).toHaveText("+1");
 
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+
   const tachiaiFilter = page.getByRole("button", {
     name: "#3 Tachiai Titans",
     exact: true,
@@ -1112,7 +1134,7 @@ async function signInAsDemoUser(page: Page) {
   await page.getByLabel("Display name").fill("E2E Player");
   await page.getByRole("button", { name: "Sign in" }).click();
   await bashoReload;
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(await signOutControl(page)).toBeVisible();
   await expect(page).toHaveURL(/\/team$/);
   await expect(page.getByLabel("Team name")).toBeVisible();
 }
@@ -1177,3 +1199,16 @@ test("keeps official bonus scoring fixed while comparing wins-only standings", a
   await expect(page.getByLabel("Scoring view")).toHaveValue("official");
   expect(await rows.allTextContents()).toEqual(officialRows);
 });
+
+async function signOutControl(page: Page) {
+  const settings = page.getByRole("button", {
+    name: "Site settings",
+    exact: true,
+  });
+  if (
+    (await settings.isVisible()) &&
+    (await settings.getAttribute("aria-expanded")) === "false"
+  )
+    await settings.click();
+  return page.getByRole("button", { name: "Sign out" });
+}

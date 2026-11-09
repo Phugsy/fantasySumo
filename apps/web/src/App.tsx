@@ -1,4 +1,5 @@
 import { useMobileInputVisibility } from "./useMobileInputVisibility";
+import { stack } from "./styles/flow.css";
 import type {
   Dispatch,
   FormEvent,
@@ -536,9 +537,20 @@ function RoutedApp() {
 
     let currentBasho: Basho;
     let bashoRikishi: Awaited<ReturnType<typeof fetchBashoRikishi>>;
+    let leaderboardRequest: ReturnType<typeof settle<LeaderboardResponse>>;
+    let scheduleRequest: ReturnType<typeof settle<ScheduleResponse>>;
+    let teamRequest: ReturnType<typeof settle<MyTeamResponse | null>>;
 
     try {
       currentBasho = await fetchCurrentBasho();
+      // Settle immediately so an early failure cannot become an unhandled rejection.
+      leaderboardRequest = settle(fetchLeaderboard(currentBasho.id));
+      scheduleRequest = settle(fetchSchedule(currentBasho.id));
+      teamRequest = settle(
+        session.user === null
+          ? Promise.resolve(null)
+          : fetchMyTeamOrNull(currentBasho.id),
+      );
       bashoRikishi = await fetchBashoRikishi(currentBasho.id);
     } catch (error) {
       if (!isCurrentBashoRequest()) {
@@ -561,7 +573,7 @@ function RoutedApp() {
 
     const schedulePromise = (async () => {
       try {
-        const loadedSchedule = await fetchSchedule(currentBasho.id);
+        const loadedSchedule = unwrap(await scheduleRequest);
 
         if (!isCurrentBashoRequest()) {
           return;
@@ -584,7 +596,7 @@ function RoutedApp() {
 
     const leaderboardPromise = (async () => {
       try {
-        const leaderboardResponse = await fetchLeaderboard(currentBasho.id);
+        const leaderboardResponse = unwrap(await leaderboardRequest);
 
         if (
           !isCurrentBashoRequest() ||
@@ -636,7 +648,7 @@ function RoutedApp() {
       }
 
       try {
-        const loadedMyTeam = await fetchMyTeamOrNull(currentBasho.id);
+        const loadedMyTeam = unwrap(await teamRequest);
 
         if (!isCurrentBashoRequest()) {
           return null;
@@ -811,10 +823,10 @@ function RoutedApp() {
     }
 
     return (
-      <>
+      <div className={stack}>
         <BashoPanel basho={basho} selectedCount={selectedIds.length} />
         {content}
-      </>
+      </div>
     );
   }
 
@@ -872,7 +884,7 @@ function RoutedApp() {
                   No rikishi are available for the current basho yet.
                 </section>
               ) : (
-                <>
+                <div className={stack}>
                   <BashoPanel
                     basho={basho}
                     selectedCount={0}
@@ -914,7 +926,7 @@ function RoutedApp() {
                     rikishi={rikishi}
                     totalDays={leaderboardTotalDays}
                   />
-                </>
+                </div>
               )
             }
           />
@@ -1416,4 +1428,15 @@ function isCurrentLeaderboardRequest(
   requestId: number,
 ): boolean {
   return requestIdRef.current === requestId;
+}
+
+async function settle<T>(
+  promise: Promise<T>,
+): Promise<PromiseSettledResult<T>> {
+  const [result] = await Promise.allSettled([promise]);
+  return result!;
+}
+function unwrap<T>(result: PromiseSettledResult<T>): T {
+  if (result.status === "rejected") throw result.reason;
+  return result.value;
 }

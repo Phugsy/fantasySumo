@@ -6,6 +6,8 @@ import {
 // Stable names let existing colocated CSS share the typed contract during
 // incremental conversion. Semantic tokens support the user's colour theme.
 export const vars = createGlobalThemeContract({
+  sectionGap: "section-gap",
+  gutter: "gutter",
   displayFont: "display-font",
   portraitMount: "portrait-mount",
   portraitInk: "portrait-ink",
@@ -53,6 +55,8 @@ export const vars = createGlobalThemeContract({
 });
 
 const light = {
+  sectionGap: "20px",
+  gutter: "24px",
   displayFont: 'Georgia, "Times New Roman", serif',
   portraitMount: "#e6ddca",
   portraitInk: "#263744",

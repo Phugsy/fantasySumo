@@ -59,6 +59,23 @@ issue #73 add system/light/dark themes through shared semantic tokens; see
 `DISPLAY_PREFERENCES.md`. Use foreground/background token pairs so all themes
 retain readable controls, messages, charts, and focus states.
 
+## Flow spacing and mobile controls
+
+`styles/flow.css.ts` supplies `stack`: a vertical flow with the shared
+`sectionGap` (20px). Use it for consecutive page panels and section blocks;
+the container owns the gap and resets child margins, so optional content does
+not make blocks touch or double their margins. `gutter` (24px) is available
+for shared horizontal insets. Component-specific dense lists keep their own gaps.
+The current-basho/player panels and My Stable use this flow.
+
+At 640px and below the header keeps primary navigation visible and puts display
+and account controls behind the **Site settings** burger. Escape returns focus
+to its toggle. Desktop retains its inline controls. With portraits enabled,
+shared rank badges overlay the portrait on mobile, using compact rank text and
+retaining the full accessible rank and tooltip. Without portraits ranks stay inline.
+Admin action feedback uses persistent, dismissible viewport toasts with the
+existing status/alert roles, including while the action controls are offscreen.
+
 ## Validation
 
 Run `make check` for TypeScript, lint, format, component tests, and production

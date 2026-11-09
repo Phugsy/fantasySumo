@@ -1,3 +1,4 @@
+import { SCORING_MODES } from "@fantasy-sumo/domain";
 import {
   createScoringOverrideRepositories,
   type ScoringOverrideRepositories,
@@ -190,8 +191,7 @@ export function createScoringRepositories(
 }
 
 function assertMode(mode: ScoringMode) {
-  if (mode !== "wins-v0" && mode !== "achievements-v1")
-    throw new Error("Unknown scoring mode.");
+  if (!SCORING_MODES.includes(mode)) throw new Error("Unknown scoring mode.");
 }
 function validateSnapshot(
   snapshot: SpecialPrizeSnapshot,

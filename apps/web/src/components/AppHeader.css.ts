@@ -125,8 +125,8 @@ globalStyle(
 globalStyle(`${root} .app-header-inner`, {
   "@media": {
     "(max-width: 920px)": {
-      paddingRight: "24px",
-      paddingLeft: "24px",
+      paddingRight: vars.gutter,
+      paddingLeft: vars.gutter,
     },
   },
 });
@@ -135,7 +135,7 @@ globalStyle(`${root} .app-header-inner`, {
   "@media": {
     "(max-width: 640px)": {
       display: "grid",
-      gridTemplateColumns: "minmax(0, 1fr)",
+      gridTemplateColumns: "minmax(0, 1fr) auto",
       gap: "10px",
       alignItems: "stretch",
       justifyContent: "stretch",
@@ -152,6 +152,7 @@ globalStyle(`${root} .app-header-actions`, {
   "@media": {
     "(max-width: 640px)": {
       display: "grid",
+      gridColumn: "1 / -1",
       gridTemplateColumns: "minmax(0, 1fr)",
       gap: "8px",
       width: "100%",

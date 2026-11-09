@@ -805,14 +805,26 @@ function createSqliteRepositories(
         .orderBy(sqlite.fantasyPicks.id)
         .all()
         .map(toFantasyPick),
-    listFantasyPicksForBasho: async (bashoId) => {
-      const teams = await repositories.listFantasyTeamsForBasho(bashoId);
-      const picks = await Promise.all(
-        teams.map((team) => repositories.listFantasyPicksForTeam(team.id)),
-      );
-
-      return picks.flat();
-    },
+    listFantasyPicksForBasho: async (bashoId) =>
+      db
+        .select({
+          id: sqlite.fantasyPicks.id,
+          teamId: sqlite.fantasyPicks.teamId,
+          rikishiId: sqlite.fantasyPicks.rikishiId,
+        })
+        .from(sqlite.fantasyPicks)
+        .innerJoin(
+          sqlite.fantasyTeams,
+          eq(sqlite.fantasyPicks.teamId, sqlite.fantasyTeams.id),
+        )
+        .where(eq(sqlite.fantasyTeams.bashoId, bashoId))
+        .orderBy(
+          sqlite.fantasyTeams.displayName,
+          sqlite.fantasyTeams.id,
+          sqlite.fantasyPicks.id,
+        )
+        .all()
+        .map(toFantasyPick),
 
     insertBoutResult: async (entry) => {
       db.insert(sqlite.boutResults).values(toBoutResultRow(entry)).run();
@@ -1870,14 +1882,26 @@ function createPostgresRepositories(
           .where(eq(pg.fantasyPicks.teamId, teamId))
           .orderBy(pg.fantasyPicks.id)
       ).map(toFantasyPick),
-    listFantasyPicksForBasho: async (bashoId) => {
-      const teams = await repositories.listFantasyTeamsForBasho(bashoId);
-      const picks = await Promise.all(
-        teams.map((team) => repositories.listFantasyPicksForTeam(team.id)),
-      );
-
-      return picks.flat();
-    },
+    listFantasyPicksForBasho: async (bashoId) =>
+      (
+        await db
+          .select({
+            id: pg.fantasyPicks.id,
+            teamId: pg.fantasyPicks.teamId,
+            rikishiId: pg.fantasyPicks.rikishiId,
+          })
+          .from(pg.fantasyPicks)
+          .innerJoin(
+            pg.fantasyTeams,
+            eq(pg.fantasyPicks.teamId, pg.fantasyTeams.id),
+          )
+          .where(eq(pg.fantasyTeams.bashoId, bashoId))
+          .orderBy(
+            pg.fantasyTeams.displayName,
+            pg.fantasyTeams.id,
+            pg.fantasyPicks.id,
+          )
+      ).map(toFantasyPick),
 
     insertBoutResult: async (entry) => {
       await db.insert(pg.boutResults).values(toBoutResultRow(entry));

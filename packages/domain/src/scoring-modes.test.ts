@@ -153,3 +153,75 @@ describe("versioned scoring modes", () => {
     ).toBe(16);
   });
 });
+
+describe("achievement-focused preset", () => {
+  const focused: ScoringOptions = {
+    ...options,
+    scoringMode: "achievements-v2",
+  };
+  it("weights rare achievements while keeping the original preset unchanged", () => {
+    expect(calculateRikishiScore("m", results, focused)).toMatchObject({
+      score: 19,
+      breakdown: {
+        wins: 9,
+        kinboshi: 3,
+        kachiKoshi: 1,
+        technique: 3,
+        fightingSpirit: 3,
+      },
+    });
+    expect(calculateRikishiScore("m", results, options).score).toBe(16);
+    expect(
+      calculateRikishiScore("m", results, { ...focused, throughDay: 7 }).score,
+    ).toBe(10);
+    expect(
+      calculateRikishiScore("m", results, { ...focused, throughDay: 8 }).score,
+    ).toBe(12);
+    expect(
+      calculateRikishiScore("m", results.slice(2), {
+        ...focused,
+        specialPrizes: [],
+      }).score,
+    ).toBe(7);
+  });
+  it("doubles the selected win and kinboshi, excluding milestone and special prizes", () => {
+    const team = { id: "team", bashoId: "test", displayName: "Test" };
+    const picks = [{ teamId: "team", rikishiId: "m" }];
+    const jokers = {
+      ...focused,
+      jokerSelections: [
+        {
+          teamId: "team",
+          day: 1,
+          rikishiId: "m",
+          opponentId: "y",
+          boutId: "bout-0",
+        },
+      ],
+    };
+    const score = calculateTeamScore(team, picks, results, jokers);
+    expect(score).toMatchObject({
+      score: 23,
+      breakdown: { joker: 1, jokerKinboshi: 3, kachiKoshi: 1, technique: 3 },
+    });
+    const history = calculateTeamScoreHistory(team, picks, results, jokers);
+    expect(history[0]).toMatchObject({ dailyScore: 8 });
+    expect(history.find((day) => day.day === 8)?.dailyScore).toBe(2);
+    expect(history.at(-1)).toMatchObject({
+      day: 15,
+      dailyScore: 6,
+      cumulativeScore: 23,
+    });
+    expect(
+      calculateTeamScore(
+        team,
+        picks,
+        [{ ...results[0]!, kimarite: "fusen" }, ...results.slice(1)],
+        jokers,
+      ),
+    ).toMatchObject({
+      score: 16,
+      breakdown: { kinboshi: 0, joker: 0, jokerKinboshi: 0 },
+    });
+  });
+});

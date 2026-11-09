@@ -80,8 +80,8 @@ globalStyle(".app-shell", {
 globalStyle(".app-shell", {
   "@media": {
     "(max-width: 920px)": {
-      paddingRight: "24px",
-      paddingLeft: "24px",
+      paddingRight: vars.gutter,
+      paddingLeft: vars.gutter,
     },
   },
 });

@@ -146,6 +146,54 @@ async function complete() {
 }
 
 describe("official scoring and prize imports", () => {
+  it("saves achievement focus and uses it across official scoring views without changing defaults", async () => {
+    expect((await selectMode("achievements-v2")).statusCode).toBe(200);
+    await app.inject({
+      method: "POST",
+      url: `/api/basho/${basho.id}/teams`,
+      headers: { cookie },
+      payload: { displayName: "Focused Stable", rikishiIds: ["m"] },
+    });
+    await complete();
+    await importSpecialPrizes(repositories, sourceFetch, basho.id);
+    const board = (
+      await app.inject(`/api/basho/${basho.id}/leaderboard`)
+    ).json();
+    expect(board).toMatchObject({
+      scoringMode: "achievements-v2",
+      leaderboard: [
+        {
+          score: 39,
+          breakdown: {
+            wins: 8,
+            kinboshi: 24,
+            kachiKoshi: 1,
+            fightingSpirit: 3,
+            technique: 3,
+          },
+        },
+      ],
+    });
+    expect(board.leaderboard[0].scoreHistory.at(-1).cumulativeScore).toBe(39);
+    expect(
+      (
+        await app.inject({
+          url: `/api/basho/${basho.id}/my-team`,
+          headers: { cookie },
+        })
+      ).json().totalScore,
+    ).toBe(39);
+    expect(
+      (await app.inject("/api/leaderboard/all-time")).json().leaderboard[0]
+        .score,
+    ).toBe(39);
+    expect(
+      (await app.inject({ url: "/api/my-history", headers: { cookie } })).json()
+        .score,
+    ).toBe(39);
+    expect((await selectMode("wins-v0")).statusCode).toBe(409);
+  });
+
   it("protects encoded admin routes for anonymous and non-admin callers", async () => {
     const login = await app.inject({
       method: "POST",

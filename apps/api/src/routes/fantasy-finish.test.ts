@@ -5,6 +5,7 @@ import {
   runMigrations,
   seedDemoDatabase,
 } from "@fantasy-sumo/db";
+import type { ScoringMode } from "@fantasy-sumo/domain";
 import { buildApp } from "../app.js";
 
 let client: ReturnType<typeof createDatabaseClient>;
@@ -26,10 +27,7 @@ afterEach(async () => {
   await client.close();
 });
 
-async function fixture(
-  id = "2026-01",
-  mode: "wins-v0" | "achievements-v1" = "wins-v0",
-) {
+async function fixture(id = "2026-01", mode: ScoringMode = "wins-v0") {
   await repos.insertBasho({
     id,
     name: `Test ${id}`,
@@ -183,26 +181,29 @@ it("reconciles a correction and aggregates title history by player rather than r
   expect((await board()).finish.outcome.status).toBe("pending");
   expect((await all()).honoursBashoCount).toBe(1);
 });
-it("withholds achievements-mode honours while final prizes are unconfirmed", async () => {
-  await fixture("2026-01", "achievements-v1");
-  expect((await board()).finish.outcome).toEqual({
-    status: "pending",
-    reason: "scoring-pending",
-  });
-  expect((await all()).latestFinish).toBeNull();
-  expect(
-    (await all()).leaderboard.every(
-      (e: { yushoCount: number }) => e.yushoCount === 0,
-    ),
-  ).toBe(true);
-  await repos.replaceSpecialPrizeSnapshot({
-    bashoId: "2026-01",
-    source: "test",
-    fetchedAt: "2026-01-01T12:00:00.000Z",
-    awards: [],
-  });
-  expect((await board()).finish.outcome.status).toBe("confirmed");
-});
+it.each(["achievements-v1", "achievements-v2"] as const)(
+  "withholds %s honours while final prizes are unconfirmed",
+  async (mode) => {
+    await fixture("2026-01", mode);
+    expect((await board()).finish.outcome).toEqual({
+      status: "pending",
+      reason: "scoring-pending",
+    });
+    expect((await all()).latestFinish).toBeNull();
+    expect(
+      (await all()).leaderboard.every(
+        (e: { yushoCount: number }) => e.yushoCount === 0,
+      ),
+    ).toBe(true);
+    await repos.replaceSpecialPrizeSnapshot({
+      bashoId: "2026-01",
+      source: "test",
+      fetchedAt: "2026-01-01T12:00:00.000Z",
+      awards: [],
+    });
+    expect((await board()).finish.outcome.status).toBe("confirmed");
+  },
+);
 it("counts a unique winner and runner-up from the same official projection", async () => {
   await fixture();
   await repos.insertFantasyPick({ teamId: "2026-01-alice", rikishiId: "ura" });

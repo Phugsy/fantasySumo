@@ -1,24 +1,46 @@
 import type { Repositories } from "@fantasy-sumo/db";
-import type { ScoringOptions } from "@fantasy-sumo/domain";
+import {
+  scoringPreset,
+  type BanzukeEntry,
+  type ScoringOptions,
+} from "@fantasy-sumo/domain";
 
+interface ScoringLoadOptions {
+  // Public rikishi scores never include a team's joker selections.
+  includeJokers?: boolean;
+  banzukeEntries?: BanzukeEntry[];
+}
 export async function getBashoScoringOptions(
   repositories: Repositories,
   bashoId: string,
   now: () => Date = () => new Date(),
-): Promise<ScoringOptions> {
-  return (await getBashoScoringContext(repositories, bashoId, now)).options;
+  loaded: ScoringLoadOptions = {},
+): Promise<ScoringOptions & { specialPrizesStatus: "pending" | "confirmed" }> {
+  const context = await getBashoScoringContext(
+    repositories,
+    bashoId,
+    now,
+    loaded,
+  );
+  return {
+    ...context.options,
+    specialPrizesStatus: context.specialPrizesStatus,
+  };
 }
 
 export async function getBashoScoringContext(
   repositories: Repositories,
   bashoId: string,
   now: () => Date = () => new Date(),
+  loaded: ScoringLoadOptions = {},
 ) {
   const [config, banzukeEntries, prizes, jokers] = await Promise.all([
     repositories.getBashoScoringConfig(bashoId),
-    repositories.listBanzukeEntriesForBasho(bashoId),
+    loaded.banzukeEntries ?? repositories.listBanzukeEntriesForBasho(bashoId),
     repositories.getSpecialPrizeSnapshot(bashoId),
-    repositories.getJokerSnapshot(bashoId, now),
+    loaded.includeJokers === false
+      ? undefined
+      : repositories.getJokerSnapshot(bashoId, now),
   ]);
   const options: ScoringOptions = {
     ...(jokers
@@ -37,7 +59,8 @@ export async function getBashoScoringContext(
     specialPrizesStatus:
       prizes === undefined ? ("pending" as const) : ("confirmed" as const),
     finalInputsReady:
-      (options.scoringMode !== "achievements-v1" || prizes !== undefined) &&
+      (!scoringPreset(options.scoringMode ?? "wins-v0").achievements ||
+        prizes !== undefined) &&
       (!jokers ||
         (!jokers.budgetDiscrepancy &&
           jokers.allocations.every((a) =>

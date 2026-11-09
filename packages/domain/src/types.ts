@@ -134,7 +134,12 @@ export interface RikishiScore {
   breakdown?: ScoreBreakdown;
 }
 
-export type ScoringMode = "wins-v0" | "achievements-v1";
+export const SCORING_MODES = [
+  "wins-v0",
+  "achievements-v1",
+  "achievements-v2",
+] as const;
+export type ScoringMode = (typeof SCORING_MODES)[number];
 export type SpecialPrizeType =
   | "outstanding-performance"
   | "fighting-spirit"
@@ -143,7 +148,7 @@ export interface SpecialPrizeAward {
   rikishiId: Rikishi["id"];
   type: SpecialPrizeType;
 }
-/** Potential points in each category, independent of the selected total. */
+/** Category points under the preset; wins-only exposes legacy achievement potential for comparison. */
 export interface ScoreBreakdown {
   wins: number;
   kinboshi: number;
