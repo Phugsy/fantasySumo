@@ -22,12 +22,9 @@ globalStyle(`${root} > .eyebrow`, {
 });
 globalStyle(`${root} h1`, { width: "fit-content", maxWidth: "100%" });
 
-// The stable page-title ID is also the route-focus target.
+// Announce route changes via this non-interactive heading without drawing a box.
+// Interactive controls retain their own visible keyboard focus indicators.
 globalStyle("#page-title:focus", { outline: "none" });
-globalStyle("#page-title:focus-visible", {
-  outline: `3px solid ${vars.focus}`,
-  outlineOffset: "4px",
-});
 
 export const lede = style({
   maxWidth: "670px",

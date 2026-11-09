@@ -214,7 +214,7 @@ test("lets an authenticated admin run the deterministic demo loop", async ({
     name: "Follow the leaderboard",
   });
   await expect(leaderboardTitle).toBeFocused();
-  await expect(leaderboardTitle).toHaveCSS("outline-style", "solid");
+  await expect(leaderboardTitle).toHaveCSS("outline-style", "none");
 });
 
 test("lets an admin persist inherited live config and validate a result import without contacting the source", async ({
