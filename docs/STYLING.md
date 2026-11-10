@@ -78,6 +78,9 @@ existing status/alert roles, including while the action controls are offscreen.
 
 ## Validation
 
+The [paper and ink comparison](PAPER_BANZUKE_TRIAL.md) is an isolated,
+review-only design trial for #130. It is not an adopted application theme.
+
 Run `make check` for TypeScript, lint, format, component tests, and production
 CSS extraction. Run the relevant browser E2E suite for game-loop or broad style
 changes. For responsive/layout or cascade changes, compare desktop and mobile
