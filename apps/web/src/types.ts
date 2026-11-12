@@ -1,11 +1,13 @@
 import type {
   PickCompositionMode,
   BashoFantasyFinish,
+  BashoRikishiHonours,
   ScoreBreakdown,
   ScoringMode,
 } from "@fantasy-sumo/domain";
 export interface Basho {
   finish?: BashoFantasyFinish;
+  rikishiHonours?: BashoRikishiHonours;
   pickCompositionMode?: PickCompositionMode;
   jokerTrial?: boolean;
   id: string;
@@ -156,6 +158,7 @@ export interface SessionResponse {
 
 export interface LeaderboardResponse {
   finish?: BashoFantasyFinish;
+  rikishiHonours?: BashoRikishiHonours;
   jokerTrial?: boolean;
   basho: Omit<Basho, "teamSize">;
   bashoId: string;

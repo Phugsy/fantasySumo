@@ -1278,6 +1278,7 @@ function mergeLeaderboardBasho(
     jokerTrial: leaderboardResponse.jokerTrial,
     specialPrizesStatus: leaderboardResponse.specialPrizesStatus,
     finish: leaderboardResponse.finish,
+    rikishiHonours: leaderboardResponse.rikishiHonours,
     teamSize: currentBasho?.teamSize ?? 0,
   };
 }

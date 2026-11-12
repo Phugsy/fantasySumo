@@ -196,6 +196,11 @@ test("plays the demo joker journey through edits, deadline, refund, budget and g
   ).toBe(409);
 
   await page.goto("/leaderboard");
+  await page.getByText("Rikishi honours", { exact: true }).click();
+  await expect(page.getByText(/Day 4 · defeated/)).toBeVisible();
+  await expect(
+    page.getByText("Waiting for verified final prizes."),
+  ).toBeVisible();
   const summary = page.getByRole("button", { name: /Joker Stable/ }).first();
   await expect(summary).toBeVisible();
   if ((await summary.getAttribute("aria-expanded")) === "false") {

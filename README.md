@@ -56,6 +56,7 @@ Start here:
 - `docs/PROJECT_BRIEF.md` - product intent and MVP definition.
 - `docs/SCORING.md` - scoring modes, category points, rule locking, and special-prize imports.
 - `docs/FANTASY_TITLES.md` - verified fantasy yusho/jun-yusho, shared titles, announcements and history.
+- `docs/BASHO_HONOURS.md` - verified rikishi gold stars and special-prize recipients.
 - `docs/JOKER_TRIAL.md` - agreed three-joker trial, daily Pick Window, scoring/refunds, and validation requirements.
 - `docs/JOKER_IMPLEMENTATION.md` - opt-in isolated joker demo, additive model, clock controls, and verification.
 - `docs/NOVEMBER_JOKER_TRIAL.md` - owner-approved November pre-start live opt-in, release guards and recovery.
