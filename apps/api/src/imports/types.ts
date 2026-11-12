@@ -72,6 +72,7 @@ export function toScheduledBoutPublicationSource(
 export interface ImportOptions {
   dryRun?: boolean;
   expectedBanzukeRikishiIds?: readonly string[];
+  lookupJsaId?: (sumoApiId: string) => Promise<string | undefined>;
 }
 
 export interface ImportResult {

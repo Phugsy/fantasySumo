@@ -5,3 +5,5 @@ export class ImportValidationError extends Error {
     super("Import validation failed.");
   }
 }
+
+export class RikishiProfileUnavailableError extends Error {}

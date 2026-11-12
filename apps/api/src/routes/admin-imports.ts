@@ -2,16 +2,12 @@ import { importSpecialPrizes } from "../imports/special-prizes.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { Repositories } from "@fantasy-sumo/db";
+import { fetchJsaBanzukeImport } from "../imports/adapters.js";
+import { importBanzuke, ImportValidationError } from "../imports/service.js";
 import {
-  fetchJsaBanzukeImport,
-  fetchSumoApiScheduleImport,
-} from "../imports/adapters.js";
-import {
-  importBanzuke,
-  importScheduledBouts,
-  ImportValidationError,
-} from "../imports/service.js";
-import { importDailyResultsAndFollowingSchedule } from "../imports/daily-update.js";
+  importDailyResultsAndFollowingSchedule,
+  importPublishedSchedule,
+} from "../imports/daily-update.js";
 import type { SourceFetch } from "../imports/types.js";
 import type { AuthService } from "../auth.js";
 import { isAuthenticatedAdmin, sendAdminForbidden } from "../admin-auth.js";
@@ -202,15 +198,16 @@ export function registerAdminImportRoutes(
     }
 
     try {
-      const command = await fetchSumoApiScheduleImport(context.sourceFetch, {
-        bashoId: request.params.bashoId,
-        day: parsedBody.data.day,
-        division: parsedBody.data.division,
-      });
-
-      return await importScheduledBouts(context.repositories, command, {
-        dryRun: parsedQuery.data.dryRun,
-      });
+      return await importPublishedSchedule(
+        context.repositories,
+        context.sourceFetch,
+        {
+          bashoId: request.params.bashoId,
+          day: parsedBody.data.day,
+          division: parsedBody.data.division,
+          dryRun: parsedQuery.data.dryRun,
+        },
+      );
     } catch (error) {
       return sendImportError(reply, error);
     }

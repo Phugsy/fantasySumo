@@ -9,10 +9,14 @@ import type { Rikishi } from "@fantasy-sumo/domain";
 import type {
   BanzukeImportCommand,
   BoutResultsImportCommand,
+  ImportOptions,
   ScheduledBoutsImportCommand,
   SourceRikishi,
 } from "./types.js";
-import { ImportValidationError } from "./validation.js";
+import {
+  ImportValidationError,
+  RikishiProfileUnavailableError,
+} from "./validation.js";
 
 type ImportCommand =
   | BanzukeImportCommand
@@ -23,6 +27,10 @@ type Resolved<T> = T & {
   identityRoster?: IdentityRosterExpectation;
 };
 type IdentityPlan = Awaited<ReturnType<typeof resolveRikishiIdentities>>;
+interface ReconciliationOptions {
+  plan?: IdentityPlan;
+  lookupJsaId?: ImportOptions["lookupJsaId"];
+}
 
 const nameKey = (name: string) => name.normalize("NFKC").trim().toLowerCase();
 
@@ -37,6 +45,7 @@ export async function resolveRikishiIdentities(
   repositories: Repositories,
   bashoId: string,
   incoming: readonly SourceRikishi[],
+  lookupJsaId?: ImportOptions["lookupJsaId"],
 ) {
   const [known, aliases, roster, basho] = await Promise.all([
     repositories.listRikishi(),
@@ -62,6 +71,7 @@ export async function resolveRikishiIdentities(
     ) {
       conflict(`Conflicting source rows for ${entry.id}.`);
     }
+    if (previous !== undefined) continue;
     seen.set(entry.id, entry);
     const identity = entry.sourceIdentity;
     let canonicalId = entry.id;
@@ -82,8 +92,7 @@ export async function resolveRikishiIdentities(
       if (existing !== undefined) {
         canonicalId = existing.rikishiId;
       } else {
-        // Only a same-tournament snapshot can bridge providers or adopt a legacy
-        // row. A shared current/historical name alone is never identity evidence.
+        // Name-based matching requires a snapshot from the same tournament.
         const matches = roster.filter(
           (rank) =>
             nameKey(
@@ -95,15 +104,36 @@ export async function resolveRikishiIdentities(
             `Ambiguous same-basho shikona ${entry.shikona}; attach a verified alias manually.`,
           );
         const match = matches[0];
-        if (match !== undefined) {
-          canonicalId = match.rikishiId;
-        } else {
-          if (
-            known.some(
-              (candidate) =>
-                nameKey(candidate.shikona) === nameKey(entry.shikona),
+        const existsOutsideRoster =
+          match === undefined &&
+          known.some(
+            (candidate) =>
+              nameKey(candidate.shikona) === nameKey(entry.shikona),
+          );
+        let jsaId: string | undefined;
+        if (match === undefined && identity.source === "sumo-api") {
+          try {
+            jsaId = await lookupJsaId?.(identity.sourceRikishiId);
+          } catch (error) {
+            if (
+              existsOutsideRoster ||
+              !(error instanceof RikishiProfileUnavailableError)
             )
-          ) {
+              throw error;
+          }
+        }
+        const jsaAlias =
+          jsaId === undefined
+            ? undefined
+            : [...aliases, ...sourceIdentities].find(
+                (alias) =>
+                  alias.source === "jsa" && alias.sourceRikishiId === jsaId,
+              );
+        const matchedId = match?.rikishiId ?? jsaAlias?.rikishiId;
+        if (matchedId !== undefined) {
+          canonicalId = matchedId;
+        } else {
+          if (existsOutsideRoster) {
             conflict(
               `Shikona ${entry.shikona} exists outside the target roster; attach a verified alias manually.`,
             );
@@ -111,6 +141,13 @@ export async function resolveRikishiIdentities(
           // Stable across retries and dry runs, opaque to shikona changes. It is
           // a local ID, never a provider ID used in another provider's namespace.
           canonicalId = `rk_${createHash("sha256").update(`${identity.source}:${identity.sourceRikishiId}`).digest("hex").slice(0, 32)}`;
+          if (jsaId !== undefined) {
+            sourceIdentities.push({
+              source: "jsa",
+              sourceRikishiId: jsaId,
+              rikishiId: canonicalId,
+            });
+          }
         }
         const sameProvider = [...aliases, ...sourceIdentities].find(
           (alias) =>
@@ -162,32 +199,33 @@ export function reconcileImportCommand(
   repositories: Repositories,
   bashoId: string,
   command: BanzukeImportCommand,
-  sharedPlan?: IdentityPlan,
+  options?: ReconciliationOptions,
 ): Promise<Resolved<BanzukeImportCommand>>;
 export function reconcileImportCommand(
   repositories: Repositories,
   bashoId: string,
   command: BoutResultsImportCommand,
-  sharedPlan?: IdentityPlan,
+  options?: ReconciliationOptions,
 ): Promise<Resolved<BoutResultsImportCommand>>;
 export function reconcileImportCommand(
   repositories: Repositories,
   bashoId: string,
   command: ScheduledBoutsImportCommand,
-  sharedPlan?: IdentityPlan,
+  options?: ReconciliationOptions,
 ): Promise<Resolved<ScheduledBoutsImportCommand>>;
 export async function reconcileImportCommand(
   repositories: Repositories,
   bashoId: string,
   command: ImportCommand,
-  sharedPlan?: IdentityPlan,
+  options: ReconciliationOptions = {},
 ): Promise<Resolved<ImportCommand>> {
   const plan =
-    sharedPlan ??
+    options.plan ??
     (await resolveRikishiIdentities(
       repositories,
       bashoId,
       command.rikishi ?? [],
+      options.lookupJsaId,
     ));
   const identityData = {
     rikishi: plan.rikishi,
@@ -242,6 +280,7 @@ export async function reconcileScheduledBoutsAndResults(
   repositories: Repositories,
   schedule: ScheduledBoutsImportCommand,
   results: BoutResultsImportCommand,
+  lookupJsaId?: ImportOptions["lookupJsaId"],
 ) {
   const identityKey = (entry: SourceRikishi) =>
     entry.sourceIdentity === undefined
@@ -271,10 +310,11 @@ export async function reconcileScheduledBoutsAndResults(
     repositories,
     schedule.bashoId,
     incoming,
+    lookupJsaId,
   );
   const [scheduleCommand, resultsCommand] = await Promise.all([
-    reconcileImportCommand(repositories, schedule.bashoId, schedule, plan),
-    reconcileImportCommand(repositories, results.bashoId, results, plan),
+    reconcileImportCommand(repositories, schedule.bashoId, schedule, { plan }),
+    reconcileImportCommand(repositories, results.bashoId, results, { plan }),
   ]);
   return { scheduleCommand, resultsCommand };
 }

@@ -516,16 +516,30 @@ identity. Banzuke record attestation also joins by Sumo API ID.
 Resolution order is deliberately conservative:
 
 1. Resolve an established provider alias, regardless of its current shikona.
-2. For a previously unseen provider ID, allow attachment only to a unique exact
-   shikona match in the **same basho's stored banzuke snapshot** (case and Unicode
-   normalization are allowed). This permits adoption of existing rows and
+2. For a previously unseen provider ID, allow name-based attachment to a
+   unique exact shikona match in the **same basho's stored banzuke snapshot**
+   (case and Unicode normalization are allowed). This permits adoption of existing rows and
    correlation of JSA and Sumo API rosters for the same tournament. The target
    must not already have a different ID from that provider.
-3. If no same-basho match exists and no shared rikishi has that name, create a
-   new opaque canonical ID. New IDs are deterministic across retries/dry runs.
-4. If the name is ambiguous, known only outside the target roster, or conflicts
-   with an established source mapping, stop with an identity validation error.
+3. If a schedule or result participant has no same-basho match, look up its
+   Sumo API profile. The profile must return the requested Sumo API ID. Its
+   explicit `nskId` can link the participant to an existing JSA alias, including
+   a jūryō visitor whose JSA alias was saved in an earlier basho.
+4. If no verified match exists and no shared rikishi has that name, create a
+   new opaque canonical ID. New IDs are deterministic across retries and dry
+   runs. When the profile supplies a JSA ID, save both provider aliases so a
+   future makuuchi promotion keeps the same canonical identity. If the profile
+   request is unavailable, a new shikona can still be imported using its Sumo
+   API ID. A Sumo API-only identity may need verification on promotion if
+   there is still no JSA alias.
+5. If the name is ambiguous, known only outside the target roster without
+   a verified provider link, or conflicts with an established source mapping,
+   stop with an identity validation error.
    Never infer a cross-basho identity from shikona, rank, or heya alone.
+
+Visiting rikishi are saved with the makuuchi card that needs them. The pick
+pool and the daily result attestation roster remain makuuchi-only. The same
+profile lookup is used by scheduled and manual imports, including dry runs.
 
 JSA banzuke snapshots take precedence for ranked names/heya. Within a Sumo API
 complete-card command, the attesting banzuke supplies display metadata when its

@@ -158,6 +158,7 @@ export async function importBoutResults(
     repositories,
     input.bashoId,
     input,
+    options,
   );
 
   const prepared = await prepareBoutResultsImport(
@@ -301,6 +302,7 @@ export async function importScheduledBouts(
     repositories,
     input.bashoId,
     input,
+    options,
   );
 
   const prepared = await prepareScheduledBoutsImport(
@@ -457,6 +459,7 @@ export async function importScheduledBoutsAndBoutResults(
       repositories,
       scheduleInput,
       resultsInput,
+      options.lookupJsaId,
     );
   if (
     scheduleCommand.attestedRikishiIds !== undefined &&
