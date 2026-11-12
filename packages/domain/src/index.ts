@@ -33,6 +33,8 @@ export type {
   TeamScoreHistoryEntry,
 } from "./types.js";
 export { deriveFantasyFinish } from "./fantasy-finish.js";
+export { evaluatePlayerTitleAchievements } from "./player-achievements.js";
+export type { PlayerAchievement } from "./player-achievements.js";
 export type {
   FantasyFinish,
   FantasyFinishRecipient,

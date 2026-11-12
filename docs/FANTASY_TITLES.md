@@ -58,3 +58,18 @@ under their existing ownership boundary.
 
 No migration, authentication policy, scoring override, external dependency,
 notification provider or new service is introduced.
+
+## Player title achievements
+
+Signed-in players can see four lifetime badges in History (#133). Emperor’s Cup,
+Rice for the Stable and Giant Fish mark the first three career yusho. First
+Runner-up marks the first jun-yusho. Shared titles count, and only confirmed
+finishes joined to the player's owned team for that basho contribute. Each badge
+links to the tournament that reached the threshold. The catalogue uses stable
+badge IDs and derives progress from current verified history, so corrections
+can move or remove a badge. Awarding a badge adds no fantasy points.
+
+To add a title milestone, add a catalogue entry with a new ID, title and
+threshold in `packages/domain/src/player-achievements.ts`, then add its artwork
+mapping and a qualification case. Other badge families need their own agreed
+rules and qualifying evidence.

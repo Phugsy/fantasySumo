@@ -13,6 +13,7 @@ import type {
 import "./HistoryPanel.css";
 import { BashoFinishSummary, CompletedBashoStandings } from "./BashoFinish";
 import { counts } from "./BashoFinish.css";
+import { PlayerAchievements } from "./PlayerAchievements";
 
 interface HistoryPanelProps {
   signedIn: boolean;
@@ -90,6 +91,12 @@ export function HistoryPanel({ signedIn, selectedBashoId }: HistoryPanelProps) {
         <CompletedBashoStandings bashoId={selectedBashoId} />
       ) : (
         <BashoFinishSummary finish={allTime.latestFinish} />
+      )}
+      {signedIn && myHistory && (
+        <PlayerAchievements
+          finishes={allTime.finishes}
+          history={myHistory.history}
+        />
       )}
       <section className="history-panel" aria-labelledby="all-time-title">
         <div className="section-heading history-heading">
