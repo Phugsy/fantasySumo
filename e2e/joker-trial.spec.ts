@@ -194,4 +194,22 @@ test("plays the demo joker journey through edits, deadline, refund, budget and g
       })
     ).status(),
   ).toBe(409);
+
+  await page.goto("/leaderboard");
+  const summary = page.getByRole("button", { name: /Joker Stable/ }).first();
+  await expect(summary).toBeVisible();
+  if ((await summary.getAttribute("aria-expanded")) === "false") {
+    await summary.click();
+  }
+  const ura = page.getByRole("button", { name: /^Ura\b/ });
+  const boostedWin = "Win · joker boost · gold star";
+  const tile = ura.getByTitle(boostedWin, { exact: true });
+  await expect(tile).toBeVisible();
+  await expect(tile).toContainText("J");
+  await expect(tile).toContainText("★");
+  await ura.click();
+  const history = page.getByRole("region", { name: "Ura result history" });
+  await expect(
+    history.getByLabel(`Day 4: ${boostedWin}, +6 points`),
+  ).toBeVisible();
 });
