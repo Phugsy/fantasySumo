@@ -5,6 +5,7 @@ import {
 import type { Repositories } from "@fantasy-sumo/db";
 import {
   fetchSumoApiDailyImport,
+  fetchSumoApiRikishiJsaId,
   fetchSumoApiScheduleImport,
   ScheduleUnavailableError,
 } from "./adapters.js";
@@ -101,6 +102,7 @@ export async function importCurrentDayScheduleAndResults(
     {
       dryRun: options.dryRun,
       expectedBanzukeRikishiIds: expectedRikishiIds,
+      lookupJsaId: (id) => fetchSumoApiRikishiJsaId(sourceFetch, id),
     },
   );
 }
@@ -123,6 +125,18 @@ async function attemptFollowingDayScheduleImport(
   });
 }
 
+export async function importPublishedSchedule(
+  repositories: Repositories,
+  sourceFetch: SourceFetch,
+  options: DailyUpdateImportOptions,
+): Promise<ImportResult> {
+  const command = await fetchSumoApiScheduleImport(sourceFetch, options);
+  return importScheduledBouts(repositories, command, {
+    dryRun: options.dryRun,
+    lookupJsaId: (id) => fetchSumoApiRikishiJsaId(sourceFetch, id),
+  });
+}
+
 export async function attemptPublishedScheduleImport(
   repositories: Repositories,
   sourceFetch: SourceFetch,
@@ -130,15 +144,10 @@ export async function attemptPublishedScheduleImport(
 ): Promise<FollowingDayScheduleImportResult> {
   const day = options.day;
   try {
-    const scheduleCommand = await fetchSumoApiScheduleImport(sourceFetch, {
-      bashoId: options.bashoId,
-      day,
-      division: options.division,
-    });
-    const scheduleImport = await importScheduledBouts(
+    const scheduleImport = await importPublishedSchedule(
       repositories,
-      scheduleCommand,
-      { dryRun: options.dryRun },
+      sourceFetch,
+      options,
     );
 
     return {

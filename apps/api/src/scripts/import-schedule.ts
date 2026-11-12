@@ -3,8 +3,7 @@ import {
   createRepositories,
   runMigrations,
 } from "@fantasy-sumo/db";
-import { fetchSumoApiScheduleImport } from "../imports/adapters.js";
-import { importScheduledBouts } from "../imports/service.js";
+import { importPublishedSchedule } from "../imports/daily-update.js";
 
 const args = new Map(
   process.argv.slice(2).flatMap((arg, index, allArgs) => {
@@ -31,15 +30,15 @@ const client = createDatabaseClient();
 try {
   await runMigrations(client);
 
-  const command = await fetchSumoApiScheduleImport(fetch, {
-    bashoId,
-    day,
-    division,
-  });
-  const result = await importScheduledBouts(
+  const result = await importPublishedSchedule(
     createRepositories(client),
-    command,
-    { dryRun },
+    fetch,
+    {
+      bashoId,
+      day,
+      division,
+      dryRun,
+    },
   );
 
   console.log(JSON.stringify(result, null, 2));

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createDatabaseClient,
   createRepositories,
@@ -15,6 +15,10 @@ import {
   mapSumoApiSchedulePayload,
   mapSumoApiTorikumiPayload,
 } from "./adapters.js";
+import {
+  importCurrentDayScheduleAndResults,
+  importPublishedSchedule,
+} from "./daily-update.js";
 import {
   importBanzuke,
   importBoutResults,
@@ -276,6 +280,171 @@ for (const provider of providers) {
       });
       expect(await repositories.listRikishiSourceIdentities()).toEqual([]);
     });
+
+    it.each([true, false])(
+      "imports a visiting rikishi with an existing JSA alias: %s",
+      async (hasJsaAlias) => {
+        if (hasJsaAlias)
+          await importBanzuke(repositories, banzuke("2026-05", "Visitor"));
+        const previous = (await repositories.listRikishi()).find(
+          (entry) => entry.shikona === "Visitor",
+        );
+        const current = banzuke("2026-07", "Visitor");
+        current.rikishi.shift();
+        current.banzukeEntries.shift();
+        await importBanzuke(repositories, current);
+        const roster = await repositories.listBanzukeEntriesForBasho("2026-07");
+        const aliasesBefore = await repositories.listRikishiSourceIdentities();
+        const fetchFn = visitorSource({ id: 987, nskId: 11 });
+        const options = { bashoId: "2026-07", day: 1 };
+
+        await importPublishedSchedule(repositories, fetchFn, {
+          ...options,
+          dryRun: true,
+        });
+        await importCurrentDayScheduleAndResults(repositories, fetchFn, {
+          ...options,
+          dryRun: true,
+        });
+        expect(await repositories.listRikishiSourceIdentities()).toEqual(
+          aliasesBefore,
+        );
+        expect(
+          await repositories.listScheduledBoutsForBasho("2026-07"),
+        ).toEqual([]);
+        expect(await repositories.listBoutResultsForBasho("2026-07")).toEqual(
+          [],
+        );
+
+        await importCurrentDayScheduleAndResults(
+          repositories,
+          fetchFn,
+          options,
+        );
+        const visitor = (await repositories.listRikishi()).find(
+          (entry) => entry.shikona === "Visitor",
+        )!;
+        if (previous !== undefined) expect(visitor.id).toBe(previous.id);
+        expect(
+          await repositories.listBoutResultsForBasho("2026-07"),
+        ).toMatchObject([{ winnerRikishiId: visitor.id }]);
+        expect(
+          await repositories.listScheduledBoutsForBasho("2026-07"),
+        ).toMatchObject([{ eastRikishiId: visitor.id }]);
+        expect(
+          await repositories.listBanzukeEntriesForBasho("2026-07"),
+        ).toEqual(roster);
+        expect(await repositories.listRikishiSourceIdentities()).toEqual(
+          expect.arrayContaining([
+            { source: "jsa", sourceRikishiId: "11", rikishiId: visitor.id },
+            {
+              source: "sumo-api",
+              sourceRikishiId: "987",
+              rikishiId: visitor.id,
+            },
+          ]),
+        );
+
+        await importCurrentDayScheduleAndResults(
+          repositories,
+          fetchFn,
+          options,
+        );
+        const profileRequests = fetchFn.mock.calls.filter(([url]) =>
+          String(url).includes("/rikishi/"),
+        );
+        expect(profileRequests).toHaveLength(3); // Both dry runs and the first write.
+        await importBanzuke(repositories, banzuke("2026-09", "Visitor"));
+        expect(
+          await repositories.listBanzukeEntriesForBasho("2026-09"),
+        ).toMatchObject([{ rikishiId: visitor.id }, { shikona: "Opponent" }]);
+      },
+    );
+
+    it("uses the profile cross-reference in a standalone schedule import", async () => {
+      await importBanzuke(repositories, banzuke("2026-05", "Visitor"));
+      const current = banzuke("2026-07", "Visitor");
+      current.rikishi.shift();
+      current.banzukeEntries.shift();
+      await importBanzuke(repositories, current);
+      const options = { bashoId: "2026-07", day: 1 };
+      const aliases = await repositories.listRikishiSourceIdentities();
+      await expect(
+        importPublishedSchedule(
+          repositories,
+          visitorSource({ id: 999, nskId: 11 }),
+          options,
+        ),
+      ).rejects.toThrow("profile does not match rikishi 987");
+      expect(await repositories.listRikishiSourceIdentities()).toEqual(aliases);
+      expect(await repositories.listScheduledBoutsForBasho("2026-07")).toEqual(
+        [],
+      );
+      const visitor = aliases.find((alias) => alias.sourceRikishiId === "11")!;
+      await importPublishedSchedule(
+        repositories,
+        visitorSource({ id: 987, nskId: 11 }),
+        options,
+      );
+      expect(
+        await repositories.listScheduledBoutsForBasho("2026-07"),
+      ).toMatchObject([{ eastRikishiId: visitor.rikishiId }]);
+      expect(await repositories.listBoutResultsForBasho("2026-07")).toEqual([]);
+    });
+
+    it.each([
+      { knownVisitor: true, failDuringRead: false },
+      { knownVisitor: false, failDuringRead: false },
+      { knownVisitor: true, failDuringRead: true },
+      { knownVisitor: false, failDuringRead: true },
+    ])(
+      "handles a profile outage (known visitor: $knownVisitor, failed body read: $failDuringRead)",
+      async ({ knownVisitor, failDuringRead }) => {
+        if (knownVisitor)
+          await importBanzuke(repositories, banzuke("2026-05", "Visitor"));
+        const current = banzuke("2026-07", "Visitor");
+        current.rikishi.shift();
+        current.banzukeEntries.shift();
+        await importBanzuke(repositories, current);
+        const options = { bashoId: "2026-07", day: 1 };
+        const aliases = await repositories.listRikishiSourceIdentities();
+        const profile = failDuringRead
+          ? new Response(
+              new ReadableStream({
+                start(controller) {
+                  controller.error(new Error("Connection reset"));
+                },
+              }),
+            )
+          : new Response(null, { status: 503 });
+        const importing = importCurrentDayScheduleAndResults(
+          repositories,
+          visitorSource(profile),
+          options,
+        );
+        if (knownVisitor) {
+          await expect(importing).rejects.toThrow("retry the import");
+          expect(await repositories.listRikishiSourceIdentities()).toEqual(
+            aliases,
+          );
+          expect(
+            await repositories.listBoutResultsForBasho(options.bashoId),
+          ).toEqual([]);
+        } else {
+          await expect(importing).resolves.toMatchObject({
+            summary: { results: { created: 1 } },
+          });
+          expect(
+            await repositories.listRikishiSourceIdentities(),
+          ).toContainEqual(
+            expect.objectContaining({
+              source: "sumo-api",
+              sourceRikishiId: "987",
+            }),
+          );
+        }
+      },
+    );
 
     it("rejects stale same-basho identity evidence before attaching aliases", async () => {
       await importBanzuke(repositories, banzuke("2026-07", "Oldname"));
@@ -591,5 +760,30 @@ function results(name: string) {
   return mapSumoApiTorikumiPayload(torikumi(name), {
     bashoId: "2026-07",
     day: 1,
+  });
+}
+
+function visitorSource(profile: { id: number; nskId: number } | Response) {
+  return vi.fn<typeof fetch>(async (url) => {
+    switch (new URL(String(url)).pathname) {
+      case "/api/basho/202607/torikumi/Makuuchi/1":
+        return Response.json(torikumi("Visitor"));
+      case "/api/basho/202607/banzuke/Makuuchi":
+        return Response.json({
+          bashoId: "202607",
+          division: "Makuuchi",
+          west: [
+            {
+              rikishiID: 654,
+              shikonaEn: "Opponent",
+              record: [{ result: "loss" }],
+            },
+          ],
+        });
+      case "/api/rikishi/987":
+        return profile instanceof Response ? profile : Response.json(profile);
+      default:
+        throw new Error(`Unexpected request ${url}`);
+    }
   });
 }

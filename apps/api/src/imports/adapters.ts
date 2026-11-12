@@ -10,6 +10,7 @@ import type {
 } from "./types.js";
 import { SUMO_API_PRE_BOUT_SOURCE } from "@fantasy-sumo/domain";
 import { toCompactBashoId, toLocalBashoId } from "./ids.js";
+import { RikishiProfileUnavailableError } from "./validation.js";
 
 const JSA_BANZUKE_BASE_URL =
   "https://www.sumo.or.jp/EnHonbashoBanzuke/indexAjax";
@@ -161,6 +162,43 @@ export async function fetchSumoApiResultsImport(
     bashoId: options.bashoId,
     day: options.day,
   });
+}
+
+export async function fetchSumoApiRikishiJsaId(
+  fetchFn: SourceFetch,
+  sumoApiId: string,
+): Promise<string | undefined> {
+  const unavailable = (cause: unknown): never => {
+    throw new RikishiProfileUnavailableError(
+      `Could not fetch the Sumo API profile for rikishi ${sumoApiId}; retry the import.`,
+      { cause },
+    );
+  };
+  const response = await fetchFn(`${SUMO_API_BASE_URL}/rikishi/${sumoApiId}`, {
+    signal: AbortSignal.timeout(5_000),
+  }).catch(unavailable);
+  if (!response.ok) {
+    throw new RikishiProfileUnavailableError(
+      `Sumo API profile for rikishi ${sumoApiId} returned HTTP ${response.status}; retry the import.`,
+    );
+  }
+  const body = await response.text().catch(unavailable);
+  const payload: unknown = JSON.parse(body);
+  if (!isRecord(payload) || payload.id !== Number(sumoApiId)) {
+    throw new Error(`Sumo API profile does not match rikishi ${sumoApiId}.`);
+  }
+  // nskId is an explicit JSA ID on the profile. Zero means no mapping.
+  if (payload.nskId === 0 || payload.nskId === undefined) return undefined;
+  if (
+    typeof payload.nskId !== "number" ||
+    !Number.isSafeInteger(payload.nskId) ||
+    payload.nskId < 1
+  ) {
+    throw new Error(
+      `Sumo API profile has an invalid JSA ID for rikishi ${sumoApiId}.`,
+    );
+  }
+  return String(payload.nskId);
 }
 
 export async function fetchSumoApiDailyImport(
