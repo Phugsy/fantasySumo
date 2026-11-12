@@ -146,6 +146,52 @@ async function complete() {
 }
 
 describe("official scoring and prize imports", () => {
+  it("lists verified honours for unpicked rikishi and distinguishes pending from empty prizes", async () => {
+    const board = async () =>
+      (await app.inject(`/api/basho/${basho.id}/leaderboard`)).json();
+    expect((await board()).rikishiHonours).toBeUndefined();
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/api/basho/${basho.id}/teams`,
+          headers: { cookie },
+          payload: { displayName: "Stable", rikishiIds: ["y"] },
+        })
+      ).statusCode,
+    ).toBe(201);
+    await complete();
+    expect((await board()).rikishiHonours).toMatchObject({
+      verifiedThroughDay: 15,
+      goldStars: Array.from({ length: 8 }, (_, index) => ({
+        day: index + 1,
+        recipient: { rikishiId: "m", shikona: "M", picked: false },
+        defeatedYokozuna: "Y",
+      })),
+      specialPrizes: null,
+    });
+
+    await importSpecialPrizes(repositories, sourceFetch, basho.id);
+    expect((await board()).rikishiHonours.specialPrizes).toEqual([
+      {
+        type: "technique",
+        recipient: { rikishiId: "m", shikona: "M", picked: false },
+      },
+      {
+        type: "fighting-spirit",
+        recipient: { rikishiId: "m", shikona: "M", picked: false },
+      },
+    ]);
+
+    payload = {
+      date: "202607",
+      yusho: [{ type: "Makuuchi" }],
+      specialPrizes: [],
+    };
+    await importSpecialPrizes(repositories, sourceFetch, basho.id);
+    expect((await board()).rikishiHonours.specialPrizes).toEqual([]);
+  });
+
   it("saves achievement focus and uses it across official scoring views without changing defaults", async () => {
     expect((await selectMode("achievements-v2")).statusCode).toBe(200);
     await app.inject({

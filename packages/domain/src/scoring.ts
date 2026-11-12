@@ -1,4 +1,5 @@
 import { scoringPreset } from "./scoring-presets.js";
+import { isKinboshiWin } from "./kinboshi.js";
 import type {
   BoutResult,
   FantasyPick,
@@ -243,25 +244,16 @@ function calculateBreakdown(
   const ranks = new Map(
     (options.banzukeEntries ?? []).map((entry) => [
       entry.rikishiId,
-      entry.rank.trim().toLowerCase(),
+      entry.rank,
     ]),
   );
-  if (/^maegashira(?:\s|$)/.test(ranks.get(rikishiId) ?? "")) {
-    breakdown.kinboshi =
-      preset.kinboshi *
-      new Set(
-        wins
-          .filter(
-            (result) =>
-              /^yokozuna(?:\s|$)/.test(
-                ranks.get(result.loserRikishiId) ?? "",
-              ) &&
-              result.loserAbsent !== true &&
-              result.kimarite?.trim().toLowerCase() !== "fusen",
-          )
-          .map((result) => result.day),
-      ).size;
-  }
+  breakdown.kinboshi =
+    preset.kinboshi *
+    new Set(
+      wins
+        .filter((result) => isKinboshiWin(result, ranks))
+        .map((result) => result.day),
+    ).size;
   if ((options.throughDay ?? 15) >= 15) {
     const awards = new Set(
       (options.specialPrizes ?? [])
@@ -295,11 +287,7 @@ function calculateBreakdown(
       );
       if (!win) continue;
       breakdown.joker += 1;
-      if (
-        /^maegashira(?:\s|$)/.test(ranks.get(rikishiId) ?? "") &&
-        /^yokozuna(?:\s|$)/.test(ranks.get(win.loserRikishiId) ?? "")
-      )
-        breakdown.jokerKinboshi += preset.kinboshi;
+      if (isKinboshiWin(win, ranks)) breakdown.jokerKinboshi += preset.kinboshi;
     }
   }
   return breakdown;

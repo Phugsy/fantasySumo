@@ -102,6 +102,34 @@ test("announces a verified completed fantasy basho once and retains final standi
         totalDays: 15,
         leaderboard: standings,
         finish,
+        rikishiHonours: {
+          verifiedThroughDay: 15,
+          goldStars: [
+            {
+              day: 4,
+              recipient: { rikishiId: "ura", shikona: "Ura", picked: true },
+              defeatedYokozuna: "Onosato",
+            },
+          ],
+          specialPrizes: [
+            {
+              type: "fighting-spirit",
+              recipient: {
+                rikishiId: "fujinokawa",
+                shikona: "Fujinokawa",
+                picked: false,
+              },
+            },
+            {
+              type: "fighting-spirit",
+              recipient: {
+                rikishiId: "churanoumi",
+                shikona: "Churanoumi",
+                picked: false,
+              },
+            },
+          ],
+        },
       };
     else if (path.endsWith("/rikishi"))
       body = {
@@ -167,4 +195,16 @@ test("announces a verified completed fantasy basho once and retains final standi
     page.getByRole("heading", { name: "September: final standings" }),
   ).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  const archive = page.getByRole("region", {
+    name: "Archived tournament standings",
+  });
+  await archive.getByText("Rikishi honours", { exact: true }).click();
+  await expect(archive.getByText("Day 4 · defeated Onosato")).toBeVisible();
+  await expect(
+    archive.getByText("Fujinokawa · unpicked by fantasy teams"),
+  ).toBeVisible();
+  await expect(
+    archive.getByText("Churanoumi · unpicked by fantasy teams"),
+  ).toBeVisible();
+  await expect(archive.getByText("No award", { exact: true })).toHaveCount(2);
 });

@@ -1,6 +1,7 @@
 export type {
   BanzukeEntry,
   Basho,
+  BashoRikishiHonours,
   BashoStatus,
   BoutResult,
   FantasyPick,
@@ -43,6 +44,7 @@ export {
   findPreviousCompletedBasho,
 } from "./previous-basho-record.js";
 export { deriveRikishiTournamentNotes } from "./tournament-notes.js";
+export { isKinboshiWin } from "./kinboshi.js";
 export {
   isCompleteScheduledBoutPublicationSource,
   isPreBoutScheduleSource,

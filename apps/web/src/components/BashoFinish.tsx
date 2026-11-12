@@ -8,6 +8,7 @@ import {
 } from "../api";
 import type { LeaderboardResponse } from "../types";
 import * as styles from "./BashoFinish.css";
+import { RikishiHonours } from "./RikishiHonours";
 
 const finishPath = (id: string) => `/history?basho=${encodeURIComponent(id)}`;
 
@@ -248,6 +249,12 @@ function CompletedBashoStandingsData({ bashoId }: { bashoId: string }) {
           Fantasy honours are unavailable until final results and scoring inputs
           are verified, with at least two entrants.
         </p>
+      )}
+      {data.rikishiHonours && (
+        <RikishiHonours
+          honours={data.rikishiHonours}
+          mode={data.scoringMode ?? "wins-v0"}
+        />
       )}
       <table className={styles.table}>
         <thead>

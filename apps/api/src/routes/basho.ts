@@ -1,4 +1,5 @@
 import { getBashoScoringContext, getBashoScoringOptions } from "../scoring.js";
+import { loadBashoRikishiHonours } from "../basho-honours.js";
 import { getRikishiIllustration } from "../rikishi-illustrations.js";
 import { getRikishiPhoto } from "../rikishi-photos.js";
 import type { FastifyInstance } from "fastify";
@@ -929,12 +930,33 @@ export function registerBashoRoutes(
       context.now,
     );
     const scoringOptions = scoring.options;
-    const leaderboard = calculateLeaderboard(
-      await context.repositories.listFantasyTeamsForBasho(basho.id),
-      await context.repositories.listFantasyPicksForBasho(basho.id),
-      boutResults,
-      { ...scoringOptions, throughDay: verifiedThroughDay },
-    );
+    const [teams, picks] = await Promise.all([
+      context.repositories.listFantasyTeamsForBasho(basho.id),
+      context.repositories.listFantasyPicksForBasho(basho.id),
+    ]);
+    const leaderboard = calculateLeaderboard(teams, picks, boutResults, {
+      ...scoringOptions,
+      throughDay: verifiedThroughDay,
+    });
+    const totalDays = getBashoTotalDays(basho);
+    const prizesConfirmed =
+      basho.status === "complete" &&
+      totalDays !== undefined &&
+      verifiedThroughDay >= totalDays &&
+      scoring.specialPrizesStatus === "confirmed";
+    const rikishiHonours =
+      basho.status === "upcoming"
+        ? undefined
+        : await loadBashoRikishiHonours({
+            repositories: context.repositories,
+            banzuke: scoringOptions.banzukeEntries ?? [],
+            results: boutResults,
+            picks,
+            verifiedThroughDay,
+            specialPrizes: prizesConfirmed
+              ? (scoringOptions.specialPrizes ?? [])
+              : null,
+          });
 
     return {
       basho: { ...basho, pickCompositionMode: getPickCompositionMode(basho) },
@@ -942,13 +964,14 @@ export function registerBashoRoutes(
       jokerTrial: scoringOptions.jokerSelections !== undefined,
       scoringMode: scoringOptions.scoringMode,
       specialPrizesStatus: scoring.specialPrizesStatus,
+      rikishiHonours,
       finish: fantasyFinish(
         basho,
         leaderboard,
         verifiedThroughDay,
         scoring.finalInputsReady,
       ),
-      totalDays: getBashoTotalDays(basho),
+      totalDays,
       leaderboard:
         basho.status === "upcoming"
           ? leaderboard.map((entry) => ({

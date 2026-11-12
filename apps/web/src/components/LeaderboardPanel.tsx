@@ -25,6 +25,7 @@ import { TournamentProgressChart } from "./TournamentProgressChart";
 import "./LeaderboardPanel.css";
 import * as resultStyles from "./LeaderboardResultTile.css";
 import { BashoFinishSummary } from "./BashoFinish";
+import { RikishiHonours } from "./RikishiHonours";
 
 interface LeaderboardPanelProps {
   basho: Basho;
@@ -93,6 +94,9 @@ export function LeaderboardPanel({
         <strong>{formatBashoHeadline(basho, totalDays)}</strong>
         <span>{getLeaderboardStatusCopy(basho)}</span>
       </div>
+      {basho.rikishiHonours && (
+        <RikishiHonours honours={basho.rikishiHonours} mode={displayMode} />
+      )}
 
       {basho.jokerTrial && (
         <p>

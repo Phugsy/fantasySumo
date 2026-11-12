@@ -148,6 +148,25 @@ export interface SpecialPrizeAward {
   rikishiId: Rikishi["id"];
   type: SpecialPrizeType;
 }
+
+export interface BashoRikishiHonours {
+  verifiedThroughDay: number;
+  goldStars: Array<{
+    day: number;
+    recipient: RikishiHonourRecipient;
+    defeatedYokozuna: string;
+  }>;
+  specialPrizes: Array<{
+    type: SpecialPrizeType;
+    recipient: RikishiHonourRecipient;
+  }> | null;
+}
+
+interface RikishiHonourRecipient {
+  rikishiId: Rikishi["id"];
+  shikona: string;
+  picked: boolean;
+}
 /** Category points under the preset; wins-only exposes legacy achievement potential for comparison. */
 export interface ScoreBreakdown {
   wins: number;
