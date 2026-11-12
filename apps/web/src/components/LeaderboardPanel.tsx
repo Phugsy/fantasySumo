@@ -23,6 +23,7 @@ import { DailyScoreBadge } from "./DailyScoreBadge";
 import { RikishiTournamentBadges } from "./RikishiTournamentBadges";
 import { TournamentProgressChart } from "./TournamentProgressChart";
 import "./LeaderboardPanel.css";
+import * as resultStyles from "./LeaderboardResultTile.css";
 import { BashoFinishSummary } from "./BashoFinish";
 
 interface LeaderboardPanelProps {
@@ -318,6 +319,8 @@ type RikishiResult = {
   day: number;
   outcome: LeaderboardEntry["scoreHistory"][number]["rikishiScores"][number]["outcome"];
   score: number;
+  goldStar: boolean;
+  jokerBoost: boolean;
 };
 
 function RikishiScoreRow({
@@ -388,10 +391,10 @@ function RikishiScoreRow({
               {results.map((result) => (
                 <li
                   key={result.day}
-                  aria-label={`Day ${result.day}: ${formatOutcome(result.outcome)}, ${formatPoints(result.score)}`}
+                  aria-label={`Day ${result.day}: ${describeResult(result)}, ${formatPoints(result.score)}`}
                 >
                   <small>Day {result.day}</small>
-                  <ResultTile outcome={result.outcome} />
+                  <ResultTile result={result} />
                   <strong>{formatSignedScore(result.score)}</strong>
                 </li>
               ))}
@@ -420,24 +423,35 @@ function RecentRikishiResults({
     <span
       className="recent-rikishi-results"
       aria-label={`Recent results for ${shikona}: ${recentResults
-        .map((result) => `day ${result.day} ${formatOutcome(result.outcome)}`)
+        .map((result) => `day ${result.day} ${describeResult(result)}`)
         .join(", ")}`}
     >
       {recentResults.map((result) => (
-        <ResultTile key={result.day} outcome={result.outcome} />
+        <ResultTile key={result.day} result={result} />
       ))}
     </span>
   );
 }
 
-function ResultTile({ outcome }: { outcome: RikishiResult["outcome"] }) {
+function describeResult({ outcome, goldStar, jokerBoost }: RikishiResult) {
+  return [
+    formatOutcome(outcome),
+    ...(jokerBoost ? ["joker boost"] : []),
+    ...(goldStar ? ["gold star"] : []),
+  ].join(" · ");
+}
+
+function ResultTile({ result }: { result: RikishiResult }) {
+  const { outcome, goldStar, jokerBoost } = result;
+  const outcomeClass = jokerBoost ? resultStyles.jokerWin : `result-${outcome}`;
+  const markerClass = goldStar ? resultStyles.goldStar : "";
   return (
     <span
-      className={`result-tile result-${outcome}`}
+      className={`result-tile ${outcomeClass} ${markerClass}`}
       aria-hidden="true"
-      title={formatOutcome(outcome)}
+      title={describeResult(result)}
     >
-      {formatOutcomeInitial(outcome)}
+      {jokerBoost ? "J" : formatOutcomeInitial(outcome)}
     </span>
   );
 }
@@ -453,7 +467,15 @@ function getRikishiResults(
 
     return result === undefined
       ? []
-      : [{ day: day.day, outcome: result.outcome, score: result.score }];
+      : [
+          {
+            day: day.day,
+            outcome: result.outcome,
+            score: result.score,
+            goldStar: (result.breakdown?.kinboshi ?? 0) > 0,
+            jokerBoost: (result.breakdown?.joker ?? 0) > 0,
+          },
+        ];
   });
 }
 
