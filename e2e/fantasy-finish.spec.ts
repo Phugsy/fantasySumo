@@ -159,6 +159,19 @@ test("announces a verified completed fantasy basho once and retains final standi
   ).toBeVisible();
   await expect(page.getByText("Yusho: 1", { exact: true })).toBeVisible();
   await expect(page.getByText("Jun-yusho: 0", { exact: true })).toBeVisible();
+  const achievements = page.getByRole("region", { name: "My achievements" });
+  const cup = achievements
+    .getByRole("listitem")
+    .filter({ hasText: "Emperor’s Cup" });
+  await expect(cup.getByRole("link", { name: "September" })).toHaveAttribute(
+    "href",
+    "/history?basho=2026-09",
+  );
+  await expect(
+    achievements
+      .getByRole("listitem")
+      .filter({ hasText: "Rice for the Stable" }),
+  ).toContainText("1 / 2 wins");
   await expect(
     page.getByRole("columnheader", { name: "Official points", exact: true }),
   ).toBeVisible();

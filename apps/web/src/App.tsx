@@ -971,6 +971,7 @@ function RoutedApp() {
             path={appPaths.history}
             element={
               <HistoryPanel
+                key={sessionUser === null ? "guest" : `user:${sessionUser.id}`}
                 signedIn={sessionUser !== null}
                 selectedBashoId={
                   new URLSearchParams(location.search).get("basho") ?? undefined
