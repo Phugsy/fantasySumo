@@ -444,16 +444,14 @@ function describeResult({ outcome, goldStar, jokerBoost }: RikishiResult) {
 function ResultTile({ result }: { result: RikishiResult }) {
   const { outcome, goldStar, jokerBoost } = result;
   const outcomeClass = jokerBoost ? resultStyles.jokerWin : `result-${outcome}`;
-  const markerClass = goldStar || jokerBoost ? resultStyles.withCornerMark : "";
+  const markerClass = goldStar ? resultStyles.goldStar : "";
   return (
     <span
       className={`result-tile ${outcomeClass} ${markerClass}`}
       aria-hidden="true"
       title={describeResult(result)}
     >
-      {formatOutcomeInitial(outcome)}
-      {jokerBoost && <span className={resultStyles.jokerMark}>J</span>}
-      {goldStar && <span className={resultStyles.goldStar}>★</span>}
+      {jokerBoost ? "J" : formatOutcomeInitial(outcome)}
     </span>
   );
 }

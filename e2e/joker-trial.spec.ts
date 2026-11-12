@@ -205,8 +205,7 @@ test("plays the demo joker journey through edits, deadline, refund, budget and g
   const boostedWin = "Win · joker boost · gold star";
   const tile = ura.getByTitle(boostedWin, { exact: true });
   await expect(tile).toBeVisible();
-  await expect(tile).toContainText("J");
-  await expect(tile).toContainText("★");
+  await expect(tile).toHaveText("J");
   await ura.click();
   const history = page.getByRole("region", { name: "Ura result history" });
   await expect(
